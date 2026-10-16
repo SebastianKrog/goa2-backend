@@ -19,6 +19,41 @@ but exclude abandoned attempts and correction operations from player browsing.
   each atomic engine step.
 - Browsing is read-only and does not pause the match or its clocks.
 
+## 0. Reuse existing replay infrastructure first
+
+Implement common primitives before adding live-history adapters. Do not create
+a parallel replay engine, patch codec, compression stack, or client patch player.
+
+| Existing implementation | Reuse or extraction |
+| --- | --- |
+| `server/shares.py` | Extract pure keyframe/patch group construction, reconstruction, compressed-size budgeting, and Brotli/gzip encoding into a shared codec used by both shares and live history. |
+| `server/replay.py` | Reuse replay loading, decision classification/application, seeded setup, winner calculation, and rewind-prefix helpers. Add capture observation to the existing driving path for backfill. |
+| `server/share_bake.py` | Reuse the forward-only render pattern. Shared replays already collapse table rewinds with `effective_decisions()`; preserve that behavior. |
+| `server/workers.py` and `server/share_mint.py` | Reuse `run_heavy()` and the existing request-independent producer/single-flight pattern for backfill, with a separate history task registry. |
+| `domain/views.py` and `server/event_history.py` | Reuse `build_view()`, board projection reuse, and the capture-for-every-seat convention, including disconnected seats. |
+| Frontend `api/replay.ts` and `utils/jsonPatch.ts` | Extract cached group reconstruction from `sharedReplaySource()` and reuse `applyPatches()`. |
+| Frontend replay components | Reuse transport controls, read-only board rendering, and applicable roster/presentation components. |
+
+- [ ] Refactor the group codec out of `shares.py` without changing existing
+      share files, URLs, visibility, or response contracts. Keep share-token,
+      publication, and retention logic in the share subsystem.
+- [ ] Give the shared codec an incremental builder API as well as the existing
+      sequential batch-render adapter. Keep the codec independent of engine,
+      authentication, player-index, and persistence concerns.
+- [ ] Expose a shared replay iteration/capture seam around existing decision
+      application instead of copying `_apply_decision()` or implementing another
+      reconstruction loop. Preserve raw-prefix information and rewind callbacks.
+- [ ] Reuse `effective_indices()` / `effective_decisions()` for table rewind
+      semantics where appropriate. They do not collapse action rollback or
+      planning takebacks; implement those as additional player-index policy.
+- [ ] Run existing replay/share tests before and after extraction, then extend
+      those fixtures to cover live adapters and codec round trips.
+
+New feature-specific code should be limited to live capture, active-index and
+rollback policy, save-consistent incremental storage, authenticated history
+delivery, and client live-buffer invalidation/navigation. Do not route player
+requests through omniscient admin endpoints or public share-token endpoints.
+
 ## 1. History model and corrections
 
 Maintain two separate histories:
@@ -87,11 +122,17 @@ and a timeout batch can contain multiple decisions before one broadcast.
 - [ ] Associate captures with raw decision counts, excluding clock telemetry,
       so existing replay and rewind indices retain their meaning.
 - [ ] Build projections for every seated hero and one spectator, including
-      disconnected seats. Reuse the prebuilt public board during projection.
+      disconnected seats. Follow the viewer enumeration and frozen projection
+      convention in `event_history.py`, while using `build_view()` for views
+      rather than attempting to rebuild them from event projections. Reuse the
+      prebuilt public board during projection.
 - [ ] Apply visibility before calculating patches. Never call the omniscient
       replay `state_body()` to serve player history.
 - [ ] Retain historical `view` and `winner`. Omit actionable input requests,
       tokens, connection metadata, and client timing fields.
+- [ ] Reuse `winner_of()` for historical winner calculation. Keep canonical
+      player projection separate from the existing omniscient `state_body()`;
+      share neutral envelope construction only if it removes actual duplication.
 - [ ] Set historical `view.clock` to `null`; retain `time_control`. Historical
       clock playback is outside v1 and must not display a ticking live clock.
 - [ ] Deep-copy/freeze canonical values so later live mutations cannot modify
@@ -101,18 +142,33 @@ and a timeout batch can contain multiple decisions before one broadcast.
 
 ## 3. Storage, durability, and recovery
 
-Use the existing `jsonpatch` dependency and immutable compressed sidecar records
-beneath the game persistence directory. Keep the committed history manifest in
-the existing atomically replaced game save. Do not rewrite historical view
-payloads on every move.
+Use the shared codec extracted from `shares.py`, backed by the existing
+`jsonpatch` and Brotli dependencies. Live storage is a new incremental adapter
+beneath the game persistence directory; completed shares remain immutable batch
+artifacts. Keep the committed history manifest in the existing atomically
+replaced game save. Do not rewrite closed groups on every move.
 
-- [ ] Store an initial full keyframe and another every 30 captured records.
-- [ ] Between keyframes, store forward RFC 6902 patches against the immediately
-      preceding audit record, with an explicit base record ID.
-- [ ] Compress each immutable record with gzip. Store all viewer projections
-      together so compression can reduce repeated public content.
-- [ ] Reconstruct a selected viewer from its nearest keyframe with at most 29
-      patches. Keep only the latest projections and a bounded read cache in RAM.
+- [ ] Use the existing `{start, keyframe, patches}` group representation. Retain
+      stable record/base IDs in accompanying metadata so codec offsets are not
+      mistaken for raw decision indices or sparse public position IDs.
+- [ ] Start with a keyframe and use the existing compressed-size budget and
+      maximum group length to choose later boundaries. Preserve the share
+      defaults: budget multiple 2, size check every 8 patches, and hard maximum
+      512 patches. The client's 30-view buffer is independent of keyframe spacing.
+- [ ] Reuse forward RFC 6902 patch creation and group reconstruction. Store
+      canonical viewer projections together inside the server-private payload
+      so group compression can exploit common content.
+- [ ] Store groups with the existing Brotli codec and reuse gzip fallback when
+      serving encoded groups. Keep compression settings configurable by caller:
+      use quality 1 for live tail writes and the existing share quality 9 for
+      batch baking. Do not add an unrelated per-record gzip storage format.
+- [ ] Keep closed groups immutable. Publish each changed active tail as a new
+      immutable file version, referenced by the next atomic game save. Delete
+      obsolete tail versions only after the replacing manifest commits. This
+      bounds rewrites to the open group and preserves old-save recoverability.
+- [ ] Reconstruct from the nearest group keyframe with the shared codec and
+      its bounded patch chain. Keep only the latest projections, open builder,
+      and a bounded reconstructed-view read cache in RAM.
 - [ ] Do not persist reverse patches in v1: clients cache complete views, and
       server reads reconstruct forward from bounded keyframe chains.
 - [ ] Extend saves with the committed record index, active player index,
@@ -155,6 +211,10 @@ viewer identity or `reveal_all` flag from the client.
 - [ ] Build client-facing patch groups exclusively from active positions.
       Internal audit reconstruction may cross abandoned records, but never send
       those records or intermediate patches to the player.
+- [ ] Use the shared codec to build these scoped groups, reusing the replay
+      keyframe/patch envelope and HTTP content-encoding support. Keep active
+      position metadata as a history-specific addition; do not expose raw share
+      decision metadata, card selections, or other viewers' projections.
 - [ ] Snapshot read metadata under `game.lock`, read and reconstruct outside the
       lock, then verify the requested positions and epoch remain valid before
       returning. Grouped reads must also validate their expected revision.
@@ -177,6 +237,15 @@ drive animations and logging, rather than reconstructing the game.
 
 - [ ] Add history API types and a `useGameHistory` hook. Cache at most 30 complete
       historical views by immutable position ID.
+- [ ] Extract the keyframe clone, `applyPatches()`, group lookup, and cached
+      reconstruction logic from `sharedReplaySource()` into common helpers used
+      by both shared replay and live history. Preserve existing share behavior
+      and patch aliasing protections; do not write another patch interpreter.
+- [ ] Keep `useGameHistory` dedicated to mutable live history. `useReplay()`
+      currently assumes fixed metadata and numeric decision indices, so reuse
+      compatible navigation/loading primitives without forcing live history
+      into that unchanged contract. Do not expose raw replay decisions through
+      the new player-history source.
 - [ ] Buffer eligible live views with history IDs, normalizing them using the
       same historical rules, including a null clock. Never mutate the live view.
 - [ ] If a position's predecessor is missing, fetch that group when browsing
@@ -190,7 +259,10 @@ drive animations and logging, rather than reconstructing the game.
 - [ ] Keep the newest live state separate from the displayed historical state.
       Continue receiving live updates while browsing.
 - [ ] Add a History entry point, previous/next controls, position details, and
-      Return to live. Reuse existing replay controls where appropriate.
+      Return to live. Adapt `ReplayControls` transport presentation so the same
+      controls can navigate either immutable replay indices or active history
+      positions; keep raw-decision inputs confined to replay mode. Reuse the
+      existing read-only board and applicable roster components.
 - [ ] Disable gameplay submissions, selections, pings, and live interaction
       controls while browsing. Keep connection and live-turn notifications.
 - [ ] If the displayed position is superseded, return to live with a brief
@@ -204,8 +276,15 @@ drive animations and logging, rather than reconstructing the game.
 - [ ] When restoring an older save, capture its current state immediately as a
       baseline, then capture new decisions normally.
 - [ ] Backfill earlier states from a consistent replay prefix in a worker process.
-      Reuse the same capture and correction/index rules; never run expensive
-      reconstruction under the live game lock.
+      Reuse `load_replay()`, seeded setup, existing decision application and
+      replay iteration/capture hooks, and `run_heavy()`. Reuse the forward render
+      pattern from `share_bake.py`; never run expensive reconstruction under the
+      live game lock or build an independent reconstruction engine.
+- [ ] Use a single in-flight producer per game, retained independently of HTTP
+      requests and shielded from disconnect cancellation, following the existing
+      share-mint orchestration. Reuse live capture and correction/index policy
+      while observing the raw replay chronology; filtering to effective decisions
+      alone would lose metadata needed for arbitrary rewind-prefix targets.
 - [ ] Tag baseline/new captures with their raw decision counts. Merge the
       backfilled prefix with live capture metadata atomically; retry the merge
       if a correction changed the epoch while reconstruction was running.
@@ -221,6 +300,13 @@ drive animations and logging, rather than reconstructing the game.
 
 ## 7. Validation and acceptance
 
+- [ ] Preserve existing baked-share formats and API behavior through codec
+      extraction. Extend existing share/replay fixtures and the frontend
+      `sharedReplaySource` / JSON Patch tests rather than duplicating those
+      test harnesses.
+- [ ] Test shared codec batch and incremental builders on the same positions,
+      including size-triggered boundaries, the hard patch-chain limit, Brotli
+      responses, gzip fallback, and reopen/recovery of the live tail.
 - [ ] Disconnect and reconnect a player, including a server restart; fetch earlier
       states without relying on any browser-retained history.
 - [ ] Verify every keyframe/patch chain equals the canonical captured view for

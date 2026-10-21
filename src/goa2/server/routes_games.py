@@ -37,6 +37,8 @@ from goa2.server.models import (
     ShareLinkResponse,
     SpectatorLinkResponse,
     SubmitInputRequest,
+    UpgradePreviewRequest,
+    UpgradePreviewResponse,
 )
 from goa2.server.player_names import resolve_player_names
 from goa2.server.rate_limit import check_creation_budget, spend_creation_budget
@@ -440,6 +442,46 @@ async def planning_done(
         game.last_result = result
         log_session_result(game, result)
         return _result_to_response(result, session.state, player.hero_id)
+
+
+@router.post("/{game_id}/upgrades/preview", response_model=UpgradePreviewResponse)
+async def preview_upgrades(
+    game_id: str,
+    body: UpgradePreviewRequest,
+    player: PlayerDep,
+    registry: RegistryDep,
+) -> UpgradePreviewResponse:
+    """Inspect a hypothetical prefix without consuming input, clocks or history."""
+    from goa2.engine.steps.cards import ResolveUpgradesStep
+
+    if player.is_spectator:
+        raise HTTPException(status_code=403, detail="Spectators cannot preview upgrades")
+    game = registry.get(game_id)
+    async with game.lock:
+        request = game.last_result.input_request if game.last_result else None
+        state = game.session.state
+        if (
+            request is None
+            or request.request_type.value != "UPGRADE_PHASE"
+            or request.id != body.request_id
+            or not state.execution_stack
+            or not isinstance(state.execution_stack[-1], ResolveUpgradesStep)
+        ):
+            raise HTTPException(status_code=409, detail="Refresh the current upgrade offer")
+        step = state.execution_stack[-1]
+        hero_id = str(player.hero_id)
+        preview = step.preview_choices(state, hero_id, body.card_ids)
+        return UpgradePreviewResponse(
+            request_id=request.id,
+            card_ids=body.card_ids,
+            remaining=preview.pending_upgrades.get(hero_id, 0),
+            options=(
+                step._get_upgrade_options(preview, hero_id)
+                if hero_id in preview.pending_upgrades
+                else []
+            ),
+            view=build_view(preview, for_hero_id=player.hero_id),
+        )
 
 
 @router.post("/{game_id}/input", response_model=ActionResultResponse)

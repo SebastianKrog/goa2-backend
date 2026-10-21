@@ -8,7 +8,12 @@ from typing import TYPE_CHECKING, Any, cast
 from pydantic import Field, model_validator
 
 from goa2.domain.events import GameEvent, GameEventType
-from goa2.domain.input import InputRequestType, create_input_request
+from goa2.domain.input import (
+    DecisionChoiceFacts,
+    DecisionContext,
+    InputRequestType,
+    create_input_request,
+)
 from goa2.domain.models import (
     ActionType,
     Card,
@@ -36,6 +41,27 @@ if TYPE_CHECKING:
     from goa2.engine.steps.selection import MultiSelectStep
 
 logger = logging.getLogger(__name__)
+
+
+def _action_decision_context(
+    actor_id: str, card: Card, options: list[dict[str, Any]]
+) -> DecisionContext:
+    primary = card.current_primary_action
+    if primary == ActionType.DEFENSE_SKILL:
+        primary = ActionType.SKILL
+    facts: dict[str, DecisionChoiceFacts] = {}
+    for option in options:
+        # The engine selects the first matching ID; retain that identity if a
+        # primary and secondary happen to offer the same action.
+        facts.setdefault(
+            option["id"],
+            DecisionChoiceFacts(
+                action_role="primary" if option.get("type") == primary else "secondary"
+            ),
+        )
+    return DecisionContext(
+        purpose="action", actor_id=actor_id, source_card_id=card.id, choice_facts=facts
+    )
 
 
 def _fast_travel_has_safe_zone(state: GameState, hero_id: str) -> bool:
@@ -468,6 +494,7 @@ class ForceDiscardStep(GameStep):
             select = SelectStep(
                 target_type=TargetType.CARD,
                 prompt=f"{resolved_victim}, select a card to discard.",
+                decision_purpose="discard",
                 output_key="card_to_discard",
                 card_containers=[CardContainerType.HAND, CardContainerType.PLAYED],
                 restrict_played_to_shields=True,
@@ -480,6 +507,7 @@ class ForceDiscardStep(GameStep):
             select = SelectStep(
                 target_type=TargetType.CARD,
                 prompt=f"{resolved_victim}, select a card to discard.",
+                decision_purpose="discard",
                 output_key="card_to_discard",
                 card_container=CardContainerType.HAND,
                 card_is_basic=self.card_is_basic,
@@ -542,6 +570,7 @@ class ForceDiscardByColorStep(GameStep):
                 SelectStep(
                     target_type=TargetType.CARD,
                     prompt=f"{victim_id}, select a {color.value} card to discard.",
+                    decision_purpose="discard",
                     output_key=self.output_key,
                     card_container=CardContainerType.HAND,
                     context_hero_id_key=self.victim_key,
@@ -629,6 +658,7 @@ class ForceDiscardOrDefeatStep(GameStep):
                 SelectStep(
                     target_type=TargetType.CARD,
                     prompt=f"{victim_id}, select a card to discard (or be Defeated).",
+                    decision_purpose="discard",
                     output_key="card_to_discard",
                     card_container=CardContainerType.HAND,
                     context_hero_id_key=self.victim_key,  # Look at victim's hand
@@ -1021,6 +1051,7 @@ class ResolveCardStep(GameStep):
                 player_id=self.hero_id,
                 prompt=f"Choose action for card {card.name}",
                 options=options,
+                decision_context=_action_decision_context(str(self.hero_id), card, options),
             ),
         )
 
@@ -1973,6 +2004,15 @@ class PerformPrimaryActionStep(GameStep):
                         request_type=InputRequestType.CHOOSE_ACTION,
                         player_id=str(actor_id),
                         prompt=f"Choose an action to perform on {card.name}",
+                        decision_context=DecisionContext(
+                            purpose="action",
+                            actor_id=str(actor_id),
+                            source_card_id=card.id,
+                            choice_facts={
+                                action_type.name: DecisionChoiceFacts(action_role="primary"),
+                                replacement.name: DecisionChoiceFacts(action_role="replacement"),
+                            },
+                        ),
                         options=[
                             {
                                 "id": action_type.name,
@@ -2218,6 +2258,7 @@ class PerformCardActionStep(GameStep):
                     player_id=performer_id,
                     prompt=f"Choose an action to perform on {card.name}",
                     options=options,
+                    decision_context=_action_decision_context(performer_id, card, options),
                 ),
             )
 
@@ -2506,15 +2547,10 @@ class ResolveUpgradesStep(GameStep):
         # Process input if provided
         if self.pending_input:
             selection = self.pending_input.get("selection")
-            if isinstance(selection, dict):
-                hero_id = selection.get("hero_id")
-                card_id = selection.get("card_id")
-                # UPGRADE_PHASE is a 'simultaneous' request and hero_id/card_id
-                # come straight from the client. Only apply an upgrade the hero
-                # actually earned (has a pending slot) and was actually offered
-                # (a legal option) — otherwise a client could grant a free extra
-                # upgrade or skip tiers to a higher-tier deck card.
-                if hero_id and card_id and self._is_legal_upgrade(state, hero_id, card_id):
+            choices = self._validated_choices(state, selection)
+            if choices is not None:
+                hero_id, card_ids = choices
+                for card_id in card_ids:
                     apply_hero_upgrade(state, hero_id, card_id)
             self.pending_input = None
 
@@ -2526,7 +2562,11 @@ class ResolveUpgradesStep(GameStep):
         broadcast_data = {}
         for h_id, count in state.pending_upgrades.items():
             options = self._get_upgrade_options(state, h_id)
-            broadcast_data[str(h_id)] = {"remaining": count, "options": options}
+            broadcast_data[str(h_id)] = {
+                "remaining": count,
+                "options": options,
+                "selection_counts": sorted({1, count}),
+            }
 
         return StepResult(
             requires_input=True,
@@ -2535,8 +2575,51 @@ class ResolveUpgradesStep(GameStep):
                 player_id="simultaneous",
                 prompt="Mandatory Upgrade Phase",
                 players=broadcast_data,
+                supports_batch=True,
+                supports_preview=True,
             ),
         )
+
+    def validate_input(self, state: GameState, selection: Any) -> None:
+        if self._validated_choices(state, selection) is None:
+            raise ValueError("Choose one legal upgrade or all remaining upgrades for your hero")
+
+    def preview_choices(self, state: GameState, hero_id: str, card_ids: list[str]) -> GameState:
+        """Read-only prefix preview using exactly the live upgrade rules."""
+        remaining = state.pending_upgrades.get(hero_id, 0)
+        if remaining <= 0 or len(card_ids) > remaining:
+            raise ValueError("No matching pending upgrades")
+        preview = state.model_copy(deep=True)
+        for card_id in card_ids:
+            self.validate_input(preview, {"hero_id": hero_id, "card_id": card_id})
+            apply_hero_upgrade(preview, hero_id, card_id)
+        return preview
+
+    def _validated_choices(self, state: GameState, selection: Any) -> tuple[str, list[str]] | None:
+        if not isinstance(selection, dict):
+            return None
+        hero_id = selection.get("hero_id")
+        card_ids = selection.get("card_ids", [selection.get("card_id")])
+        if not isinstance(hero_id, str) or not isinstance(card_ids, list):
+            return None
+        remaining = state.pending_upgrades.get(hero_id, 0)
+        if (
+            remaining <= 0
+            or len(card_ids) not in {1, remaining}
+            or not all(isinstance(card_id, str) for card_id in card_ids)
+            or len(set(card_ids)) != len(card_ids)
+            or ("card_ids" in selection and "card_id" in selection)
+        ):
+            return None
+        # Recheck tier eligibility after each choice, without spending any live
+        # upgrades unless the entire ordered batch is legal.
+        preview = state.model_copy(deep=True) if len(card_ids) > 1 else state
+        for card_id in card_ids:
+            if not self._is_legal_upgrade(preview, hero_id, card_id):
+                return None
+            if preview is not state:
+                apply_hero_upgrade(preview, hero_id, card_id)
+        return hero_id, card_ids
 
     def _is_legal_upgrade(self, state: GameState, hero_id: str, card_id: str) -> bool:
         """A submitted upgrade is legal only if the hero has a pending upgrade

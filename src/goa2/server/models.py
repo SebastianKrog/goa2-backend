@@ -66,6 +66,19 @@ class SubmitInputRequest(BaseModel):
     selection: Any = None
 
 
+class UpgradePreviewRequest(BaseModel):
+    request_id: str = Field(min_length=1)
+    card_ids: list[str] = Field(default_factory=list, max_length=6)
+
+
+class UpgradePreviewResponse(BaseModel):
+    request_id: str
+    card_ids: list[str]
+    remaining: int
+    options: list[dict[str, Any]]
+    view: dict[str, Any]
+
+
 class GiveGoldRequest(BaseModel):
     hero_id: str
     amount: int

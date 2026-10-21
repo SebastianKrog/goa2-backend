@@ -1090,6 +1090,7 @@ override decisions.
 | `unresolved_cards` | object[] | Cards in resolution order (highest initiative first). Each entry: `{hero_id, initiative, card}`. Only populated during RESOLUTION phase; empty array otherwise. Ties broken by `tie_breaker_team`. Recalculated dynamically — order may change between actions due to modifiers. |
 | `active_zone_id` | string/null | Legacy single-lane field: the current Battle Zone when the game has exactly one lane, `null` otherwise. Prefer `battle_zones`. |
 | `battle_zones` | object | Current Battle Zone per lane (`lane_id -> zone_id`). Single-lane maps have one entry (`"lane_1"`). |
+| `battle_zone_minion_counts` | object | Additive physical minion counts per active lane: `{ "lane_1": { "zone_id": "Mid", "counts": { "RED": 2, "BLUE": 3 } } }`. Heavy minions count once; off-board pieces, tokens/illusions and hero bonuses do not count. Combat modifiers/exclusions do not change these counts. Piece location determines membership, not its respawn lane binding. Missing/unknown zones are omitted. Older servers omit the entire field. |
 | `wave_counters` | object | Remaining Wave counters per lane (`lane_id -> int`). |
 | `cheats_enabled` | boolean | Whether cheats are enabled for this game |
 | `tie_breaker_team` | string | Team that currently wins ties (`"RED"` or `"BLUE"`). In a game created from a draft, this starts as the draft's `first_team` — the coin flip that decided who bans first is the same coin. Games created directly via `POST /games` flip it from the seed. |
@@ -1500,6 +1501,51 @@ The `request_id` correlates this prompt with its response. Echo it unchanged in
 every REST or WebSocket input response. The `type` field determines what kind
 of input is needed and what options fields are present.
 
+### Optional decision semantics
+
+New requests can carry an additive `decision_context`. Existing option fields,
+labels, computed values, response payloads and request correlation are unchanged.
+Older backends and saved requests may omit it; clients must keep their legacy
+handling as a fallback. These facts describe an offer, not a new submission format.
+
+```json
+{
+  "purpose": "action",
+  "actor_id": "hero_arien",
+  "source_card_id": "deluge",
+  "choice_facts": { "MOVEMENT": { "action_role": "primary" } }
+}
+```
+
+All context fields are optional. `purpose` is `action`, `defense`, `discard`,
+`cast_spell`, `rune_selection` or `rune_inscription` where the issuing step knows
+the purpose. `actor_id` identifies the acting/choosing hero, which can differ
+from the authorized responder under action control. `source_card_id` is provided
+only when the source is known and permitted for the recipient. Never use it to
+reconstruct a hidden card from a catalog.
+
+`choice_facts` is keyed by offered option ID. Facts may include `action_role`
+(`primary`, `secondary`, `replacement`), `defense_stat` (`DEFENSE`, `INITIATIVE`),
+and `defense_kind` (`primary`, `secondary`). Primary defense is effect-driven;
+it is not a guarantee that an attack will be blocked. Read existing option
+`value`/`defense_value` and request `defense_needed` rather than recomputing them.
+Missing facts mean unknown, not a different default rule. Context does not enable
+batch selection; existing capability fields and accepted submissions still apply.
+
+REST and WebSocket apply the same responder-scoping boundary. Facts for options
+outside the offer and hidden source identities are removed. Aggregate simultaneous
+requests omit this context until a per-player projection is explicitly supported;
+their existing scoped `players` data is unchanged.
+
+For minion HUDs, render each `battle_zone_minion_counts` lane separately. An explicit
+zero is valid. An older-server fallback may use public minion positions and tile
+zone membership; missing membership is unavailable, not a whole-board total or zero.
+This field is derived for views and is not persisted in game state.
+
+See the [existing frontend compatibility record](SHARED_DECISION_FACTS_COMPATIBILITY.md)
+for the unchanged default frontend revision, control/candidate browser checks,
+accepted legacy submissions and verification limits.
+
 ### Common input request types
 
 | Type | Options field | Selection value | Description |
@@ -1518,6 +1564,69 @@ During `UPGRADE_PHASE`, another hero's `items` keep their pre-phase values so a
 pending chooser cannot read what the others took. They jump to their real values
 for everyone once the last upgrade is submitted; a hero always sees their own
 choice applied immediately.
+
+### Batched upgrades and Snorri rune placement
+
+The REST `/games/{game_id}/input` endpoint and WebSocket `SUBMIT_INPUT`
+both accept the following batch selections. Echo the current `request_id`.
+Existing single-choice payloads remain supported.
+
+For `UPGRADE_PHASE`, send one hero's ordered upgrade choices:
+
+```json
+{"request_id": "<request_id>", "selection": {"hero_id": "hero_arien", "card_ids": ["<first_card_id>", "<second_card_id>"]}}
+```
+
+The request includes `supports_batch: true`. Submit exactly one choice or all of
+that hero's `players[hero_id].remaining` choices. The allowed counts are listed in
+`players[hero_id].selection_counts`. Each card must be legal after the preceding
+choices have been applied: finish the lowest card tier before moving to the next.
+Do not send both `card_id` and `card_ids`. Only the authenticated hero's upgrades
+can be selected. Intermediate subsets (for example, two of three upgrades) are
+rejected. A single choice leaves the hero waiting for their remaining upgrades.
+
+#### Read-only upgrade previews
+
+An upgrade request advertising `supports_preview: true` supports authenticated
+`POST /games/{game_id}/upgrades/preview` with
+`{"request_id":"<current request_id>","card_ids":["<ordered card ID>"]}`.
+The prefix may be empty or incomplete (at most six IDs). The engine validates
+and applies it on a copy using the same upgrade rules as actual submissions.
+The response contains `request_id`, echoed `card_ids`, `remaining`, next-step
+`options`, and a player-scoped hypothetical `view`. Use its options for the next
+staged choice and its own hero items for predicted totals. Opponent data retains
+normal visibility restrictions.
+
+This endpoint never submits input, advances clocks, saves, broadcasts, or adds
+history/replay records. Invalid prefixes return 400; stale requests or a changed
+phase return 409; spectator tokens return 403. Refresh the current offer before
+retrying. A preview prefix is not necessarily a legal Commit: the existing
+single-or-complete batch count restriction still applies to mutations. Clients
+must gate this endpoint on `supports_preview`; older servers retain explicit
+single-upgrade confirmations without an automatic submission chain.
+
+Snorri's **Inscribe the Runes** `SELECT_OPTION` prompt includes
+`supports_batch: true`, `next_slot`, `max_selections`, and `selection_counts`.
+Optional `placed_runes` maps acknowledged slot numbers (JSON string keys) to rune
+IDs, including after a mid-inscription reload. Keep these separate from local
+planned slots and the automatic final rune; never infer unknown earlier slots.
+Send distinct remaining rune IDs in slot order, starting at `next_slot`:
+
+```json
+{"request_id": "<request_id>", "selection": ["axe", "bird", "anvil", "horn"]}
+```
+
+Submit one rune or enough to complete the remaining slots. The final rune is
+placed automatically, so three of four (or two of three remaining) also completes
+the arrangement. Two of four is rejected. Empty batches, duplicate runes, unknown
+runes, or already placed runes reject the whole batch and leave prior choices
+intact. The final arrangement emits one `RUNES_PLACED` event. Other rune-choice
+prompts still take one rune.
+
+Invalid upgrade/rune submissions return HTTP 400 or a WebSocket `ERROR`. They
+preserve the current request ID, pending action, and all previous choices; they
+do not add a replay decision or grant a new clock allowance. Fetching the view
+again returns the same pending prompt. Stale request IDs are also rejected.
 
 ### How to respond
 

@@ -1523,8 +1523,31 @@ Do not send both `card_id` and `card_ids`. Only the authenticated hero's upgrade
 can be selected. Intermediate subsets (for example, two of three upgrades) are
 rejected. A single choice leaves the hero waiting for their remaining upgrades.
 
+#### Read-only upgrade previews
+
+An upgrade request advertising `supports_preview: true` supports authenticated
+`POST /games/{game_id}/upgrades/preview` with
+`{"request_id":"<current request_id>","card_ids":["<ordered card ID>"]}`.
+The prefix may be empty or incomplete (at most six IDs). The engine validates
+and applies it on a copy using the same upgrade rules as actual submissions.
+The response contains `request_id`, echoed `card_ids`, `remaining`, next-step
+`options`, and a player-scoped hypothetical `view`. Use its options for the next
+staged choice and its own hero items for predicted totals. Opponent data retains
+normal visibility restrictions.
+
+This endpoint never submits input, advances clocks, saves, broadcasts, or adds
+history/replay records. Invalid prefixes return 400; stale requests or a changed
+phase return 409; spectator tokens return 403. Refresh the current offer before
+retrying. A preview prefix is not necessarily a legal Commit: the existing
+single-or-complete batch count restriction still applies to mutations. Clients
+must gate this endpoint on `supports_preview`; older servers retain explicit
+single-upgrade confirmations without an automatic submission chain.
+
 Snorri's **Inscribe the Runes** `SELECT_OPTION` prompt includes
 `supports_batch: true`, `next_slot`, `max_selections`, and `selection_counts`.
+Optional `placed_runes` maps acknowledged slot numbers (JSON string keys) to rune
+IDs, including after a mid-inscription reload. Keep these separate from local
+planned slots and the automatic final rune; never infer unknown earlier slots.
 Send distinct remaining rune IDs in slot order, starting at `next_slot`:
 
 ```json

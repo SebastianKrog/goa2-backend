@@ -1131,6 +1131,7 @@ class PlaceRunesStep(GameStep):
                 options=[InputOption(id=rune.value, text=rune.value.title()) for rune in remaining],
                 supports_batch=True,
                 next_slot=slot,
+                placed_runes={str(index): rune.value for index, rune in self.placed.items()},
                 max_selections=len(remaining),
                 selection_counts=sorted({1, len(remaining) - 1, len(remaining)}),
             ),

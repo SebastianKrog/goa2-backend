@@ -2573,12 +2573,24 @@ class ResolveUpgradesStep(GameStep):
                 prompt="Mandatory Upgrade Phase",
                 players=broadcast_data,
                 supports_batch=True,
+                supports_preview=True,
             ),
         )
 
     def validate_input(self, state: GameState, selection: Any) -> None:
         if self._validated_choices(state, selection) is None:
             raise ValueError("Choose one legal upgrade or all remaining upgrades for your hero")
+
+    def preview_choices(self, state: GameState, hero_id: str, card_ids: list[str]) -> GameState:
+        """Read-only prefix preview using exactly the live upgrade rules."""
+        remaining = state.pending_upgrades.get(hero_id, 0)
+        if remaining <= 0 or len(card_ids) > remaining:
+            raise ValueError("No matching pending upgrades")
+        preview = state.model_copy(deep=True)
+        for card_id in card_ids:
+            self.validate_input(preview, {"hero_id": hero_id, "card_id": card_id})
+            apply_hero_upgrade(preview, hero_id, card_id)
+        return preview
 
     def _validated_choices(self, state: GameState, selection: Any) -> tuple[str, list[str]] | None:
         if not isinstance(selection, dict):

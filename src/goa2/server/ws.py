@@ -899,7 +899,11 @@ async def game_ws(websocket: WebSocket, game_id: str) -> None:
         return
 
     try:
-        game = registry.get(game_id)
+        game = (
+            registry.get(game_id)
+            if registry.is_loaded(game_id)
+            else await asyncio.to_thread(registry.get, game_id)
+        )
     except GameNotFoundError:
         await websocket.close(code=4004, reason="Game not found")
         return
@@ -914,11 +918,14 @@ async def game_ws(websocket: WebSocket, game_id: str) -> None:
     async with game.outbound_lock:
         async with game.lock:
             previous_websocket = None
+            first_join = False
             if is_spectator:
                 game.spectator_ws_connections[spectator_connection_id] = websocket
             else:
                 previous_websocket = game.ws_connections.get(token)
                 game.ws_connections[token] = websocket
+                first_join = not game.joined
+                game.joined = True
             initial = _build_state_update(game, hero_id if not is_spectator else None)
         if previous_websocket is not None and previous_websocket is not websocket:
             await previous_websocket.close(
@@ -926,6 +933,10 @@ async def game_ws(websocket: WebSocket, game_id: str) -> None:
                 reason="Connection superseded by a newer session",
             )
         await websocket.send_json(initial)
+
+    if first_join:
+        async with game.lock:
+            registry.save_game(game_id)
 
     if game.game_logger:
         game.game_logger.log_ws_connect(hero_id if not is_spectator else None, is_spectator)

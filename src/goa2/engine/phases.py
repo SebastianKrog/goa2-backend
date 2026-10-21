@@ -1,6 +1,7 @@
 import logging
 
 from goa2.domain.models import Card, GamePhase
+from goa2.domain.rules_version import THIS_TURN_OUTLASTS_END_OF_TURN
 from goa2.domain.state import GameState
 from goa2.domain.types import HeroID
 from goa2.engine.handler import push_steps
@@ -325,6 +326,11 @@ def _collect_after_cards_played_steps(state: GameState) -> list[GameStep]:
         e for e in state.active_effects if e.effect_type != EffectType.AFTER_CARDS_PLAYED_TRIGGER
     ]
 
+    from goa2.engine.effect_manager import EffectManager
+
+    for card_id in {e.source_card_id for e in triggers if e.source_card_id}:
+        EffectManager._update_card_active_status(state, card_id)
+
     from goa2.engine.steps import SetActorStep
 
     steps: list[GameStep] = []
@@ -477,7 +483,13 @@ def end_turn(state: GameState):
 
     from goa2.engine.effect_manager import EffectManager
 
-    finishing = EffectManager.expire_active_turn_effects(state)
+    lingering_ids: list[str] = []
+    if state.rules_version >= THIS_TURN_OUTLASTS_END_OF_TURN:
+        finishing, lingering_ids = EffectManager.collect_turn_expiry(state)
+        if not finishing:
+            EffectManager.remove_effects(state, lingering_ids)
+    else:
+        finishing = EffectManager.expire_active_turn_effects(state)
 
     if finishing:
         from goa2.engine.steps import AdvanceTurnStep, SetActorStep
@@ -488,7 +500,7 @@ def end_turn(state: GameState):
             finish_steps.extend(steps)
             finish_steps.append(FinishedExpiringEffectStep())
 
-        finish_steps.append(AdvanceTurnStep())
+        finish_steps.append(AdvanceTurnStep(expire_effect_ids=lingering_ids))
         push_steps(state, finish_steps)
         return
 

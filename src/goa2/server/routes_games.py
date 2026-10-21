@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
 from goa2.domain.events import GameEvent, GameEventType
 from goa2.domain.input import InputResponse
@@ -39,6 +39,7 @@ from goa2.server.models import (
     SubmitInputRequest,
 )
 from goa2.server.player_names import resolve_player_names
+from goa2.server.rate_limit import check_creation_budget, spend_creation_budget
 from goa2.server.result_logging import log_session_result
 from goa2.server.share_mint import mint_replay_share
 from goa2.server.time_control import (
@@ -87,7 +88,10 @@ def _result_to_response(
 
 
 @router.post("", response_model=CreateGameResponse, status_code=201)
-async def create_game(body: CreateGameRequest, registry: RegistryDep) -> CreateGameResponse:
+async def create_game(
+    body: CreateGameRequest, registry: RegistryDep, request: Request
+) -> CreateGameResponse:
+    ip = check_creation_budget(request)
     map_path = _map_path(body.map_name)
     if body.game_type not in ("QUICK", "LONG"):
         raise HTTPException(
@@ -131,6 +135,7 @@ async def create_game(body: CreateGameRequest, registry: RegistryDep) -> CreateG
         hero_names=hero_names,
         bot_specs=bot_specs,
     )
+    spend_creation_budget(request, ip)
 
     if game.game_logger:
         game.game_logger.log_game_created(body.red_heroes, body.blue_heroes, body.map_name)
@@ -144,6 +149,7 @@ async def create_game(body: CreateGameRequest, registry: RegistryDep) -> CreateG
             seed=seed,
             time_control=body.time_control,
             player_names=hero_names,
+            rules_version=state.rules_version,
         )
 
     await start_bot_lifecycle(game, registry)

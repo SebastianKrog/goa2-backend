@@ -16,6 +16,7 @@ from goa2.domain.models import (
     TokenType,
 )
 from goa2.domain.models.spawn import SpawnType
+from goa2.domain.rules_version import CURRENT_RULES_VERSION
 from goa2.domain.state import GameState
 from goa2.domain.time_control import TimeControlConfig, create_game_clock
 from goa2.domain.types import BoardEntityID
@@ -45,7 +46,7 @@ class GameSetup:
         """
         Returns (wave_counters_per_lane, life_counters) for the given game
         type, player count, and lane count. Uneven player counts use the next
-        configured player-count bracket.
+        configured player-count bracket; counts above the largest bracket use it.
 
         Rules:
           Single lane:
@@ -70,13 +71,8 @@ class GameSetup:
 
         life_bracket = next(
             (player_count for player_count in sorted(lc_lookup) if player_count >= total_players),
-            None,
+            max(lc_lookup),
         )
-        if life_bracket is None:
-            raise ValueError(
-                f"Unsupported player count {total_players} for {gt.value} game. "
-                f"Supported: {sorted(lc_lookup.keys())}."
-            )
         life_counters = lc_lookup[life_bracket]
 
         return waves, life_counters
@@ -91,6 +87,7 @@ class GameSetup:
         seed: int | None = None,
         time_control: TimeControlConfig | None = None,
         tie_breaker_team: TeamColor | None = None,
+        rules_version: int = CURRENT_RULES_VERSION,
     ) -> GameState:
         """
         Initializes a game with the specified map and heroes.
@@ -103,6 +100,8 @@ class GameSetup:
             derived from the setup inputs.
         :param tie_breaker_team: Result of a coin flip already held elsewhere (a
             draft lobby's, say). If omitted, the coin is flipped here from the seed.
+        :param rules_version: Rebuilding a recorded game passes the version it was
+            played under (see domain/rules_version.py).
         """
 
         normalized_game_type = _normalize_game_type(game_type)
@@ -137,6 +136,7 @@ class GameSetup:
             game_type=normalized_game_type,
             cheats_enabled=cheats_enabled,
             time_control=time_control,
+            rules_version=rules_version,
         )
 
         # Derive the deterministic game seed before creating hidden supplies.

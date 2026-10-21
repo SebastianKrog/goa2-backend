@@ -47,6 +47,8 @@ def test_registry_contains_all_patch_and_unstick_ops():
         "add_effect",
         "remove_effect",
         "move_card",
+        "swap_item_card",
+        "set_item",
         "set_wave_counter",
         "set_tie_breaker_team",
         "skip_input",
@@ -145,7 +147,7 @@ def test_summarize_op_is_human_readable():
 # Resource / counter patch ops (Task 2)
 # ---------------------------------------------------------------------------
 
-from goa2.domain.models import GamePhase, TeamColor  # noqa: E402
+from goa2.domain.models import CardState, GamePhase, TeamColor  # noqa: E402
 
 
 def test_set_gold_and_level(session):
@@ -245,6 +247,123 @@ def test_move_card_hand_to_discard_and_back(session):
     assert card.id not in [c.id for c in hero.discard_pile]
 
 
+def test_move_card_into_chosen_played_slot(session):
+    hero = session.state.get_hero("hero_arien")
+    hero.resolved_turn_count = 3
+    card = hero.hand[0]
+    apply_override_decision(
+        session,
+        "move_card",
+        {"hero_id": "hero_arien", "card_id": card.id, "zone": "played", "slot": 3},
+    )
+    hero = session.state.get_hero("hero_arien")
+    assert [c.id if c else None for c in hero.played_cards] == [None, None, card.id]
+
+
+def test_move_card_into_occupied_slot_rejected(session):
+    hero = session.state.get_hero("hero_arien")
+    hero.resolved_turn_count = 2
+    first, second = hero.hand[0], hero.hand[1]
+    apply_override_decision(
+        session,
+        "move_card",
+        {"hero_id": "hero_arien", "card_id": first.id, "zone": "played", "slot": 2},
+    )
+    with pytest.raises(OverrideRejectedError) as exc:
+        apply_override_decision(
+            session,
+            "move_card",
+            {"hero_id": "hero_arien", "card_id": second.id, "zone": "played", "slot": 2},
+        )
+    assert exc.value.code == "slot_occupied"
+    hero = session.state.get_hero("hero_arien")
+    assert second.id in [c.id for c in hero.hand]
+
+
+def test_move_card_refuses_slot_of_unplayed_turn(session):
+    hero = session.state.get_hero("hero_arien")
+    hero.resolved_turn_count = 1
+    card = hero.hand[0]
+    with pytest.raises(OverrideRejectedError) as exc:
+        apply_override_decision(
+            session,
+            "move_card",
+            {"hero_id": "hero_arien", "card_id": card.id, "zone": "played", "slot": 2},
+        )
+    assert exc.value.code == "slot_unavailable"
+
+
+def test_move_card_without_slot_needs_a_finished_turn(session):
+    hero = session.state.get_hero("hero_arien")
+    card = hero.hand[0]
+    with pytest.raises(OverrideRejectedError) as exc:
+        apply_override_decision(
+            session,
+            "move_card",
+            {"hero_id": "hero_arien", "card_id": card.id, "zone": "played"},
+        )
+    assert exc.value.code == "slot_unavailable"
+    assert card.id in [c.id for c in session.state.get_hero("hero_arien").hand]
+
+
+def test_move_card_recovers_card_no_zone_holds(session):
+    hero = session.state.get_hero("hero_arien")
+    card = hero.hand.pop(0)
+    apply_override_decision(
+        session,
+        "move_card",
+        {"hero_id": "hero_arien", "card_id": card.id, "zone": "hand"},
+    )
+    assert card.id in [c.id for c in session.state.get_hero("hero_arien").hand]
+
+
+def test_move_card_from_deck_to_hand_and_back(session):
+    hero = session.state.get_hero("hero_arien")
+    card = next(c for c in hero.deck if c.state == CardState.DECK)
+    apply_override_decision(
+        session,
+        "move_card",
+        {"hero_id": "hero_arien", "card_id": card.id, "zone": "hand"},
+    )
+    hero = session.state.get_hero("hero_arien")
+    in_hand = next(c for c in hero.hand if c.id == card.id)
+    assert in_hand.state == CardState.HAND
+
+    apply_override_decision(
+        session,
+        "move_card",
+        {"hero_id": "hero_arien", "card_id": card.id, "zone": "deck"},
+    )
+    hero = session.state.get_hero("hero_arien")
+    assert card.id not in [c.id for c in hero.hand]
+    assert next(c for c in hero.deck if c.id == card.id).state == CardState.DECK
+
+
+def test_move_card_sets_zone_state(session):
+    hero = session.state.get_hero("hero_arien")
+    card = hero.hand[0]
+    apply_override_decision(
+        session,
+        "move_card",
+        {"hero_id": "hero_arien", "card_id": card.id, "zone": "discard"},
+    )
+    hero = session.state.get_hero("hero_arien")
+    assert next(c for c in hero.discard_pile if c.id == card.id).state == CardState.DISCARD
+
+
+def test_move_card_refuses_item_cards(session):
+    hero = session.state.get_hero("hero_arien")
+    card = next(c for c in hero.deck if c.state == CardState.DECK)
+    card.state = CardState.ITEM
+    with pytest.raises(OverrideRejectedError) as exc:
+        apply_override_decision(
+            session,
+            "move_card",
+            {"hero_id": "hero_arien", "card_id": card.id, "zone": "hand"},
+        )
+    assert exc.value.code == "unknown_card"
+
+
 def test_move_card_unknown_card_rejected(session):
     with pytest.raises(OverrideRejectedError):
         apply_override_decision(
@@ -310,3 +429,85 @@ def test_add_effect_from_payload(session):
 def test_add_effect_invalid_payload_rejected(session):
     with pytest.raises(OverrideRejectedError):
         apply_override_decision(session, "add_effect", {"effect": {"id": "x"}})
+
+
+def test_remove_effect_untaps_its_card(session):
+    card_id = session.state.get_hero("hero_arien").hand[0].id
+    session.state.get_card_by_id(card_id).is_active = True
+    session.state.add_effect(
+        ActiveEffect(
+            id="fx_card",
+            source_id="hero_arien",
+            source_card_id=card_id,
+            effect_type=EffectType.AREA_STAT_MODIFIER,
+            scope=EffectScope(shape=Shape.GLOBAL, origin_id="hero_arien"),
+            duration=DurationType.THIS_ROUND,
+            created_at_turn=1,
+            created_at_round=1,
+        )
+    )
+    apply_override_decision(session, "remove_effect", {"effect_id": "fx_card"})
+    assert session.state.get_card_by_id(card_id).is_active is False
+
+
+def test_add_effect_taps_its_card(session):
+    card_id = session.state.get_hero("hero_arien").hand[0].id
+    payload = {
+        "id": "fx_card",
+        "source_id": "hero_arien",
+        "source_card_id": card_id,
+        "effect_type": EffectType.AREA_STAT_MODIFIER.value,
+        "scope": {"shape": Shape.GLOBAL.value, "origin_id": "hero_arien"},
+        "duration": DurationType.THIS_ROUND.value,
+        "created_at_turn": 1,
+        "created_at_round": 1,
+    }
+    apply_override_decision(session, "add_effect", {"effect": payload})
+    assert session.state.get_card_by_id(card_id).is_active is True
+
+
+def _upgrade_arien(state, color):
+    from goa2.domain.models import CardColor, CardTier
+    from goa2.engine.steps.cards import apply_hero_upgrade
+
+    hero = state.get_hero("hero_arien")
+    chosen, other = [c for c in hero.deck if c.color == CardColor(color) and c.tier == CardTier.II]
+    apply_hero_upgrade(state, "hero_arien", chosen.id)
+    return hero, chosen.id, other.id
+
+
+def test_swap_item_card_swaps_upgrade_and_item(session):
+    hero, chosen_id, other_id = _upgrade_arien(session.state, "RED")
+    old_stat = next(c for c in hero.deck if c.id == other_id).item
+    new_stat = next(c for c in hero.deck if c.id == chosen_id).item
+
+    apply_override_decision(
+        session, "swap_item_card", {"hero_id": "hero_arien", "color": "RED", "tier": "II"}
+    )
+
+    hero = session.state.get_hero("hero_arien")
+    assert other_id in [c.id for c in hero.hand]
+    assert chosen_id not in [c.id for c in hero.hand]
+    assert next(c for c in hero.deck if c.id == chosen_id).state == "ITEM"
+    if old_stat != new_stat:
+        assert hero.items.get(old_stat, 0) == 0
+    assert hero.items.get(new_stat, 0) == 1
+
+
+def test_swap_item_card_without_item_rejected(session):
+    with pytest.raises(OverrideRejectedError) as exc:
+        apply_override_decision(
+            session, "swap_item_card", {"hero_id": "hero_arien", "color": "RED", "tier": "II"}
+        )
+    assert exc.value.code == "no_item"
+
+
+def test_set_item(session):
+    apply_override_decision(
+        session, "set_item", {"hero_id": "hero_arien", "stat": "ATTACK", "value": 2}
+    )
+    assert session.state.get_hero("hero_arien").items["ATTACK"] == 2
+    apply_override_decision(
+        session, "set_item", {"hero_id": "hero_arien", "stat": "ATTACK", "value": 0}
+    )
+    assert "ATTACK" not in session.state.get_hero("hero_arien").items

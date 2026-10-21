@@ -201,7 +201,7 @@ def test_actual_registry_rejects_apply_for_orphaned_game(monkeypatch, registry_s
         )
         registry = GameRegistry()
         if registry_state == "replaced":
-            registry._games[game.game_id] = cast(Any, object())
+            registry._games[game.game_id] = cast(Any, SimpleNamespace(last_access=0.0))
 
         apply = Mock(
             return_value=SessionResult(
@@ -251,7 +251,7 @@ def test_actual_registry_rejects_idle_advance_for_orphaned_game(
         )
         registry = GameRegistry()
         if registry_state == "replaced":
-            registry._games[game.game_id] = cast(Any, object())
+            registry._games[game.game_id] = cast(Any, SimpleNamespace(last_access=0.0))
 
         progressed = await bots._maybe_plain_advance(
             cast(Any, game),
@@ -308,7 +308,7 @@ def test_actual_registry_rejects_agent_publication_for_orphaned_game(
             if registry_state == "missing":
                 registry._games.pop(game.game_id)
             else:
-                registry._games[game.game_id] = cast(Any, object())
+                registry._games[game.game_id] = cast(Any, SimpleNamespace(last_access=0.0))
         finally:
             release.set()
         await worker

@@ -16,11 +16,12 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from goa2.domain.hex import Hex
-from goa2.domain.models import GamePhase, TeamColor
+from goa2.domain.models import CardColor, CardState, CardTier, GamePhase, StatType, TeamColor
 from goa2.domain.models.effect import ActiveEffect
 from goa2.domain.models.marker import MarkerType
 from goa2.domain.state import GameState
 from goa2.domain.types import BoardEntityID, HeroID
+from goa2.engine.effect_manager import EffectManager
 from goa2.engine.session import GameSession, SessionResult
 
 
@@ -401,7 +402,8 @@ _register(
 class MoveCardArgs(BaseModel):
     hero_id: str
     card_id: str
-    zone: Literal["hand", "discard", "played"]
+    zone: Literal["hand", "discard", "played", "deck"]
+    slot: int | None = Field(default=None, ge=1, le=4, description="Turn slot for zone='played'")
 
 
 def _detach_card(hero: Any, card_id: str) -> Any:
@@ -427,26 +429,79 @@ def _detach_card(hero: Any, card_id: str) -> Any:
     return None
 
 
+# A deck card no live zone holds: unbought upgrades, retired cards, and cards
+# orphaned by a bug. ITEM/PASSIVE cards are excluded because hero.items and
+# ultimate checks read them in place.
+_UNMOVABLE_STATES = (CardState.ITEM, CardState.PASSIVE)
+
+
+def _take_from_deck(hero: Any, card_id: str) -> Any:
+    for card in hero.deck:
+        if card.id == card_id and card.state not in _UNMOVABLE_STATES:
+            return card
+    return None
+
+
+_ZONE_STATE = {
+    "hand": CardState.HAND,
+    "discard": CardState.DISCARD,
+    "played": CardState.RESOLVED,
+    "deck": CardState.DECK,
+}
+
+
 def _apply_move_card(session: GameSession, args: MoveCardArgs) -> None:
     hero = _require_hero(session.state, args.hero_id)
-    card = _detach_card(hero, args.card_id)
+    slot = args.slot
+    if slot is not None and args.zone != "played":
+        raise OverrideRejectedError("slot only applies to zone 'played'", code="bad_args")
+    if args.zone == "played":
+        # Slots past resolved_turn_count belong to turns not yet played; the
+        # engine overwrites them on resolution, losing the card.
+        open_slots = [
+            n
+            for n in range(1, hero.resolved_turn_count + 1)
+            if hero.card_in_turn_slot(n) is None or hero.card_in_turn_slot(n).id == args.card_id
+        ]
+        if slot is None:
+            if not open_slots:
+                raise OverrideRejectedError(
+                    f"{args.hero_id} has no empty slot for a finished turn", code="slot_unavailable"
+                )
+            slot = open_slots[0]
+        elif slot > hero.resolved_turn_count:
+            raise OverrideRejectedError(
+                f"Turn {slot} has not been played yet by {args.hero_id}", code="slot_unavailable"
+            )
+        elif slot not in open_slots:
+            raise OverrideRejectedError(
+                f"Played slot {slot} of {args.hero_id} already holds "
+                f"{hero.card_in_turn_slot(slot).id!r}",
+                code="slot_occupied",
+            )
+    card = _detach_card(hero, args.card_id) or _take_from_deck(hero, args.card_id)
     if card is None:
         raise OverrideRejectedError(
             f"Card {args.card_id!r} not found in a movable zone of {args.hero_id} "
-            "(hand / discard / played / current / extra)",
+            "(hand / discard / played / current / extra / deck)",
             code="unknown_card",
         )
+    card.state = _ZONE_STATE[args.zone]
+    card.is_facedown = False
+    card.played_this_round = args.zone == "played"
+    if args.zone == "deck":
+        card.is_active = False
     if args.zone == "hand":
         hero.hand.append(card)
     elif args.zone == "discard":
         hero.discard_pile.append(card)
-    else:  # played — fill the first empty slot, else append
-        for i, slot in enumerate(hero.played_cards):
-            if slot is None:
-                hero.played_cards[i] = card
-                break
-        else:
-            hero.played_cards.append(card)
+    elif args.zone == "deck":
+        pass  # hero.deck is the master list; a card held by no live zone is in the deck
+    else:
+        assert slot is not None
+        while len(hero.played_cards) < slot:
+            hero.played_cards.append(None)
+        hero.played_cards[slot - 1] = card
 
 
 _register(
@@ -454,10 +509,80 @@ _register(
         name="move_card",
         family="patch",
         label="Move card between zones",
-        description="Move a card stuck in the wrong zone to hand, discard, or played.",
+        description="Move a card between hand, discard, a played slot, and the deck.",
         args_model=MoveCardArgs,
         apply=_apply_move_card,
         summary_template="Move card {card_id} of {hero_id} to {zone}",
+    )
+)
+
+
+class SwapItemCardArgs(BaseModel):
+    hero_id: str
+    color: Literal[CardColor.RED, CardColor.BLUE, CardColor.GREEN]
+    tier: Literal[CardTier.II, CardTier.III]
+
+
+def _apply_swap_item_card(session: GameSession, args: SwapItemCardArgs) -> None:
+    from goa2.engine.steps.cards import SwapItemCardStep
+
+    hero = _require_hero(session.state, args.hero_id)
+    siblings = [c for c in hero.deck if c.color == args.color and c.tier == args.tier]
+    item = next((c for c in siblings if c.state == CardState.ITEM), None)
+    other = next((c for c in siblings if c.state != CardState.ITEM), None)
+    if item is None or other is None:
+        raise OverrideRejectedError(
+            f"{args.hero_id} has no {args.color} tier {args.tier} item to swap",
+            code="no_item",
+        )
+    SwapItemCardStep(hero_key="hero", item_card_key="item", target_card_key="other").resolve(
+        session.state, {"hero": args.hero_id, "item": item.id, "other": other.id}
+    )
+    if item.state == CardState.ITEM:
+        raise OverrideRejectedError(
+            f"{other.id!r} is not in a zone its item sibling can take", code="swap_failed"
+        )
+
+
+_register(
+    OverrideOp(
+        name="swap_item_card",
+        family="patch",
+        label="Swap upgrade with its item",
+        description=(
+            "Swap a tucked item card with its same-color, same-tier sibling "
+            "(fixes picking the wrong upgrade)."
+        ),
+        args_model=SwapItemCardArgs,
+        apply=_apply_swap_item_card,
+        summary_template="Swap {hero_id}'s {color} tier {tier} upgrade with its item",
+    )
+)
+
+
+class SetItemArgs(BaseModel):
+    hero_id: str
+    stat: StatType
+    value: int = Field(ge=0)
+
+
+def _apply_set_item(session: GameSession, args: SetItemArgs) -> None:
+    hero = _require_hero(session.state, args.hero_id)
+    if args.value:
+        hero.items[args.stat] = args.value
+    else:
+        hero.items.pop(args.stat, None)
+
+
+_register(
+    OverrideOp(
+        name="set_item",
+        family="patch",
+        label="Set item count",
+        description="Set how many items of one stat a hero has (does not move item cards).",
+        args_model=SetItemArgs,
+        apply=_apply_set_item,
+        summary_template="Set {hero_id} {stat} items to {value}",
     )
 )
 
@@ -529,6 +654,8 @@ def _apply_add_effect(session: GameSession, args: AddEffectArgs) -> None:
             f"Effect id {effect.id!r} already active", code="duplicate_effect"
         )
     session.state.add_effect(effect)
+    if effect.source_card_id:
+        EffectManager._update_card_active_status(session.state, effect.source_card_id)
 
 
 _register(
@@ -550,12 +677,11 @@ class RemoveEffectArgs(BaseModel):
 
 def _apply_remove_effect(session: GameSession, args: RemoveEffectArgs) -> None:
     state = session.state
-    before = len(state.active_effects)
-    state.active_effects = [e for e in state.active_effects if e.id != args.effect_id]
-    if len(state.active_effects) == before:
+    if not any(e.id == args.effect_id for e in state.active_effects):
         raise OverrideRejectedError(
             f"No active effect with id {args.effect_id!r}", code="unknown_effect"
         )
+    EffectManager.expire_effect_by_id(state, args.effect_id)
 
 
 _register(

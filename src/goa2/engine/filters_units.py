@@ -13,6 +13,7 @@ from goa2.domain.models.enums import (
 )
 from goa2.domain.models.marker import MarkerType
 from goa2.domain.models.token import Token
+from goa2.domain.rules_version import ATTACK_IMMUNITY_COVERS_WHOLE_ACTION
 from goa2.domain.state import GameState
 from goa2.domain.types import BoardEntityID
 
@@ -307,17 +308,19 @@ class ImmunityFilter(FilterCondition):
             return False  # Immune = fails filter
 
         # Check 2: ATTACK_IMMUNITY effects
-        current_action = context.get("current_action_type")
-        current_actor_id = str(state.current_actor_id) if state.current_actor_id else ""
-        return not (
-            current_action == ActionType.ATTACK
-            and is_attack_immune_to_actor(
-                str(candidate),
-                state,
-                actor_id=current_actor_id,
-                attack_is_basic=bool(context.get("attack_is_basic", False)),
-            )
-        )
+        # Only applies when current action is ATTACK
+        if context.get("current_action_type") == ActionType.ATTACK:
+            current_actor_id = str(state.current_actor_id) if state.current_actor_id else None
+            if state.rules_version >= ATTACK_IMMUNITY_COVERS_WHOLE_ACTION:
+                is_basic = rules.attack_is_basic(state, current_actor_id)
+            else:
+                # Only set once AttackSequenceStep runs, so choices made
+                # before it treat a basic attack as non-basic.
+                is_basic = bool(context.get("attack_is_basic", False))
+            if rules.is_immune_to_attack(state, candidate, current_actor_id, is_basic=is_basic):
+                return False
+
+        return True  # Passes filter (not immune)
 
 
 class UnitOnSpawnPointFilter(FilterCondition):

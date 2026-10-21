@@ -24,6 +24,7 @@ from goa2.server.errors import (
     InvalidPhaseError,
     NotYourTurnError,
 )
+from goa2.server.rate_limit import CreationLimiter, create_limit_per_hour
 from goa2.server.registry import GameRegistry
 from goa2.server.routes_bug_reports import public_router as bug_reports_router
 from goa2.server.routes_draft import router as draft_router
@@ -40,6 +41,7 @@ logger = logging.getLogger(__name__)
 # from the last persisted mutation — connecting, watching, and reconnecting do
 # not reset it.
 DEFAULT_GAME_TTL_DAYS = 5
+UNJOINED_SWEEP_SECONDS = 300
 
 load_dotenv()
 
@@ -63,11 +65,23 @@ async def _cleanup_loop(registry: GameRegistry):
         removed = registry.cleanup_stale_games(max_age_seconds=_game_ttl_days() * 86400)
         if removed:
             logger.info("Cleanup: removed %d stale game(s)", removed)
+        unloaded = await registry.unload_idle_finished_games()
+        if unloaded:
+            logger.info("Cleanup: unloaded %d idle finished game(s)", unloaded)
         # Replays outlive game saves: retained for their own TTL (default 30d)
         # so bugs reported after a game ends can still be reproduced.
         purged = cleanup_old_replays()
         if purged:
             logger.info("Cleanup: removed %d old replay log(s)", purged)
+
+
+async def _unjoined_sweep_loop(registry: GameRegistry):
+    """Delete games no player joined within a day, checked every few minutes."""
+    while True:
+        await asyncio.sleep(UNJOINED_SWEEP_SECONDS)
+        expired = await registry.expire_unjoined_games()
+        if expired:
+            logger.info("Cleanup: deleted %d game(s) no player joined", expired)
 
 
 @asynccontextmanager
@@ -84,6 +98,7 @@ async def lifespan(app: FastAPI):
         await start_bot_lifecycle(game, registry)
 
     cleanup_task = asyncio.create_task(_cleanup_loop(registry))
+    unjoined_task = asyncio.create_task(_unjoined_sweep_loop(registry))
     # Background, never awaited: a worker takes seconds to spawn, and blocking
     # startup on it would delay every restart to spare the first rewind.
     # Off by default under tests, which build hundreds of apps.
@@ -99,9 +114,10 @@ async def lifespan(app: FastAPI):
         # before tearing down either dependency.
         await cancel_all_bot_tasks(registry)
         await stop_timers(registry)
-        cleanup_task.cancel()
-        with suppress(asyncio.CancelledError):
-            await cleanup_task
+        for task in (cleanup_task, unjoined_task):
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
         if warmup_task is not None:
             warmup_task.cancel()
             with suppress(asyncio.CancelledError, Exception):
@@ -127,6 +143,7 @@ def _configure_logging() -> None:
 def create_app() -> FastAPI:
     _configure_logging()
     app = FastAPI(title="GoA2 API", version="0.1.0", lifespan=lifespan)
+    app.state.creation_limiter = CreationLimiter(create_limit_per_hour())
 
     # Routers
     app.include_router(heroes_router)

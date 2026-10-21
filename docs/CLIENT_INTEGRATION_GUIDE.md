@@ -124,7 +124,7 @@ Include the token in the `Authorization` header:
 Authorization: Bearer <token>
 ```
 
-All endpoints except `POST /games` and `GET /heroes` require authentication. The server validates that the token belongs to the game specified in the URL path.
+All endpoints except `POST /games` and `GET /heroes` require authentication. `POST /games` and `POST /drafts` are rate-limited per IP instead (see [Creation limit](#creation-limit)). The server validates that the token belongs to the game specified in the URL path.
 
 ### WebSocket authentication
 
@@ -292,6 +292,32 @@ Omitting `game_type` defaults to `"LONG"` (standard game).
   "spectator_token": "ghi789..."
 }
 ```
+
+A game no player joins within 24 hours is deleted. "Joined" means a player token
+opened the game WebSocket (or a player decision was submitted); REST polling and
+spectator sockets do not count. After deletion its tokens are unknown: REST
+returns `401`, the WebSocket closes with `4001`.
+
+**Error conditions:**
+- `400` — Invalid `game_type`
+- `404` — Map not found
+- `422` — Malformed request body
+- `429` — Creation limit reached (see [Creation limit](#creation-limit))
+
+#### Creation limit
+
+`POST /games` and `POST /drafts` share one budget per client IP: at most
+`GOA2_CREATE_LIMIT_PER_HOUR` creations (default 5) in any rolling hour. Over
+the limit, both return `429` with a `Retry-After` header (seconds until the
+next creation is allowed) and a human-readable `detail`:
+
+```json
+{"detail": "Too many games created from your network; try again in 50 minutes"}
+```
+
+Only successful creations count; rejected requests (`4xx`, including `429`)
+do not use up the budget. Starting a draft, joining, and playing are not
+limited. The count is held in memory and resets when the server restarts.
 
 ### `GET /games/{game_id}`
 
@@ -1481,7 +1507,7 @@ of input is needed and what options fields are present.
 | `SELECT_HEX` | `valid_hexes` | `{"q": 1, "r": 0, "s": -1}` | Choose a hex on the board |
 | `SELECT_UNIT` | `valid_options` | `"hero_knight"` | Choose a unit by ID |
 | `SELECT_CARD` | `valid_options` | `"card_id"` | Choose a card by ID. When the chooser may be unable to resolve an ID against their own view (a non-owner caster picking from a masked spellbook, e.g. a copy effect driving Gydion's cast), the request also carries `options` (list of `{id, text}`) with display names — render those as labelled choices for any ID that has no card in the view |
-| `CHOOSE_ACTION` | `options` (list of `{id, text}`) | `"ATTACK"` | Choose from named actions |
+| `CHOOSE_ACTION` | `options` (list of `{id, text}`) | `"ATTACK"` | Choose from named actions. Also sent mid-action when a card performs another card's Movement/Attack primary and Fast Travel/Clear could replace it (options: the primary and `"FAST_TRAVEL"` or `"CLEAR"`) |
 | `SELECT_OPTION` | `options` (list of `{id, text}`) | `"option_id"` | Choose from generic options |
 | `SELECT_CARD_OR_PASS` | `options` (list of `{id, text, ...}`) | `"card_id"` or `"PASS"` | Choose a defense card in reaction. Includes combat context fields and per-card metadata. Some cards make the defender block with a stat other than Defense — always render `defense_value` (see below) |
 | `CHOOSE_ACTOR` | `player_ids` | `"hero_arien"` | Choose which hero acts next |
@@ -1859,6 +1885,11 @@ are left unchanged. Broadcasts a `STATE_UPDATE` like any other mutation:
 Sending `"time_control": null` explicitly disables clocks; omitting it leaves
 the current lobby setting unchanged.
 
+`POST /drafts` counts against the same per-IP creation budget as `POST /games`
+and returns `429` with `Retry-After` when it is spent; see
+[Creation limit](#creation-limit). Starting the draft creates its game without
+counting again.
+
 At `start`, the number of **assigned** players (those on a team) must be a supported match size
 (2, 4, 5, or 6) — otherwise `start` returns `400`. Each team must have at least one player and a
 captain. Team sizes may be uneven (e.g. 2 vs 3 for a 5-player game).
@@ -2191,7 +2222,8 @@ list:
 
 Patch ops: `move_entity`, `remove_entity`, `place_entity`, `set_life_counters`,
 `set_gold`, `set_level`, `add_marker`, `remove_marker`, `add_effect`,
-`remove_effect`, `move_card`, `set_wave_counter`, `set_tie_breaker_team`.
+`remove_effect`, `move_card`, `swap_item_card`, `set_item`, `set_wave_counter`,
+`set_tie_breaker_team`.
 Unstick ops: `skip_input`, `abort_action`, `end_turn`, `force_actor`.
 (The endpoint output is authoritative; this list is illustrative.)
 
@@ -2215,7 +2247,8 @@ list so a rewind target index means something to the table:
 
 - Card identity in labels is player-scoped with the same visibility rule as the
   view: an opponent's facedown commit reads "a card" until the card is public;
-  spectators get the fully-masked form.
+  spectators get the fully-masked form. A Level Up choice reads
+  "<hero> upgraded a card" to everyone but the upgrading player.
 - `superseded: true` marks records behind a rewind (dead segments). Render
   `ov_rewind` rows as visible markers and grey out superseded rows rather than
   hiding them.

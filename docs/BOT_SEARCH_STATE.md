@@ -127,3 +127,11 @@ See [Batch and sequence legality checks](LEGALITY_CHECKS.md) for the read-only
 candidate and prefix-trie sequence APIs, shared movement traversal, guard cases,
 measurements and regression coverage. These checks do not replace completed
 search rollouts or change the two-turn horizon.
+
+
+## Native engine roadmap
+
+The [Rust search engine implementation plan](superpowers/plans/2026-10-23-rust-search-engine.md)
+defines the Python legality oracle, compact native rules representation,
+make/unmake, iterative alpha-beta search, hidden/simultaneous planning,
+differential tests, integration milestones and performance acceptance gates.

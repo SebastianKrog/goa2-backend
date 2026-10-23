@@ -670,7 +670,8 @@ class HasEmptyNeighborFilter(FilterCondition):
 class MovementPathFilter(FilterCondition):
     """
     Filters hexes to only those reachable via valid movement path.
-    Uses a single BFS to compute all reachable hexes, then does O(1) lookups.
+    Prepared scans use one BFS and O(1) lookups. Direct calls are fresh so a
+    filter cannot retain legality from a different state, unit or context.
     """
 
     type: FilterType = FilterType.MOVEMENT_PATH
@@ -680,22 +681,16 @@ class MovementPathFilter(FilterCondition):
     pass_through_obstacles: bool = False
 
     def _get_reachable(self, state: GameState, context: dict) -> set:
-        cache = getattr(self, "_reachable_cache", None)
-        if cache is not None:
-            return cache
-
         uid = self.unit_id
         if not uid and self.unit_key:
             uid = context.get(self.unit_key)
         if not uid:
             uid = state.current_actor_id
         if not uid:
-            object.__setattr__(self, "_reachable_cache", set())
             return set()
 
         start_hex = state.entity_locations.get(BoardEntityID(str(uid)))
         if not start_hex:
-            object.__setattr__(self, "_reachable_cache", set())
             return set()
 
         from goa2.engine import rules
@@ -710,7 +705,6 @@ class MovementPathFilter(FilterCondition):
             topology_unit_ids=[str(uid)],
             moved_ids=[str(uid)],
         )
-        object.__setattr__(self, "_reachable_cache", result)
         return result
 
     def prepare(self, state: GameState, context: dict):

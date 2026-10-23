@@ -149,6 +149,93 @@ def validate_movement_path(
     topology_unit_ids: list[str] | None = None,
     moved_ids: list[str] | None = None,
 ) -> bool:
+    """Validate one destination using the same prepared traversal as batch checks."""
+    return validate_movement_paths(
+        board,
+        start,
+        [end],
+        max_steps,
+        ignore_obstacles,
+        active_zone_id,
+        state,
+        actor_id,
+        pass_through_obstacles,
+        topology_unit_ids,
+        moved_ids,
+    )[0]
+
+
+def validate_movement_paths(
+    board: Board,
+    start: Hex,
+    ends,
+    max_steps: int,
+    ignore_obstacles: bool = False,
+    active_zone_id: str | None = None,
+    state: GameState | None = None,
+    actor_id: str | None = None,
+    pass_through_obstacles: bool = False,
+    topology_unit_ids: list[str] | None = None,
+    moved_ids: list[str] | None = None,
+) -> list[bool]:
+    """Check many destinations from one unchanged state, preserving input order.
+
+    Ordinary search boards share one exact traversal. Effects, tokens, custom
+    validators and ordinary non-search boards use the original per-target rules.
+    ``ignore_obstacles`` permits an occupied destination, whereas
+    ``pass_through_obstacles`` permits intermediate obstacles; these are distinct.
+    No query result survives this call or a state mutation.
+    """
+    ends = list(ends)
+    if not ends:
+        return []
+    if max_steps <= 0:
+        return [False] * len(ends)
+    reachable = _plain_reachable(board, start, max_steps, state, pass_through_obstacles)
+    if reachable is None:
+        return [
+            _validate_movement_path_general(
+                board,
+                start,
+                end,
+                max_steps,
+                ignore_obstacles,
+                active_zone_id,
+                state,
+                actor_id,
+                pass_through_obstacles,
+                topology_unit_ids,
+                moved_ids,
+            )
+            for end in ends
+        ]
+    terminal = set()
+    if ignore_obstacles and not pass_through_obstacles:
+        previous = _plain_reachable(board, start, max_steps - 1, state, False)
+        terminal = {
+            neighbor for h in previous for neighbor in h.neighbors() if neighbor in board.tiles
+        }
+    return [
+        end != start
+        and (end in reachable or end in terminal)
+        and (ignore_obstacles or not board.get_tile(end).is_obstacle)
+        for end in ends
+    ]
+
+
+def _validate_movement_path_general(
+    board: Board,
+    start: Hex,
+    end: Hex,
+    max_steps: int,
+    ignore_obstacles: bool = False,
+    active_zone_id: str | None = None,
+    state: GameState | None = None,
+    actor_id: str | None = None,
+    pass_through_obstacles: bool = False,
+    topology_unit_ids: list[str] | None = None,
+    moved_ids: list[str] | None = None,
+) -> bool:
     """
     Validates if a unit can move from start to end within max_steps.
     Standard rules:

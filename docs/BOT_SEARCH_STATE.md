@@ -119,3 +119,11 @@ ResolveCardTextStep 0.170 seconds. These are separate overlapping breakdowns,
 not percentages to add together. This is an opening position with few connected
 attacks; it does not establish combat cost in a crowded late-game position.
 The raw capture is the lab runtime's search-1000-action-breakdown.json.
+
+
+## Legality queries
+
+See [Batch and sequence legality checks](LEGALITY_CHECKS.md) for the read-only
+candidate and prefix-trie sequence APIs, shared movement traversal, guard cases,
+measurements and regression coverage. These checks do not replace completed
+search rollouts or change the two-turn horizon.

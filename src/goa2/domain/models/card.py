@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, ClassVar
 
-from pydantic import ConfigDict, Field, model_validator
+from pydantic import ConfigDict, Field, PrivateAttr, model_serializer, model_validator
 
 from .base import GameEntity
 from .enums import ActionType, CardColor, CardState, CardTier, StatType
@@ -13,6 +13,12 @@ class Card(GameEntity):
     Represents a specific card definition.
     Current state (In Hand, Discarded) is managed by GameState.
     """
+
+    _search_dynamic_fields: ClassVar[frozenset[str]] = frozenset({
+        "state", "is_facedown", "played_this_round", "initiative_override",
+        "passive_uses_this_turn", "is_active_base", "enraged_active_override", "metadata",
+    })
+    _definition_revision: int = PrivateAttr(default=0)
 
     # Renamed internal storage for masking logic
     tier: CardTier = Field(alias="tier")
@@ -83,6 +89,13 @@ class Card(GameEntity):
 
     metadata: dict[str, Any] | None = None
 
+    @model_serializer(mode="wrap")
+    def _serialize_card(self, handler, info):
+        # Optional internal encoding context; ordinary API/save serialization
+        # remains exactly the normal Pydantic handler output.
+        encoder = info.context.get("_compact_card_encoder") if isinstance(info.context, dict) else None
+        return encoder.pack_card(self) if encoder is not None else handler(self)
+
     def __init__(self, **data):
         super().__init__(**data)
         if self.metadata is None:
@@ -90,6 +103,8 @@ class Card(GameEntity):
 
     def __setattr__(self, name: str, value: Any) -> None:
         super().__setattr__(name, value)
+        if name not in self._search_dynamic_fields and name in type(self).model_fields:
+            self._definition_revision += 1
         if name == "state" and value != CardState.UNRESOLVED:
             super().__setattr__("initiative_override", None)
 

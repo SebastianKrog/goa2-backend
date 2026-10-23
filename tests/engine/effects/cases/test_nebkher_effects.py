@@ -1001,8 +1001,8 @@ def test_mind_grip_does_not_substitute_defenders_glitches(round_trip) -> None:
     state = (
         EffectScenarioBuilder()
         .with_hexes([(q, r, -q - r) for q in range(-4, 5) for r in range(-4, 5) if abs(q + r) <= 4])
-        .red_hero(NEB, at=(1, 0, -1), current_card=hero_card("NebKher", "mind_grip"))
-        .blue_hero("hero_emmitt", at=(0, 0, 0))
+        .red_hero(NEB, name="NebKher", at=(1, 0, -1), current_card=hero_card("NebKher", "mind_grip"))
+        .blue_hero("hero_emmitt", name="Emmitt", at=(0, 0, 0))
         .with_actor(NEB)
         .build()
     )

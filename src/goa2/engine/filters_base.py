@@ -29,6 +29,15 @@ class FilterCondition(BaseModel):
 
     type: FilterType
 
+    def prepare(self, state: GameState, context: dict):
+        """Bind a predicate for one read-only candidate scan.
+
+        Callers must prepare again after any state/context mutation. The default
+        preserves per-candidate behavior; expensive filters may precompute only
+        candidate-independent facts. Nothing is retained on the filter or state.
+        """
+        return lambda candidate: self.apply(candidate, state, context)
+
     def apply(self, candidate: Any, state: GameState, context: dict) -> bool:
         """
         Returns True if the candidate passes the filter.

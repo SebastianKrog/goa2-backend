@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_serializer, model_validator
 
 from goa2.domain.hex import Hex
 from goa2.domain.models.spawn import SpawnPoint
@@ -46,6 +46,22 @@ class Board(BaseModel):
     spawn_points: list[SpawnPoint] = Field(default_factory=list)
 
     tiles: dict[Hex, Tile] = Field(default_factory=dict)
+
+    @field_serializer("tiles", mode="wrap")
+    def _serialize_tiles(self, tiles, handler):
+        # Disposable search maps can share immutable records internally while
+        # retaining the ordinary dict[Hex, Tile] save/API representation.
+        materialize = getattr(tiles, "_as_plain_tiles", None)
+        if materialize is not None:
+            return handler(materialize())
+        if any(not isinstance(tile, Tile) for tile in tiles.values()):
+            tiles = {
+                key: (
+                    tile._as_search_tile_model() if hasattr(tile, "_as_search_tile_model") else tile
+                )
+                for key, tile in tiles.items()
+            }
+        return handler(tiles)
 
     # Ordered zone sequences from Red Throne to Blue Throne, keyed by lane id.
     # Single-lane maps have one entry (DEFAULT_LANE_ID);

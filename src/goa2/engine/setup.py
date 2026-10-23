@@ -16,6 +16,7 @@ from goa2.domain.models import (
     TokenType,
 )
 from goa2.domain.models.spawn import SpawnType
+from goa2.domain.models.token import roster_token_types
 from goa2.domain.rules_version import CURRENT_RULES_VERSION
 from goa2.domain.state import GameState
 from goa2.domain.time_control import TimeControlConfig, create_game_clock
@@ -220,9 +221,17 @@ class GameSetup:
 
     @staticmethod
     def _initialize_token_pool(state: GameState):
-        state.token_pool = {token_type: [] for token_type in TokenType}
+        required = roster_token_types(
+            hero.name for team in state.teams.values() for hero in team.heroes
+        )
+        state.token_pool = {kind: [] for kind in TokenType if kind in required}
 
         for token_type in TokenType:
+            if token_type not in required:
+                # Preserve entity IDs and the seeded mine layout of recorded
+                # games without allocating unused token objects.
+                state.next_entity_id += TOKEN_SUPPLY.get(token_type, 0)
+                continue
             if token_type == TokenType.MINE_DUD:
                 # Both mine subtypes are allocated together below so their
                 # generic IDs do not reveal a stable blast/dud boundary.

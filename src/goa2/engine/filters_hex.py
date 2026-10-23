@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import Any, Literal
 
 from pydantic import Field, field_serializer, field_validator
@@ -20,6 +21,22 @@ from goa2.engine.filters_base import (
     revalidate_filters,
 )
 from goa2.engine.topology import get_topology_service
+
+
+def _reject_hex(candidate):
+    return False
+
+
+_reject_hex.hex_candidates = ()
+
+
+@lru_cache(maxsize=256)
+def _hex_disk(q, r, s, radius):
+    return tuple(
+        Hex(q=q + dq, r=r + dr, s=s - dq - dr)
+        for dq in range(-radius, radius + 1)
+        for dr in range(max(-radius, -dq - radius), min(radius, -dq + radius) + 1)
+    )
 
 
 class ObstacleFilter(FilterCondition):
@@ -402,71 +419,66 @@ class RangeFilter(FilterCondition):
     distance_mode: Literal["topology", "geometric"] = "topology"
 
     def apply(self, candidate: Any, state: GameState, context: dict) -> bool:
-        # Resolve runtime bounds from context if keys are provided, otherwise
-        # fall back to the static min_range/max_range literals. None on either
-        # bound means "unbounded" on that side.
-        max_r = self.max_range
-        if self.max_range_key:
-            raw_max = context.get(self.max_range_key)
-            if isinstance(raw_max, int):
-                max_r = raw_max
-        min_r = self.min_range
-        if self.min_range_key:
-            raw_min = context.get(self.min_range_key)
-            if isinstance(raw_min, int):
-                min_r = raw_min
+        return self._prepare_range(state, context)(candidate)
 
-        origin_hex: Hex | None = None
-        origin_uid: Any = None
+    def prepare(self, state: GameState, context: dict):
+        if type(self).apply is not RangeFilter.apply:
+            return super().prepare(state, context)
+        return self._prepare_range(state, context)
 
-        # Priority: origin_hex_key (direct hex) > origin_id > origin_key > actor
+    def _prepare_range(self, state: GameState, context: dict):
+        max_r, min_r = self.max_range, self.min_range
+        if self.max_range_key and isinstance(context.get(self.max_range_key), int):
+            max_r = context[self.max_range_key]
+        if self.min_range_key and isinstance(context.get(self.min_range_key), int):
+            min_r = context[self.min_range_key]
+        origin_hex = None
+        origin_uid = None
         if self.origin_hex_key:
             raw = context.get(self.origin_hex_key)
             if isinstance(raw, Hex):
                 origin_hex = raw
             elif isinstance(raw, dict):
                 origin_hex = Hex(**raw)
-
         if origin_hex is None:
             if self.origin_id:
                 origin_uid = self.origin_id
             elif self.origin_key:
                 origin_uid = context.get(self.origin_key)
-
             if not origin_uid:
                 origin_uid = state.current_actor_id
-
             if not origin_uid:
-                return False
-
+                return _reject_hex
             origin_hex = state.get_position(str(origin_uid))
-            if not origin_hex:
+            if origin_hex is None:
+                return _reject_hex
+        geometric = self.distance_mode == "geometric"
+        topology = get_topology_service()
+
+        def accepts(candidate):
+            target_uid = None
+            if isinstance(candidate, Hex):
+                target_hex = candidate
+            elif isinstance(candidate, str):
+                target_uid = candidate
+                target_hex = state.entity_locations.get(BoardEntityID(candidate))
+            else:
                 return False
-
-        target_hex = None
-        target_uid = None
-        if isinstance(candidate, Hex):
-            target_hex = candidate
-        elif isinstance(candidate, str):  # EntityID
-            target_uid = candidate
-            target_hex = state.entity_locations.get(BoardEntityID(candidate))
-
-        if not target_hex:
-            return False
-
-        if self.distance_mode == "geometric":
-            dist = origin_hex.distance(target_hex)
-        else:
-            topology = get_topology_service()
-            unit_ids = [str(uid) for uid in (origin_uid, target_uid) if uid]
-            # Disconnection is not an arbitrarily large legal range. Reject it
-            # even when this range constraint has no upper bound.
-            if not topology.are_connected(origin_hex, target_hex, state, unit_ids=unit_ids):
+            if target_hex is None:
                 return False
-            dist = origin_hex.distance(target_hex)
-        if min_r is not None and dist < min_r:
-            return False
-        return max_r is None or dist <= max_r
+            if not geometric:
+                unit_ids = [str(uid) for uid in (origin_uid, target_uid) if uid]
+                if not topology.are_connected(origin_hex, target_hex, state, unit_ids=unit_ids):
+                    return False
+            distance = origin_hex.distance(target_hex)
+            return (min_r is None or distance >= min_r) and (max_r is None or distance <= max_r)
+
+        if isinstance(max_r, int):
+            if max_r < 0:
+                accepts.hex_candidates = ()
+            elif 1 + 3 * max_r * (max_r + 1) < len(state.board.tiles):
+                accepts.hex_candidates = _hex_disk(origin_hex.q, origin_hex.r, origin_hex.s, max_r)
+        return accepts
 
 
 class SpawnPointFilter(FilterCondition):
@@ -701,6 +713,17 @@ class MovementPathFilter(FilterCondition):
         object.__setattr__(self, "_reachable_cache", result)
         return result
 
+    def prepare(self, state: GameState, context: dict):
+        if type(self).apply is not MovementPathFilter.apply:
+            return super().prepare(state, context)
+        reachable = self._get_reachable(state, context)
+
+        def accepts(candidate):
+            return isinstance(candidate, Hex) and candidate in reachable
+
+        accepts.hex_candidates = reachable
+        return accepts
+
     def apply(self, candidate: Any, state: GameState, context: dict) -> bool:
         if not isinstance(candidate, Hex):
             return False
@@ -729,61 +752,52 @@ class FastTravelDestinationFilter(FilterCondition):
     def apply(self, candidate: Any, state: GameState, context: dict) -> bool:
         if not isinstance(candidate, Hex):
             return False
+        return self.prepare(state, context)(candidate)
 
+    def prepare(self, state: GameState, context: dict):
+        """Resolve shared action/safe-zone facts once for an unchanged scan."""
         uid = self.unit_id or state.current_actor_id
         if not uid:
-            return False
-
-        # Check validation first
+            return _reject_hex
+        uid = str(uid)
         if not state.validator.can_fast_travel(
-            state, str(uid), context, source_card_id=self.source_card_id
+            state, uid, context, source_card_id=self.source_card_id
         ).allowed:
-            return False
-
-        unit = state.get_unit(UnitID(str(uid)))
-        if not unit:
-            return False
-
-        current_hex = state.entity_locations.get(BoardEntityID(str(uid)))
-        if not current_hex:
-            return False
-
+            return _reject_hex
+        unit = state.get_unit(UnitID(uid))
+        current_hex = state.entity_locations.get(BoardEntityID(uid))
+        if unit is None or unit.team is None or current_hex is None:
+            return _reject_hex
         current_zone_id = state.board.get_zone_for_hex(current_hex)
         if not current_zone_id:
-            return False
-
+            return _reject_hex
         from goa2.engine.rules import get_safe_zones_for_fast_travel
 
-        if unit.team is None:
-            return False
-
-        safe_zones = get_safe_zones_for_fast_travel(state, unit.team, current_zone_id)
-
+        safe_zones = frozenset(get_safe_zones_for_fast_travel(state, unit.team, current_zone_id))
         if not safe_zones:
-            return False
+            return _reject_hex
+        topology = get_topology_service()
 
-        # Check if candidate is in a safe zone and empty
-        cand_zone_id = state.board.get_zone_for_hex(candidate)
-        if cand_zone_id not in safe_zones:
-            return False
+        def accepts(candidate):
+            if not isinstance(candidate, Hex):
+                return False
+            cand_zone_id = state.board.get_zone_for_hex(candidate)
+            if cand_zone_id not in safe_zones:
+                return False
+            if self.require_zone_change and cand_zone_id == current_zone_id:
+                return False
+            if not topology.are_connected(current_hex, candidate, state, unit_ids=[uid]):
+                return False
+            if state.validator.is_obstacle_for_actor(state, candidate, uid, context):
+                return False
+            tile = state.board.get_tile(candidate)
+            return not (not tile or tile.is_occupied)
 
-        # "Fast travel to an adjacent zone" must actually leave the current one.
-        if self.require_zone_change and cand_zone_id == current_zone_id:
-            return False
-
-        # Fast travel is bound by topology (reality splits) ...
-        if not get_topology_service().are_connected(
-            current_hex, candidate, state, unit_ids=[str(uid)]
-        ):
-            return False
-
-        # ... and by static barriers, which make hexes obstacles for this actor.
-        if state.validator.is_obstacle_for_actor(state, candidate, str(uid), context):
-            return False
-
-        tile = state.board.get_tile(candidate)
-        # Note: SelectStep already filters for candidates.
-        # But we must ensure it is empty.
-        # Exception: if it's the unit's own hex, it might be "occupied" by itself
-        # but usually Fast Travel wants a NEW empty hex.
-        return not (not tile or tile.is_occupied)
+        allowed_zones = safe_zones - {current_zone_id} if self.require_zone_change else safe_zones
+        zone_candidates = getattr(state.board.tiles, "_zone_candidates", None)
+        accepts.hex_candidates = (
+            zone_candidates(allowed_zones)
+            if zone_candidates is not None
+            else tuple(h for h, tile in state.board.tiles.items() if tile.zone_id in allowed_zones)
+        )
+        return accepts

@@ -1136,7 +1136,7 @@ def test_glitch_token_supply_is_three():
     state = (
         EffectScenarioBuilder()
         .line_board(4)
-        .red_hero("hero_a", at=(0, 0, 0))
+        .red_hero("hero_a", name="Emmitt", at=(0, 0, 0))
         .blue_hero("hero_b", at=(2, 0, -2))
         .build()
     )

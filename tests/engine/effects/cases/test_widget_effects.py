@@ -93,7 +93,7 @@ def test_widget_easy_effects_are_registered() -> None:
 
 @pytest.mark.effect_contract
 def test_setup_creates_persistent_pyro_token() -> None:
-    state = EffectScenarioBuilder().line_board().red_hero("hero_widget", at=(0, 0, 0)).build()
+    state = EffectScenarioBuilder().line_board().red_hero("hero_widget", name="Widget", at=(0, 0, 0)).build()
     GameSetup._initialize_token_pool(state)
 
     assert len(state.token_pool[TokenType.PYRO]) == 1

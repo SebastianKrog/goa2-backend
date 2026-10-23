@@ -35,6 +35,21 @@ from goa2.engine.steps.base import GameStep, StepResult
 logger = logging.getLogger(__name__)
 
 
+def _narrow_hex_candidates(candidates, predicates, state):
+    bound = None
+    for predicate in predicates:
+        candidate_bound = getattr(predicate, "hex_candidates", None)
+        if candidate_bound is not None and (bound is None or len(candidate_bound) < len(bound)):
+            bound = candidate_bound
+    if bound is None or len(bound) >= len(candidates):
+        return candidates
+    ordered_subset = getattr(state.board.tiles, "_ordered_subset", None)
+    if ordered_subset is not None:
+        return ordered_subset(bound)
+    allowed = set(bound)
+    return [candidate for candidate in candidates if candidate in allowed]
+
+
 def normalize_prompt_player_id(state: GameState, raw_id: Any) -> str:
     """Resolve an entity ID to the player who answers input prompts.
 
@@ -300,6 +315,9 @@ class SelectStep(GameStep):
 
         valid_candidates = []
         effective_filters = self._get_effective_filters()
+        predicates = [f.prepare(state, context) for f in effective_filters]
+        if self.target_type == TargetType.HEX:
+            candidates = _narrow_hex_candidates(candidates, predicates, state)
         for c in candidates:
             # Intrinsic Validation for UNITS: Check can_be_targeted (LOS, etc.)
             # Only actual units are validated — tokens skip it in both modes
@@ -315,8 +333,8 @@ class SelectStep(GameStep):
                     continue
 
             is_valid = True
-            for f in effective_filters:
-                if not f.apply(c, state, context):
+            for accepts in predicates:
+                if not accepts(c):
                     is_valid = False
                     break
             if is_valid:
@@ -501,6 +519,9 @@ class MultiSelectStep(GameStep):
         # Apply filters
         valid = []
         effective_filters = self._get_effective_filters()
+        predicates = [f.prepare(state, context) for f in effective_filters]
+        if self.target_type == TargetType.HEX:
+            candidates = _narrow_hex_candidates(candidates, predicates, state)
         for c in candidates:
             # Skip already selected
             if str(c) in self.selections:
@@ -519,8 +540,8 @@ class MultiSelectStep(GameStep):
 
             # Apply custom filters
             is_valid = True
-            for f in effective_filters:
-                if not f.apply(c, state, context):
+            for accepts in predicates:
+                if not accepts(c):
                     is_valid = False
                     break
             if is_valid:

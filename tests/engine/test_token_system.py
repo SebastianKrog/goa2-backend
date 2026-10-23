@@ -62,11 +62,21 @@ def _make_state() -> GameState:
     return state
 
 
-def test_game_setup_initializes_token_pool():
+def test_game_setup_omits_supply_for_roster_without_tokens():
     state = GameSetup.create_game("src/goa2/data/maps/forgotten_island.json", ["Arien"], ["Wasp"])
-    assert set(state.token_pool.keys()) == set(TokenType)
-    for token_type, expected_count in TOKEN_SUPPLY.items():
-        assert len(state.token_pool[token_type]) == expected_count
+    assert state.token_pool == {}
+    assert not any(isinstance(entity, Token) for entity in state.misc_entities.values())
+
+
+def test_game_setup_initializes_only_roster_supply():
+    state = GameSetup.create_game("src/goa2/data/maps/forgotten_island.json", ["Min"], ["Tali"])
+    required = {TokenType.SMOKE_BOMB, TokenType.GRENADE, TokenType.MINE_BLAST,
+                TokenType.MINE_DUD, TokenType.ICE, TokenType.TOTEM}
+    assert set(state.token_pool) == required
+    for kind in required:
+        assert len(state.token_pool[kind]) == TOKEN_SUPPLY[kind]
+        for token in state.token_pool[kind]:
+            assert state.misc_entities[token.id] is token
 
 
 def test_mine_subtypes_are_seeded_behind_generic_ids():
@@ -75,7 +85,7 @@ def test_mine_subtypes_are_seeded_behind_generic_ids():
     def mapping(seed: int) -> dict[str, TokenType]:
         state = GameSetup.create_game(
             "src/goa2/data/maps/forgotten_island.json",
-            ["Arien"],
+            ["Min"],
             ["Wasp"],
             seed=seed,
         )

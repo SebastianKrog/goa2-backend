@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from typing import Literal
 
 from goa2.domain.models.base import BoardEntity
@@ -23,6 +24,29 @@ TOKEN_SUPPLY: dict[TokenType, int] = {
     TokenType.ILLUSION: 3,
     TokenType.FAMILIAR: 1,
 }
+
+
+# Include every upgrade/spell, not just the hero's current hand or level.
+HERO_TOKEN_TYPES: dict[str, frozenset[TokenType]] = {
+    "Min": frozenset(
+        {TokenType.SMOKE_BOMB, TokenType.GRENADE, TokenType.MINE_BLAST, TokenType.MINE_DUD}
+    ),
+    "Mortimer": frozenset({TokenType.ZOMBIE}),
+    "Widget": frozenset({TokenType.PYRO}),
+    "Trinkets": frozenset({TokenType.BARRIER}),
+    "Tali": frozenset({TokenType.ICE, TokenType.TOTEM}),
+    "Wuk": frozenset({TokenType.TREE}),
+    "Mrak": frozenset({TokenType.ROCK}),
+    "Ignatia": frozenset({TokenType.MAGMA}),
+    "Emmitt": frozenset({TokenType.GLITCH}),
+    "NebKher": frozenset({TokenType.ILLUSION}),
+    "Gydion": frozenset({TokenType.FAMILIAR}),
+}
+
+
+def roster_token_types(hero_names: Iterable[str]) -> set[TokenType]:
+    """Supply needed for all future actions available to this roster."""
+    return {kind for name in hero_names for kind in HERO_TOKEN_TYPES.get(name, ())}
 
 
 class Token(BoardEntity):

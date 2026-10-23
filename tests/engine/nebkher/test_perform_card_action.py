@@ -197,8 +197,8 @@ def _state() -> GameState:
     board.zones = {"z1": Zone(id="z1", hexes=hexes, neighbors=[])}
     board.populate_tiles_from_zones()
 
-    actor = Hero(id="hero_actor", name="Actor", team=TeamColor.RED, deck=[], level=1)
-    enemy = Hero(id="hero_enemy", name="Enemy", team=TeamColor.BLUE, deck=[], level=1)
+    actor = Hero(id="hero_actor", name="NebKher", team=TeamColor.RED, deck=[], level=1)
+    enemy = Hero(id="hero_enemy", name="Wuk", team=TeamColor.BLUE, deck=[], level=1)
     state = GameState(
         board=board,
         teams={

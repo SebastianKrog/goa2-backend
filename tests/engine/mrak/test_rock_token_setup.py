@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from goa2.domain.board import Board
-from goa2.domain.models import Team, TeamColor, TokenType
+from goa2.domain.models import Hero, Team, TeamColor, TokenType
 from goa2.domain.models.token import TOKEN_SUPPLY
 from goa2.domain.state import GameState
 from goa2.engine.setup import GameSetup
@@ -13,7 +13,7 @@ def _state() -> GameState:
     return GameState(
         board=Board(),
         teams={
-            TeamColor.RED: Team(color=TeamColor.RED, heroes=[], minions=[]),
+            TeamColor.RED: Team(color=TeamColor.RED, heroes=[Hero(id="hero_test", name="Mrak", team=TeamColor.RED, deck=[])], minions=[]),
             TeamColor.BLUE: Team(color=TeamColor.BLUE, heroes=[], minions=[]),
         },
     )

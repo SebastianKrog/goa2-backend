@@ -23,7 +23,7 @@ from automata.search.continuation import (
     AgentContinuationPolicy,
     PriorSamplingContinuationPolicy,
 )
-from automata.search.contracts import LeafEvaluator, LeafMode, SearchPolicy
+from automata.search.contracts import CutoffUnit, LeafEvaluator, LeafMode, SearchPolicy
 from automata.search.fallback import FallbackLeafEvaluator, FallbackSearchPolicy
 from automata.search.heuristic import HeuristicLeafEvaluator, HeuristicPrior
 from goa2.domain.state import GameState
@@ -90,6 +90,8 @@ def agent_for_spec(
     state: GameState | None = None,
     artifact_root: str | Path | None = None,
     runtime_cache: RuntimeCacheLike | None = None,
+    leaf_evaluator: LeafEvaluator | None = None,
+    cutoff_unit: CutoffUnit = CutoffUnit.ROUNDS,
 ) -> Agent:
     """Build one of the classic random, heuristic, or ISMCTS agents."""
     if spec.kind == "random":
@@ -100,7 +102,7 @@ def agent_for_spec(
         settings = spec.search or SearchSettings()
         policy = HeuristicAgent(seed=seed)
         prior: SearchPolicy = HeuristicPrior(policy)
-        leaf: LeafEvaluator = HeuristicLeafEvaluator()
+        leaf: LeafEvaluator = leaf_evaluator or HeuristicLeafEvaluator()
         if settings.artifact is not None:
             if state is None or artifact_root is None:
                 raise ValueError("learned ISMCTS requires game state and artifact root")
@@ -160,6 +162,7 @@ def agent_for_spec(
             decision_timeout_seconds=settings.decision_timeout_seconds,
             seed=seed,
             cutoff_limit=settings.horizon,
+            cutoff_unit=cutoff_unit,
             leaf_mode=(
                 LeafMode.IMMEDIATE
                 if settings.leaf_mode == "immediate"

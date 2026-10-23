@@ -40,18 +40,32 @@ from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from functools import wraps
+from time import perf_counter as _reuse_clock
 from typing import Any, ParamSpec, Protocol, TypeVar, cast
 
+from automata.advance_reuse import read_only_heuristic, reuse_advance
 from automata.agents.contracts import Agent, PlanningKind
+from automata.agents.heuristic_agent import HeuristicAgent
+from automata.agents.random_agent import RandomAgent
 from automata.decision import ActionBoundaryKind, DecisionDescriptor, DecisionSemanticRole
-from automata.runtime.clone import clone_state
+from automata.rollout_reuse import reuse_bounded
+from automata.runtime.clone import clone_state, prepare_search_state
 from automata.runtime.determinize import determinize
 from automata.runtime.outcomes import resolve_terminal_winner_side
+from automata.runtime.tile_map import SearchTileMap
 from automata.runtime.value_boundary import (
     StableValueBoundary,
     capture_transition_anchor,
     should_stop_before_stable_boundary,
     transition_reached,
+)
+from automata.search_reuse import (
+    board_key,
+    current_reuse,
+    planning_rng_lock,
+    record_planning_event,
+    search_reuse,
+    trace_planning,
 )
 from goa2.domain.input import (
     InputOption,
@@ -91,7 +105,7 @@ from ..contracts import (
     supports_contextual_root_coverage,
     supports_immediate_edge,
 )
-from ..heuristic import HeuristicLeafEvaluator
+from ..heuristic import HeuristicLeafEvaluator, HeuristicPrior
 from ..node import Key, Node, action_key
 from ..root import RootMismatchError as RootMismatchError
 from ..root import RootTarget, ValidatedRoot, validate_root, validate_root_decision
@@ -148,7 +162,7 @@ def _suppress_hypothetical_engine_info() -> Iterator[None]:
 def _without_hypothetical_engine_info(func: Callable[_P, _R]) -> Callable[_P, _R]:
     @wraps(func)
     def wrapped(*args: _P.args, **kwargs: _P.kwargs) -> _R:
-        with _suppress_hypothetical_engine_info():
+        with _suppress_hypothetical_engine_info(), search_reuse():
             return func(*args, **kwargs)
 
     return wrapped
@@ -304,14 +318,26 @@ class SearchProgressionError(RuntimeError):
 
 def _state_fingerprint(state: GameState) -> bytes:
     """Stable progression fingerprint without the immutable/derived board."""
-    payload = state.model_dump_json(exclude={"board"}).encode("utf-8")
+    cache = current_reuse()
+    if cache is not None:
+        return cache.compact.fingerprint(state)
+    # Produce the exact same JSON bytes directly, avoiding a Unicode string
+    # allocation followed immediately by UTF-8 re-encoding on every transition.
+    payload = state.__pydantic_serializer__.to_json(state, exclude={"board"})
     return hashlib.blake2b(payload, digest_size=16).digest()
 
 
-def _decision_fingerprint(state: GameState, decision: DecisionDescriptor) -> tuple[object, ...]:
+_READ_ONLY_INPUT_METHODS = (HeuristicAgent.choose_input, RandomAgent.choose_input)
+_READ_ONLY_PRIOR_SCORE = HeuristicPrior.score
+_READ_ONLY_CONTINUATION_CHOOSE = AgentContinuationPolicy.choose
+
+
+def _decision_fingerprint(
+    state: GameState, decision: DecisionDescriptor, *, fingerprint: bytes | None = None
+) -> tuple[object, ...]:
     request = decision.request
     return (
-        _state_fingerprint(state),
+        _state_fingerprint(state) if fingerprint is None else fingerprint,
         decision.kind,
         str(decision.hero.id) if decision.hero is not None else None,
         request.id if request is not None else None,
@@ -414,6 +440,19 @@ class _Simulator:
             ),
         )
 
+    def _own_state(self, decision=None):
+        """Detach a private search snapshot before mutation or custom evaluation."""
+        if getattr(self, "_borrowed_state", False):
+            known = getattr(self, "_known_state_key", None)
+            self.state = clone_state(self.state)
+            self.session.state = self.state
+            self._borrowed_state = False
+            if known is not None:
+                self._known_state_key = (id(self.state), known[1], known[2])
+            if decision is not None and decision.hero is not None:
+                decision = replace(decision, hero=self.state.get_hero(HeroID(decision.hero.id)))
+        return decision
+
     def progression_error(
         self,
         reason: str,
@@ -489,6 +528,7 @@ class _Simulator:
                     return True
         return False
 
+    @reuse_advance
     def advance(
         self,
         pending: InputResponse | None = None,
@@ -501,6 +541,12 @@ class _Simulator:
         resp = pending
         seen_planning: set[tuple[object, ...]] = set()
         seen_environment_inputs: set[tuple[object, ...]] = set()
+        ready_fingerprint: bytes | None = getattr(self, "_advance_entry_fingerprint", None)
+        readonly_input_policy = (
+            type(self.environment_policy) in (HeuristicAgent, RandomAgent)
+            and getattr(self.environment_policy.choose_input, "__func__", None)
+            in _READ_ONLY_INPUT_METHODS
+        )
         while True:
             self._check_advance_budget()
             if action_boundary is not None and resp is None:
@@ -518,7 +564,11 @@ class _Simulator:
                     # Non-owned commit (teammate or opponent) = hidden sample
                     # via the default policy so it never becomes a root.
                     planning_fingerprint = (
-                        _state_fingerprint(self.state),
+                        (
+                            ready_fingerprint
+                            if ready_fingerprint is not None
+                            else _state_fingerprint(self.state)
+                        ),
                         str(hero.id),
                         second_card_window,
                     )
@@ -533,6 +583,7 @@ class _Simulator:
                             ),
                         )
                     seen_planning.add(planning_fingerprint)
+                    ready_fingerprint = None
                     planning = self.environment_policy.choose_planning(self.state, hero)
                     if planning.kind is PlanningKind.FINISH:
                         self.session.finish_planning(HeroID(hero.id))
@@ -544,10 +595,15 @@ class _Simulator:
                     continue
                 # All committed: fall through to advance the resolution stack.
 
-            before = _state_fingerprint(self.state)
+            before = (
+                ready_fingerprint
+                if ready_fingerprint is not None
+                else _state_fingerprint(self.state)
+            )
+            ready_fingerprint = None
             self._record_transition("session")
             if action_boundary is None:
-                result = self.session.advance(resp)
+                result = self._advance_session(resp, before)
             else:
                 result = self.session.advance(
                     resp,
@@ -580,19 +636,24 @@ class _Simulator:
                 # Non-owned input, or a non-branchable request (e.g. UPGRADE_PHASE):
                 # resolve with the default policy and keep advancing.
                 decision = DecisionDescriptor("INPUT", request=request)
-                input_fingerprint = _decision_fingerprint(self.state, decision)
+                after = _state_fingerprint(self.state)
+                input_fingerprint = _decision_fingerprint(self.state, decision, fingerprint=after)
                 self._record_transition("input", decision)
                 if input_fingerprint in seen_environment_inputs:
                     raise self.progression_error("repeated environment input decision", decision)
                 seen_environment_inputs.add(input_fingerprint)
                 selection = self.environment_policy.choose_input(self.state, request)
+                # Built-in input policies only read game state. Reuse the exact
+                # key just computed for their cycle guard, until the next rule
+                # mutation. Unknown/overridden policies retain fresh hashing.
+                if readonly_input_policy:
+                    ready_fingerprint = after
                 resp = InputResponse(request_id=request.id, selection=selection)
                 continue
-            if (
-                result.result_type == SessionResultType.ACTION_COMPLETE
-                and before == _state_fingerprint(self.state)
-            ):
-                raise self.progression_error("unchanged ACTION_COMPLETE")
+            if result.result_type == SessionResultType.ACTION_COMPLETE:
+                ready_fingerprint = _state_fingerprint(self.state)
+                if before == ready_fingerprint:
+                    raise self.progression_error("unchanged ACTION_COMPLETE")
             # ACTION_COMPLETE / PHASE_CHANGED: keep advancing.
 
     # -- root anchoring ---------------------------------------------------- #
@@ -614,6 +675,74 @@ class _Simulator:
         validate_root_decision(self.state, self.our_team, target, decision)
         return decision
 
+    def _advance_session(self, response, before):
+        """Reuse only exact rule transitions, never environment policy choices."""
+        cache = current_reuse()
+        session = self.session
+        if (
+            cache is None
+            or not isinstance(self.state.board.tiles, SearchTileMap)
+            or self.state.board.tiles._foreign
+            or type(session) is not GameSession
+            or session._create_rollback_snapshots
+            or session._rollback_snapshot is not None
+        ):
+            return session.advance(response)
+        # Cheap rule transitions cost less than constructing a board key and
+        # cloning a saved world. Measure uncached cost by operation shape and
+        # only attempt reuse where that measured cost can amortize the cache.
+        top = self.state.execution_stack[-1] if self.state.execution_stack else None
+        selection = response.selection if response is not None else None
+        selection_shape = selection if isinstance(selection, str) else type(selection)
+        operation = (type(top), self.state.phase, response is None, selection_shape)
+        samples, total = cache.transition_costs.get(operation, (0, 0.0))
+        if samples < 2 or total / samples < 0.0015:
+            started = _reuse_clock()
+            result = session.advance(response)
+            cache.put(
+                "transition_costs", operation, (samples + 1, total + _reuse_clock() - started)
+            )
+            return result
+        # before covers full hidden hands, stacks, pending request IDs, context,
+        # seed and all other serialized game state. Add mutable board geometry
+        # and the session-local phase used to classify its result.
+        encoded_response = response.model_dump_json() if response is not None else None
+        key = (
+            before,
+            board_key(self.state),
+            session._last_phase,
+            session._rollback_actor_id,
+            encoded_response,
+        )
+        saved = cache.get("transitions", key)
+        if saved is not None:
+            world, result, last_phase, rollback_actor = saved
+            self.state = clone_state(world)
+            session.state = self.state
+            session._last_phase = last_phase
+            session._rollback_actor_id = rollback_actor
+            return result.model_copy(deep=True)
+        repeated = key in cache.transition_seen
+        cache.put("transition_seen", key, True)
+        started = _reuse_clock()
+        result = session.advance(response)
+        elapsed = _reuse_clock() - started
+        cache.put("transition_costs", operation, (samples + 1, total + elapsed))
+        # Do not pay to snapshot cheap or never-repeated transitions. A later
+        # occurrence can populate the cache, then hits clone independent state.
+        if repeated and elapsed >= 0.0015:
+            cache.put(
+                "transitions",
+                key,
+                (
+                    clone_state(self.state),
+                    result.model_copy(deep=True),
+                    session._last_phase,
+                    session._rollback_actor_id,
+                ),
+            )
+        return result
+
     # -- applying *our* action --------------------------------------------- #
     def apply_ours(
         self,
@@ -624,6 +753,8 @@ class _Simulator:
     ) -> DecisionDescriptor:
         """Apply our action, optionally stopping before its resolution boundary."""
         if decision.kind == "CARD":
+            decision = self._own_state(decision)
+            self._known_state_key = None
             hero = decision.hero
             assert hero is not None
             card = _find_card(hero, key) if key is not None else None
@@ -1311,6 +1442,7 @@ def _evaluate_selected_edge(
         if _uses_immediate_edge(cfg) and supports_immediate_edge(leaf_evaluator)
         else None
     )
+    turn_origin = (sim.state.round, sim.state.turn) if cfg.cutoff_unit is CutoffUnit.TURNS else None
     reached, action_boundary, stable_turn_boundary = _apply_root_edge(
         sim,
         decision,
@@ -1331,6 +1463,7 @@ def _evaluate_selected_edge(
         immediate_edge=immediate_edge,
         action_boundary=action_boundary,
         stable_turn_boundary=stable_turn_boundary,
+        **({"turn_origin": turn_origin} if turn_origin is not None else {}),
         cutoff_observer=cutoff_observer,
     )
 
@@ -1403,61 +1536,73 @@ def _same_action_input(
     return sim.state.execution_stack[-1].type not in _ACTION_BOUNDARY_STEPS
 
 
-def _rollout(
-    sim: _Simulator,
-    decision: DecisionDescriptor,
-    cfg: SearchConfig,
-    continuation_policy: ContinuationPolicy | Agent,
-    leaf_evaluator: LeafEvaluator,
-    context: SearchContext,
-    *,
-    immediate_edge: object = _NO_IMMEDIATE_EDGE,
-    action_boundary: _ActionBoundary | None = None,
-    stable_turn_boundary: _StableTurnBoundary | None = None,
-    cutoff_observer: CutoffObserver | None = None,
-) -> float:
-    """Continuation-policy playout until the configured cutoff."""
-    continuation = as_continuation_policy(continuation_policy)
-    start_round = sim.state.round
+def _choose_continuation(sim, continuation, context, decision, legal):
+    cache = current_reuse()
+    known = getattr(sim, "_known_state_key", None)
+    if (
+        cache is None
+        or not getattr(sim, "_reuse_known_keys", False)
+        or known is None
+        or known[0] != id(sim.state)
+        or type(continuation) is not AgentContinuationPolicy
+        or getattr(continuation.choose, "__func__", None) is not _READ_ONLY_CONTINUATION_CHOOSE
+        or not read_only_heuristic(continuation.agent)
+    ):
+        return continuation.choose(context, sim.state, decision, legal)
+    request = decision.request
+    key = (
+        known[1],
+        known[2],
+        context.root_viewer_id,
+        context.perspective_team,
+        context.current_owner_id,
+        decision.kind,
+        request.id if request is not None else None,
+        tuple(legal),
+    )
+    saved = cache.get("continuations", key)
+    if decision.kind == "INPUT":
+        if saved is not None:
+            return saved[0]
+        selected = continuation.choose(context, sim.state, decision, legal)
+        cache.put("continuations", key, (selected,))
+        return selected
+    with planning_rng_lock(continuation.agent):
+        if saved is not None:
+            recipe, selected = saved
+            if recipe is not None:
+                chosen_index = recipe.choose_index(continuation.agent._rng)
+                selected = decision.hero.hand[chosen_index].id
+                record_planning_event(continuation.agent, replace(recipe, selected=chosen_index))
+            if selected not in legal:
+                raise ValueError(
+                    "cached continuation selected an action outside canonical legality"
+                )
+            return selected
+        with trace_planning(continuation.agent) as trace:
+            selected = continuation.choose(context, sim.state, decision, legal)
+        if trace.valid and len(trace.recipes) <= 1:
+            cache.put("continuations", key, (trace.recipes[0] if trace.recipes else None, selected))
+        return selected
+
+
+@reuse_bounded
+def _bounded_continuation(
+    sim, decision, cfg, continuation, context, start_round, start_turn_round, start_turn
+):
     decisions = 0
     forced_decisions = 0
-    seen_forced_decisions: set[tuple[object, ...]] = set()
+    seen_forced_decisions = set()
 
-    def within_cutoff() -> bool:
+    def within_cutoff():
         if cfg.cutoff_unit is CutoffUnit.ROUNDS:
             return (sim.state.round - start_round) < cfg.cutoff_limit
+        if cfg.cutoff_unit is CutoffUnit.TURNS:
+            elapsed = (sim.state.round - start_turn_round) * 4 + sim.state.turn - start_turn
+            return elapsed < cfg.cutoff_limit
         return decisions < cfg.cutoff_limit
 
-    if cfg.leaf_mode is LeafMode.IMMEDIATE_ACTION and action_boundary is not None:
-        while _same_action_input(sim, decision, boundary=action_boundary):
-            if decisions >= cfg.max_forced_decisions:
-                raise sim.progression_error(
-                    f"same-action decision limit exceeded ({cfg.max_forced_decisions})",
-                    decision,
-                    forced_decisions=decisions,
-                )
-            fingerprint = _decision_fingerprint(sim.state, decision)
-            if fingerprint in seen_forced_decisions:
-                raise sim.progression_error(
-                    "repeated same-action decision",
-                    decision,
-                    forced_decisions=decisions,
-                )
-            seen_forced_decisions.add(fingerprint)
-            context = context.for_decision(
-                decision,
-                owner_id=_decision_owner_id(sim.state, decision, context),
-            )
-            legal = tuple(legal_keys(decision))
-            key = continuation.choose(context, sim.state, decision, legal)
-            decision = sim.apply_ours(decision, key, action_boundary=action_boundary)
-            decisions += 1
-
-    while (
-        cfg.leaf_mode is LeafMode.BOUNDED_CONTINUATION
-        and not decision.is_terminal
-        and within_cutoff()
-    ):
+    while not decision.is_terminal and within_cutoff():
         context = context.for_decision(
             decision,
             owner_id=_decision_owner_id(sim.state, decision, context),
@@ -1482,9 +1627,66 @@ def _rollout(
             decisions += 1
             continue
         legal = tuple(legal_keys(decision))
-        key = continuation.choose(context, sim.state, decision, legal)
+        key = _choose_continuation(sim, continuation, context, decision, legal)
         decision = sim.apply_ours(decision, key)
         decisions += 1
+
+    return decision, context, decisions, forced_decisions, seen_forced_decisions
+
+
+def _rollout(
+    sim: _Simulator,
+    decision: DecisionDescriptor,
+    cfg: SearchConfig,
+    continuation_policy: ContinuationPolicy | Agent,
+    leaf_evaluator: LeafEvaluator,
+    context: SearchContext,
+    *,
+    immediate_edge: object = _NO_IMMEDIATE_EDGE,
+    action_boundary: _ActionBoundary | None = None,
+    stable_turn_boundary: _StableTurnBoundary | None = None,
+    cutoff_observer: CutoffObserver | None = None,
+    turn_origin: tuple[int, int] | None = None,
+) -> float:
+    """Continuation-policy playout until the configured cutoff."""
+    continuation = as_continuation_policy(continuation_policy)
+    start_round = sim.state.round
+    start_turn_round, start_turn = turn_origin or (sim.state.round, getattr(sim.state, "turn", 1))
+    decisions = 0
+    forced_decisions = 0
+    seen_forced_decisions: set[tuple[object, ...]] = set()
+
+    if cfg.leaf_mode is LeafMode.IMMEDIATE_ACTION and action_boundary is not None:
+        while _same_action_input(sim, decision, boundary=action_boundary):
+            if decisions >= cfg.max_forced_decisions:
+                raise sim.progression_error(
+                    f"same-action decision limit exceeded ({cfg.max_forced_decisions})",
+                    decision,
+                    forced_decisions=decisions,
+                )
+            fingerprint = _decision_fingerprint(sim.state, decision)
+            if fingerprint in seen_forced_decisions:
+                raise sim.progression_error(
+                    "repeated same-action decision",
+                    decision,
+                    forced_decisions=decisions,
+                )
+            seen_forced_decisions.add(fingerprint)
+            context = context.for_decision(
+                decision,
+                owner_id=_decision_owner_id(sim.state, decision, context),
+            )
+            legal = tuple(legal_keys(decision))
+            key = _choose_continuation(sim, continuation, context, decision, legal)
+            decision = sim.apply_ours(decision, key, action_boundary=action_boundary)
+            decisions += 1
+
+    if cfg.leaf_mode is LeafMode.BOUNDED_CONTINUATION:
+        decision, context, decisions, forced_decisions, seen_forced_decisions = (
+            _bounded_continuation(
+                sim, decision, cfg, continuation, context, start_round, start_turn_round, start_turn
+            )
+        )
 
     # A zero-legal CARD pass is an engine transition, not a model decision.
     # Advance through it even when the selected leaf mode does not run bounded
@@ -1513,6 +1715,8 @@ def _rollout(
         )
         decision = _apply_ours(sim, decision, None, action_boundary)
 
+    if not decision.is_terminal:
+        decision = sim._own_state(decision)
     if decision.is_terminal:
         return terminal_reward(decision.winner, sim.our_team, state=sim.state)
     if decision.kind == "BOUNDARY":
@@ -1554,6 +1758,38 @@ def _rollout(
 # --------------------------------------------------------------------------- #
 
 
+def _score_descendant_policy(sim, prior, context, legal):
+    cache = current_reuse()
+    known = getattr(sim, "_known_state_key", None)
+    if (
+        cache is None
+        or not getattr(sim, "_reuse_known_keys", False)
+        or known is None
+        or known[0] != id(sim.state)
+        or type(prior) is not HeuristicPrior
+        or getattr(prior.score, "__func__", None) is not _READ_ONLY_PRIOR_SCORE
+        or not read_only_heuristic(prior._h)
+    ):
+        return score_policy(prior, context, sim.state, legal)
+    request = context.decision.request
+    key = (
+        known[1],
+        known[2],
+        context.root_viewer_id,
+        context.perspective_team,
+        context.current_owner_id,
+        context.action_boundary_kind,
+        context.decision.kind,
+        request.id if request is not None else None,
+        tuple(legal),
+    )
+    scores = cache.get("policies", key)
+    if scores is None:
+        scores = score_policy(prior, context, sim.state, legal)
+        cache.put("policies", key, scores)
+    return scores
+
+
 def _simulate(
     root: Node,
     root_state: GameState,
@@ -1589,6 +1825,32 @@ def _simulate(
     if deadline is not None:
         simulator_kwargs["deadline"] = deadline
     sim = _Simulator(world, our_team, environment_policy, **simulator_kwargs)
+    # This private simulator exclusively owns the state. Carry keys only when
+    # every policy called between advances is the unmodified built-in reader.
+    # Custom policies and direct simulator callers always re-hash fresh state.
+    sim._reuse_known_keys = (
+        cfg.leaf_mode is LeafMode.BOUNDED_CONTINUATION
+        and cfg.cutoff_unit is CutoffUnit.TURNS
+        and type(continuation_policy) is AgentContinuationPolicy
+        and getattr(continuation_policy.choose, "__func__", None) is _READ_ONLY_CONTINUATION_CHOOSE
+        and read_only_heuristic(continuation_policy.agent)
+        and (
+            prior is None
+            or (
+                type(prior) is HeuristicPrior
+                and read_only_heuristic(prior._h)
+                and getattr(prior.score, "__func__", None) is _READ_ONLY_PRIOR_SCORE
+            )
+        )
+    )
+    sim._defer_state_copy = sim._reuse_known_keys
+    cache = current_reuse()
+    if sim._reuse_known_keys and cache is not None and root_state.phase != GamePhase.PLANNING:
+        known = cache.initial_state_keys.get(id(root_state))
+        if known is None:
+            known = (root_state, cache.compact.fingerprint(root_state), board_key(root_state))
+            cache.initial_state_keys[id(root_state)] = known
+        sim._known_state_key = (id(world), known[1], known[2])
     # Strict root validation: surface EXACTLY the requested root or raise.
     decision = sim.advance_to_root(root_target)
     context = SearchContext(
@@ -1639,7 +1901,7 @@ def _simulate(
             root_policy
             if is_root
             else (
-                score_policy(prior, current_context, sim.state, legal)
+                _score_descendant_policy(sim, prior, current_context, legal)
                 if prior is not None
                 else None
             )
@@ -1850,6 +2112,7 @@ def _validated_search_root_and_state(
         **simulator_kwargs,
     )
     surfaced = validation_sim.advance()
+    validation_clone = validation_sim.state
     validated = validate_root(
         validation_clone,
         perspective_team,
@@ -1925,6 +2188,7 @@ def search(
     hidden-info resampling), but does NOT redo the legal-set diff since
     that's a property of the caller's arguments, not the determinization.
     """
+    state = prepare_search_state(state)
     evaluator = leaf_evaluator or HeuristicLeafEvaluator()
     if cfg.leaf_mode is LeafMode.STABLE_TRANSITION and not isinstance(
         evaluator, StableValueEvaluator

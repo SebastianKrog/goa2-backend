@@ -8,7 +8,52 @@ from goa2.domain.models.unit import Unit
 from goa2.domain.rules_version import ATTACK_IMMUNITY_COVERS_WHOLE_ACTION
 from goa2.domain.state import GameState
 from goa2.domain.types import BoardEntityID, HeroID, UnitID
-from goa2.engine.topology import get_topology_service
+from goa2.engine.plain_geometry import plain_path_effects
+from goa2.engine.topology import TopologyService, get_topology_service
+from goa2.engine.validation import ValidationService
+from goa2.engine.validation_terrain import TerrainValidationMixin
+
+_PLAIN_OBSTACLE = TerrainValidationMixin.is_obstacle_for_actor
+_PLAIN_DENIAL = TerrainValidationMixin._is_denied_empty_hex
+_PLAIN_PASSABLE = TerrainValidationMixin.is_passable_token
+_PLAIN_ON_MAP = Board.is_on_map
+_PLAIN_TRAVERSABLE = TopologyService.get_traversable_neighbors
+_PLAIN_CONNECTED = TopologyService.are_connected
+_PLAIN_NEIGHBORS = Hex.neighbors
+
+
+def _plain_reachable(board, start, max_steps, state, pass_through_obstacles):
+    implementation = getattr(board.tiles, "_reachable_plain", None)
+    if (
+        implementation is None
+        or state is None
+        or type(state) is not GameState
+        or board is not state.board
+        or type(board) is not Board
+        or type(start) is not Hex
+        or not isinstance(max_steps, int)
+        or not plain_path_effects(state)
+        or Hex.neighbors is not _PLAIN_NEIGHBORS
+        or getattr(board.tiles, "_foreign", False)
+    ):
+        return None
+    validator, topology = state.validator, get_topology_service()
+    if (
+        type(validator) is not ValidationService
+        or type(topology) is not TopologyService
+        or getattr(validator.is_obstacle_for_actor, "__func__", None) is not _PLAIN_OBSTACLE
+        or getattr(validator._is_denied_empty_hex, "__func__", None) is not _PLAIN_DENIAL
+        or getattr(validator.is_passable_token, "__func__", None) is not _PLAIN_PASSABLE
+        or getattr(board.is_on_map, "__func__", None) is not _PLAIN_ON_MAP
+        or getattr(topology.get_traversable_neighbors, "__func__", None) is not _PLAIN_TRAVERSABLE
+        or getattr(topology.are_connected, "__func__", None) is not _PLAIN_CONNECTED
+    ):
+        return None
+    if state.misc_entities and any(
+        uid in state.misc_entities for uid in board.tiles._occupied_ids()
+    ):
+        return None
+    return implementation(start, max_steps, pass_through_obstacles)
 
 
 def find_reachable_hexes(
@@ -31,6 +76,9 @@ def find_reachable_hexes(
 
     if max_steps <= 0:
         return reachable
+    plain = _plain_reachable(board, start, max_steps, state, pass_through_obstacles)
+    if plain is not None:
+        return plain
 
     topology = get_topology_service() if state else None
     queue: deque[tuple[Hex, int]] = deque([(start, 0)])

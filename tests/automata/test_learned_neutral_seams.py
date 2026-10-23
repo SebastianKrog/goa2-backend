@@ -129,7 +129,7 @@ def test_leaf_evaluation_and_modes_have_exact_score_semantics() -> None:
         LeafMode.STABLE_TRANSITION,
         LeafMode.BOUNDED_CONTINUATION,
     } == set(LeafMode)
-    assert {CutoffUnit.ROUNDS, CutoffUnit.DECISIONS} == set(CutoffUnit)
+    assert {CutoffUnit.ROUNDS, CutoffUnit.TURNS, CutoffUnit.DECISIONS} == set(CutoffUnit)
     with pytest.raises(ValueError, match=r"\[-1, 1\]"):
         LeafEvaluation(value=2.0)
 

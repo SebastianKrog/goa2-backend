@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, model_serializer
 
 from goa2.domain.types import BoardEntityID
 
@@ -12,6 +12,15 @@ class GameEntity(BaseModel):
 
     id: str
     name: str
+
+    @model_serializer(mode="wrap")
+    def _serialize_entity(self, handler, info):
+        # Search can encode shared definitions/references without changing
+        # ordinary API or checkpoint serialization.
+        encoder = (
+            info.context.get("_compact_card_encoder") if isinstance(info.context, dict) else None
+        )
+        return encoder.pack_entity(self) if encoder is not None else handler(self)
 
 
 class BoardEntity(GameEntity):

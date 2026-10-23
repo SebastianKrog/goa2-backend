@@ -59,10 +59,11 @@ class HeuristicPrior:
         elif decision.kind == "INPUT" and decision.request is not None:
             request = decision.request
 
-            for option in request.options:
-                key = action_key(selection_value(option))
-                if key in legal and key not in scores:
-                    scores[key] = self._h.score_option(state, request, option)
+            with self._h.position_scoring(state):
+                for option in request.options:
+                    key = action_key(selection_value(option))
+                    if key in legal and key not in scores:
+                        scores[key] = self._h.score_option(state, request, option)
         return PolicyScores(
             tuple(legal), tuple(scores.get(key, 0.0) for key in legal), ScoreSemantics.LOGITS
         )

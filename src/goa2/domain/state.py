@@ -23,6 +23,7 @@ from goa2.domain.models import (
 )
 from goa2.domain.models.effect import ActiveEffect
 from goa2.domain.models.marker import Marker, MarkerType
+from goa2.domain.models.token import roster_token_types
 from goa2.domain.time_control import GameClockState, TimeControlConfig
 from goa2.domain.types import BoardEntityID, HeroID, UnitID
 
@@ -424,7 +425,32 @@ class GameState(BaseModel):
         for tokens in self.token_pool.values():
             for token in tokens:
                 self.misc_entities[token.id] = token
+        self.prune_token_supply()
         return self
+
+    def prune_token_supply(self) -> None:
+        """Drop unused supply on restore as well as in newly created games.
+
+        Keep exceptional scenario pieces already placed or assigned an owner,
+        including their supply. Non-token entities (turrets, hero pieces, etc.)
+        are created on demand, so they are never discarded here.
+        """
+        required = roster_token_types(
+            hero.name for team in self.teams.values() for hero in team.heroes
+        )
+        for entity in self.misc_entities.values():
+            if isinstance(entity, Token) and (
+                entity.id in self.entity_locations or entity.owner_id is not None
+            ):
+                required.add(entity.token_type)
+        self.token_pool = {
+            kind: tokens for kind, tokens in self.token_pool.items() if kind in required
+        }
+        self.misc_entities = {
+            uid: entity
+            for uid, entity in self.misc_entities.items()
+            if not isinstance(entity, Token) or entity.token_type in required
+        }
 
     @model_validator(mode="after")
     def unify_card_references(self) -> GameState:

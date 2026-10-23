@@ -14,7 +14,7 @@ def test_magma_token_registered_with_supply_four():
 
 
 def test_magma_pool_initialized_at_setup():
-    state = GameSetup.create_game("src/goa2/data/maps/forgotten_island.json", ["Arien"], ["Wasp"])
+    state = GameSetup.create_game("src/goa2/data/maps/forgotten_island.json", ["Ignatia"], ["Wasp"])
     assert len(state.token_pool[TokenType.MAGMA]) == 4
     # Plain obstacle: not passable, not facedown.
     magma = state.token_pool[TokenType.MAGMA][0]

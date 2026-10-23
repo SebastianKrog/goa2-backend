@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from enum import Enum
+from functools import lru_cache
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+
+_HEX_OFFSETS = ((1, 0, -1), (1, -1, 0), (0, -1, 1), (-1, 0, 1), (-1, 1, 0), (0, 1, -1))
 
 
 class HexDirection(int, Enum):
@@ -91,35 +94,36 @@ class Hex(BaseModel):
         Manhattan distance between two hexes.
         Used for Range and Radius calculations.
         """
-        return (self - other).length()
+        # Equivalent cube distance without constructing/validating a temporary
+        # Pydantic Hex for every heuristic pair-distance query.
+        return max(abs(self.q - other.q), abs(self.r - other.r), abs(self.s - other.s))
 
     def scale(self, factor: int) -> Hex:
         """Scales the hex coordinates by a factor."""
         return Hex(q=self.q * factor, r=self.r * factor, s=self.s * factor)
 
+    def __deepcopy__(self, memo=None):
+        if type(self) is Hex:
+            if memo is not None:
+                memo[id(self)] = self
+            return self
+        # Frozen subclasses can still contain mutable extra fields.
+        return super().__deepcopy__(memo)
+
+    def model_copy(self, *, update=None, deep=False):
+        if type(self) is Hex and deep and update:
+            # BaseModel.model_copy writes updates into its deepcopy result.
+            # A coordinate update must allocate instead of modifying `self`.
+            return super().model_copy(update=update, deep=False)
+        return super().model_copy(update=update, deep=deep)
+
     def neighbor(self, direction_index: int) -> Hex:
-        """Returns the neighbor in a specific direction index (0-5)."""
-        vectors = [
-            Hex(q=1, r=0, s=-1),
-            Hex(q=1, r=-1, s=0),
-            Hex(q=0, r=-1, s=1),
-            Hex(q=-1, r=0, s=1),
-            Hex(q=-1, r=1, s=0),
-            Hex(q=0, r=1, s=-1),
-        ]
-        return self + vectors[direction_index % 6]
+        """Return one immutable adjacent coordinate, in the established order."""
+        return _adjacent_hexes(self.q, self.r, self.s)[direction_index % 6]
 
     def neighbors(self) -> list[Hex]:
-        """Returns the 6 adjacent hexes."""
-        vectors = [
-            Hex(q=1, r=0, s=-1),
-            Hex(q=1, r=-1, s=0),
-            Hex(q=0, r=-1, s=1),
-            Hex(q=-1, r=0, s=1),
-            Hex(q=-1, r=1, s=0),
-            Hex(q=0, r=1, s=-1),
-        ]
-        return [self + v for v in vectors]
+        """Return a fresh list of six shared immutable adjacent coordinates."""
+        return list(_adjacent_hexes(self.q, self.r, self.s))
 
     def ring(self, radius: int) -> list[Hex]:
         """
@@ -226,19 +230,8 @@ class Hex(BaseModel):
         unit_r = diff.r // dist
         unit_s = diff.s // dist
 
-        unit_vec = Hex(q=unit_q, r=unit_r, s=unit_s)
-
-        vectors = [
-            Hex(q=1, r=0, s=-1),
-            Hex(q=1, r=-1, s=0),
-            Hex(q=0, r=-1, s=1),
-            Hex(q=-1, r=0, s=1),
-            Hex(q=-1, r=1, s=0),
-            Hex(q=0, r=1, s=-1),
-        ]
-
         try:
-            return vectors.index(unit_vec)
+            return _HEX_OFFSETS.index((unit_q, unit_r, unit_s))
         except ValueError:
             return None
 
@@ -257,3 +250,8 @@ class Hex(BaseModel):
         else:
             s = -q - r
         return Hex(q=int(q), r=int(r), s=int(s))
+
+
+@lru_cache(maxsize=16384)
+def _adjacent_hexes(q: int, r: int, s: int) -> tuple[Hex, ...]:
+    return tuple(Hex(q=q + dq, r=r + dr, s=s + ds) for dq, dr, ds in _HEX_OFFSETS)

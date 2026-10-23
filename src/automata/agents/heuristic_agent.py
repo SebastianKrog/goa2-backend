@@ -13,10 +13,23 @@ Priorities, roughly:
 from __future__ import annotations
 
 import math
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import Any
 
 import goa2.engine.stats as stats
+from automata.search_reuse import (
+    PlanningDrawRecipe,
+    current_planning_trace,
+    current_reuse,
+    invalidate_planning_events,
+    plain_movement_key,
+    planning_events_active,
+    position_board_key,
+    record_planning_event,
+    serialized_planning,
+)
 from goa2.data.heroes.registry import HeroRegistry
 from goa2.domain.card_knowledge import (
     CardKnowledgeStatus,
@@ -33,6 +46,7 @@ from goa2.domain.types import HeroID, UnitID
 from goa2.engine.filters_hex import FastTravelDestinationFilter
 from goa2.engine.map_logic import zones_between
 from goa2.engine.phases import initiative_is_reversed
+from goa2.engine.plain_geometry import plain_distance_effects
 from goa2.engine.rules import (
     can_perform_action_on_card,
     find_reachable_hexes,
@@ -43,6 +57,20 @@ from goa2.engine.stats import calculate_minion_defense_modifier, compute_card_st
 from goa2.engine.topology import get_topology_service
 
 from .contracts import PlanningDecision
+
+
+@dataclass
+class _PositionScan:
+    agent: object
+    state: GameState
+    enemies: dict[TeamColor, list[Hex]] = field(default_factory=dict)
+    scores: dict[tuple[TeamColor, Hex], float | None] = field(default_factory=dict)
+    shared_scores: dict = field(default_factory=dict)
+    movement_key: object = None
+
+
+_POSITION_SCAN: ContextVar[_PositionScan | None] = ContextVar("position_scoring_scan", default=None)
+
 
 # CHOOSE_ACTION priority (higher = preferred as the played action).
 _ACTION_PRIORITY = {
@@ -85,12 +113,35 @@ class HeuristicAgent:
 
         self._rng = random.Random(seed)
 
+    @contextmanager
+    def position_scoring(self, state: GameState):
+        """Reuse geometry during one pure scoring batch; never across mutations.
+
+        Context-local storage keeps independent threads/searches isolated and
+        restores an outer batch after nested policy calls, including exceptions.
+        """
+        current = _POSITION_SCAN.get()
+        if current is not None and current.agent is self and current.state is state:
+            yield
+            return
+        token = _POSITION_SCAN.set(_PositionScan(self, state))
+        try:
+            yield
+        finally:
+            _POSITION_SCAN.reset(token)
+
     # --- helpers -----------------------------------------------------------
     def _enemy_positions(self, state: GameState, team: TeamColor) -> list[Any]:
+        scan = _POSITION_SCAN.get()
+        shared = scan is not None and scan.agent is self and scan.state is state
+        if shared and team in scan.enemies:
+            return scan.enemies[team]
         enemy = TeamColor.BLUE if team == TeamColor.RED else TeamColor.RED
         out = []
         for unit in [*state.teams[enemy].heroes, *state.teams[enemy].minions]:
             out.extend(state.get_positions(str(unit.id)))
+        if shared:
+            scan.enemies[team] = out
         return out
 
     def _unit_team(self, state: GameState, uid: str) -> TeamColor | None:
@@ -107,15 +158,18 @@ class HeuristicAgent:
         return None
 
     # --- planning ----------------------------------------------------------
+    @serialized_planning
     def choose_planning(self, state: GameState, hero: Hero) -> PlanningDecision:
         if not hero.hand:
             return PlanningDecision.pass_()
         initiative_direction = -1 if _is_reversed_initiative(state) else 1
 
         # Highest score; break ties by effective acting order, then rng.
-        best = max(
-            hero.hand,
-            key=lambda card: (
+        trace = current_planning_trace(self)
+        ranked = [] if trace is not None or planning_events_active() else None
+
+        def rank(card):
+            key = (
                 self.score_card(state, hero, card),
                 initiative_direction
                 * stats.get_computed_stat(
@@ -126,8 +180,27 @@ class HeuristicAgent:
                     performing_card=card,
                 ),
                 self._rng.random(),
-            ),
-        )
+            )
+            if ranked is not None:
+                ranked.append(key)
+            return key
+
+        best = max(hero.hand, key=rank)
+        if ranked is not None:
+            # Replaying consumes every draw, even for candidates whose score
+            # makes them ineligible; tie order is exactly Python max's order.
+            selected = max(range(len(ranked)), key=ranked.__getitem__)
+            maximum = ranked[selected][:2]
+            eligible = tuple(index for index, value in enumerate(ranked) if value[:2] == maximum)
+            if not eligible:
+                if trace is not None:
+                    trace.valid = False
+                invalidate_planning_events()
+            else:
+                recipe = PlanningDrawRecipe(len(ranked), eligible, selected)
+                if trace is not None:
+                    trace.recipes.append(recipe)
+                record_planning_event(self, recipe)
         return PlanningDecision.commit(best)
 
     def score_card(self, state: GameState, hero: Hero, card: Card) -> float:
@@ -591,7 +664,8 @@ class HeuristicAgent:
         if not opts:
             return "SKIP" if request.can_skip else None
 
-        best = max(opts, key=lambda o: self.score_option(state, request, o))
+        with self.position_scoring(state):
+            best = max(opts, key=lambda o: self.score_option(state, request, o))
         return selection_value(best)
 
     def score_option(self, state: GameState, request: InputRequest, option: Any) -> float:
@@ -660,7 +734,34 @@ class HeuristicAgent:
         if current_score is None:
             return fallback
 
-        if action == ActionType.MOVEMENT:
+        reuse = current_reuse()
+        geometry = None
+        if reuse is not None:
+            scan = _POSITION_SCAN.get()
+            if scan is not None and scan.agent is self and scan.state is state:
+                if scan.movement_key is None:
+                    scan.movement_key = plain_movement_key(state) or False
+                geometry = scan.movement_key or None
+            else:
+                geometry = plain_movement_key(state)
+        query = (
+            (geometry, board_actor_id, current, action, option.metadata.get("value"))
+            if geometry is not None
+            else None
+        )
+        # A card or context change may prohibit fast travel despite identical
+        # geometry. This permission gate is never memoized across branches.
+        if (
+            query is not None
+            and action == ActionType.FAST_TRAVEL
+            and not state.validator.can_fast_travel(
+                state, board_actor_id, state.execution_context
+            ).allowed
+        ):
+            return fallback
+        destinations = reuse.get("destinations", query) if query is not None else None
+        cached = destinations is not None
+        if not cached and action == ActionType.MOVEMENT:
             movement = _strict_nonnegative_int(option.metadata.get("value"))
             if movement is None:
                 return fallback
@@ -677,18 +778,25 @@ class HeuristicAgent:
                 )
             except (AttributeError, KeyError, TypeError, ValueError):
                 return fallback
-        else:
+        elif not cached:
             destination_filter = FastTravelDestinationFilter(unit_id=board_actor_id)
             context = state.execution_context
             try:
-                destinations = [
-                    candidate
-                    for candidate in state.board.tiles
-                    if destination_filter.apply(candidate, state, context)
-                ]
+                accepts = destination_filter.prepare(state, context)
+                tiles = state.board.tiles
+                bounded = getattr(accepts, "hex_candidates", None)
+                candidates = (
+                    tiles._ordered_subset(bounded)
+                    if bounded is not None and hasattr(tiles, "_ordered_subset")
+                    else tiles
+                )
+                destinations = [candidate for candidate in candidates if accepts(candidate)]
             except (AttributeError, KeyError, TypeError, ValueError):
                 return fallback
 
+        if query is not None and not cached:
+            # Immutable output; every scan keeps its own independent result.
+            reuse.put("destinations", query, tuple(destinations))
         scores = [self._position_score(state, destination, team) for destination in destinations]
         legal_scores = [score for score in scores if score is not None]
         if not legal_scores:
@@ -787,6 +895,37 @@ class HeuristicAgent:
         return self._position_score(state, destination, team) or 0.0
 
     def _position_score(self, state: GameState, destination: Hex, team: TeamColor) -> float | None:
+        scan = _POSITION_SCAN.get()
+        if scan is None or scan.agent is not self or scan.state is not state:
+            return self._uncached_position_score(state, destination, team)
+        key = (team, destination)
+        if key not in scan.scores:
+            reuse = current_reuse()
+            shared = None
+            if reuse is not None and plain_distance_effects(state):
+                if team not in scan.shared_scores:
+                    geometry = (
+                        position_board_key(state),
+                        team,
+                        tuple(self._enemy_positions(state, team)),
+                    )
+                    shared = reuse.get("positions", geometry)
+                    if shared is None:
+                        shared = {}
+                        reuse.put("positions", geometry, shared)
+                    scan.shared_scores[team] = shared
+                shared = scan.shared_scores[team]
+            if shared is not None and destination in shared:
+                scan.scores[key] = shared[destination]
+            else:
+                scan.scores[key] = self._uncached_position_score(state, destination, team)
+                if shared is not None:
+                    shared[destination] = scan.scores[key]
+        return scan.scores[key]
+
+    def _uncached_position_score(
+        self, state: GameState, destination: Hex, team: TeamColor
+    ) -> float | None:
         zid = self._zone_of(state, destination)
         if zid is None:
             return None

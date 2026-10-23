@@ -109,9 +109,14 @@ class TopologyService:
         Returns:
             True if hexes can interact, False if blocked by topology
         """
-        query_unit_ids = self._query_unit_ids(origin, target, state, unit_ids)
-
+        # Resolving occupants and unit IDs is only needed by topology effects.
+        # Most search states have none; keep ordinary geometric queries cheap.
+        query_unit_ids = None
         for effect in state.active_effects:
+            if effect.effect_type not in (EffectType.TOPOLOGY_SPLIT, EffectType.TOPOLOGY_ISOLATION):
+                continue
+            if query_unit_ids is None:
+                query_unit_ids = self._query_unit_ids(origin, target, state, unit_ids)
             if effect.effect_type == EffectType.TOPOLOGY_SPLIT:
                 if self._ignored_for_units(effect, state, query_unit_ids):
                     continue

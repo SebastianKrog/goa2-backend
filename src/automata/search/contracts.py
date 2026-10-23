@@ -221,6 +221,7 @@ class LeafMode(StrEnum):
 
 class CutoffUnit(StrEnum):
     ROUNDS = "ROUNDS"
+    TURNS = "TURNS"
     DECISIONS = "DECISIONS"
 
 

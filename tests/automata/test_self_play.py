@@ -1695,7 +1695,7 @@ def test_self_play_builtin_lh_preset_constructs_resolved_seeded_strategy(
         ({"iterations": 8, "unknown": True}, "unknown"),
         ({"iterations": "8"}, "iterations"),
         ({"iterations": 8, "leaf_mode": "ROLLOUT"}, "leaf_mode"),
-        ({"iterations": 8, "cutoff_unit": "TURNS"}, "cutoff_unit"),
+        ({"iterations": 8, "cutoff_unit": "UNKNOWN"}, "cutoff_unit"),
         ({"iterations": 8, "seed": 42}, "seed"),
         ({"iterations": 8, "root_puct_c": "1.5"}, "root_puct_c"),
     ],

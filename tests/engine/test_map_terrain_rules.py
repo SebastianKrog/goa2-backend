@@ -1,5 +1,4 @@
 import json
-import os
 
 from goa2.domain.board import Board, Tile
 from goa2.domain.hex import Hex
@@ -7,7 +6,7 @@ from goa2.engine import rules
 from goa2.engine.map_loader import load_map
 
 
-def test_terrain_outside_zone():
+def test_terrain_outside_zone(tmp_path):
     """Verify that terrain hexes are added to the board even if they don't belong to a zone."""
     # Create a dummy map JSON
     map_data = {
@@ -18,28 +17,21 @@ def test_terrain_outside_zone():
         ],
     }
 
-    file_path = "temp_map.json"
-    with open(file_path, "w") as f:
-        json.dump(map_data, f)
+    file_path = tmp_path / "temp_map.json"
+    file_path.write_text(json.dumps(map_data), encoding="utf-8")
+    board = load_map(str(file_path))
 
-    try:
-        board = load_map(file_path)
+    # Hex (0,0,0) should be in zone1
+    h0 = Hex(q=0, r=0, s=0)
+    assert board.get_tile(h0).zone_id == "zone1"
+    assert board.get_tile(h0).is_terrain is False
 
-        # Hex (0,0,0) should be in zone1
-        h0 = Hex(q=0, r=0, s=0)
-        assert board.get_tile(h0).zone_id == "zone1"
-        assert board.get_tile(h0).is_terrain is False
-
-        # Hex (1,0,-1) should be terrain and have NO zone
-        h1 = Hex(q=1, r=0, s=-1)
-        tile1 = board.get_tile(h1)
-        assert tile1 is not None
-        assert tile1.is_terrain is True
-        assert tile1.zone_id is None
-
-    finally:
-        if os.path.exists(file_path):
-            os.remove(file_path)
+    # Hex (1,0,-1) should be terrain and have NO zone
+    h1 = Hex(q=1, r=0, s=-1)
+    tile1 = board.get_tile(h1)
+    assert tile1 is not None
+    assert tile1.is_terrain is True
+    assert tile1.zone_id is None
 
 
 def test_missing_hex_is_terrain():

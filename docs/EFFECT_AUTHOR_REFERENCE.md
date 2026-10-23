@@ -474,6 +474,20 @@ this.
 
 ---
 
+#### Token supply and roster
+
+`GameSetup` allocates only token types available to the heroes in the game,
+including later upgrades and spells. When adding a token-capable hero, update
+`HERO_TOKEN_TYPES` in `domain/models/token.py` as well as `TOKEN_SUPPLY`.
+Tests that initialize supply must give their scenario heroes their actual names.
+
+Loading a checkpoint prunes unused off-board supply from both `token_pool` and
+`misc_entities`. Tokens already placed or assigned an owner retain their supply;
+non-token entities created on demand are preserved. Entity numbering remains
+stable for existing replays.
+
+---
+
 #### `PlaceMarkerStep`
 
 **Category:** MARKER

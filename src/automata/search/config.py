@@ -91,7 +91,7 @@ class SearchConfig:
     uct_c: float = 1.4
 
     # Stop bounded continuation after this many units. ROUNDS preserves the
-    # original behavior; DECISIONS bounds the number of controlled choices.
+    # original behavior; TURNS counts game turns and DECISIONS controlled choices.
     cutoff_limit: int = 2
     cutoff_unit: CutoffUnit = CutoffUnit.ROUNDS
 

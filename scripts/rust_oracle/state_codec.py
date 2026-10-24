@@ -1,0 +1,281 @@
+"""Lossless outer-boundary export, distinct from the native simulation state.
+
+Keep physical aliases without treating printed card IDs as instance IDs. This
+format is private offline tooling; no backend API or persistence format changes.
+"""
+
+from __future__ import annotations
+
+from oracle import ORACLE_REVISION, digest, verify_sources
+
+REFERENCE_KEY = "$goa2_instance"
+
+
+def reject_reserved(value):
+    if isinstance(value, dict):
+        if REFERENCE_KEY in value:
+            raise ValueError(f"reserved boundary key in source data: {REFERENCE_KEY}")
+        for child in value.values():
+            reject_reserved(child)
+    elif isinstance(value, list):
+        for child in value:
+            reject_reserved(child)
+
+
+class InstanceEncoder:
+    def __init__(self):
+        self.references = {}
+        self.objects = []  # Keep originals alive: Python may otherwise reuse id().
+        self.definitions = []
+        self.definition_indices = {}
+        self.instances = []
+
+    def pack(self, value, kind, dynamic_fields):
+        key = id(value)
+        if key in self.references:
+            return {REFERENCE_KEY: self.references[key]}
+        instance = len(self.instances)
+        self.references[key] = instance
+        self.objects.append(value)
+        fields = value.model_dump(mode="json", context={})
+        reject_reserved(fields)
+        definition = {
+            "kind": kind,
+            "fields": {key: item for key, item in fields.items() if key not in dynamic_fields},
+        }
+        # Intern scenario overrides by content, never by printed identity.
+        definition_key = digest(definition)
+        if definition_key not in self.definition_indices:
+            self.definition_indices[definition_key] = len(self.definitions)
+            self.definitions.append(definition)
+        self.instances.append(
+            {
+                "definition": self.definition_indices[definition_key],
+                "fields": {key: item for key, item in fields.items() if key in dynamic_fields},
+            }
+        )
+        return {REFERENCE_KEY: instance}
+
+    def walk(self, value, serialized):
+        from enum import Enum
+
+        from pydantic import BaseModel
+
+        from goa2.domain.models import Card, Token
+
+        if isinstance(value, Card):
+            return self.pack_card(value)
+        if isinstance(value, Token):
+            return self.pack_token(value)
+        if isinstance(value, BaseModel) and isinstance(serialized, dict):
+            result = dict(serialized)
+            for name, field in type(value).model_fields.items():
+                key = field.serialization_alias or name
+                if key in result:
+                    result[key] = self.walk(getattr(value, name), result[key])
+            return result
+        if isinstance(value, dict) and isinstance(serialized, dict):
+            result = dict(serialized)
+            for key, item in value.items():
+                serialized_key = str(key.value) if isinstance(key, Enum) else str(key)
+                if serialized_key in result:
+                    result[serialized_key] = self.walk(item, result[serialized_key])
+            return result
+        if isinstance(value, (list, tuple)) and isinstance(serialized, list):
+            return [self.walk(item, raw) for item, raw in zip(value, serialized, strict=True)]
+        return serialized
+
+    def pack_card(self, card):
+        from goa2.domain.models.spell import SpellCard
+
+        kind = "spell" if isinstance(card, SpellCard) else "card"
+        return self.pack(card, kind, card._search_dynamic_fields)
+
+    def pack_token(self, token):
+        fixed = {"id", "name", "token_type"}
+        dynamic = set(type(token).model_fields) - fixed
+        return self.pack(token, "token", dynamic)
+
+
+def export_state_with_instances(state):
+    manifest = verify_sources()
+    plain = state.model_dump(mode="json")
+    reject_reserved(plain)
+    encoder = InstanceEncoder()
+    compact = encoder.walk(state, plain)
+    envelope = {
+        "schema_version": 1,
+        "oracle_revision": ORACLE_REVISION,
+        "source_sha256": manifest["source_sha256"],
+        "rules_version": state.rules_version,
+        "definitions": encoder.definitions,
+        "instances": encoder.instances,
+        "state": compact,
+    }
+    if materialize(envelope) != plain:
+        raise AssertionError("export omitted or altered semantic state")
+    return envelope, tuple(encoder.objects)
+
+
+def export_state(state):
+    return export_state_with_instances(state)[0]
+
+
+def materialize(envelope):
+    definitions = envelope["definitions"]
+    instances = envelope["instances"]
+
+    def expand(value):
+        if isinstance(value, dict):
+            if REFERENCE_KEY in value:
+                if set(value) != {REFERENCE_KEY} or type(value[REFERENCE_KEY]) is not int:
+                    raise ValueError("invalid instance reference")
+                index = value[REFERENCE_KEY]
+                if not 0 <= index < len(instances):
+                    raise ValueError("instance reference outside table")
+                instance = instances[index]
+                definition_index = instance["definition"]
+                if type(definition_index) is not int or not 0 <= definition_index < len(
+                    definitions
+                ):
+                    raise ValueError("definition reference outside table")
+                definition = definitions[definition_index]
+                if definition["fields"].keys() & instance["fields"].keys():
+                    raise ValueError("definition and instance fields overlap")
+                return {**definition["fields"], **instance["fields"]}
+            return {key: expand(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [expand(item) for item in value]
+        return value
+
+    return expand(envelope["state"])
+
+
+def state_corpus():
+    from oracle import ROOT
+
+    from goa2.bootstrap import register_all_effects
+    from goa2.domain.models import GamePhase, TargetType
+    from goa2.engine.setup import GameSetup
+    from goa2.engine.steps.selection import SelectStep
+
+    register_all_effects()
+    cases = []
+    rosters = [
+        ("standard", ["Arien", "Hanu"], ["Brogan", "Tigerclaw"]),
+        ("tokens-spells-pieces", ["Razzle", "Trinkets"], ["Gydion", "Emmitt"]),
+    ]
+    for name, red, blue in rosters:
+        state = GameSetup.create_game(
+            str(ROOT / "src/goa2/data/maps/forgotten_island.json"), red, blue, seed=29
+        )
+        cases.append(
+            {
+                "name": name,
+                "envelope": export_state(state),
+                "expected": state.model_dump(mode="json"),
+            }
+        )
+    state = GameSetup.create_game(
+        str(ROOT / "src/goa2/data/maps/forgotten_island.json"),
+        ["Arien", "Hanu"],
+        ["Brogan", "Tigerclaw"],
+        seed=7,
+    )
+    hero = next(iter(state.teams.values())).heroes[0]
+    original = hero.hand[0]
+    independent = original.model_copy(deep=True)
+    independent.is_facedown = not original.is_facedown
+    scenario = original.model_copy(deep=True)
+    scenario.range_value = 17
+    hero.deck.extend([independent, scenario])
+    hero.hand.extend([independent, scenario])
+    state.pending_inputs[hero.id] = original
+    state.phase = GamePhase.RESOLUTION
+    state.execution_stack = [
+        SelectStep(
+            step_id="fixture/continuation/0",
+            target_type=TargetType.NUMBER,
+            number_options=[1, 2],
+            prompt="Codec continuation",
+            output_key="answer",
+        )
+    ]
+    state.execution_context = {
+        "target_id": "hero_hanu",
+        "pending_input": None,
+        "nested": {"card": original},
+    }
+    cases.append(
+        {
+            "name": "mid-action-aliases-and-scenario-overrides",
+            "envelope": export_state(state),
+            "expected": state.model_dump(mode="json"),
+        }
+    )
+    payload = {"schema_version": 1, "oracle_revision": ORACLE_REVISION, "cases": cases}
+    return {**payload, "corpus_sha256": digest(payload)}
+
+
+def main():
+    import argparse
+    import json
+    from pathlib import Path
+
+    from oracle import ROOT, Worker
+
+    parser = argparse.ArgumentParser(__doc__)
+    parser.add_argument("mode", choices=["export", "verify"])
+    parser.add_argument("--corpus", type=Path, default=ROOT / "rust/tests/fixtures/states.json")
+    parser.add_argument("worker", nargs=argparse.REMAINDER)
+    args = parser.parse_args()
+    if args.mode == "export":
+        corpus = state_corpus()
+        args.corpus.parent.mkdir(parents=True, exist_ok=True)
+        args.corpus.write_text(json.dumps(corpus, separators=(",", ":")) + "\n")
+        print(json.dumps({"cases": len(corpus["cases"]), "corpus_sha256": corpus["corpus_sha256"]}))
+        return
+    verify_sources()
+    corpus = json.loads(args.corpus.read_text())
+    identity = corpus.pop("corpus_sha256")
+    if digest(corpus) != identity:
+        raise ValueError("state corpus identity mismatch")
+    command = args.worker
+    if command and command[0] == "--":
+        command = command[1:]
+    if not command:
+        parser.error("worker command required after --")
+    worker = Worker(command)
+    try:
+        for case in corpus["cases"]:
+            response = worker.request("roundtrip_state", envelope=case["envelope"])
+            if response["semantic_state"] != case["expected"]:
+                raise AssertionError(f"state roundtrip mismatch: {case['name']}")
+            if response["envelope"] != case["envelope"]:
+                raise AssertionError(f"instance alias or field mismatch: {case['name']}")
+            try:
+                worker.request("validate_execution", envelope=case["envelope"])
+            except RuntimeError as error:
+                if "unsupported native transition" not in str(error):
+                    raise
+            else:
+                raise AssertionError("unsupported native execution was accepted")
+    finally:
+        worker.close()
+    print(
+        json.dumps(
+            {
+                "cases": len(corpus["cases"]),
+                "corpus_sha256": identity,
+                "semantic_and_alias_roundtrips": True,
+            }
+        )
+    )
+
+
+if __name__ == "__main__":
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+    main()

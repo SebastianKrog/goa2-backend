@@ -11,7 +11,7 @@ The toolchain is pinned in `rust-toolchain.toml`; dependency versions are locked
 in `Cargo.lock`. Install Rust with rustup and a C linker (`gcc` on Ubuntu), then:
 
 ```sh
-cd /mnt/c/Users/Sebastian/Documents/GitHub/goa2-backend-bots
+cd ~/projects/goa2-backend-bots
 sh rust/cargo-wsl.sh test --locked --workspace
 sh rust/cargo-wsl.sh clippy --locked --workspace --all-targets -- -D warnings
 sh rust/cargo-wsl.sh fmt --all -- --check
@@ -21,6 +21,10 @@ sh rust/cargo-wsl.sh build --locked --release --workspace
 The wrapper keeps build artifacts on the Linux filesystem at
 `$HOME/.cache/goa2-rust/target`; override `CARGO_TARGET_DIR` when needed. Source
 files stay in the bot checkout. Plain `cargo` also works on other supported hosts.
+Keep the source checkout on the Linux filesystem as well as the build outputs;
+using `/mnt/c` for source can trigger WSL's Cargo performance notice.
+The active checkout on this machine is `/home/sebastian/projects/goa2-backend-bots`.
+The Windows checkout is retained as a committed backup and frozen Python runtime.
 No neural model, training runtime, server startup or lab restart is required.
 
 For faster full-corpus iteration, run the optimized test binaries in WSL:
@@ -38,15 +42,19 @@ jsonpatch versions. The content identity covers source files and that runtime.
 Export and verification reject changed/new source files or runtime drift. Do not regenerate the manifest to accept a different oracle
 without an explicit reference update.
 
-From PowerShell in the bot checkout, using the existing Python environment:
+The frozen Windows Python runtime can validate the Linux checkout over WSL's
+file share. From PowerShell, set these paths to the preserved runtime and active
+checkout (do not edit the Windows backup):
 
 ```powershell
-.venv/Scripts/python.exe scripts/rust_oracle/oracle.py verify-movement -- wsl.exe --exec /home/sebastian/.cache/goa2-rust/target/release/goa2-search-cli
-.venv/Scripts/python.exe scripts/rust_oracle/state_codec.py verify -- wsl.exe --exec /home/sebastian/.cache/goa2-rust/target/release/goa2-search-cli
-.venv/Scripts/python.exe scripts/rust_oracle/stack_traces.py verify -- wsl.exe --exec /home/sebastian/.cache/goa2-rust/target/release/goa2-search-cli
-.venv/Scripts/python.exe scripts/rust_oracle/model_traces.py verify -- wsl.exe --exec /home/sebastian/.cache/goa2-rust/target/release/goa2-search-cli
-.venv/Scripts/python.exe scripts/rust_oracle/planning_traces.py verify -- wsl.exe --exec /home/sebastian/.cache/goa2-rust/target/release/goa2-search-cli
-.venv/Scripts/python.exe scripts/rust_oracle/action_traces.py verify -- wsl.exe --exec /home/sebastian/.cache/goa2-rust/target/release/goa2-search-cli
+$oraclePython = 'C:/Users/Sebastian/Documents/GitHub/goa2-backend-bots/.venv/Scripts/python.exe'
+$engineRoot = '\\wsl.localhost\Ubuntu\home\sebastian\projects\goa2-backend-bots'
+& $oraclePython "$engineRoot/scripts/rust_oracle/oracle.py" verify-movement -- wsl.exe --exec /home/sebastian/.cache/goa2-rust/target/release/goa2-search-cli
+& $oraclePython "$engineRoot/scripts/rust_oracle/state_codec.py" verify -- wsl.exe --exec /home/sebastian/.cache/goa2-rust/target/release/goa2-search-cli
+& $oraclePython "$engineRoot/scripts/rust_oracle/stack_traces.py" verify -- wsl.exe --exec /home/sebastian/.cache/goa2-rust/target/release/goa2-search-cli
+& $oraclePython "$engineRoot/scripts/rust_oracle/model_traces.py" verify -- wsl.exe --exec /home/sebastian/.cache/goa2-rust/target/release/goa2-search-cli
+& $oraclePython "$engineRoot/scripts/rust_oracle/planning_traces.py" verify -- wsl.exe --exec /home/sebastian/.cache/goa2-rust/target/release/goa2-search-cli
+& $oraclePython "$engineRoot/scripts/rust_oracle/action_traces.py" verify -- wsl.exe --exec /home/sebastian/.cache/goa2-rust/target/release/goa2-search-cli
 ```
 
 Replace the Linux executable path if using another user or target directory.
@@ -54,15 +62,15 @@ On WSL with the same frozen Python/package versions installed, use `python3` and
 worker executable directly. The Windows Python environment is currently used
 for oracle generation; Rust builds, worker execution and native tests run in WSL.
 
-To regenerate fixtures from the *unchanged* frozen source:
+To regenerate fixtures from the *unchanged* frozen source, using the same PowerShell variables:
 
 ```powershell
-.venv/Scripts/python.exe scripts/rust_oracle/oracle.py export-movement
-.venv/Scripts/python.exe scripts/rust_oracle/state_codec.py export
-.venv/Scripts/python.exe scripts/rust_oracle/stack_traces.py export
-.venv/Scripts/python.exe scripts/rust_oracle/model_traces.py export
-.venv/Scripts/python.exe scripts/rust_oracle/planning_traces.py export
-.venv/Scripts/python.exe scripts/rust_oracle/action_traces.py export
+& $oraclePython "$engineRoot/scripts/rust_oracle/oracle.py" export-movement
+& $oraclePython "$engineRoot/scripts/rust_oracle/state_codec.py" export
+& $oraclePython "$engineRoot/scripts/rust_oracle/stack_traces.py" export
+& $oraclePython "$engineRoot/scripts/rust_oracle/model_traces.py" export
+& $oraclePython "$engineRoot/scripts/rust_oracle/planning_traces.py" export
+& $oraclePython "$engineRoot/scripts/rust_oracle/action_traces.py" export
 ```
 
 `cargo test` consumes the committed fixtures directly. Worker verification also
@@ -99,14 +107,14 @@ remain distinct flags. Query results are not cached across mutations.
 ## Recorded validation, 2026-10-24
 
 - 3,451 Python engine/domain/legality/oracle-tool tests passed; NN/training tests excluded.
-- 109 native unit/integration tests passed in WSL, including all frozen corpora;
+- 112 native unit/integration tests passed in WSL, including all frozen corpora;
   strict Clippy and locked release compilation pass.
 - 68 selected Python retrieval/Sabina/oracle tests passed
   after the latest addition; NN tests remain excluded.
 - Native regression corpus: 141,876 bare-board plus 141,876 stateful destination
   verdicts across six map files and three generated boards; three complete
   semantic-state/alias round trips.
-- 2,088 native/Python transition traces compare 8,750 operations, including invalid
+- 2,152 native/Python transition traces compare 8,817 operations, including invalid
   choices, strict stale-request handling, actor overrides, Razzle piece ownership,
   optional skips, mandatory aborts, paused template copies, occupancy changes,
   forced movement, terrain crossings, straight-line checks, ordered destination
@@ -663,3 +671,11 @@ traces / 8,750 operations (CLI comparison 172.67 seconds). All 59 selected Pytho
 manager/oracle tests, strict Clippy, Rust fmt, Black and Ruff checks pass.
 CreateEffectStep bindings, behavioral consumers, finishing-payload scheduling,
 full search and performance gates remain unfinished; no live services changed.
+
+
+Latest verification after migrating the committed checkout to WSL: all 112
+native tests pass, including 2,152 transition traces / 8,817 operations and the
+123-case effect lifecycle/creation corpus. Strict Clippy and Rust fmt pass.
+CreateEffectStep binds dynamic state and freezes finishing colors, with exact
+creation events and restore/private-worker regressions. Gameplay/input consumers
+of active effects remain guarded; search and the full engine are unfinished.

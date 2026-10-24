@@ -1500,3 +1500,34 @@ is committed and that commit is synchronized and verified. Keep the Windows
 checkout and its frozen Python environment as a backup/reference. No lab or
 frontend settings or live services are changed by the migration. Remaining engine,
 search and performance scope is unchanged.
+
+
+### 2026-10-24: committed checkpoint and WSL migration verified
+
+Committed all current Rust engine work as 92510d5 before the final migration
+synchronization. The initial file copy remained staging until the committed
+Windows state was synced and checksum-verified. Git HEAD and branch matched,
+and the Linux checkout was clean before migration documentation updates.
+Active development now lives at /home/sebastian/projects/goa2-backend-bots
+(Windows access: \\wsl.localhost\Ubuntu\home\sebastian\projects\goa2-backend-bots).
+The Windows original remains an intact committed backup/frozen Python runtime.
+Virtual environments, disposable caches and ignored diagnostics were not copied;
+all source, Git history and canonical fixtures were retained. Local Git identity
+was preserved and core.autocrlf=input selected for Linux. Tracked CRLF text was
+normalized to LF without changing Git-normalized content.
+
+Cargo confirmed source filesystem ext2/ext3 and compiled the actual crates from
+/home/sebastian/projects/goa2-backend-bots/rust. Full locked release workspace
+suite passed all 112 tests, including the three new effect-step regressions,
+all 2,152 handler cases / 8,817 operations (CLI comparison 112.14 seconds),
+and 123 manager cases / 570 operations. Strict Clippy and Rust fmt passed.
+The preserved Windows Python runtime successfully verified the migrated source
+through the WSL file share against the unchanged frozen manifest. No NN tests,
+lab/frontend configuration changes, service restarts or pushes were involved.
+
+The full engine/search objective remains unfinished; continue development only
+in the Linux checkout, using the Windows original as backup/reference. Pending
+work includes active-effect gameplay consumers and finishing scheduling, other
+card/passive/spell rules, aggregate aliases, make/unmake and hashing, evaluation,
+iterative team-aware search, hidden/simultaneous planning, parallelism, optional
+validated integration and full-simulation performance/strength gates.

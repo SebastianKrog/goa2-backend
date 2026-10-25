@@ -4,7 +4,7 @@ use crate::{
     data::{Datum, Symbols},
     primary::{PrimaryOperands, PrimaryValues},
     spatial::{HexFilter, SpatialContext, compile_filter},
-    targeting::{UnitFilter, compile_effective_unit_filters},
+    targeting::{UnitCandidates, UnitFilter, compile_effective_unit_filters},
 };
 use serde_json::Value;
 use std::cmp::Ordering;
@@ -48,9 +48,16 @@ impl Query {
             Self::Empty => Ok(Self::empty(collect)),
             Self::Units { tokens, filters } => {
                 // Count/Collect do not call can_be_targeted, unlike SelectStep.
-                let candidates = context
-                    .world
-                    .select_units(*tokens, None, filters, context)?;
+                let candidates = context.world.select_units(
+                    if *tokens {
+                        UnitCandidates::UnitsAndTokens
+                    } else {
+                        UnitCandidates::Units
+                    },
+                    None,
+                    filters,
+                    context,
+                )?;
                 if collect {
                     Ok(Datum::List(
                         candidates.into_iter().map(Datum::Text).collect(),

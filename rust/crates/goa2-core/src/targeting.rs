@@ -1,11 +1,29 @@
-//! Compiled unit-selection predicates. Active-effect targeting is rejected at
-//! the root until its full closure is native; ordinary immunity is exact.
+//! Compiled unit predicates and ordered candidate pools, with live effect rules.
 use crate::{
     data::{Datum, Symbol, Symbols},
     spatial::{HexFilter, SpatialContext, compile_filter},
     world::{EntityKind, MinionKind, NativeWorld},
 };
 use serde_json::Value;
+#[derive(Clone, Copy, Debug)]
+pub enum UnitCandidates {
+    Units,
+    UnitsWithIllusions,
+    UnitsAndTokens,
+}
+#[derive(Clone, Debug)]
+pub(crate) struct TargetingKeys {
+    action: Symbol,
+    attack: Symbol,
+}
+impl TargetingKeys {
+    pub(crate) fn compile(s: &mut Symbols) -> Self {
+        Self {
+            action: s.intern("current_action_type"),
+            attack: s.intern("ATTACK"),
+        }
+    }
+}
 #[derive(Clone, Copy, Debug)]
 pub enum Relation {
     Friendly,
@@ -19,7 +37,7 @@ pub enum UnitFilter {
     Spatial(HexFilter),
     AdjacentContext(Symbol),
     EmptyNeighbor,
-    CanMove,
+    Displacement(crate::validation::DisplacementKind),
     Team(Relation),
     Kind(EntityKind),
     Exclude {
@@ -71,9 +89,12 @@ impl NativeWorld {
                 && self.position(m.id).is_some_and(|h| zone.hexes.contains(&h))
         })
     }
-    pub fn immune_filter(&self, id: Symbol, actor: Option<Symbol>) -> bool {
+    pub fn immune_filter(&self, id: Symbol, context: &SpatialContext<'_>) -> Result<bool, String> {
+        let actor = context
+            .actor
+            .filter(|id| *id != self.definitions.effect_empty);
         let Some(target) = self.entity(id) else {
-            return false;
+            return Ok(false);
         };
         if target.kind == EntityKind::Token && target.immune_enemy_actions {
             let actor_team = actor.and_then(|a| self.entity(a)).and_then(|a| a.team);
@@ -83,51 +104,83 @@ impl NativeWorld {
                 .and_then(|h| self.entity(h.id))
                 .and_then(|e| e.team);
             if actor_team.is_some() && owner_team.is_some() && actor_team != owner_team {
-                return false;
+                return Ok(false);
             }
         }
-        !self.ordinary_immune(id, actor)
-    }
-    pub fn ensure_target_closure(&self) -> Result<(), String> {
-        if self.has_effects {
-            Err("active-effect targeting/equivalence closure not compiled".into())
-        } else {
-            Ok(())
+        if matches!(
+            target.kind,
+            EntityKind::Hero | EntityKind::Piece | EntityKind::Minion
+        ) {
+            let immune = if let Some(actor) = actor {
+                self.actor_immune(id, actor)?
+            } else {
+                self.ordinary_immune(id, None)
+            };
+            if immune {
+                return Ok(false);
+            }
         }
+        if context.registers.get(self.definitions.targeting.action)
+            == Some(&Datum::Text(self.definitions.targeting.attack))
+        {
+            let basic = match actor.filter(|id| self.hero(*id).is_some()) {
+                Some(actor) => self
+                    .performing_card(actor, context.registers)?
+                    .and_then(|card| self.card(card))
+                    .is_some_and(|card| self.definitions.cards[card.definition].basic),
+                None => false,
+            };
+            if self.attack_immune(id, actor, basic) {
+                return Ok(false);
+            }
+        }
+        Ok(true)
     }
     pub fn select_units(
         &self,
-        tokens: bool,
+        pool: UnitCandidates,
         target_actor: Option<Symbol>,
         filters: &[UnitFilter],
         context: &SpatialContext<'_>,
     ) -> Result<Vec<Symbol>, String> {
-        self.ensure_target_closure()?;
+        let actual_unit = |id| {
+            self.entity(id).is_some_and(|e| {
+                matches!(
+                    e.kind,
+                    EntityKind::Hero | EntityKind::Minion | EntityKind::Piece
+                )
+            })
+        };
         let mut candidates = self
             .locations
             .iter()
             .filter_map(|(id, _)| {
-                self.entity(*id).and_then(|e| {
-                    matches!(
-                        e.kind,
-                        EntityKind::Hero | EntityKind::Minion | EntityKind::Piece
-                    )
-                    .then_some((*id, true))
-                    .or_else(|| (tokens && e.kind == EntityKind::Token).then_some((*id, false)))
-                })
-            })
-            .filter_map(|(id, unit)| {
-                if unit
-                    && target_actor.is_some_and(|a| {
-                        self.resolved_position(a).is_none() || self.resolved_position(id).is_none()
-                    })
-                {
-                    None
-                } else {
-                    Some(id)
-                }
+                (actual_unit(*id)
+                    || matches!(pool, UnitCandidates::UnitsAndTokens)
+                        && self
+                            .entity(*id)
+                            .is_some_and(|e| e.kind == EntityKind::Token))
+                .then_some(*id)
             })
             .collect::<Vec<_>>();
+        if matches!(pool, UnitCandidates::UnitsWithIllusions) {
+            candidates.extend(
+                self.locations.iter().filter_map(|(id, _)| {
+                    self.equivalent_illusion(*id, context.actor).then_some(*id)
+                }),
+            );
+        }
+        let mut visible = Vec::with_capacity(candidates.len());
+        for id in candidates {
+            if actual_unit(id)
+                && target_actor.is_some_and(|actor| actor != self.definitions.effect_empty)
+                && !self.can_target(target_actor, Some(id))?.allowed
+            {
+                continue;
+            }
+            visible.push(id);
+        }
+        let mut candidates = visible;
         for filter in filters {
             let mut next = Vec::new();
             for id in candidates {
@@ -188,30 +241,44 @@ impl UnitFilter {
                     Some(Datum::Text(id)) => world.position(*id),
                     _ => None,
                 };
-                world
-                    .position(id)
-                    .zip(target)
-                    .is_some_and(|(a, b)| world.on_map(a) && world.on_map(b) && a.distance(b) == 1)
+                if let Some((a, b)) = world.position(id).zip(target) {
+                    world.on_map(a)
+                        && world.on_map(b)
+                        && a.distance(b) == 1
+                        && world.effect_connected(a, b, &[])?
+                } else {
+                    false
+                }
             }
             Self::EmptyNeighbor => world.position(id).is_some_and(|h| {
                 h.neighbors()
                     .iter()
                     .any(|n| world.on_map(*n) && !world.obstacle(*n))
             }),
-            Self::CanMove => {
-                if world.has_effects {
-                    return Err("displacement prevention not compiled".into());
+            Self::Displacement(kind) => {
+                if let Some(actor) = context
+                    .actor
+                    .filter(|id| *id != world.definitions.effect_empty)
+                {
+                    world.can_displace(id, Some(actor), *kind, None)?.allowed
+                } else {
+                    true
                 }
-                true
             }
             Self::Team(relation) => {
                 let actor = context.actor.and_then(|a| world.entity(a));
-                if let Some(actor) = actor.filter(|a| a.team.is_some() && entity.team.is_some()) {
+                let team = entity.team.or_else(|| {
+                    world
+                        .equivalent_illusion(id, context.actor)
+                        .then(|| world.illusion_minion_team(context.actor))
+                        .flatten()
+                });
+                if let Some(actor) = actor.filter(|a| a.team.is_some() && team.is_some()) {
                     match relation {
                         Relation::SelfOnly => actor.id == id,
-                        Relation::Enemy => actor.team != entity.team,
+                        Relation::Enemy => actor.team != team,
                         Relation::Friendly => {
-                            actor.team == entity.team
+                            actor.team == team
                                 && actor.id != id
                                 && !(world.acting_piece == Some(id)
                                     && entity.owner == Some(actor.id))
@@ -226,6 +293,8 @@ impl UnitFilter {
                     matches!(entity.kind, EntityKind::Hero | EntityKind::Piece)
                 } else {
                     entity.kind == *kind
+                        || *kind == EntityKind::Minion
+                            && world.equivalent_illusion(id, context.actor)
                 }
             }
             Self::Exclude { self_, keys } => {
@@ -250,16 +319,8 @@ impl UnitFilter {
                     })
                 })
             }),
-            Self::Immunity => world.immune_filter(id, context.actor),
-            Self::Range(filter) => {
-                let mut accepted = [true];
-                if let Some(hex) = world.position(id) {
-                    filter.apply_scan(context, &[hex], &mut accepted)?;
-                    accepted[0]
-                } else {
-                    false
-                }
-            }
+            Self::Immunity => world.immune_filter(id, context)?,
+            Self::Range(filter) => filter.accept_unit(context, id)?,
             Self::ContextIds(key) => {
                 if let Some(Datum::List(items)) = context.registers.get(*key) {
                     // Context ID lists are normally strings. Reject aggregate/string
@@ -284,7 +345,13 @@ impl UnitFilter {
                 entity.kind == EntityKind::Token
                     && kind.is_none_or(|k| entity.token_type == Some(k))
             }
-            Self::MinionTypes(kinds) => entity.minion_kind.is_some_and(|k| kinds.contains(&k)),
+            Self::MinionTypes(kinds) => entity.minion_kind.map_or_else(
+                || {
+                    kinds.contains(&MinionKind::Melee)
+                        && world.equivalent_illusion(id, context.actor)
+                },
+                |kind| kinds.contains(&kind),
+            ),
         })
     }
 }
@@ -330,7 +397,12 @@ pub fn compile_unit_filter(raw: &Value, symbols: &mut Symbols) -> Result<UnitFil
             ),
         ),
         "has_empty_neighbor_filter" => UnitFilter::EmptyNeighbor,
-        "can_be_moved_filter" => UnitFilter::CanMove,
+        "can_be_moved_filter" => {
+            UnitFilter::Displacement(crate::validation::DisplacementKind::Move)
+        }
+        "can_be_placed_filter" => {
+            UnitFilter::Displacement(crate::validation::DisplacementKind::Place)
+        }
         "team_filter" => UnitFilter::Team(match raw["relation"].as_str() {
             Some("FRIENDLY") => Relation::Friendly,
             Some("ENEMY") => Relation::Enemy,

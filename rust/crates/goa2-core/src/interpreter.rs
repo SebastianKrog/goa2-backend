@@ -15,9 +15,12 @@ use crate::{
     reactions::{DefenseMenu, DefenseOp, ReactionRules, Window},
     spatial::{HexFilter, Origin, SpatialContext, compile_filter},
     stats::{CardStats, MarkerKind, Stat},
-    targeting::UnitFilter,
+    targeting::{UnitCandidates, UnitFilter},
     world::{EntityKind, NativeWorld},
 };
+mod object_execution;
+pub use object_execution::LiveEffectExpiry;
+
 use serde_json::{Value, json};
 use std::{
     sync::{
@@ -47,6 +50,35 @@ fn unsupported(message: impl Into<String>) -> EngineError {
     EngineError::Unsupported(message.into())
 }
 
+fn prompt_actor(
+    owner: Option<Symbol>,
+    key: Option<Symbol>,
+    actor: Option<Symbol>,
+    symbols: &Symbols,
+    read: impl FnOnce(Symbol) -> Result<Option<Symbol>>,
+) -> Result<Option<Symbol>> {
+    if let Some(owner) = owner.filter(|id| !symbols.name(*id).is_empty()) {
+        return Ok(Some(owner));
+    }
+    if let Some(key) = key.filter(|id| !symbols.name(*id).is_empty()) {
+        return Ok(read(key)?.or(actor));
+    }
+    Ok(actor)
+}
+
+fn scope_actor(
+    literal: Option<Symbol>,
+    key: Option<Symbol>,
+    symbols: &Symbols,
+    read: impl FnOnce(Symbol) -> Result<Option<Symbol>>,
+) -> Result<Option<Symbol>> {
+    if let Some(key) = key.filter(|id| !symbols.name(*id).is_empty()) {
+        read(key)
+    } else {
+        Ok(literal)
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RequestToken {
     Imported(Symbol),
@@ -74,10 +106,10 @@ struct DefenseProgram {
     flag: usize,
     place: usize,
     remove: usize,
-    reflect_select: usize,
-    reflect_discard: usize,
-    deflect_select: usize,
-    deflect_discard: usize,
+    reflect_select: Option<usize>,
+    reflect_discard: Option<usize>,
+    deflect_select: Option<usize>,
+    deflect_discard: Option<usize>,
 }
 #[derive(Clone, Debug)]
 struct FlowProgram {
@@ -93,8 +125,15 @@ struct BattleProgram {
     displace: usize,
 }
 #[derive(Clone, Debug)]
+struct PassiveBody {
+    effect: Symbol,
+    owner: Symbol,
+    templates: Vec<usize>,
+}
+#[derive(Clone, Debug)]
 struct Frame {
     instruction: usize,
+    object: Option<crate::objects::ObjectId>,
     pending: Option<Datum>,
     request: Option<RequestToken>,
     index: i64,
@@ -112,6 +151,12 @@ struct Frame {
     effect: Option<EffectBinding>,
     offer_override: Option<crate::passives::Offer>,
     forced: Option<ForceBinding>,
+    mine_trigger: Option<(Option<Symbol>, Symbol, Option<Symbol>)>,
+    mine_snapshot: Option<(Vec<Symbol>, Symbol)>,
+    protection: Option<crate::protection::ProtectionBinding>,
+    mine_prechosen: bool,
+    pre_move: Option<(Symbol, i32)>,
+    pre_processed: Vec<Symbol>,
     action: Option<ActionStep>,
     multi: Vec<Symbol>,
     zone_return: Option<crate::minion_return::ReturnBinding>,
@@ -126,7 +171,29 @@ struct Conditions {
 }
 #[derive(Clone, Debug)]
 enum Instruction {
+    MinionProtection {
+        spec: crate::protection::ProtectionBinding,
+        remove: usize,
+        discard: usize,
+    },
     CreateEffect(Arc<crate::effect_steps::EffectStepSpec>),
+    MineChoice {
+        unit: Option<Symbol>,
+        key: Option<Symbol>,
+        destination: Symbol,
+        range: i32,
+        output: Symbol,
+        prompt: Symbol,
+    },
+    TriggerMines {
+        ids: Option<Vec<Symbol>>,
+        victim: Option<Symbol>,
+        ids_key: Symbol,
+        victim_key: Symbol,
+        rollback: Symbol,
+        blast: Symbol,
+        discard: Option<usize>,
+    },
     Flow(crate::turn::FlowStep),
     Battle(crate::battle::BattleStep),
     ReturnMinions {
@@ -236,11 +303,11 @@ enum Instruction {
     },
     OfferPassive {
         spec: crate::passives::Offer,
-        body: usize,
         mark: usize,
     },
     MarkPassive {
         card: Symbol,
+        provider: Option<Symbol>,
     },
     DefenseText {
         on_block: bool,
@@ -255,7 +322,22 @@ enum Instruction {
     },
     RemoveMarker(MarkerKind),
     RestoreAction,
-    PreAction,
+    FinishedEffect,
+    RestoreContext {
+        other: bool,
+    },
+    PreMovement {
+        hero: Option<Symbol>,
+        key: Option<Symbol>,
+        children: Vec<usize>,
+    },
+    PreDiscard {
+        hero: Option<Symbol>,
+        key: Option<Symbol>,
+        abort: bool,
+        force: usize,
+        defeat: usize,
+    },
 
     Combat {
         damage: i64,
@@ -263,6 +345,7 @@ enum Instruction {
         defeat: usize,
     },
     Defeat {
+        protection: Option<usize>,
         victim: Option<Symbol>,
         key: Option<Symbol>,
         killer: Option<Symbol>,
@@ -303,6 +386,9 @@ enum Instruction {
         prompt: Symbol,
     },
     Move {
+        mine_choice: Option<usize>,
+        mine_trigger: Option<usize>,
+        prechosen: bool,
         unit: Option<Symbol>,
         unit_key: Option<Symbol>,
         destination: Option<Hex>,
@@ -419,6 +505,8 @@ enum Team {
 }
 #[derive(Clone, Debug)]
 pub enum RequestChoices {
+    Protection(Vec<crate::cards::CardId>),
+    Mines(Vec<crate::mines::MinePath>),
     Numbers {
         values: Vec<i64>,
         labels: Vec<(i64, Symbol)>,
@@ -469,14 +557,24 @@ pub enum RequestChoices {
 pub struct NativeRequest {
     pub id: RequestToken,
     pub owner: Symbol,
+    /// Original prompt actor; ownership is remapped only when the request is issued.
+    controlled: Option<Symbol>,
     prompt: Symbol,
     movement_range: Option<i32>,
+    pre_action_range: Option<i32>,
     pub choices: RequestChoices,
     can_skip: bool,
     discard: bool,
 }
 #[derive(Clone, Debug)]
 pub enum NativeEvent {
+    MineTriggered {
+        actor: Option<Symbol>,
+        target: Symbol,
+        from: Hex,
+        kind: Option<Symbol>,
+        blast: bool,
+    },
     EffectCreated(crate::effect_steps::EffectCreated),
     Round(crate::round::RoundEvent),
     TurnEnded(Symbol),
@@ -510,6 +608,7 @@ pub enum NativeEvent {
         actor: Option<Symbol>,
         token: Symbol,
         from: Hex,
+        effects_removed: usize,
     },
     Marker(MarkerEvent),
     Combat(CombatEvent),
@@ -575,6 +674,7 @@ pub struct NativeSession {
     steps: Arc<Vec<CompiledStep>>,
     symbols: Arc<Symbols>,
     context: Registers,
+    objects: Option<object_execution::BoundObjects>,
     world: NativeWorld,
     combat_rules: CombatRules,
     marker_rules: MarkerRules,
@@ -587,6 +687,8 @@ pub struct NativeSession {
     reaction_rules: Arc<ReactionRules>,
     passive_rules: Arc<crate::passives::PassiveRules>,
     passive_offer: Option<usize>,
+    protection_program: Option<usize>,
+    passive_bodies: Arc<Vec<PassiveBody>>,
     stack: Vec<Frame>,
     planning: crate::planning::Planning,
     boundary: crate::turn::Boundary,
@@ -614,30 +716,94 @@ impl NativeSession {
         ) {
             return Err(unsupported("phase flow not yet compiled"));
         }
+        let mut objects = object_execution::BoundObjects::compile(&source)?;
         let raw = &source.state;
         let has_effects = raw["active_effects"]
             .as_array()
             .is_some_and(|v| !v.is_empty());
-        let lifecycle_only = matches!(header.phase, Phase::Resolution)
-            && raw["execution_stack"].as_array().is_some_and(|stack| {
-                stack.iter().all(|step| {
-                    matches!(
-                        step["type"].as_str(),
-                        Some("create_effect" | "set_context_flag" | "log_message")
+        let effect_steps_only = matches!(
+            header.phase,
+            Phase::Planning | Phase::Resolution | Phase::Cleanup | Phase::LevelUp
+        ) && raw["execution_stack"].as_array().is_some_and(|stack| {
+            stack.iter().all(|step| {
+                matches!(
+                    step["type"].as_str(),
+                    Some(
+                        "create_effect"
+                            | "remove_token"
+                            | "check_adjacency"
+                            | "place_unit"
+                            | "swap_units"
+                            | "set_actor"
+                            | "validate_repeat"
+                            | "move_unit"
+                            | "move_sequence"
+                            | "mine_path_choice"
+                            | "trigger_mine"
+                            | "force_discard"
+                            | "discard_card"
+                            | "check_passive_abilities"
+                            | "offer_passive"
+                            | "mark_passive_used"
+                            | "defeat_unit"
+                            | "resolve_combat"
+                            | "remove_unit"
+                            | "trigger_game_over"
+                            | "force_discard_or_defeat"
+                            | "check_minion_protection"
+                            | "reaction_window"
+                            | "resolve_defense_text"
+                            | "resolve_on_block_effect"
+                            | "restore_action_type"
+                            | "place_marker"
+                            | "remove_marker"
+                            | "attack_sequence"
+                            | "multi_select"
+                            | "count"
+                            | "collect_units"
+                            | "check_context_condition"
+                            | "check_target_defeated"
+                            | "resolve_pre_action_movement"
+                            | "resolve_pre_action_discard"
+                            | "return_minion_to_zone"
+                            | "minion_battle"
+                            | "choose_minion_removal"
+                            | "check_lane_push"
+                            | "lane_push"
+                            | "resolve_displacement"
+                            | "end_phase_cleanup"
+                            | "resolve_upgrades"
+                            | "round_reset"
+                            | "ask_confirmation"
+                            | "set_context_flag"
+                            | "log_message"
+                            | "finished_expiring_effect"
                     )
-                })
-            });
-        if has_effects && !lifecycle_only {
+                ) || (step["type"] == "select_step"
+                    && matches!(
+                        step["target_type"].as_str(),
+                        Some("HEX" | "NUMBER" | "CARD" | "UNIT" | "UNIT_OR_TOKEN")
+                    ))
+            })
+        });
+        let inert_terminal = header.phase == Phase::GameOver
+            && raw["execution_stack"]
+                .as_array()
+                .is_some_and(|stack| stack.is_empty());
+        if objects.is_none() && has_effects && !effect_steps_only && !inert_terminal {
             return Err(unsupported(
-                "active-effect and action-controller closure not yet compiled",
+                "active-effect gameplay/phase closure not yet compiled",
             ));
         }
-        let mut symbols = Symbols::default();
+        let mut symbols = objects
+            .as_ref()
+            .map_or_else(Symbols::default, |objects| (*objects.arena.symbols).clone());
         let selection_key = symbols.intern("selection");
         let action_stack_key = symbols.intern("action_context_stack");
         let yes = symbols.intern("YES");
         let skip = symbols.intern("SKIP");
         let no_actor = symbols.intern("None");
+        symbols.intern("system");
         let coordinates = ["q", "r", "s"].map(|name| symbols.intern(name));
         let planning = if has_effects {
             crate::planning::Planning::compile_effect_boundary(&source, &mut symbols)
@@ -661,26 +827,61 @@ impl NativeSession {
             .as_object()
             .ok_or_else(|| unsupported("invalid execution context"))?
         {
-            context_items.push((
-                symbols.intern(key),
-                Datum::from_json(value, &mut symbols).map_err(unsupported)?,
-            ));
+            if objects.is_none() {
+                context_items.push((
+                    symbols.intern(key),
+                    Datum::from_json(value, &mut symbols).map_err(unsupported)?,
+                ));
+            }
         }
         let mut steps = Vec::new();
         let mut stack = Vec::new();
-        for wire in raw["execution_stack"]
+        for (index, wire) in raw["execution_stack"]
             .as_array()
             .ok_or_else(|| unsupported("invalid execution stack"))?
+            .iter()
+            .enumerate()
         {
             let id = compile_step(wire, &mut steps, &mut symbols)?;
-            stack.push(steps[id].initial.clone());
+            let mut frame = steps[id].initial.clone();
+            if let Some(objects) = &mut objects {
+                let object = objects.step(index)?;
+                objects.bind_program(object, id, &steps)?;
+                frame.object = Some(object);
+                frame.pending = None;
+            }
+            stack.push(frame);
         }
-        let has_flow = header.phase == Phase::Planning
-            || steps
+        if let Some(objects) = &mut objects {
+            objects.bind_stored_programs(&source, &mut steps, &mut symbols)?;
+            objects.compile_scheduler(&mut steps, &mut symbols)?;
+        }
+        if objects.is_none()
+            && steps
                 .iter()
-                .any(|s| matches!(s.instruction, Instruction::Flow(_)));
+                .any(|step| matches!(step.instruction, Instruction::RestoreContext { .. }))
+        {
+            return Err(unsupported(
+                "action-context restoration requires live object bindings",
+            ));
+        }
+        let may_upgrade_cards = steps.iter().any(|s| {
+            matches!(
+                s.instruction,
+                Instruction::Flow(crate::turn::FlowStep::Cleanup | crate::turn::FlowStep::Upgrades)
+            )
+        });
+        let has_flow = objects.is_none()
+            && ((!has_effects && header.phase == Phase::Planning)
+                || steps
+                    .iter()
+                    .any(|step| matches!(step.instruction, Instruction::Flow(_))));
         let flow_program = if has_flow {
-            Some(Arc::new(compile_flow_program(&mut steps, &mut symbols)?))
+            Some(Arc::new(compile_flow_program(
+                &mut steps,
+                &mut symbols,
+                has_effects,
+            )?))
         } else {
             None
         };
@@ -695,14 +896,315 @@ impl NativeSession {
         } else {
             None
         };
-        let world = NativeWorld::compile(&source, &mut symbols).map_err(unsupported)?;
+        // This projection is read-only in the closed arena instruction set.
+        // Mutable context and steps remain authoritative only in the arena.
+        let world_source = objects
+            .as_ref()
+            .map(|_| object_execution::world_projection(&source));
+        let world = NativeWorld::compile(world_source.as_ref().unwrap_or(&source), &mut symbols)
+            .map_err(unsupported)?;
+        // Projectile selection is a dependency of a possible on-block body,
+        // not of every defense window. Do not compile unreachable targeting.
+        if steps.iter().any(|s| {
+            matches!(
+                s.instruction,
+                Instruction::DefenseText { on_block: true, .. }
+            )
+        }) {
+            let mut projectile = |effect: &str, deflect: bool| -> Result<Option<(usize, usize)>> {
+                let possible = if has_effects && !may_upgrade_cards {
+                    // Bounded roots without upgrades consume held cards;
+                    // discard is retained for an imported on-block frame.
+                    world.heroes.iter().any(|hero| {
+                        hero.hand
+                            .iter()
+                            .chain(&hero.discard)
+                            .chain(hero.played.iter().flatten())
+                            .chain(hero.current.iter())
+                            .any(|id| {
+                                world.card(*id).is_some_and(|card| {
+                                    symbols.name(world.definitions.cards[card.definition].effect)
+                                        == effect
+                                })
+                            })
+                    })
+                } else {
+                    // Cleanup/upgrade and full ordinary roots can introduce deck cards.
+                    world
+                        .definitions
+                        .cards
+                        .iter()
+                        .any(|d| symbols.name(d.effect) == effect)
+                };
+                if possible {
+                    Ok(Some(compile_projectile(deflect, &mut steps, &mut symbols)?))
+                } else {
+                    Ok(None)
+                }
+            };
+            let reflect = projectile("reflect_projectiles", false)?;
+            let deflect = projectile("deflect_projectiles", true)?;
+            for step in &mut steps {
+                if let Instruction::DefenseText {
+                    on_block: true,
+                    program,
+                } = &mut step.instruction
+                {
+                    program.reflect_select = reflect.map(|p| p.0);
+                    program.reflect_discard = reflect.map(|p| p.1);
+                    program.deflect_select = deflect.map(|p| p.0);
+                    program.deflect_discard = deflect.map(|p| p.1);
+                }
+            }
+        }
+        let mut passive_bodies = Vec::new();
+        let wild = symbols.intern("wild_hunt");
+        let gun = symbols.intern("big_sodding_gun");
+        let before_action = symbols.intern("before_action");
+        let after_push = symbols.intern("after_push");
+        let needs_trigger = |trigger| {
+            (has_flow && !has_effects)
+                || steps.iter().any(|step| match &step.instruction {
+                    Instruction::Passive { trigger: kind, .. } => *kind == trigger,
+                    Instruction::OfferPassive { spec, .. } => spec.trigger == trigger,
+                    _ => false,
+                })
+        };
+        let needs_wild = needs_trigger(before_action);
+        let needs_gun = needs_trigger(after_push);
+        if needs_wild
+            && (world.definitions.cards.iter().any(|d| d.effect == wild)
+                || world
+                    .effects
+                    .instances
+                    .iter()
+                    .any(|e| e.granted_passive == Some(wild)))
+        {
+            let recipes = crate::templates::instructions().map_err(unsupported)?["passive_bodies"]
+                ["wild_hunt"]
+                .as_array()
+                .ok_or_else(|| unsupported("frozen Wild Hunt recipe missing"))?
+                .clone();
+            for hero in &world.heroes {
+                let mut templates = Vec::new();
+                for recipe in &recipes {
+                    let mut recipe = recipe.clone();
+                    bind_passive_owner(&mut recipe, symbols.name(hero.id));
+                    templates.push(compile_step(&recipe, &mut steps, &mut symbols)?);
+                }
+                passive_bodies.push(PassiveBody {
+                    effect: wild,
+                    owner: hero.id,
+                    templates,
+                });
+            }
+        }
+        if needs_gun
+            && (world.definitions.cards.iter().any(|d| d.effect == gun)
+                || world
+                    .effects
+                    .instances
+                    .iter()
+                    .any(|e| e.granted_passive == Some(gun)))
+        {
+            let template = compile_step(
+                &combat_template("discard_or_defeat")?,
+                &mut steps,
+                &mut symbols,
+            )?;
+            for hero in &world.heroes {
+                passive_bodies.push(PassiveBody {
+                    effect: gun,
+                    owner: hero.id,
+                    templates: vec![template],
+                });
+            }
+        }
+        let needs_protection = steps
+            .iter()
+            .any(|s| matches!(s.instruction, Instruction::MinionProtection { .. }))
+            || steps
+                .iter()
+                .any(|s| matches!(s.instruction, Instruction::Defeat { .. }))
+                && (world.effects.instances.iter().any(|e| {
+                    e.definition.behavior.kind == crate::effect_rules::Kind::MinionProtection
+                }) || steps
+                    .iter()
+                    .any(|s| matches!(s.instruction, Instruction::CreateEffect(_))));
+        let protection_program = if needs_protection {
+            let program = compile_step(
+                &combat_template("minion_protection")?,
+                &mut steps,
+                &mut symbols,
+            )?;
+            for step in &mut steps {
+                if let Instruction::Defeat { protection, .. } = &mut step.instruction {
+                    *protection = Some(program);
+                }
+            }
+            Some(program)
+        } else {
+            None
+        };
+        let may_create_effects = steps
+            .iter()
+            .any(|step| matches!(step.instruction, Instruction::CreateEffect(_)));
+        let may_deploy = steps
+            .iter()
+            .any(|s| matches!(s.instruction, Instruction::Place { .. }))
+            && (world.definitions.entities.iter().any(|e| e.passable)
+                || world.definitions.supply_passable.iter().any(|(_, p)| *p));
+        let move_links = steps
+            .iter()
+            .enumerate()
+            .filter_map(|(i, step)| {
+                if let Instruction::Move {
+                    destination_key,
+                    range,
+                    prechosen,
+                    ..
+                } = step.instruction
+                {
+                    (world.has_deployed_passable() || prechosen || may_deploy).then_some((
+                        i,
+                        destination_key,
+                        range,
+                        prechosen,
+                    ))
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+        for (i, destination, range, prechosen) in move_links {
+            let mut choice = combat_template("mine_path_choice")?;
+            choice["destination_key"] = json!(symbols.name(destination));
+            choice["range_val"] = json!(range);
+            let choice = compile_step(&choice, &mut steps, &mut symbols)?;
+            let trigger =
+                compile_step(&combat_template("trigger_mine")?, &mut steps, &mut symbols)?;
+            // These potential IDs specialize only the discard linker. Each
+            // runtime child replaces them with its actual literal queue.
+            let mut possible_ids = world
+                .definitions
+                .entities
+                .iter()
+                .filter(|e| {
+                    e.token_type.is_some() && (may_deploy || world.position(e.id).is_some())
+                })
+                .map(|e| e.id)
+                .collect::<Vec<_>>();
+            if prechosen
+                && let Some(ids) = raw["execution_context"]["triggered_mine_ids"].as_array()
+            {
+                possible_ids.extend(
+                    ids.iter()
+                        .filter_map(Value::as_str)
+                        .map(|id| symbols.intern(id)),
+                );
+            }
+            if let Instruction::TriggerMines { ids, .. } = &mut steps[trigger].instruction {
+                *ids = Some(possible_ids);
+            }
+
+            if let Instruction::Move {
+                mine_choice,
+                mine_trigger,
+                ..
+            } = &mut steps[i].instruction
+            {
+                *mine_choice = Some(choice);
+                *mine_trigger = Some(trigger);
+            }
+        }
+        let mine_links = steps
+            .iter()
+            .enumerate()
+            .filter_map(|(index, step)| {
+                if let Instruction::TriggerMines {
+                    ids,
+                    blast,
+                    victim_key,
+                    ..
+                } = &step.instruction
+                {
+                    let possible = ids.as_ref().map_or_else(
+                        || {
+                            world
+                                .definitions
+                                .entities
+                                .iter()
+                                .any(|e| e.token_type == Some(*blast))
+                        },
+                        |ids| {
+                            ids.iter().any(|id| {
+                                world
+                                    .entity(*id)
+                                    .is_some_and(|e| e.token_type == Some(*blast))
+                            })
+                        },
+                    );
+                    Some((index, *victim_key, possible))
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+        for (index, key, possible) in mine_links {
+            if !possible {
+                continue;
+            }
+            if may_create_effects {
+                return Err(unsupported(
+                    "blast mine dynamically-created effect closure not compiled",
+                ));
+            }
+            let mut forced = combat_template("force_discard")?;
+            forced["victim_key"] = json!(symbols.name(key));
+            let child = compile_step(&forced, &mut steps, &mut symbols)?;
+            if let Instruction::TriggerMines { discard, .. } = &mut steps[index].instruction {
+                *discard = Some(child);
+            }
+        }
         let passive_rules = Arc::new(
             crate::passives::PassiveRules::compile(&world, &mut symbols).map_err(unsupported)?,
         );
-        let passive_offer = if steps
+        let passive_triggers = steps
             .iter()
-            .any(|s| matches!(s.instruction, Instruction::Passive { .. }))
-        {
+            .filter_map(|s| {
+                if let Instruction::Passive { trigger, .. } = s.instruction {
+                    Some(trigger)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+        let needs_passive_offer = if has_effects {
+            let mut needed = false;
+            for hero in &world.heroes {
+                for trigger in &passive_triggers {
+                    let offers = passive_rules
+                        .scan(&world, Some(hero.id), Some(hero.id), *trigger)
+                        .map_err(unsupported)?;
+                    for offer in &offers {
+                        if let Some((_, effect)) = passive_rules.resolve(&world, hero.id, *offer)
+                            && !passive_bodies
+                                .iter()
+                                .any(|body| body.effect == effect && body.owner == hero.id)
+                        {
+                            return Err(unsupported(
+                                "eligible effect-backed passive body not compiled",
+                            ));
+                        }
+                    }
+                    needed |= !offers.is_empty();
+                }
+            }
+            needed
+        } else {
+            !passive_triggers.is_empty()
+        };
+        let passive_offer = if needs_passive_offer {
             Some(compile_step(
                 &combat_template("offer_passive")?,
                 &mut steps,
@@ -732,7 +1234,6 @@ impl NativeSession {
                 step.instruction,
                 Instruction::Defeat { .. } | Instruction::Combat { .. }
             ) {
-                world.ensure_combat_closure().map_err(unsupported)?;
                 for hero in &world.heroes {
                     world
                         .lifecycle_hero(hero.id)
@@ -745,9 +1246,6 @@ impl NativeSession {
             ) || matches!(&step.instruction,Instruction::Hex {filters,..} if filters.iter().any(|f|matches!(f,HexFilter::FastTravel {..})))
             {
                 world.ensure_fast_travel_closure().map_err(unsupported)?;
-            }
-            if let Instruction::Unit { .. } = step.instruction {
-                world.ensure_target_closure().map_err(unsupported)?;
             }
             if let Instruction::ChoosePiece { hero, .. } = step.instruction
                 && world
@@ -819,11 +1317,23 @@ impl NativeSession {
         if next_step == u64::MAX {
             return Err(unsupported("step generation counter exhausted"));
         }
+        if objects.is_some() {
+            // Live pending payloads belong only to arena step objects. Avoid
+            // retaining/cloning a stale aggregate in immutable frame templates.
+            for step in &mut steps {
+                step.initial.pending = None;
+            }
+        }
+        let symbols = Arc::new(symbols);
+        if let Some(objects) = &mut objects {
+            objects.arena.symbols = symbols.clone();
+        }
         Ok(Self {
             source: Arc::new(source),
             steps: Arc::new(steps),
-            symbols: Arc::new(symbols),
+            symbols,
             context,
+            objects,
             world,
             combat_rules,
             marker_rules,
@@ -836,6 +1346,8 @@ impl NativeSession {
             reaction_rules,
             passive_rules,
             passive_offer,
+            protection_program,
+            passive_bodies: Arc::new(passive_bodies),
             stack,
             planning,
             boundary,
@@ -873,7 +1385,16 @@ impl NativeSession {
         };
         Ok(self
             .world
-            .select_units(tokens, self.planning.actor, filters, &context)
+            .select_units(
+                if tokens {
+                    UnitCandidates::UnitsAndTokens
+                } else {
+                    UnitCandidates::Units
+                },
+                self.planning.actor,
+                filters,
+                &context,
+            )
             .map_err(unsupported)?
             .into_iter()
             .filter(|id| !frame.multi.contains(id))
@@ -883,6 +1404,9 @@ impl NativeSession {
         self.world.hero(actor).map_or(actor, |hero| hero.id)
     }
     fn symbol_from_context(&self, key: Symbol) -> Result<Option<Symbol>> {
+        if let Some(objects) = &self.objects {
+            return objects.symbol_from_context(key, &self.symbols);
+        }
         match self.context.get(key) {
             Some(Datum::Text(id)) if !self.symbols.name(*id).is_empty() => Ok(Some(*id)),
             Some(value) if value.truthy(&self.symbols) => {
@@ -892,13 +1416,13 @@ impl NativeSession {
         }
     }
     fn prompt_owner(&self, owner: Option<Symbol>, owner_key: Option<Symbol>) -> Result<Symbol> {
-        let raw = if owner.is_some() {
-            owner
-        } else if let Some(key) = owner_key {
-            self.symbol_from_context(key)?.or(self.planning.actor)
-        } else {
-            self.planning.actor
-        };
+        let raw = prompt_actor(
+            owner,
+            owner_key,
+            self.planning.actor,
+            &self.symbols,
+            |key| self.symbol_from_context(key),
+        )?;
         Ok(self.normalized_owner(raw.unwrap_or(self.no_actor)))
     }
     fn flow_frame(&mut self, name: &str) -> Result<Frame> {
@@ -967,7 +1491,7 @@ impl NativeSession {
                 i,
                 Instruction::Flow(
                     crate::turn::FlowStep::Confirm(_) | crate::turn::FlowStep::Finalize(_)
-                )
+                ) | Instruction::FinishedEffect
             )
         };
         let flag = |name: &str| {
@@ -1099,6 +1623,13 @@ impl NativeSession {
         };
         frame.request = Some(token);
         request.id = token;
+        if let Some(controller) =
+            self.world
+                .action_controller(request.owner, self.planning.actor, self.planning.owner)
+        {
+            request.controlled = Some(request.owner);
+            request.owner = controller;
+        }
         Ok(request)
     }
     pub fn advance(&mut self, budget: &ExecutionBudget<'_>) -> Result<AdvanceResult> {
@@ -1114,6 +1645,9 @@ impl NativeSession {
         budget: &ExecutionBudget<'_>,
         stop_after: Option<usize>,
     ) -> Result<AdvanceResult> {
+        if self.objects.is_some() {
+            return self.advance_objects(budget, stop_after);
+        }
         let mut result = AdvanceResult::default();
         if !self.stack.is_empty() && self.planning.phase != Phase::GameOver {
             budget.check(0)?;
@@ -1157,6 +1691,39 @@ impl NativeSession {
             if let Some(values) = frame.effect.as_ref().and_then(|e| e.primary.as_ref()) {
                 bind_primary(&mut instruction, values, &self.primary_operands)?;
             }
+            if let Some((snapshot, key, source)) = frame.mine_trigger {
+                if let Instruction::ForceDiscard {
+                    victim,
+                    key: victim_key,
+                    immunity,
+                    ..
+                } = &mut instruction
+                {
+                    *victim = snapshot;
+                    *victim_key = Some(key);
+                    *immunity = source;
+                } else {
+                    return Err(unsupported("invalid mine discard snapshot"));
+                }
+            }
+            if let Some(binding) = &frame.protection {
+                if let Instruction::MinionProtection { spec, .. } = &mut instruction {
+                    *spec = binding.clone();
+                } else {
+                    return Err(unsupported("invalid protection continuation binding"));
+                }
+            }
+            if let Some((ids, target)) = &frame.mine_snapshot {
+                if let Instruction::TriggerMines {
+                    ids: queue, victim, ..
+                } = &mut instruction
+                {
+                    *queue = Some(ids.clone());
+                    *victim = Some(*target);
+                } else {
+                    return Err(unsupported("invalid movement mine snapshot"));
+                }
+            }
             if let Some(binding) = &frame.zone_return {
                 bind_zone_return(&mut instruction, binding)?;
             }
@@ -1165,6 +1732,9 @@ impl NativeSession {
             }
             if let Some(cont) = &frame.continuation {
                 bind_continuation(&mut instruction, cont)?;
+            }
+            if let Some((hero, range)) = frame.pre_move {
+                bind_pre_movement(&mut instruction, hero, range)?;
             }
             let mandatory = conditions.mandatory;
             let selected = frame
@@ -1184,15 +1754,390 @@ impl NativeSession {
             if self.world.has_effects
                 && !matches!(
                     instruction,
-                    Instruction::CreateEffect(_) | Instruction::Set { .. } | Instruction::Log
+                    Instruction::CreateEffect(_)
+                        | Instruction::Place { .. }
+                        | Instruction::Swap { .. }
+                        | Instruction::SetActor { .. }
+                        | Instruction::ValidateRepeat { .. }
+                        | Instruction::Move { .. }
+                        | Instruction::MovementSequence { .. }
+                        | Instruction::MineChoice { .. }
+                        | Instruction::TriggerMines { .. }
+                        | Instruction::ForceDiscard { .. }
+                        | Instruction::Discard { .. }
+                        | Instruction::CardSelect(_)
+                        | Instruction::Passive { .. }
+                        | Instruction::OfferPassive { .. }
+                        | Instruction::MarkPassive { .. }
+                        | Instruction::Unit { .. }
+                        | Instruction::Multi { .. }
+                        | Instruction::Attack { .. }
+                        | Instruction::CheckDefeated { .. }
+                        | Instruction::Query { .. }
+                        | Instruction::ContextCondition { .. }
+                        | Instruction::PreMovement { .. }
+                        | Instruction::PreDiscard { .. }
+                        | Instruction::ReturnMinions { .. }
+                        | Instruction::Battle(_)
+                        | Instruction::Flow(
+                            crate::turn::FlowStep::Cleanup
+                                | crate::turn::FlowStep::Upgrades
+                                | crate::turn::FlowStep::Reset
+                        )
+                        | Instruction::Reaction { .. }
+                        | Instruction::DefenseText { .. }
+                        | Instruction::RestoreAction
+                        | Instruction::PlaceMarker { .. }
+                        | Instruction::RemoveMarker(_)
+                        | Instruction::MinionProtection { .. }
+                        | Instruction::Defeat { .. }
+                        | Instruction::Combat { .. }
+                        | Instruction::Remove { .. }
+                        | Instruction::GameOver(_)
+                        | Instruction::DiscardOrDefeat { .. }
+                        | Instruction::Hex { .. }
+                        | Instruction::Number { .. }
+                        | Instruction::Confirm { .. }
+                        | Instruction::CheckAdjacency { .. }
+                        | Instruction::RemoveToken { .. }
+                        | Instruction::Set { .. }
+                        | Instruction::FinishedEffect
+                        | Instruction::Log
                 )
             {
                 return Err(unsupported(
-                    "active-effect gameplay/controller consumers not yet compiled",
+                    "active-effect gameplay consumers not yet compiled",
                 ));
             }
             let mut request = None;
             match instruction {
+                Instruction::MinionProtection {
+                    spec,
+                    remove,
+                    discard,
+                } => {
+                    use crate::protection::ProtectionDecision;
+                    let mut retry = None;
+                    match self.world.protection_decision(&spec).map_err(unsupported)? {
+                        ProtectionDecision::Missing => continue,
+                        ProtectionDecision::Next(effect) => retry = Some(effect),
+                        ProtectionDecision::Defeat => {
+                            let events = self
+                                .combat_rules
+                                .protection_defeat(
+                                    &mut self.world,
+                                    &mut self.context,
+                                    spec.minion,
+                                    spec.killer,
+                                    true,
+                                )
+                                .map_err(combat_error)?;
+                            result
+                                .events
+                                .extend(events.into_iter().map(NativeEvent::Combat));
+                            let child = self.generated_frame(remove, Some(spec.minion), None)?;
+                            self.stack.push(child);
+                        }
+                        ProtectionDecision::Sacrifice {
+                            effect,
+                            hero,
+                            token,
+                        } => {
+                            let from = self
+                                .world
+                                .remove_entity(token)
+                                .map_err(EngineError::Rule)?
+                                .ok_or_else(|| unsupported("protection token vanished"))?;
+                            let removed = self.world.remove_token_effects(token);
+                            result.events.push(NativeEvent::TokenRemoved {
+                                actor: Some(hero),
+                                token,
+                                from,
+                                effects_removed: removed,
+                            });
+                            result
+                                .events
+                                .push(NativeEvent::Combat(CombatEvent::Protected {
+                                    hero,
+                                    minion: spec.minion,
+                                    effect,
+                                    card: None,
+                                    token: Some(token),
+                                }));
+                        }
+                        ProtectionDecision::Cards {
+                            effect,
+                            hero,
+                            cards,
+                        } => {
+                            if let Some(pending) = &frame.pending {
+                                let selection = protection_selection(
+                                    pending,
+                                    &self.symbols,
+                                    self.selection_key,
+                                );
+                                let card = selection.and_then(|v| {
+                                    if let Datum::Text(id) = v {
+                                        cards.iter().copied().find(|card| {
+                                            self.world.definitions.cards
+                                                [self.world.card(*card).unwrap().definition]
+                                                .printed_id
+                                                == id
+                                        })
+                                    } else {
+                                        None
+                                    }
+                                });
+                                if let Some(card) = card {
+                                    let card = self.world.definitions.cards
+                                        [self.world.card(card).unwrap().definition]
+                                        .printed_id;
+                                    let events = self
+                                        .combat_rules
+                                        .protection_defeat(
+                                            &mut self.world,
+                                            &mut self.context,
+                                            spec.minion,
+                                            spec.killer,
+                                            false,
+                                        )
+                                        .map_err(combat_error)?;
+                                    result
+                                        .events
+                                        .extend(events.into_iter().map(NativeEvent::Combat));
+                                    result.events.push(NativeEvent::Combat(
+                                        CombatEvent::Protected {
+                                            hero,
+                                            minion: spec.minion,
+                                            effect,
+                                            card: Some(card),
+                                            token: None,
+                                        },
+                                    ));
+                                    let mut child = self.generated_frame(discard, None, None)?;
+                                    child.discard_override = Some((hero, card));
+                                    self.stack.push(child);
+                                } else {
+                                    retry = Some(effect);
+                                }
+                            } else {
+                                request = Some(NativeRequest {
+                                    controlled: None,
+                                    id: RequestToken::Generated(0),
+                                    owner: hero,
+                                    prompt: spec.minion,
+                                    movement_range: None,
+                                    pre_action_range: None,
+                                    choices: RequestChoices::Protection(cards),
+                                    can_skip: true,
+                                    discard: true,
+                                });
+                            }
+                        }
+                    }
+                    if let Some(effect) = retry {
+                        let mut tried = spec.tried.to_vec();
+                        tried.push(effect);
+                        let mut child = self.generated_frame(
+                            self.protection_program
+                                .ok_or_else(|| unsupported("protection retry program missing"))?,
+                            None,
+                            None,
+                        )?;
+                        child.protection = Some(crate::protection::ProtectionBinding {
+                            minion: spec.minion,
+                            killer: spec.killer,
+                            tried: Arc::from(tried),
+                        });
+                        self.stack.push(child);
+                    }
+                }
+                Instruction::MineChoice {
+                    unit,
+                    key,
+                    destination,
+                    range,
+                    output,
+                    prompt,
+                } => {
+                    let range = frame.range_override.unwrap_or(range);
+                    let unit = frame.unit_override.unwrap_or(unit);
+                    let empty = Datum::List(Vec::new());
+                    let Some(value) = self
+                        .context
+                        .get(destination)
+                        .filter(|v| v.truthy(&self.symbols))
+                    else {
+                        self.context.set(output, empty);
+                        continue;
+                    };
+                    if !matches!(value, Datum::Object(_)) {
+                        self.context.set(output, empty);
+                        continue;
+                    }
+                    let destination = datum_hex(value, &self.symbols, self.coordinates)?;
+                    let unit = unit
+                        .or(if let Some(key) = key {
+                            self.symbol_from_context(key)?
+                        } else {
+                            None
+                        })
+                        .or(self.planning.actor);
+                    let Some(unit) = unit else {
+                        self.context.set(output, empty);
+                        continue;
+                    };
+                    let team = self
+                        .world
+                        .entity(unit)
+                        .filter(|e| matches!(e.kind, EntityKind::Hero | EntityKind::Piece))
+                        .and_then(|e| e.team);
+                    let Some((start, team)) = self.world.position(unit).zip(team) else {
+                        self.context.set(output, empty);
+                        continue;
+                    };
+                    let paths = self
+                        .world
+                        .mine_paths(start, range, self.planning.actor, Some(team), &[unit])
+                        .map_err(unsupported)?;
+                    let options = self
+                        .world
+                        .tile_index(destination)
+                        .map(|i| paths[i].clone())
+                        .unwrap_or_default();
+                    let selected_index = match selected.as_ref() {
+                        Some(Datum::Text(id)) => options
+                            .iter()
+                            .enumerate()
+                            .find(|(i, _)| i.to_string() == self.symbols.name(*id))
+                            .map(|(i, _)| i),
+                        _ => None,
+                    };
+                    let choice = if options.len() <= 1 {
+                        Some(0)
+                    } else {
+                        selected_index
+                    };
+                    if let Some(index) = choice {
+                        self.context.set(
+                            output,
+                            Datum::List(
+                                options
+                                    .get(index)
+                                    .map(|p| p.mines.iter().copied().map(Datum::Text).collect())
+                                    .unwrap_or_default(),
+                            ),
+                        );
+                        continue;
+                    }
+                    frame.pending = None;
+                    request = Some(NativeRequest {
+                        controlled: None,
+                        id: RequestToken::Generated(0),
+                        owner: self
+                            .planning
+                            .actor
+                            .filter(|id| *id != self.world.definitions.effect_empty)
+                            .unwrap_or(self.world.definitions.effect_empty),
+                        prompt,
+                        movement_range: None,
+                        pre_action_range: None,
+                        choices: RequestChoices::Mines(options),
+                        can_skip: false,
+                        discard: false,
+                    });
+                }
+                Instruction::TriggerMines {
+                    ids,
+                    victim,
+                    ids_key,
+                    victim_key,
+                    rollback,
+                    blast,
+                    discard,
+                } => {
+                    let ids = if let Some(ids) = ids {
+                        ids
+                    } else {
+                        match self.context.get(ids_key) {
+                            None | Some(Datum::Null) => Vec::new(),
+                            Some(Datum::List(values)) => values
+                                .iter()
+                                .map(|v| {
+                                    if let Datum::Text(id) = v {
+                                        Ok(*id)
+                                    } else {
+                                        Err(unsupported("non-string mine identity"))
+                                    }
+                                })
+                                .collect::<Result<Vec<_>>>()?,
+                            Some(v) if !v.truthy(&self.symbols) => Vec::new(),
+                            _ => return Err(unsupported("mine queue must be a native list")),
+                        }
+                    };
+                    if ids.is_empty() {
+                        continue;
+                    }
+                    if discard.is_none()
+                        && ids.iter().any(|id| {
+                            self.world
+                                .entity(*id)
+                                .is_some_and(|e| e.token_type == Some(blast))
+                        })
+                    {
+                        return Err(unsupported(
+                            "mine type changed; blast recipe requires recompilation",
+                        ));
+                    }
+
+                    let victim = if let Some(victim) =
+                        victim.filter(|id| *id != self.world.definitions.effect_empty)
+                    {
+                        Some(victim)
+                    } else {
+                        self.symbol_from_context(victim_key)?
+                    };
+                    let mut sources = Vec::new();
+                    for id in ids {
+                        let entity = self.world.entity(id);
+                        let exists = entity.is_some();
+                        let kind = entity.and_then(|e| e.token_type);
+                        let is_blast = kind == Some(blast);
+                        let owner = entity
+                            .and_then(|e| e.owner)
+                            .filter(|id| *id != self.world.definitions.effect_empty);
+                        let from = self.world.remove_entity(id).map_err(EngineError::Rule)?;
+                        if from.is_some() {
+                            self.world.remove_token_effects(id);
+                        }
+                        if is_blast {
+                            sources.push(owner);
+                        }
+                        if let Some(from) = from.filter(|_| exists) {
+                            result.events.push(NativeEvent::MineTriggered {
+                                actor: self
+                                    .planning
+                                    .actor
+                                    .filter(|id| *id != self.world.definitions.effect_empty),
+                                target: id,
+                                from,
+                                kind,
+                                blast: is_blast,
+                            });
+                        }
+                    }
+                    self.context.set(ids_key, Datum::List(Vec::new()));
+                    self.context.set(rollback, Datum::Bool(true));
+                    for source in sources.into_iter().rev() {
+                        let mut child = self.generated_frame(
+                            discard.ok_or_else(|| unsupported("missing blast recipe"))?,
+                            None,
+                            None,
+                        )?;
+                        child.mine_trigger = Some((victim, victim_key, source));
+                        self.stack.push(child);
+                    }
+                }
                 Instruction::CreateEffect(spec) => {
                     let context = crate::effects::CreationContext {
                         round: self.round.round,
@@ -1244,6 +2189,12 @@ impl NativeSession {
                                         card.passive_uses = 0;
                                     }
                                 }
+                                let owner = self.world.heroes[index].id;
+                                for effect in &mut self.world.effects.instances {
+                                    if effect.source == owner && effect.passive_uses > 0 {
+                                        effect.passive_uses = 0;
+                                    }
+                                }
                             }
                             self.boundary.finalize(hero, &self.symbols);
                             self.context.clear();
@@ -1270,10 +2221,12 @@ impl NativeSession {
                                 continue;
                             }
                             request = Some(NativeRequest {
+                                controlled: None,
                                 id: RequestToken::Generated(0),
                                 owner: hero,
                                 prompt: rules.confirm_prompt,
                                 movement_range: None,
+                                pre_action_range: None,
                                 choices: RequestChoices::ConfirmAction,
                                 can_skip: false,
                                 discard: false,
@@ -1289,10 +2242,12 @@ impl NativeSession {
                                 frame.pending = None;
                                 let index = usize::from(choice.team == rules.teams[1]);
                                 request = Some(NativeRequest {
+                                    controlled: None,
                                     id: RequestToken::Generated(0),
                                     owner: rules.owners[index],
                                     prompt: rules.confirm_prompt,
                                     movement_range: None,
+                                    pre_action_range: None,
                                     choices: RequestChoices::Actors {
                                         team: choice.team,
                                         values: choice.candidates,
@@ -1367,10 +2322,12 @@ impl NativeSession {
                                 .ok_or_else(|| unsupported("respawn prompt missing"))?;
                             let location=selected.as_ref().is_some_and(|v|(matches!(v,Datum::Object(_))&&v.truthy(&self.symbols))||matches!(v,Datum::Text(id) if self.symbols.name(*id)=="RESPAWN"));
                             request = Some(NativeRequest {
+                                controlled: None,
                                 id: RequestToken::Generated(0),
                                 owner: hero,
                                 prompt: if location { *hex } else { *choice },
                                 movement_range: None,
+                                pre_action_range: None,
                                 choices: RequestChoices::Respawn {
                                     hexes: candidates,
                                     location,
@@ -1437,10 +2394,12 @@ impl NativeSession {
                                 continue;
                             }
                             request = Some(NativeRequest {
+                                controlled: None,
                                 id: RequestToken::Generated(0),
                                 owner: rules.simultaneous,
                                 prompt: rules.prompt,
                                 movement_range: None,
+                                pre_action_range: None,
                                 choices: RequestChoices::Upgrades(
                                     rules.players(&self.world, &self.round),
                                 ),
@@ -1490,10 +2449,12 @@ impl NativeSession {
                                 frame.pending = None;
                             }
                             request = Some(NativeRequest {
+                                controlled: None,
                                 id: RequestToken::Generated(0),
                                 owner: p.owner,
                                 prompt: p.prompt,
                                 movement_range: None,
+                                pre_action_range: None,
                                 choices: match p.choices {
                                     crate::battle::Choices::Units(values) => {
                                         RequestChoices::Units {
@@ -1532,7 +2493,14 @@ impl NativeSession {
                         .ok_or_else(|| unsupported("minion return team missing"))?;
                     let Some(plan) = self
                         .return_rules
-                        .next(&self.world, &self.symbols, &processed, favored)
+                        .next(
+                            &self.world,
+                            &self.symbols,
+                            &processed,
+                            favored,
+                            self.planning.actor,
+                            &self.context,
+                        )
                         .map_err(unsupported)?
                     else {
                         continue;
@@ -1570,10 +2538,12 @@ impl NativeSession {
                     }
                     frame.pending = None;
                     request = Some(NativeRequest {
+                        controlled: None,
                         id: RequestToken::Generated(0),
                         owner: plan.owner,
                         prompt: plan.prompt,
                         movement_range: None,
+                        pre_action_range: None,
                         choices: RequestChoices::Hexes(plan.candidates),
                         can_skip: false,
                         discard: false,
@@ -1699,7 +2669,11 @@ impl NativeSession {
                     let list = |values: &[Symbol]| {
                         Datum::List(values.iter().copied().map(Datum::Text).collect())
                     };
-                    if self.planning.actor.is_none() {
+                    if self
+                        .planning
+                        .actor
+                        .is_none_or(|id| id == self.world.definitions.effect_empty)
+                    {
                         self.context.set(output, list(&frame.multi));
                         continue;
                     }
@@ -1738,10 +2712,12 @@ impl NativeSession {
                         continue;
                     }
                     request = Some(NativeRequest {
+                        controlled: None,
                         id: RequestToken::Generated(0),
                         owner: self.normalized_owner(self.planning.actor.unwrap()),
                         prompt,
                         movement_range: None,
+                        pre_action_range: None,
                         choices: RequestChoices::Multiple {
                             values,
                             count: frame.multi.len(),
@@ -1767,16 +2743,15 @@ impl NativeSession {
                     {
                         continue;
                     }
-                    if self.world.has_effects {
-                        return Err(unsupported("token-bound effect removal not compiled"));
-                    }
                     if let Some(from) =
                         self.world.remove_entity(token).map_err(EngineError::Rule)?
                     {
+                        let effects_removed = self.world.remove_token_effects(token);
                         result.events.push(NativeEvent::TokenRemoved {
                             actor: self.planning.actor,
                             token,
                             from,
+                            effects_removed,
                         });
                     }
                 }
@@ -1788,10 +2763,12 @@ impl NativeSession {
                     {
                         ActionResolution::Prompt(menu) => {
                             request = Some(NativeRequest {
+                                controlled: None,
                                 id: RequestToken::Generated(0),
                                 owner: hero,
                                 prompt: menu.name,
                                 movement_range: None,
+                                pre_action_range: None,
                                 choices: RequestChoices::Action(menu),
                                 can_skip: false,
                                 discard: false,
@@ -1970,10 +2947,11 @@ impl NativeSession {
                             _ => Ok(None),
                         };
                         if let Some((from, to)) = position(a)?.zip(position(b)?) {
-                            if self.world.has_effects {
-                                return Err(unsupported("effect-aware adjacency not compiled"));
-                            }
                             from.distance(to) == 1
+                                && self
+                                    .world
+                                    .effect_connected(from, to, &[])
+                                    .map_err(unsupported)?
                         } else {
                             false
                         }
@@ -2020,10 +2998,20 @@ impl NativeSession {
                     if self.world.occupant(to).is_some_and(|other| other != unit) {
                         continue;
                     }
-                    if self.world.has_effects {
-                        return Err(unsupported("placement prevention not compiled"));
-                    }
-                    if self.world.entity(unit).is_none() || self.world.occupant(to).is_some() {
+                    if !self
+                        .world
+                        .can_displace(
+                            unit,
+                            self.planning
+                                .actor
+                                .filter(|id| !self.symbols.name(*id).is_empty())
+                                .or(Some(unit)),
+                            crate::validation::DisplacementKind::Place,
+                            Some(to),
+                        )
+                        .map_err(unsupported)?
+                        .allowed
+                    {
                         if mandatory {
                             self.abort_action();
                         }
@@ -2039,7 +3027,10 @@ impl NativeSession {
                         .map_err(EngineError::Rule)?;
                     result.events.push(if token {
                         NativeEvent::TokenMoved {
-                            actor: self.planning.actor,
+                            actor: self
+                                .planning
+                                .actor
+                                .filter(|id| !self.symbols.name(*id).is_empty()),
                             token: unit,
                             from,
                             to,
@@ -2073,10 +3064,33 @@ impl NativeSession {
                     else {
                         continue;
                     };
-                    if self.world.has_effects {
-                        return Err(unsupported("swap prevention not compiled"));
-                    }
-                    if self.world.entity(a).is_none() || self.world.entity(b).is_none() {
+                    if !self
+                        .world
+                        .can_displace(
+                            a,
+                            self.planning
+                                .actor
+                                .filter(|id| !self.symbols.name(*id).is_empty())
+                                .or_else(|| self.symbols.lookup("system")),
+                            crate::validation::DisplacementKind::Swap,
+                            None,
+                        )
+                        .map_err(unsupported)?
+                        .allowed
+                        || !self
+                            .world
+                            .can_displace(
+                                b,
+                                self.planning
+                                    .actor
+                                    .filter(|id| !self.symbols.name(*id).is_empty())
+                                    .or_else(|| self.symbols.lookup("system")),
+                                crate::validation::DisplacementKind::Swap,
+                                None,
+                            )
+                            .map_err(unsupported)?
+                            .allowed
+                    {
                         if mandatory {
                             self.abort_action();
                         }
@@ -2097,7 +3111,7 @@ impl NativeSession {
                             self.planning.actor,
                             &self.context,
                             &self.symbols,
-                            frame.forced,
+                            frame.forced.as_ref(),
                         )
                         .map_err(unsupported)?;
                     let choices = spec
@@ -2106,7 +3120,7 @@ impl NativeSession {
                             &self.context,
                             &self.symbols,
                             owner,
-                            frame.forced,
+                            frame.forced.as_ref(),
                         )
                         .map_err(unsupported)?;
                     if choices.is_empty() {
@@ -2140,10 +3154,12 @@ impl NativeSession {
                         continue;
                     }
                     request = Some(NativeRequest {
+                        controlled: None,
                         id: RequestToken::Generated(0),
                         owner: self.normalized_owner(owner.unwrap_or(self.no_actor)),
                         prompt: spec.prompt,
                         movement_range: None,
+                        pre_action_range: None,
                         choices: RequestChoices::CardIds {
                             values: choices
                                 .iter()
@@ -2153,7 +3169,7 @@ impl NativeSession {
                                         .printed_id
                                 })
                                 .collect(),
-                            forced_victim: frame.forced.map(|f| f.victim),
+                            forced_victim: frame.forced.as_ref().map(|f| f.victim),
                             defeat_victim: frame.defeat_prompt_victim,
                         },
                         can_skip: !mandatory,
@@ -2181,25 +3197,54 @@ impl NativeSession {
                     let Some(hero) = self.world.hero(victim) else {
                         continue;
                     };
-                    if !hero.hand.iter().any(|id| {
-                        self.world.card(*id).is_some_and(|c| {
-                            basic.is_none_or(|b| {
-                                self.world.definitions.cards[c.definition].basic == b
-                            })
-                        })
-                    }) {
+                    if let Some(source) = immunity
+                        && self
+                            .world
+                            .actor_immune(hero.id, source)
+                            .map_err(unsupported)?
+                    {
                         continue;
                     }
-                    if self.world.has_effects {
-                        return Err(unsupported(if immunity.is_some() {
-                            "forced-discard immunity/shield closure not compiled"
-                        } else {
-                            "forced-discard shield closure not compiled"
-                        }));
+                    let eligible = hero
+                        .hand
+                        .iter()
+                        .copied()
+                        .filter(|id| {
+                            self.world.card(*id).is_some_and(|c| {
+                                basic.is_none_or(|b| {
+                                    self.world.definitions.cards[c.definition].basic == b
+                                })
+                            })
+                        })
+                        .collect::<Vec<_>>();
+                    if eligible.is_empty() {
+                        continue;
                     }
+                    let shields = self.world.active_shield_cards(hero.id);
+                    let allowed = if !shields.is_empty() && basic.is_some() {
+                        Some(Arc::from(
+                            eligible
+                                .iter()
+                                .chain(shields.iter())
+                                .map(|id| {
+                                    self.world.definitions.cards
+                                        [self.world.card(*id).unwrap().definition]
+                                        .printed_id
+                                })
+                                .collect::<Vec<_>>(),
+                        ))
+                    } else {
+                        None
+                    };
+                    let binding = ForceBinding {
+                        victim,
+                        basic,
+                        shields: !shields.is_empty(),
+                        allowed,
+                    };
                     for id in [discard, select] {
                         let mut child = self.generated_frame(id, None, None)?;
-                        child.forced = Some(ForceBinding { victim, basic });
+                        child.forced = Some(binding.clone());
                         self.stack.push(child);
                     }
                 }
@@ -2219,10 +3264,13 @@ impl NativeSession {
                     let Some(hero) = self.world.hero(victim) else {
                         continue;
                     };
-                    if immunity.is_some() && self.world.has_effects {
-                        return Err(unsupported(
-                            "discard-or-defeat immunity closure not compiled",
-                        ));
+                    if let Some(source) = immunity
+                        && self
+                            .world
+                            .actor_immune(hero.id, source)
+                            .map_err(unsupported)?
+                    {
+                        continue;
                     }
                     if self.world.position(victim).is_none()
                         && !(hero.id == victim && self.world.has_board_presence(victim))
@@ -2319,6 +3367,7 @@ impl NativeSession {
                             &mut self.context,
                             &self.symbols,
                             frame.attack_binding.map_or(target, |b| b.key),
+                            self.planning.actor,
                             selected.as_ref(),
                         )
                         .map_err(unsupported)?
@@ -2336,10 +3385,12 @@ impl NativeSession {
                                 frame.pending = None;
                             }
                             request = Some(NativeRequest {
+                                controlled: None,
                                 id: RequestToken::Generated(0),
                                 owner: menu.owner,
                                 prompt: target,
                                 movement_range: None,
+                                pre_action_range: None,
                                 choices: RequestChoices::Defense(menu),
                                 can_skip: false,
                                 discard: false,
@@ -2358,7 +3409,7 @@ impl NativeSession {
                     let binding = if let Some(binding) = frame.discard_override {
                         Some(binding)
                     } else {
-                        let hero = if let Some(forced) = frame.forced {
+                        let hero = if let Some(forced) = frame.forced.as_ref() {
                             Some(forced.victim)
                         } else if hero.is_some() {
                             hero
@@ -2394,7 +3445,9 @@ impl NativeSession {
                         .map_err(unsupported)?;
                     for binding in offers.into_iter().rev() {
                         let mut child = self.generated_frame(
-                            self.passive_offer.expect("passive offer program compiled"),
+                            self.passive_offer.ok_or_else(|| {
+                                unsupported("newly eligible passive requires recompilation")
+                            })?,
                             None,
                             None,
                         )?;
@@ -2402,7 +3455,7 @@ impl NativeSession {
                         self.stack.push(child);
                     }
                 }
-                Instruction::OfferPassive { spec, body, mark } => {
+                Instruction::OfferPassive { spec, mark } => {
                     let spec = frame.offer_override.unwrap_or(spec);
                     let Some(owner) = spec
                         .hero
@@ -2411,25 +3464,23 @@ impl NativeSession {
                     else {
                         continue;
                     };
-                    let Some(card) =
-                        crate::passives::PassiveRules::card(&self.world, owner, spec.card)
+                    let Some((card, effect)) = self.passive_rules.resolve(&self.world, owner, spec)
                     else {
                         continue;
                     };
                     let c = self.world.card(card).unwrap();
                     let d = &self.world.definitions.cards[c.definition];
-                    if c.facedown
-                        || !d.has_effect
-                        || !self.reaction_rules.registered_effect(d.effect)
-                    {
+                    if !self.reaction_rules.registered_effect(effect) {
                         continue;
                     }
                     if spec.optional && selected.is_none() {
                         request = Some(NativeRequest {
+                            controlled: None,
                             id: RequestToken::Generated(0),
                             owner,
                             prompt: spec.prompt,
                             movement_range: None,
+                            pre_action_range: None,
                             choices: RequestChoices::Passive {
                                 card: spec.card,
                                 name: d.name,
@@ -2445,22 +3496,42 @@ impl NativeSession {
                                 &self.context,
                                 &self.symbols,
                                 owner,
-                                card,
+                                effect,
                                 spec.trigger,
                             )
                             .map_err(unsupported)?
                     {
+                        let templates = self
+                            .passive_bodies
+                            .iter()
+                            .find(|body| body.effect == effect && body.owner == owner)
+                            .ok_or_else(|| {
+                                unsupported("eligible passive body requires compilation")
+                            })?
+                            .templates
+                            .clone();
                         let mut child = self.generated_frame(mark, None, None)?;
                         child.offer_override = Some(spec);
                         self.stack.push(child);
-                        let child = self.generated_frame(body, None, None)?;
-                        self.stack.push(child);
+                        for id in templates.into_iter().rev() {
+                            let mut child = self.generated_frame(id, None, None)?;
+                            // The recipe already carries the passive owner's literal
+                            // unit/origins; absence of an override must preserve them.
+                            child.unit_override = None;
+                            self.stack.push(child);
+                        }
                     }
                 }
-                Instruction::MarkPassive { card } => {
+                Instruction::MarkPassive { card, provider } => {
                     let card = frame.offer_override.map_or(card, |o| o.card);
-                    crate::passives::PassiveRules::mark(&mut self.world, self.planning.actor, card)
-                        .map_err(unsupported)?;
+                    let provider = frame.offer_override.map_or(provider, |o| o.provider);
+                    crate::passives::PassiveRules::mark(
+                        &mut self.world,
+                        self.planning.actor,
+                        card,
+                        provider,
+                    )
+                    .map_err(unsupported)?;
                 }
                 Instruction::DefenseText { on_block, program } => {
                     if let Some(plan) = self
@@ -2482,9 +3553,13 @@ impl NativeSession {
                                 DefenseOp::RemoveBounty => (program.remove, None, None, None),
                                 DefenseOp::ProjectileTarget { deflect, range } => (
                                     if deflect {
-                                        program.deflect_select
+                                        program.deflect_select.ok_or_else(|| {
+                                            unsupported("deflect targeting body missing")
+                                        })?
                                     } else {
-                                        program.reflect_select
+                                        program.reflect_select.ok_or_else(|| {
+                                            unsupported("reflect targeting body missing")
+                                        })?
                                     },
                                     None,
                                     None,
@@ -2492,9 +3567,13 @@ impl NativeSession {
                                 ),
                                 DefenseOp::ProjectileDiscard { deflect } => (
                                     if deflect {
-                                        program.deflect_discard
+                                        program.deflect_discard.ok_or_else(|| {
+                                            unsupported("deflect discard body missing")
+                                        })?
                                     } else {
-                                        program.reflect_discard
+                                        program.reflect_discard.ok_or_else(|| {
+                                            unsupported("reflect discard body missing")
+                                        })?
                                     },
                                     None,
                                     None,
@@ -2553,13 +3632,130 @@ impl NativeSession {
                         result.events.push(NativeEvent::Marker(event));
                     }
                 }
+                Instruction::FinishedEffect => {}
+                Instruction::RestoreContext { .. } => {
+                    return Err(unsupported(
+                        "action-context restoration requires live object bindings",
+                    ));
+                }
                 Instruction::RestoreAction => self
                     .reaction_rules
                     .restore(&mut self.context)
                     .map_err(unsupported)?,
-                Instruction::PreAction => {
-                    if self.world.has_effects {
-                        return Err(unsupported("pre-action effect execution not compiled"));
+                Instruction::PreMovement {
+                    hero,
+                    key,
+                    children,
+                } => {
+                    let hero = if let Some(hero) =
+                        hero.filter(|id| *id != self.world.definitions.effect_empty)
+                    {
+                        Some(hero)
+                    } else {
+                        key.map(|key| self.symbol_from_context(key))
+                            .transpose()?
+                            .flatten()
+                    };
+                    let Some(hero) = hero.filter(|id| *id != self.world.definitions.effect_empty)
+                    else {
+                        continue;
+                    };
+                    let provider = self.world.effects.instances.iter().find(|effect| {
+                        effect.definition.behavior.kind == crate::effect_rules::Kind::PreMovement
+                            && effect.source == hero
+                            && effect.active
+                            && self.world.effect_active(effect)
+                    });
+                    let Some(provider) = provider else {
+                        continue;
+                    };
+                    let range = provider
+                        .definition
+                        .behavior
+                        .maximum
+                        .filter(|n| *n != 0)
+                        .unwrap_or(1);
+                    let range = i32::try_from(range)
+                        .map_err(|_| unsupported("pre-action movement range outside i32"))?;
+                    for id in children.into_iter().rev() {
+                        let mut child = self.generated_frame(id, None, None)?;
+                        child.unit_override = None;
+                        child.pre_move = Some((hero, range));
+                        self.stack.push(child);
+                    }
+                }
+                Instruction::PreDiscard {
+                    hero,
+                    key,
+                    abort,
+                    force,
+                    defeat,
+                } => {
+                    let hero = if let Some(hero) =
+                        hero.filter(|id| *id != self.world.definitions.effect_empty)
+                    {
+                        Some(hero)
+                    } else {
+                        key.map(|key| self.symbol_from_context(key))
+                            .transpose()?
+                            .flatten()
+                    };
+                    let Some(hero) = hero.filter(|id| *id != self.world.definitions.effect_empty)
+                    else {
+                        continue;
+                    };
+                    let Some(owner) = self.world.hero(hero) else {
+                        continue;
+                    };
+                    if !self.world.has_board_presence(hero) {
+                        if abort {
+                            self.abort_action();
+                        }
+                        continue;
+                    }
+                    let has_hand = !owner.hand.is_empty();
+                    let board_actor = self.world.resolved_actor(hero);
+                    let mut next = None;
+                    for effect in &self.world.effects.instances {
+                        if effect.definition.behavior.kind != crate::effect_rules::Kind::PreDiscard
+                            || frame.pre_processed.contains(&effect.id)
+                            || !self.world.effect_active(effect)
+                            || !self
+                                .world
+                                .effect_in_scope(effect, board_actor, false)
+                                .map_err(unsupported)?
+                            || self
+                                .world
+                                .effect_ignored(effect, board_actor)
+                                .map_err(unsupported)?
+                        {
+                            continue;
+                        }
+                        frame.pre_processed.push(effect.id);
+                        if has_hand || effect.definition.behavior.discard_or_defeat {
+                            next = Some((effect.id, effect.source));
+                            break;
+                        }
+                    }
+                    if let Some((effect, source)) = next {
+                        self.stack.push(frame.clone());
+                        if has_hand {
+                            self.world.remove_effects(&[effect]);
+                            let key = self
+                                .symbols
+                                .lookup("pre_action_discard_victim")
+                                .ok_or_else(|| unsupported("pre-discard key missing"))?;
+                            self.context.set(key, Datum::Text(hero));
+                            let child = self.generated_frame(force, None, None)?;
+                            self.stack.push(child);
+                        } else {
+                            let mut child = self.generated_frame(defeat, None, None)?;
+                            child.defeat_override = Some(DefeatBinding {
+                                victim: hero,
+                                killer: Some(source),
+                            });
+                            self.stack.push(child);
+                        }
                     }
                 }
 
@@ -2620,6 +3816,7 @@ impl NativeSession {
                     }
                 }
                 Instruction::Defeat {
+                    protection,
                     victim,
                     key,
                     killer,
@@ -2652,6 +3849,22 @@ impl NativeSession {
                             assist,
                         )
                         .map_err(combat_error)?;
+                    if outcome.protection {
+                        let mut child = self.generated_frame(
+                            protection.ok_or_else(|| {
+                                unsupported("new minion protection requires recompilation")
+                            })?,
+                            None,
+                            None,
+                        )?;
+                        child.protection = Some(crate::protection::ProtectionBinding {
+                            minion: binding.victim,
+                            killer: binding.killer,
+                            tried: Arc::from([]),
+                        });
+                        self.stack.push(child);
+                        continue;
+                    }
                     result
                         .events
                         .extend(outcome.events.into_iter().map(NativeEvent::Combat));
@@ -2690,13 +3903,16 @@ impl NativeSession {
                     self.context.set(key, value);
                 }
                 Instruction::SetActor { literal, key, save } => {
-                    self.context
-                        .set(save, self.planning.actor.map_or(Datum::Null, Datum::Text));
-                    let next = if let Some(key) = key {
-                        self.symbol_from_context(key)?
-                    } else {
-                        literal
-                    };
+                    self.context.set(
+                        save,
+                        self.planning
+                            .actor
+                            .filter(|id| !self.symbols.name(*id).is_empty())
+                            .map_or(Datum::Null, Datum::Text),
+                    );
+                    let next = scope_actor(literal, key, &self.symbols, |key| {
+                        self.symbol_from_context(key)
+                    })?;
                     if let Some(actor) = next.filter(|id| !self.symbols.name(*id).is_empty()) {
                         self.planning.actor = Some(actor);
                     }
@@ -2811,10 +4027,12 @@ impl NativeSession {
                     // The Python step clears malformed pending input before reissuing.
                     frame.pending = None;
                     request = Some(NativeRequest {
+                        controlled: None,
                         id: RequestToken::Generated(0),
                         owner: hero,
                         prompt,
                         movement_range: None,
+                        pre_action_range: None,
                         choices: RequestChoices::Cards(vec![
                             (
                                 first_def.printed_id,
@@ -2869,10 +4087,12 @@ impl NativeSession {
                     }
                     frame.pending = None;
                     request = Some(NativeRequest {
+                        controlled: None,
                         id: RequestToken::Generated(0),
                         owner: hero,
                         prompt,
                         movement_range: None,
+                        pre_action_range: None,
                         choices: RequestChoices::Units {
                             tokens: false,
                             values: pieces
@@ -2950,7 +4170,16 @@ impl NativeSession {
                     };
                     let choices = self
                         .world
-                        .select_units(tokens, target_actor, &filters, &spatial)
+                        .select_units(
+                            if tokens {
+                                UnitCandidates::UnitsAndTokens
+                            } else {
+                                UnitCandidates::UnitsWithIllusions
+                            },
+                            target_actor,
+                            &filters,
+                            &spatial,
+                        )
                         .map_err(unsupported)?;
                     if choices.is_empty() {
                         if mandatory {
@@ -2975,10 +4204,12 @@ impl NativeSession {
                         continue;
                     }
                     request = Some(NativeRequest {
+                        controlled: None,
                         id: RequestToken::Generated(0),
                         owner: self.normalized_owner(target_actor.unwrap_or(self.no_actor)),
                         prompt,
                         movement_range: None,
+                        pre_action_range: None,
                         choices: RequestChoices::Units {
                             tokens,
                             values: choices.into_iter().map(|id| (id, None)).collect(),
@@ -3029,19 +4260,14 @@ impl NativeSession {
                         self.context.set(output, Datum::Int(value));
                         continue;
                     }
-                    let raw_owner = if let Some(owner) = owner {
-                        Some(owner)
-                    } else if let Some(key) = owner_key {
-                        self.symbol_from_context(key)?.or(self.planning.actor)
-                    } else {
-                        self.planning.actor
-                    };
-                    let owner = self.normalized_owner(raw_owner.unwrap_or(self.no_actor));
+                    let owner = self.prompt_owner(owner, owner_key)?;
                     request = Some(NativeRequest {
+                        controlled: None,
                         id: RequestToken::Generated(0),
                         owner,
                         prompt,
                         movement_range: None,
+                        pre_action_range: None,
                         choices: RequestChoices::Numbers {
                             values: options,
                             labels,
@@ -3116,10 +4342,12 @@ impl NativeSession {
                         continue;
                     }
                     request = Some(NativeRequest {
+                        controlled: None,
                         id: RequestToken::Generated(0),
                         owner: self.prompt_owner(owner, owner_key)?,
                         prompt,
                         movement_range: frame.range_override,
+                        pre_action_range: frame.pre_move.map(|(_, range)| range),
                         choices: RequestChoices::Hexes(choices),
                         can_skip: !mandatory,
                         discard,
@@ -3238,9 +4466,23 @@ impl NativeSession {
                     } else {
                         range
                     };
-                    let through = unit
-                        .is_some_and(|u| self.world.movement_aura_passes(u))
-                        .then_some(true);
+                    let range = if let Some(unit) = unit {
+                        i32::try_from(
+                            self.world
+                                .movement_action_range(unit, i64::from(range))
+                                .map_err(unsupported)?,
+                        )
+                        .map_err(|_| unsupported("capped movement range outside i32"))?
+                    } else {
+                        range
+                    };
+                    let through = if let Some(unit) = unit {
+                        (self.world.movement_aura_passes(unit)
+                            || self.world.movement_zone_passes(unit).map_err(unsupported)?)
+                        .then_some(true)
+                    } else {
+                        None
+                    };
                     let mut movement = self.generated_frame(movement, unit, Some(range))?;
                     movement.through_override = through;
                     self.stack.push(movement);
@@ -3273,16 +4515,21 @@ impl NativeSession {
                         continue;
                     }
                     request = Some(NativeRequest {
+                        controlled: None,
                         id: RequestToken::Generated(0),
                         owner: self.normalized_owner(owner),
                         prompt,
                         movement_range: None,
+                        pre_action_range: None,
                         choices: RequestChoices::YesNo,
                         can_skip: false,
                         discard: false,
                     });
                 }
                 Instruction::Move {
+                    mine_choice,
+                    mine_trigger,
+                    prechosen,
                     unit,
                     unit_key,
                     destination,
@@ -3334,10 +4581,64 @@ impl NativeSession {
                         }
                         continue;
                     }
+                    let actor = self
+                        .planning
+                        .actor
+                        .filter(|id| *id != self.world.definitions.effect_empty)
+                        .unwrap_or(unit);
+                    if !self
+                        .world
+                        .can_displace(
+                            unit,
+                            Some(actor),
+                            crate::validation::DisplacementKind::Move,
+                            None,
+                        )
+                        .map_err(unsupported)?
+                        .allowed
+                    {
+                        if mandatory {
+                            self.abort_action();
+                        }
+                        continue;
+                    }
+                    let distance = if self
+                        .world
+                        .effect_connected(from, to, &[unit])
+                        .map_err(unsupported)?
+                    {
+                        i64::from(from.distance(to))
+                    } else {
+                        0
+                    };
+                    if !self
+                        .world
+                        .movement_legality(unit, distance, is_action, None, &self.context)
+                        .map_err(unsupported)?
+                        .allowed
+                    {
+                        if mandatory {
+                            self.abort_action();
+                        }
+                        continue;
+                    }
                     let valid = if from == to {
                         range >= 0
                     } else {
-                        self.world.path(from, to, range, through)
+                        self.world
+                            .movement_paths(
+                                &crate::geometry::MovementQuery {
+                                    start: from,
+                                    ends: vec![to],
+                                    max_steps: range,
+                                    ignore_obstacles: false,
+                                    pass_through_obstacles: through,
+                                },
+                                self.planning.actor,
+                                Some(&[unit]),
+                                &[],
+                            )
+                            .map_err(unsupported)?[0]
                     };
                     if !valid {
                         continue;
@@ -3346,22 +4647,156 @@ impl NativeSession {
                         let Some(line) = from.line_to(to) else {
                             continue;
                         };
-                        if line.iter().take(line.len().saturating_sub(1)).any(|hex| {
-                            !self.world.on_map(*hex) || (!through && self.world.obstacle(*hex))
-                        }) {
+                        if !self
+                            .world
+                            .effect_connected(from, to, &[])
+                            .map_err(unsupported)?
+                        {
+                            continue;
+                        }
+                        let mut blocked = false;
+                        for hex in line.iter().take(line.len().saturating_sub(1)) {
+                            if !self.world.on_map(*hex)
+                                || (!through
+                                    && self
+                                        .world
+                                        .obstacle_for_actor(*hex, Some(unit))
+                                        .map_err(unsupported)?
+                                    && !self.world.passable_token(*hex, &[unit]))
+                            {
+                                blocked = true;
+                                break;
+                            }
+                        }
+                        if blocked {
                             continue;
                         }
                         line
                     } else {
                         Vec::new()
                     };
+                    let ids_key = self.symbols.lookup("triggered_mine_ids");
+                    let mut triggered = Vec::new();
+                    if prechosen || frame.mine_prechosen {
+                        if let Some(key) = ids_key {
+                            triggered = match self.context.get(key) {
+                                None => Vec::new(),
+                                Some(Datum::List(ids)) => ids
+                                    .iter()
+                                    .map(|v| {
+                                        if let Datum::Text(id) = v {
+                                            Ok(*id)
+                                        } else {
+                                            Err(unsupported("non-string prechosen mine identity"))
+                                        }
+                                    })
+                                    .collect::<Result<Vec<_>>>()?,
+                                _ => {
+                                    return Err(unsupported(
+                                        "prechosen mine queue must be a native list",
+                                    ));
+                                }
+                            };
+                        }
+                    } else if let Some(team) = self
+                        .world
+                        .entity(unit)
+                        .filter(|e| matches!(e.kind, EntityKind::Hero | EntityKind::Piece))
+                        .and_then(|e| e.team)
+                        .filter(|team| from != to && self.world.has_enemy_mine_supply(*team))
+                    {
+                        if straight {
+                            for hex in line.iter().take(line.len().saturating_sub(1)) {
+                                if !self.world.passable_token(*hex, &[]) {
+                                    continue;
+                                }
+                                if let Some(entity) = self
+                                    .world
+                                    .occupant(*hex)
+                                    .and_then(|id| self.world.entity(id))
+                                    .filter(|e| e.kind == EntityKind::Token)
+                                    && let Some(owner) =
+                                        entity.owner.and_then(|id| self.world.hero(id))
+                                    && owner.team != team
+                                {
+                                    triggered.push(entity.id);
+                                }
+                            }
+                        } else {
+                            let paths = self
+                                .world
+                                .mine_paths(from, range, self.planning.actor, Some(team), &[unit])
+                                .map_err(unsupported)?;
+                            let options = self
+                                .world
+                                .tile_index(to)
+                                .map(|i| paths[i].as_slice())
+                                .unwrap_or(&[]);
+                            if options.len() > 1 {
+                                let choice = mine_choice.ok_or_else(|| {
+                                    unsupported(
+                                        "newly deployed mines require movement recompilation",
+                                    )
+                                })?;
+                                frame.mine_prechosen = true;
+                                // The Python model copy is a new runtime frame. Imported
+                                // fixture labels remain explicit; generated copies receive
+                                // their own ephemeral identity, preserved across restore.
+                                if frame.generated.is_some()
+                                    || self.steps[frame.instruction].wire["step_id"]
+                                        .as_str()
+                                        .is_some_and(|id| id.starts_with("native-step-"))
+                                {
+                                    self.next_step =
+                                        self.next_step.checked_add(1).ok_or_else(|| {
+                                            unsupported("step generation counter exhausted")
+                                        })?;
+                                    frame.generated = Some(self.next_step);
+                                }
+                                self.stack.push(frame.clone());
+                                let choice =
+                                    self.generated_frame(choice, Some(unit), Some(range))?;
+                                self.stack.push(choice);
+                                continue;
+                            }
+                            if let Some(path) = options.first() {
+                                triggered = path.mines.to_vec();
+                            }
+                        }
+                    }
+                    // Resolve all unsupported closure checks before changing location.
+                    let trigger = if triggered.is_empty() {
+                        None
+                    } else {
+                        let trigger = mine_trigger.ok_or_else(|| {
+                            unsupported("newly deployed mines require movement recompilation")
+                        })?;
+                        if let Instruction::TriggerMines { blast, discard, .. } =
+                            &self.steps[trigger].instruction
+                            && triggered.iter().any(|id| {
+                                self.world
+                                    .entity(*id)
+                                    .is_some_and(|e| e.token_type == Some(*blast))
+                            })
+                            && discard.is_none()
+                        {
+                            return Err(unsupported(
+                                "blast mine discard recipe requires recompilation",
+                            ));
+                        }
+                        Some(trigger)
+                    };
                     if let Some(key) = crossed {
-                        let hexes = line
-                            .iter()
-                            .take(line.len().saturating_sub(1))
-                            .filter(|hex| self.world.obstacle(**hex))
-                            .map(|hex| native_hex(*hex, self.coordinates))
-                            .collect::<Vec<_>>();
+                        let mut hexes = Vec::new();
+                        for hex in line.iter().take(line.len().saturating_sub(1)) {
+                            if self
+                                .world
+                                .obstacle_for_actor(*hex, Some(actor))
+                                .map_err(unsupported)?
+                            {
+                                hexes.push(native_hex(*hex, self.coordinates));
+                            }
+                        }
                         self.context.set(key, Datum::List(hexes));
                     }
                     self.world
@@ -3376,6 +4811,22 @@ impl NativeSession {
                         to,
                         range,
                     });
+                    if let Some(trigger) = trigger {
+                        let ids_key =
+                            ids_key.ok_or_else(|| unsupported("mine context key not compiled"))?;
+                        let victim_key = self
+                            .symbols
+                            .lookup("mine_victim_id")
+                            .ok_or_else(|| unsupported("mine victim key not compiled"))?;
+                        self.context.set(
+                            ids_key,
+                            Datum::List(triggered.iter().copied().map(Datum::Text).collect()),
+                        );
+                        self.context.set(victim_key, Datum::Text(unit));
+                        let mut child = self.generated_frame(trigger, None, None)?;
+                        child.mine_snapshot = Some((triggered, unit));
+                        self.stack.push(child);
+                    }
                 }
                 Instruction::Query {
                     spec,
@@ -3484,10 +4935,12 @@ impl NativeSession {
                         continue;
                     }
                     request = Some(NativeRequest {
+                        controlled: None,
                         id: RequestToken::Generated(0),
                         owner: actor,
                         prompt,
                         movement_range: None,
+                        pre_action_range: None,
                         choices: RequestChoices::Repeat {
                             done: frame.index,
                             max,
@@ -3560,23 +5013,53 @@ impl NativeSession {
         }
         self.schedule_continuations()
     }
+    fn ensure_planning_effect_closure(&self) -> Result<()> {
+        if self.objects.is_some() {
+            return Err(unsupported(
+                "shared-object planning continuation not yet bound",
+            ));
+        }
+        if self.world.has_effects {
+            return Err(unsupported("planning active-effect closure not compiled"));
+        }
+        if self.planning.phase == Phase::Planning
+            && self.flow_program.as_ref().is_none_or(|program| {
+                !program
+                    .entries
+                    .iter()
+                    .any(|(name, _)| *name == "find_actor")
+            })
+        {
+            return Err(unsupported(
+                "planning continuation closure not compiled; restore the saved boundary",
+            ));
+        }
+        Ok(())
+    }
     pub fn commit_card(&mut self, hero: Symbol, card: crate::cards::CardId) -> Result<()> {
+        self.ensure_planning_effect_closure()?;
         let result = self.planning.commit(&mut self.world, hero, card);
         self.finish_planning_command(result)
     }
     pub fn uncommit_card(&mut self, hero: Symbol) -> Result<()> {
+        self.ensure_planning_effect_closure()?;
         let result = self.planning.uncommit(&mut self.world, hero);
         self.finish_planning_command(result)
     }
     pub fn pass_planning(&mut self, hero: Symbol) -> Result<()> {
+        self.ensure_planning_effect_closure()?;
         let result = self.planning.pass(&mut self.world, hero);
         self.finish_planning_command(result)
     }
     pub fn finish_planning(&mut self, hero: Symbol) -> Result<()> {
+        self.ensure_planning_effect_closure()?;
         let result = self.planning.finish(&mut self.world, hero);
         self.finish_planning_command(result)
     }
     pub fn submit(&mut self, request: RequestToken, selection: Datum) -> Result<()> {
+        if self.objects.is_some() {
+            return self.submit_objects(request, selection);
+        }
         let frame = self
             .stack
             .last_mut()
@@ -3609,7 +5092,12 @@ impl NativeSession {
         Ok(())
     }
     pub fn import_selection(&mut self, value: &Value) -> Result<Datum> {
-        Datum::from_json(value, Arc::make_mut(&mut self.symbols)).map_err(unsupported)
+        let value =
+            Datum::from_json(value, Arc::make_mut(&mut self.symbols)).map_err(unsupported)?;
+        if let Some(objects) = &mut self.objects {
+            objects.arena.symbols = self.symbols.clone();
+        }
+        Ok(value)
     }
     pub fn request_token(&self, token: RequestToken) -> String {
         match token {
@@ -3630,17 +5118,28 @@ impl NativeSession {
         {
             RequestToken::Generated(id)
         } else {
-            RequestToken::Imported(Arc::make_mut(&mut self.symbols).intern(value))
+            let id = Arc::make_mut(&mut self.symbols).intern(value);
+            if let Some(objects) = &mut self.objects {
+                objects.arena.symbols = self.symbols.clone();
+            }
+            RequestToken::Imported(id)
         }
     }
     /// Compact outer boundary preserves physical instance aliases on restore.
     pub fn export_envelope(&self) -> Result<StateEnvelope> {
-        let mut source = (*self.source).clone();
+        let mut source = if let Some(objects) = &self.objects {
+            objects.arena.boundary(&self.source).map_err(unsupported)?
+        } else {
+            (*self.source).clone()
+        };
         source.native_resume = Some(crate::codec::NativeResume {
             version: 1,
             request_high_water: self.next_request,
             step_high_water: self.next_step,
         });
+        if self.objects.is_some() {
+            return Ok(source);
+        }
         self.planning
             .export_fields(&mut source, &self.symbols)
             .map_err(unsupported)?;
@@ -3671,7 +5170,22 @@ impl NativeSession {
                         }
                         if let Some(cont)=&frame.continuation {patch_continuation(&mut wire,cont,&self.symbols);}
                         if let Some(battle)=&frame.battle {battle.patch_wire(&mut wire,&self.symbols);}
-                        if let Some(binding) = &frame.zone_return {
+                        if let Some(binding) = &frame.protection {
+                            wire["minion_id"] = json!(self.symbols.name(binding.minion));
+                            wire["killer_id"] = binding.killer.map_or(Value::Null, |id| json!(self.symbols.name(id)));
+                            wire["tried_effect_ids"] = json!(binding.tried.iter().map(|id| self.symbols.name(*id)).collect::<Vec<_>>());
+                        }
+                        if frame.mine_prechosen { wire["mine_path_prechosen"] = json!(true); }
+                        if let Some((ids, victim)) = &frame.mine_snapshot {
+                            wire["mine_ids"] = json!(ids.iter().map(|id| self.symbols.name(*id)).collect::<Vec<_>>());
+                            wire["victim_id"] = json!(self.symbols.name(*victim));
+                        }
+                        if let Some((victim,key,source))=frame.mine_trigger {
+                wire["victim_id"]=victim.map(|id|self.symbols.name(id)).map_or(Value::Null,|id|json!(id));
+                wire["victim_key"]=json!(self.symbols.name(key));
+                wire["immunity_source_id"]=source.map(|id|self.symbols.name(id)).map_or(Value::Null,|id|json!(id));
+            }
+            if let Some(binding) = &frame.zone_return {
                             match binding {
                                 crate::minion_return::ReturnBinding::Processed(ids) => {
                                     wire["processed_minion_ids"] = json!(ids.iter().map(|id| self.symbols.name(*id)).collect::<Vec<_>>());
@@ -3700,6 +5214,7 @@ impl NativeSession {
                         if let Some(unit) = frame.unit_override {
                             let value = unit.map_or(Value::Null, |id| json!(self.symbols.name(id)));
                             if wire["type"] == "move_unit"
+                                || wire["type"] == "mine_path_choice"
                                 || wire["type"] == "fast_travel_unit"
                                 || wire["type"] == "remove_unit"
                             {
@@ -3726,6 +5241,7 @@ impl NativeSession {
                             }
                         }
                         if let Some(offer) = frame.offer_override {
+                            wire["active_effect_id"] = offer.provider.map_or(Value::Null, |id| json!(self.symbols.name(id)));
                             wire["card_id"] = json!(self.symbols.name(offer.card));
                             if wire["type"] == "offer_passive" {
                                 wire["trigger"] = json!(self.symbols.name(offer.trigger));
@@ -3738,7 +5254,7 @@ impl NativeSession {
                             wire["prompt"] = json!(format!("{}, select a card to discard (or be Defeated).", self.symbols.name(prompt)));
                         }
                         if let Some(range) = frame.range_override {
-                            if wire["type"] == "move_unit" {
+                            if wire["type"] == "move_unit" || wire["type"] == "mine_path_choice" {
                                 wire["range_val"] = json!(range);
                             } else if wire["type"] == "select_step" {
                                 wire["prompt"] =
@@ -3756,12 +5272,32 @@ impl NativeSession {
                                 }
                             }
                         }
-                        if let Some(forced) = frame.forced {
+                        if let Some((hero,range)) = frame.pre_move {
+                            if wire["type"] == "move_unit" {
+                                wire["unit_id"] = json!(self.symbols.name(hero)); wire["range_val"] = json!(range);
+                            } else if wire["type"] == "select_step" {
+                                wire["prompt"] = json!(format!("Pre-action movement (up to {range} space{})", if range > 1 { "s" } else { "" }));
+                                for filter in wire["filters"].as_array_mut().expect("compiled pre-action movement filters") {
+                                    if filter["type"] == "occupied_filter" { filter["exclude_id"] = json!(self.symbols.name(hero)); }
+                                    if filter["type"] == "movement_path_filter" { filter["unit_id"] = json!(self.symbols.name(hero)); filter["range_val"] = json!(range); }
+                                }
+                            }
+                        }
+                        if wire["type"] == "resolve_pre_action_discard" {
+                            wire["processed_effect_ids"] = json!(frame.pre_processed.iter().map(|id| self.symbols.name(*id)).collect::<Vec<_>>());
+                        }
+                        if let Some(forced) = frame.forced.as_ref() {
                             if wire["type"] == "select_step" {
                                 wire["context_hero_id"] = json!(self.symbols.name(forced.victim));
                                 wire["override_player_id"] =
                                     json!(self.symbols.name(forced.victim));
                                 wire["card_is_basic"] = json!(forced.basic);
+                                if forced.shields {
+                                    wire["card_containers"] = json!(["HAND", "PLAYED"]);
+                                    wire["restrict_played_to_shields"] = json!(true);
+                                    wire["card_is_basic"] = Value::Null;
+                                    wire["allowed_card_ids"] = forced.allowed.as_ref().map_or(Value::Null, |ids| json!(ids.iter().map(|id| self.symbols.name(*id)).collect::<Vec<_>>()));
+                                }
                                 wire["prompt"] = json!(format!(
                                     "{}, select a card to discard.",
                                     self.symbols.name(forced.victim)
@@ -3900,6 +5436,24 @@ impl NativeSession {
         self.export_envelope()?.materialize().map_err(unsupported)
     }
     pub fn request_json(&self, request: &NativeRequest) -> Value {
+        let mut wire = self.request_json_base(request);
+        if let Some(controlled) = request.controlled {
+            wire["context"]["controlled_hero_id"] = json!(self.symbols.name(controlled));
+            wire["player_id"] = json!(self.symbols.name(request.owner));
+        }
+        wire
+    }
+    fn request_json_base(&self, request: &NativeRequest) -> Value {
+        let owner = request.controlled.unwrap_or(request.owner);
+        if let RequestChoices::Protection(cards) = &request.choices {
+            return json!({"id":self.request_token(request.id),"request_type":"SELECT_CARD","player_id":self.symbols.name(owner),
+                "prompt":format!("Discard a card to protect {}?",self.symbols.name(request.prompt)),
+                "options":cards.iter().map(|id| {let d=&self.world.definitions.cards[self.world.card(*id).unwrap().definition]; json!({"id":self.symbols.name(d.printed_id),"text":self.symbols.name(d.name),"metadata":{"card_id":self.symbols.name(d.printed_id),"color":d.color.map(|id| self.symbols.name(id))}})}).collect::<Vec<_>>(),
+                "can_skip":true,"can_rollback":false,"context":{},"decision_context":{"purpose":"discard","actor_id":self.symbols.name(owner),"source_card_id":null,"choice_facts":{}}});
+        }
+        if let RequestChoices::Mines(options) = &request.choices {
+            return json!({"id":self.request_token(request.id),"request_type":"SELECT_OPTION","player_id":self.symbols.name(owner),"prompt":"Choose which mines to move through","options":options.iter().enumerate().map(|(i,path)|json!({"id":i.to_string(),"text":format!("Path through {} mine(s)",path.mines.len()),"metadata":{"metadata":{"mine_count":path.mines.len(),"mine_hexes":path.mines.iter().filter_map(|id|self.world.position(*id)).collect::<Vec<_>>(),"path":path.path}}})).collect::<Vec<_>>(),"can_skip":false,"can_rollback":false,"context":{},"decision_context":null});
+        }
         if let RequestChoices::Action(menu) = &request.choices {
             return menu.to_json(self.request_token(request.id), &self.symbols);
         }
@@ -3912,7 +5466,7 @@ impl NativeSession {
                 .map(|h| format!("'{}'", self.symbols.name(*h)))
                 .collect::<Vec<_>>()
                 .join(", ");
-            return json!({"id":self.request_token(request.id),"request_type":"CHOOSE_ACTOR","player_id":self.symbols.name(request.owner),
+            return json!({"id":self.request_token(request.id),"request_type":"CHOOSE_ACTOR","player_id":self.symbols.name(owner),
                 "prompt":format!("Team {}, choose who acts first between [{names}].",self.symbols.name(*team)),
                 "options":values.iter().map(|h|json!({"id":self.symbols.name(*h),"text":self.symbols.name(*h),"metadata":{}})).collect::<Vec<_>>(),
                 "can_skip":false,"can_rollback":false,"context":{"team":self.symbols.name(*team)},"decision_context":null});
@@ -3926,7 +5480,7 @@ impl NativeSession {
                     .map(|id| json!({"id":id,"text":id,"metadata":{}}))
                     .collect()
             };
-            return json!({"id":self.request_token(request.id),"request_type":if *location{"CHOOSE_RESPAWN_HEX"}else{"CHOOSE_RESPAWN"},"player_id":self.symbols.name(request.owner),
+            return json!({"id":self.request_token(request.id),"request_type":if *location{"CHOOSE_RESPAWN_HEX"}else{"CHOOSE_RESPAWN"},"player_id":self.symbols.name(owner),
                 "prompt":self.symbols.name(request.prompt),"options":options,"can_skip":false,"can_rollback":false,"context":{"valid_hexes":hexes},"decision_context":null});
         }
         if let RequestChoices::Upgrades(players) = &request.choices {
@@ -3943,7 +5497,7 @@ impl NativeSession {
                 "options":[],"can_skip":false,"can_rollback":false,"context":{"players":players,"supports_batch":true,"supports_preview":true},"decision_context":null});
         }
         let (kind,options)=match &request.choices {
-            RequestChoices::Defense(_) | RequestChoices::Action(_)|RequestChoices::Actors{..}|RequestChoices::Respawn{..}|RequestChoices::Upgrades(_)=>unreachable!(),
+            RequestChoices::Protection(_) | RequestChoices::Mines(_) | RequestChoices::Defense(_) | RequestChoices::Action(_)|RequestChoices::Actors{..}|RequestChoices::Respawn{..}|RequestChoices::Upgrades(_)=>unreachable!(),
             RequestChoices::ConfirmAction=>("CHOOSE_ACTION",vec![json!({"id":"CONFIRM","text":"Confirm","metadata":{}})]),
             RequestChoices::Multiple{values,..}=>("SELECT_UNIT",values.iter().map(|id|json!({"id":self.symbols.name(*id),"text":self.symbols.name(*id),"metadata":{}})).collect()),
             RequestChoices::Units {tokens,values}=>(if *tokens {"SELECT_UNIT_OR_TOKEN"}else{"SELECT_UNIT"},values.iter().map(|(id,label)|{
@@ -3962,7 +5516,12 @@ impl NativeSession {
                 json!({"id":n.to_string(),"text":label,"metadata":if labels.is_empty(){json!({})}else{json!({"raw":n})}})
             }).collect()),
         };
-        let prompt = if let RequestChoices::Repeat { done, max } = &request.choices {
+        let prompt = if let Some(range) = request.pre_action_range {
+            format!(
+                "Pre-action movement (up to {range} space{})",
+                if range > 1 { "s" } else { "" }
+            )
+        } else if let RequestChoices::Repeat { done, max } = &request.choices {
             format!("{} ({done}/{max} done)", self.symbols.name(request.prompt))
         } else if let RequestChoices::Multiple { count, max, .. } = &request.choices {
             format!("{} ({count}/{max})", self.symbols.name(request.prompt))
@@ -3987,9 +5546,9 @@ impl NativeSession {
                 |range| format!("Select Movement Destination (Range {range})"),
             )
         };
-        json!({"id":self.request_token(request.id),"request_type":kind,"player_id":self.symbols.name(request.owner),
+        json!({"id":self.request_token(request.id),"request_type":kind,"player_id":self.symbols.name(owner),
             "prompt":prompt,"options":options,"can_skip":request.can_skip,"can_rollback":false,"context":match &request.choices {RequestChoices::Passive{card,name}=>json!({"card_id":self.symbols.name(*card),"card_name":self.symbols.name(*name)}),RequestChoices::ZoneHexes{unit:Some(id),..}=>json!({"context_unit_id":self.symbols.name(*id)}),_=>json!({})},
-            "decision_context":if request.discard {json!({"purpose":"discard","actor_id":self.symbols.name(request.owner),"source_card_id":null,"choice_facts":{}})}else{Value::Null}})
+            "decision_context":if request.discard {json!({"purpose":"discard","actor_id":self.symbols.name(owner),"source_card_id":null,"choice_facts":{}})}else{Value::Null}})
     }
     pub fn event_json(&self, event: &NativeEvent) -> Value {
         match event {
@@ -4013,8 +5572,22 @@ impl NativeSession {
             NativeEvent::RespawnCleared { hero, token, from } => {
                 json!({"event_type":"TOKEN_REMOVED","actor_id":self.symbols.name(*hero),"target_id":self.symbols.name(*token),"from_hex":from,"to_hex":null,"metadata":{"reason":"respawn"}})
             }
-            NativeEvent::TokenRemoved { actor, token, from } => {
-                json!({"event_type":"TOKEN_REMOVED","actor_id":actor.map(|id|self.symbols.name(id)),"target_id":self.symbols.name(*token),"from_hex":from,"to_hex":null,"metadata":{"effects_removed":0}})
+            NativeEvent::MineTriggered {
+                actor,
+                target,
+                from,
+                kind,
+                blast,
+            } => {
+                json!({"event_type":"MINE_TRIGGERED","actor_id":actor.map(|id|self.symbols.name(id)),"target_id":self.symbols.name(*target),"from_hex":from,"to_hex":null,"metadata":{"token_type":kind.map(|id|self.symbols.name(id)),"is_blast":blast}})
+            }
+            NativeEvent::TokenRemoved {
+                actor,
+                token,
+                from,
+                effects_removed,
+            } => {
+                json!({"event_type":"TOKEN_REMOVED","actor_id":actor.map(|id|self.symbols.name(id)),"target_id":self.symbols.name(*token),"from_hex":from,"to_hex":null,"metadata":{"effects_removed":effects_removed}})
             }
             NativeEvent::TokenMoved {
                 actor,
@@ -4390,7 +5963,10 @@ fn bind_action(
                 .lookup(p.name())
                 .ok_or_else(|| unsupported("passive trigger missing"))?
         }
-        (ActionStep::PreMovement(_) | ActionStep::PreDiscard(_), Instruction::PreAction) => {}
+        (ActionStep::PreMovement(owner), Instruction::PreMovement { hero, .. })
+        | (ActionStep::PreDiscard(owner), Instruction::PreDiscard { hero, .. }) => {
+            *hero = Some(*owner)
+        }
         (ActionStep::CardText { hero: h, .. }, Instruction::CardText { hero, .. }) => *hero = *h,
         (
             ActionStep::Movement { hero, base },
@@ -4519,6 +6095,82 @@ fn compile_attack(
         select,
         children,
     })
+}
+fn bind_pre_movement(instruction: &mut Instruction, hero: Symbol, range: i32) -> Result<()> {
+    match instruction {
+        Instruction::Hex { filters, .. } => {
+            for filter in filters {
+                match filter {
+                    HexFilter::Obstacle { exclude, .. } => {
+                        *exclude = Origin {
+                            literal: Some(hero),
+                            key: None,
+                            frame: false,
+                        }
+                    }
+                    HexFilter::Movement {
+                        origin,
+                        range: distance,
+                        ..
+                    } => {
+                        *origin = Origin {
+                            literal: Some(hero),
+                            key: None,
+                            frame: false,
+                        };
+                        *distance = range;
+                    }
+                    _ => return Err(unsupported("unknown pre-action movement predicate")),
+                }
+            }
+        }
+        Instruction::Move {
+            unit,
+            range: distance,
+            ..
+        } => {
+            *unit = Some(hero);
+            *distance = range;
+        }
+        _ => return Err(unsupported("unknown pre-action movement child")),
+    }
+    Ok(())
+}
+fn compile_projectile(
+    deflect: bool,
+    steps: &mut Vec<CompiledStep>,
+    symbols: &mut Symbols,
+) -> Result<(usize, usize)> {
+    let key = if deflect {
+        "deflect_victim"
+    } else {
+        "reflect_victim"
+    };
+    let mut select = combat_template("select_unit")?;
+    select["prompt"] = json!(if deflect {
+        "Select enemy hero in range to discard (not attacker)"
+    } else {
+        "Select enemy hero in range to discard"
+    });
+    select["output_key"] = json!(key);
+    select["is_mandatory"] = json!(false);
+    let mut range = combat_template("range")?;
+    range["max_range"] = json!(3);
+    let mut filters = vec![
+        json!({"type":"unit_type_filter","unit_type":"HERO"}),
+        json!({"type":"team_filter","relation":"ENEMY"}),
+        range,
+    ];
+    if deflect {
+        filters.push(json!({"type":"exclude_identity_filter","exclude_self":true,"exclude_keys":["attacker_id"]}));
+    }
+    select["filters"] = json!(filters);
+    let mut force = combat_template("force_discard")?;
+    force["victim_key"] = json!(key);
+    Ok((
+        compile_step(&select, steps, symbols)?,
+        compile_step(&force, steps, symbols)?,
+    ))
 }
 fn compile_step(
     raw: &Value,
@@ -4814,6 +6466,43 @@ fn compile_step(
                 defeat: compile_step(&combat_template("defeat")?, steps, symbols)?,
             }
         }
+        "mine_path_choice" => Instruction::MineChoice {
+            unit: optional_symbol(raw, "unit_id", symbols)?,
+            key: optional_symbol(raw, "unit_key", symbols)?,
+            destination: symbols.intern(raw["destination_key"].as_str().unwrap_or("target_hex")),
+            range: i32::try_from(integer(raw, "range_val", 1)?)
+                .map_err(|_| unsupported("mine range outside i32"))?,
+            output: symbols.intern(raw["output_key"].as_str().unwrap_or("triggered_mine_ids")),
+            prompt: symbols.intern("Choose which mines to move through"),
+        },
+        "trigger_mine" => {
+            let ids = if raw["mine_ids"].is_null() {
+                None
+            } else {
+                Some(
+                    raw["mine_ids"]
+                        .as_array()
+                        .ok_or_else(|| unsupported("invalid explicit mine list"))?
+                        .iter()
+                        .map(|v| {
+                            v.as_str()
+                                .map(|s| symbols.intern(s))
+                                .ok_or_else(|| unsupported("invalid explicit mine identity"))
+                        })
+                        .collect::<Result<Vec<_>>>()?,
+                )
+            };
+            Instruction::TriggerMines {
+                ids,
+                victim: optional_symbol(raw, "victim_id", symbols)?,
+                ids_key: symbols
+                    .intern(raw["mine_ids_key"].as_str().unwrap_or("triggered_mine_ids")),
+                victim_key: symbols.intern(raw["victim_key"].as_str().unwrap_or("mine_victim_id")),
+                rollback: symbols.intern("rollback_reanchor_pending"),
+                blast: symbols.intern("mine_blast"),
+                discard: None,
+            }
+        }
         "force_discard" => {
             let victim = optional_symbol(raw, "victim_id", symbols)?;
             let key = optional_symbol(raw, "victim_key", symbols)?;
@@ -4865,30 +6554,21 @@ fn compile_step(
             hero: optional_symbol(raw, "hero_id", symbols)?,
             trigger: required_symbol(raw, "trigger", symbols)?,
         },
-        "offer_passive" => {
-            if raw.get("active_effect_id").is_some_and(|v| !v.is_null()) {
-                return Err(unsupported("effect-backed passive offer not compiled"));
-            }
-            Instruction::OfferPassive {
-                spec: crate::passives::Offer {
-                    card: required_symbol(raw, "card_id", symbols)?,
-                    trigger: required_symbol(raw, "trigger", symbols)?,
-                    optional: flag(raw, "is_optional", true)?,
-                    prompt: required_symbol(raw, "prompt", symbols)?,
-                    hero: optional_symbol(raw, "hero_id", symbols)?,
-                },
-                body: compile_step(&combat_template("discard_or_defeat")?, steps, symbols)?,
-                mark: compile_step(&combat_template("mark_passive")?, steps, symbols)?,
-            }
-        }
-        "mark_passive_used" => {
-            if raw.get("active_effect_id").is_some_and(|v| !v.is_null()) {
-                return Err(unsupported("effect-backed passive usage not compiled"));
-            }
-            Instruction::MarkPassive {
+        "offer_passive" => Instruction::OfferPassive {
+            spec: crate::passives::Offer {
                 card: required_symbol(raw, "card_id", symbols)?,
-            }
-        }
+                trigger: required_symbol(raw, "trigger", symbols)?,
+                optional: flag(raw, "is_optional", true)?,
+                prompt: required_symbol(raw, "prompt", symbols)?,
+                hero: optional_symbol(raw, "hero_id", symbols)?,
+                provider: passive_provider_symbol(raw, symbols)?,
+            },
+            mark: compile_step(&combat_template("mark_passive")?, steps, symbols)?,
+        },
+        "mark_passive_used" => Instruction::MarkPassive {
+            card: required_symbol(raw, "card_id", symbols)?,
+            provider: passive_provider_symbol(raw, symbols)?,
+        },
         "resolve_defense_text" | "resolve_on_block_effect" => {
             let on_block = raw["type"] == "resolve_on_block_effect";
             let mut enter = combat_template("set_actor")?;
@@ -4901,48 +6581,11 @@ fn compile_step(
             let mut exit = combat_template("set_actor")?;
             exit["actor_key"] = enter["save_key"].clone();
             exit["save_key"] = json!("_discard");
-            let projectile = |deflect: bool,
-                              steps: &mut Vec<CompiledStep>,
-                              symbols: &mut Symbols|
-             -> Result<(usize, usize)> {
-                let key = if deflect {
-                    "deflect_victim"
-                } else {
-                    "reflect_victim"
-                };
-                let mut select = combat_template("select_unit")?;
-                select["prompt"] = json!(if deflect {
-                    "Select enemy hero in range to discard (not attacker)"
-                } else {
-                    "Select enemy hero in range to discard"
-                });
-                select["output_key"] = json!(key);
-                select["is_mandatory"] = json!(false);
-                let mut range = combat_template("range")?;
-                range["max_range"] = json!(3);
-                let mut filters = vec![
-                    json!({"type":"unit_type_filter","unit_type":"HERO"}),
-                    json!({"type":"team_filter","relation":"ENEMY"}),
-                    range,
-                ];
-                if deflect {
-                    filters.push(json!({"type":"exclude_identity_filter","exclude_self":true,"exclude_keys":["attacker_id"]}));
-                }
-                select["filters"] = json!(filters);
-                let mut force = combat_template("force_discard")?;
-                force["victim_key"] = json!(key);
-                Ok((
-                    compile_step(&select, steps, symbols)?,
-                    compile_step(&force, steps, symbols)?,
-                ))
-            };
-            let (reflect_select, reflect_discard) = projectile(false, steps, symbols)?;
-            let (deflect_select, deflect_discard) = projectile(true, steps, symbols)?;
             let program = DefenseProgram {
-                reflect_select,
-                reflect_discard,
-                deflect_select,
-                deflect_discard,
+                reflect_select: None,
+                reflect_discard: None,
+                deflect_select: None,
+                deflect_discard: None,
                 enter: compile_step(&enter, steps, symbols)?,
                 exit: compile_step(&exit, steps, symbols)?,
                 flag: compile_step(&combat_template("context")?, steps, symbols)?,
@@ -4967,8 +6610,33 @@ fn compile_step(
             serde_json::from_value(raw["marker_type"].clone())
                 .map_err(|e| unsupported(e.to_string()))?,
         ),
+        "finished_expiring_effect" => Instruction::FinishedEffect,
         "restore_action_type" => Instruction::RestoreAction,
-        "resolve_pre_action_movement" | "resolve_pre_action_discard" => Instruction::PreAction,
+        "restore_action_context" => Instruction::RestoreContext {
+            other: flag(raw, "other_hero_action", false)?,
+        },
+        "resolve_pre_action_movement" => {
+            let recipes =
+                crate::templates::instructions().map_err(unsupported)?["pre_action_movement"]
+                    .as_array()
+                    .ok_or_else(|| unsupported("frozen pre-action movement body missing"))?
+                    .clone();
+            Instruction::PreMovement {
+                hero: optional_symbol(raw, "hero_id", symbols)?,
+                key: optional_symbol(raw, "hero_key", symbols)?,
+                children: recipes
+                    .iter()
+                    .map(|step| compile_step(step, steps, symbols))
+                    .collect::<Result<Vec<_>>>()?,
+            }
+        }
+        "resolve_pre_action_discard" => Instruction::PreDiscard {
+            hero: optional_symbol(raw, "hero_id", symbols)?,
+            key: optional_symbol(raw, "hero_key", symbols)?,
+            abort: flag(raw, "abort_on_defeat", true)?,
+            force: compile_step(&combat_template("pre_force_discard")?, steps, symbols)?,
+            defeat: compile_step(&combat_template("defeat")?, steps, symbols)?,
+        },
         "remove_unit" => Instruction::Remove {
             unit: optional_symbol(raw, "unit_id", symbols)?,
             key: optional_symbol(raw, "unit_key", symbols)?,
@@ -4982,6 +6650,7 @@ fn compile_step(
             let remove = compile_step(&combat_template("remove_unit")?, steps, symbols)?;
             let over = compile_step(&combat_template("game_over")?, steps, symbols)?;
             Instruction::Defeat {
+                protection: None,
                 victim: optional_symbol(raw, "victim_id", symbols)?,
                 key: optional_symbol(raw, "victim_key", symbols)?,
                 killer: nullable_symbol(raw, "killer_id", symbols)?,
@@ -4990,6 +6659,26 @@ fn compile_step(
                 over,
             }
         }
+        "check_minion_protection" => Instruction::MinionProtection {
+            spec: crate::protection::ProtectionBinding {
+                minion: required_symbol(raw, "minion_id", symbols)?,
+                killer: nullable_symbol(raw, "killer_id", symbols)?,
+                tried: Arc::from(
+                    raw["tried_effect_ids"]
+                        .as_array()
+                        .ok_or_else(|| unsupported("protection tried list missing"))?
+                        .iter()
+                        .map(|v| {
+                            v.as_str()
+                                .map(|id| symbols.intern(id))
+                                .ok_or_else(|| unsupported("invalid protection identity"))
+                        })
+                        .collect::<Result<Vec<_>>>()?,
+                ),
+            },
+            remove: compile_step(&combat_template("remove_unit")?, steps, symbols)?,
+            discard: compile_step(&combat_template("discard_card")?, steps, symbols)?,
+        },
         "resolve_combat" => {
             let defeat = compile_step(&combat_template("defeat")?, steps, symbols)?;
             Instruction::Combat {
@@ -5059,10 +6748,10 @@ fn compile_step(
         },
         "move_sequence" => compile_movement_sequence(raw, steps, symbols)?,
         "move_unit" => {
-            if flag(raw, "mine_path_prechosen", false)? {
-                return Err(unsupported("preselected mine triggers are not compiled"));
-            }
             Instruction::Move {
+                mine_choice: None,
+                mine_trigger: None,
+                prechosen: flag(raw, "mine_path_prechosen", false)?,
                 unit: optional_symbol(raw, "unit_id", symbols)?,
                 unit_key: optional_symbol(raw, "unit_key", symbols)?,
                 destination: match raw.get("target_hex_arg") {
@@ -5232,6 +6921,7 @@ fn compile_step(
     let id = steps.len();
     let initial = Frame {
         instruction: id,
+        object: None,
         pending,
         request,
         index,
@@ -5249,6 +6939,24 @@ fn compile_step(
         effect: None,
         offer_override: None,
         forced: None,
+        mine_trigger: None,
+        mine_snapshot: None,
+        protection: None,
+        mine_prechosen: false,
+        pre_move: None,
+        pre_processed: raw["processed_effect_ids"]
+            .as_array()
+            .map(|ids| {
+                ids.iter()
+                    .map(|id| {
+                        id.as_str()
+                            .map(|id| symbols.intern(id))
+                            .ok_or_else(|| unsupported("invalid processed effect ID"))
+                    })
+                    .collect::<Result<Vec<_>>>()
+            })
+            .transpose()?
+            .unwrap_or_default(),
         action: None,
         zone_return: None,
         battle: None,
@@ -5344,28 +7052,35 @@ fn card_error(e: crate::cards::CardError) -> EngineError {
 fn compile_flow_program(
     steps: &mut Vec<CompiledStep>,
     symbols: &mut Symbols,
+    round_only: bool,
 ) -> Result<FlowProgram> {
-    let names = [
-        "resolve_card",
-        "confirm_resolution",
-        "finalize_hero",
-        "respawn",
-        "tie",
-        "find_actor",
-        "retrieve_unresolved",
-        "flip_coin",
-        "return_minions",
-        "check_lane_push",
-        "advance_turn",
-        "end_phase",
-        "end_cleanup",
-        "upgrades",
-        "round_reset",
-        "minion_battle",
-    ];
+    // Active-effect phase roots currently admit cleanup/upgrades/reset only.
+    // Compile their reachable continuations, not unported future action flows.
+    let names: &[&str] = if round_only {
+        &["upgrades", "round_reset"]
+    } else {
+        &[
+            "resolve_card",
+            "confirm_resolution",
+            "finalize_hero",
+            "respawn",
+            "tie",
+            "find_actor",
+            "retrieve_unresolved",
+            "flip_coin",
+            "return_minions",
+            "check_lane_push",
+            "advance_turn",
+            "end_phase",
+            "end_cleanup",
+            "upgrades",
+            "round_reset",
+            "minion_battle",
+        ]
+    };
     let entries = names
-        .into_iter()
-        .map(|name| Ok((name, compile_step(&combat_template(name)?, steps, symbols)?)))
+        .iter()
+        .map(|&name| Ok((name, compile_step(&combat_template(name)?, steps, symbols)?)))
         .collect::<Result<Vec<_>>>()?;
     Ok(FlowProgram { entries })
 }
@@ -5399,6 +7114,43 @@ fn patch_continuation(wire: &mut Value, cont: &crate::planning::Continuation, sy
         _ => {}
     }
 }
+
+fn protection_selection(value: &Datum, symbols: &Symbols, selection: Symbol) -> Option<Datum> {
+    if let Datum::Object(fields) = value {
+        symbols
+            .lookup("selected_card_id")
+            .and_then(|key| fields.iter().find(|(k, _)| *k == key).map(|(_, v)| v))
+            .filter(|v| v.truthy(symbols))
+            .or_else(|| fields.iter().find(|(k, _)| *k == selection).map(|(_, v)| v))
+            .cloned()
+    } else {
+        Some(value.clone())
+    }
+}
+fn passive_provider_symbol(raw: &Value, symbols: &mut Symbols) -> Result<Option<Symbol>> {
+    match raw.get("active_effect_id") {
+        None | Some(Value::Null) => Ok(None),
+        Some(Value::String(id)) => Ok(Some(symbols.intern(id))),
+        _ => Err(unsupported("invalid passive provider identity")),
+    }
+}
+fn bind_passive_owner(value: &mut Value, owner: &str) {
+    match value {
+        Value::String(s) if s == "template-passive-owner" => *s = owner.to_owned(),
+        Value::Array(values) => {
+            for value in values {
+                bind_passive_owner(value, owner);
+            }
+        }
+        Value::Object(fields) => {
+            for value in fields.values_mut() {
+                bind_passive_owner(value, owner);
+            }
+        }
+        _ => {}
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -5791,7 +7543,7 @@ mod tests {
         assert!(Arc::ptr_eq(&a.world.definitions, &b.world.definitions));
     }
     #[test]
-    fn resolved_cards_gate_stats_only_for_uncompiled_aura_hooks() {
+    fn resolved_witching_hour_is_a_compiled_card_hook() {
         let envelope = source("turn-finalize-ordinary");
         let mut symbols = Symbols::default();
         let mut plain = NativeWorld::compile(&envelope, &mut symbols).unwrap();
@@ -5812,12 +7564,11 @@ mod tests {
         let hero = symbols.lookup("hero_arien").unwrap();
         assert!(!guarded.has_uncompiled_auras);
         guarded.resolve_current_card(hero, Some(1)).unwrap();
-        assert!(guarded.has_uncompiled_auras);
-        assert!(
-            guarded
-                .computed_stat(hero, Stat::Initiative, 3)
-                .unwrap_err()
-                .contains("aura")
+        assert!(!guarded.has_uncompiled_auras);
+        assert_eq!(guarded.computed_stat(hero, Stat::Initiative, 3).unwrap(), 3);
+        assert_eq!(
+            crate::auras::CardAura::compile("future_unported_aura", true),
+            crate::auras::CardAura::Uncompiled
         );
     }
     #[test]
@@ -6276,6 +8027,1056 @@ mod tests {
         }
     }
     #[test]
+    fn standalone_mine_choices_restore_at_every_instruction() {
+        for variant in [
+            "plain",
+            "one-dud",
+            "one-blast",
+            "mixed",
+            "friendly",
+            "unowned",
+            "unknown-owner",
+            "supply-only",
+            "entity-priority",
+            "pool-mismatch",
+            "terrain-mine",
+            "map-gap",
+            "offboard-start",
+            "no-actor",
+            "actor-other",
+            "actor-empty",
+            "barrier",
+            "empty-denial",
+            "split",
+            "isolation",
+            "topology-dormant",
+            "bound-owner",
+            "controlled",
+        ] {
+            for mode in ["first", "last", "invalid", "numeric"] {
+                let name = format!("mine-choice-{variant}-{mode}");
+                let root = NativeSession::compile(source(&name)).unwrap();
+                assert_eq!(
+                    run_instruction_restores(root.clone(), true),
+                    run_instruction_restores(root, false),
+                    "{name}"
+                );
+            }
+        }
+    }
+    #[test]
+    fn ordered_mine_trigger_chains_restore_tokens_discards_and_rollback_flags() {
+        for variant in [
+            "dud",
+            "blast",
+            "mixed",
+            "reverse",
+            "duplicate-blast",
+            "offboard-blast",
+            "unknown",
+            "hero-id",
+            "empty-literal",
+            "context-list",
+            "literal-victim",
+            "missing-victim",
+            "empty-hand",
+            "actor-other",
+            "actor-empty",
+            "dud-effects",
+            "offboard-dud-effects",
+        ] {
+            let name = format!("mine-trigger-{variant}");
+            let root = NativeSession::compile(source(&name)).unwrap();
+            assert_eq!(
+                run_instruction_restores(root.clone(), true),
+                run_instruction_restores(root, false),
+                "{name}"
+            );
+        }
+    }
+    #[test]
+    fn automatic_mine_movement_restores_every_instruction_and_generated_snapshot() {
+        for kind in ["dud", "blast"] {
+            for route in ["corridor", "choice"] {
+                for root_type in ["sequence", "direct"] {
+                    let name = format!("mine-move-{kind}-{route}-{root_type}-first");
+                    let root = NativeSession::compile(source(&name)).unwrap();
+                    assert_eq!(
+                        run_instruction_restores(root.clone(), true),
+                        run_instruction_restores(root, false),
+                        "{name}"
+                    );
+                }
+            }
+        }
+        for variant in [
+            "piece",
+            "actor-other",
+            "actor-none",
+            "actor-empty",
+            "literal",
+            "literal-requeue",
+            "custom-key",
+            "straight",
+            "prechosen",
+            "prechosen-empty",
+            "prechosen-unknown",
+            "dud-effects",
+            "controlled",
+            "second-move",
+            "two-straight",
+            "two-prechosen",
+            "sequence-select",
+            "supply-only",
+            "pool-mismatch",
+            "skip",
+        ] {
+            let name = format!("mine-move-{variant}");
+            let root = NativeSession::compile(source(&name)).unwrap();
+            assert_eq!(
+                run_instruction_restores(root.clone(), true),
+                run_instruction_restores(root, false),
+                "{name}"
+            );
+        }
+    }
+    #[test]
+    fn generated_mine_requeue_identity_is_identical_after_restore() {
+        let mut direct =
+            NativeSession::compile(source("mine-move-dud-choice-sequence-first")).unwrap();
+        direct.advance_prefix(1).unwrap();
+        let mut restored = NativeSession::compile(direct.export_envelope().unwrap()).unwrap();
+        assert_eq!(
+            direct.semantic_state().unwrap(),
+            restored.semantic_state().unwrap()
+        );
+        direct.advance_prefix(1).unwrap();
+        restored.advance_prefix(1).unwrap();
+        assert_eq!(
+            direct.semantic_state().unwrap(),
+            restored.semantic_state().unwrap()
+        );
+        let a = direct.advance_prefix(1).unwrap().request.unwrap();
+        let b = restored.advance_prefix(1).unwrap().request.unwrap();
+        assert_eq!(direct.request_json(&a), restored.request_json(&b));
+    }
+    #[test]
+    fn automatic_mine_choice_workers_keep_movement_and_discards_private() {
+        let mut root =
+            NativeSession::compile(source("mine-move-blast-choice-direct-first")).unwrap();
+        let request = root
+            .advance(&ExecutionBudget::default())
+            .unwrap()
+            .request
+            .unwrap();
+        let RequestChoices::Mines(options) = &request.choices else {
+            panic!("mine choices")
+        };
+        let hit = options.iter().position(|p| !p.mines.is_empty()).unwrap();
+        let avoid = options.iter().position(|p| p.mines.is_empty()).unwrap();
+        let before = root.semantic_state().unwrap();
+        let mut workers = [root.clone(), root.clone()];
+        for (worker, index) in workers.iter_mut().zip([hit, avoid]) {
+            let value = worker.import_selection(&json!(index.to_string())).unwrap();
+            worker.submit(request.id, value).unwrap();
+            // This completes the move, with only the hit worker awaiting discard.
+        }
+        let hit_result = workers[0].advance(&ExecutionBudget::default()).unwrap();
+        let avoid_result = workers[1].advance(&ExecutionBudget::default()).unwrap();
+        assert!(hit_result.request.is_some());
+        assert!(avoid_result.request.is_none());
+        let mine = root.symbols.lookup("mine_a").unwrap();
+        assert!(workers[0].world.position(mine).is_none());
+        assert!(workers[1].world.position(mine).is_some());
+        assert_eq!(root.semantic_state().unwrap(), before);
+        assert!(Arc::ptr_eq(&workers[0].steps, &workers[1].steps));
+        assert!(Arc::ptr_eq(
+            &workers[0].world.definitions,
+            &workers[1].world.definitions
+        ));
+    }
+    #[test]
+    fn mine_choice_workers_keep_different_sets_private() {
+        let mut root = NativeSession::compile(source("mine-choice-mixed-first")).unwrap();
+        let request = root
+            .advance(&ExecutionBudget::default())
+            .unwrap()
+            .request
+            .unwrap();
+        let RequestChoices::Mines(options) = &request.choices else {
+            panic!("mine choices")
+        };
+        assert!(options.len() > 1);
+        let before = root.semantic_state().unwrap();
+        let mut first = root.clone();
+        let mut last = root.clone();
+        let a = first.import_selection(&json!("0")).unwrap();
+        let b = last
+            .import_selection(&json!((options.len() - 1).to_string()))
+            .unwrap();
+        first.submit(request.id, a).unwrap();
+        last.submit(request.id, b).unwrap();
+        first.advance(&ExecutionBudget::default()).unwrap();
+        last.advance(&ExecutionBudget::default()).unwrap();
+        let key = root.symbols.lookup("triggered_mine_ids").unwrap();
+        assert_ne!(first.context.get(key), last.context.get(key));
+        assert_eq!(root.semantic_state().unwrap(), before);
+        assert!(Arc::ptr_eq(&first.steps, &last.steps));
+        assert!(Arc::ptr_eq(
+            &first.world.definitions,
+            &last.world.definitions
+        ));
+    }
+    #[test]
+    fn effect_discard_steps_restore_at_every_instruction() {
+        for variant in [
+            "plain",
+            "current",
+            "current-facedown",
+            "facedown",
+            "duplicate",
+            "missing-card",
+            "inactive",
+            "old-active",
+            "wrong-source",
+            "empty-card",
+            "off-scope",
+            "multiple",
+            "linked-expiry",
+            "empty-hand",
+            "no-basic",
+            "basic",
+            "non-basic",
+            "immune",
+            "friendly-immunity",
+            "no-immunity-source",
+            "irrelevant-provider",
+        ] {
+            let name = format!("discard-effect-{variant}-first");
+            let root = NativeSession::compile(source(&name)).unwrap();
+            assert_eq!(
+                run_instruction_restores(root.clone(), true),
+                run_instruction_restores(root, false),
+                "{name}"
+            );
+        }
+        for variant in [
+            "plain",
+            "current",
+            "immune",
+            "linked-expiry",
+            "irrelevant-provider",
+        ] {
+            for mode in ["move", "trigger"] {
+                let name = format!("discard-effect-blast-{variant}-{mode}-first");
+                let root = NativeSession::compile(source(&name)).unwrap();
+                assert_eq!(
+                    run_instruction_restores(root.clone(), true),
+                    run_instruction_restores(root, false),
+                    "{name}"
+                );
+            }
+        }
+    }
+    #[test]
+    fn selected_shield_expiry_survives_restore_without_finishing_steps() {
+        for variant in ["plain", "current", "linked-expiry", "basic", "non-basic"] {
+            let mut direct =
+                NativeSession::compile(source(&format!("discard-effect-{variant}-last"))).unwrap();
+            direct.advance_prefix(1).unwrap();
+            let mut restored = NativeSession::compile(direct.export_envelope().unwrap()).unwrap();
+            let a = direct.advance_prefix(1).unwrap().request.unwrap();
+            let b = restored.advance_prefix(1).unwrap().request.unwrap();
+            assert_eq!(direct.request_json(&a), restored.request_json(&b));
+            let shield = direct.symbols.lookup("stone_carapace").unwrap();
+            assert!(
+                direct.request_json(&a)["options"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|o| o["id"] == "stone_carapace")
+            );
+            direct.submit(a.id, Datum::Text(shield)).unwrap();
+            restored.submit(b.id, Datum::Text(shield)).unwrap();
+            direct.advance_prefix(1).unwrap();
+            restored.advance_prefix(1).unwrap();
+            restored = NativeSession::compile(restored.export_envelope().unwrap()).unwrap();
+            let a = direct.advance(&ExecutionBudget::default()).unwrap();
+            let b = restored.advance(&ExecutionBudget::default()).unwrap();
+            assert!(a.request.is_none() && b.request.is_none());
+            assert_eq!(
+                direct.semantic_state().unwrap(),
+                restored.semantic_state().unwrap()
+            );
+            assert!(
+                direct
+                    .world
+                    .effects
+                    .instances
+                    .iter()
+                    .all(|e| e.card != Some(shield))
+            );
+            assert!(
+                direct
+                    .symbols
+                    .lookup("should_not_finish")
+                    .is_none_or(|key| direct.context.get(key).is_none())
+            );
+            let card = direct.world.card_by_printed(shield).unwrap();
+            assert!(!direct.world.card(card).unwrap().active);
+        }
+    }
+    #[test]
+    fn shield_and_hand_discard_workers_keep_cards_and_effects_private() {
+        let mut root = NativeSession::compile(source("discard-effect-plain-last")).unwrap();
+        let req = root
+            .advance(&ExecutionBudget::default())
+            .unwrap()
+            .request
+            .unwrap();
+        let before = root.semantic_state().unwrap();
+        let shield = root.symbols.lookup("stone_carapace").unwrap();
+        let hand = root.request_json(&req)["options"][0]["id"].clone();
+        let mut a = root.clone();
+        let mut b = root.clone();
+        a.submit(req.id, Datum::Text(shield)).unwrap();
+        let hand = b.import_selection(&hand).unwrap();
+        b.submit(req.id, hand).unwrap();
+        a.advance(&ExecutionBudget::default()).unwrap();
+        b.advance(&ExecutionBudget::default()).unwrap();
+        assert!(
+            a.world
+                .effects
+                .instances
+                .iter()
+                .all(|e| e.card != Some(shield))
+        );
+        assert!(
+            b.world
+                .effects
+                .instances
+                .iter()
+                .any(|e| e.card == Some(shield))
+        );
+        assert_eq!(root.semantic_state().unwrap(), before);
+        assert!(Arc::ptr_eq(&a.steps, &b.steps));
+        assert!(Arc::ptr_eq(&a.world.definitions, &b.world.definitions));
+    }
+    #[test]
+    fn granted_and_ordinary_wild_hunt_restore_every_instruction() {
+        for variant in [
+            "plain",
+            "offboard",
+            "inactive",
+            "wrong-source",
+            "missing-card",
+            "unknown-grant",
+            "empty-grant",
+            "no-grant",
+            "used",
+            "negative-uses",
+            "facedown-carrier",
+            "duplicate-provider",
+            "scope-ignored",
+            "old-active",
+            "empty-provider-id",
+            "no-actor",
+            "mine",
+            "mine-linked-provider",
+            "actions-only-cap",
+            "movement-cap",
+            "ordinary",
+            "ordinary-low-level",
+            "ordinary-facedown",
+            "ordinary-dedup",
+        ] {
+            for entry in ["scan", "direct"] {
+                let name = format!("provider-{variant}-{entry}-yes");
+                let root = NativeSession::compile(source(&name)).unwrap();
+                assert_eq!(
+                    run_instruction_restores(root.clone(), true),
+                    run_instruction_restores(root, false),
+                    "{name}"
+                );
+            }
+        }
+    }
+    #[test]
+    fn provider_rechecks_live_identity_before_accepted_offer_executes() {
+        let mut root = NativeSession::compile(source("provider-plain-scan-yes")).unwrap();
+        let request = root
+            .advance(&ExecutionBudget::default())
+            .unwrap()
+            .request
+            .unwrap();
+        let before = root.semantic_state().unwrap();
+        let hero = root.symbols.lookup("hero_mrak").unwrap();
+        let position = root.world.position(hero);
+        for variant in 0..5 {
+            let mut worker = root.clone();
+            match variant {
+                0 => worker.world.effects.instances.clear(),
+                1 => worker.world.effects.instances[0].active = false,
+                2 => {
+                    worker.world.effects.instances[0].source =
+                        worker.symbols.lookup("hero_min").unwrap()
+                }
+                3 => worker.world.effects.instances[0].card = None,
+                _ => worker.world.effects.instances[0].granted_passive = None,
+            }
+            worker.submit(request.id, Datum::Text(worker.yes)).unwrap();
+            assert!(
+                worker
+                    .advance(&ExecutionBudget::default())
+                    .unwrap()
+                    .request
+                    .is_none()
+            );
+            assert_eq!(worker.world.position(hero), position);
+            assert!(
+                worker
+                    .world
+                    .effects
+                    .instances
+                    .iter()
+                    .all(|e| e.passive_uses == 0)
+            );
+        }
+        assert_eq!(root.semantic_state().unwrap(), before);
+    }
+    #[test]
+    fn provider_counter_is_private_and_does_not_increment_the_foreign_card() {
+        let mut root = NativeSession::compile(source("provider-plain-scan-yes")).unwrap();
+        let request = root
+            .advance(&ExecutionBudget::default())
+            .unwrap()
+            .request
+            .unwrap();
+        let before = root.semantic_state().unwrap();
+        let carrier = root.world.effects.instances[0].card.unwrap();
+        let physical = root.world.card_by_printed(carrier).unwrap();
+        let mut accepted = root.clone();
+        let mut declined = root.clone();
+        accepted
+            .submit(request.id, Datum::Text(accepted.yes))
+            .unwrap();
+        let no = declined.import_selection(&json!("NO")).unwrap();
+        declined.submit(request.id, no).unwrap();
+        declined.advance(&ExecutionBudget::default()).unwrap();
+        let target = accepted
+            .advance(&ExecutionBudget::default())
+            .unwrap()
+            .request
+            .unwrap();
+        let value = accepted.request_json(&target)["options"][0]["metadata"]["hex"].clone();
+        let value = accepted.import_selection(&value).unwrap();
+        accepted.submit(target.id, value).unwrap();
+        accepted.advance(&ExecutionBudget::default()).unwrap();
+        assert_eq!(accepted.world.effects.instances[0].passive_uses, 1);
+        assert_eq!(declined.world.effects.instances[0].passive_uses, 0);
+        assert_eq!(accepted.world.card(physical).unwrap().passive_uses, 7);
+        let restored = NativeSession::compile(accepted.export_envelope().unwrap()).unwrap();
+        assert_eq!(
+            accepted.semantic_state().unwrap(),
+            restored.semantic_state().unwrap()
+        );
+        assert_eq!(restored.world.effects.instances[0].passive_uses, 1);
+        assert!(Arc::ptr_eq(
+            &accepted.world.effects.instances[0].definition,
+            &declined.world.effects.instances[0].definition
+        ));
+        assert!(Arc::ptr_eq(
+            &accepted.passive_bodies,
+            &declined.passive_bodies
+        ));
+        assert_eq!(root.semantic_state().unwrap(), before);
+    }
+    #[test]
+    fn provider_marking_matches_rows_even_when_inactive_or_carrier_is_missing() {
+        for variant in [
+            "plain",
+            "inactive",
+            "wrong-source",
+            "missing-card",
+            "empty-provider-id",
+            "no-actor",
+            "used",
+            "negative-uses",
+            "ordinary",
+            "ordinary-facedown",
+        ] {
+            let name = format!("provider-mark-{variant}");
+            let root = NativeSession::compile(source(&name)).unwrap();
+            assert_eq!(
+                run_instruction_restores(root.clone(), true),
+                run_instruction_restores(root, false),
+                "{name}"
+            );
+        }
+    }
+    #[test]
+    fn effect_combat_protection_and_granted_gun_restore_every_instruction() {
+        for name in [
+            "combat-effect-protection-card-False",
+            "combat-effect-protection-two-skip-False",
+            "combat-effect-protection-two-invalid-False",
+            "combat-effect-protection-all-decline-False",
+            "combat-effect-protection-totem-priority-False",
+            "combat-effect-protection-totem-offboard-False",
+            "combat-effect-protection-card-linked-False",
+            "combat-effect-protection-tried-True",
+            "combat-effect-protection-pending-legacy",
+            "combat-effect-protection-pending-selection",
+            "combat-effect-protection-heavy-True",
+            "combat-effect-bounty-twice",
+            "combat-effect-bounty-last-coin",
+            "combat-effect-bounty-multiple",
+            "combat-effect-bounty-split",
+            "combat-effect-bounty-isolated",
+            "combat-effect-expiry-source",
+            "combat-effect-expiry-owned-card",
+            "combat-effect-expiry-foreign-card",
+            "combat-effect-expiry-empty-token",
+            "combat-effect-negative--16-None",
+            "combat-effect-negative--16--17",
+            "combat-effect-force-empty",
+            "combat-effect-force-immune",
+            "combat-effect-gun-hand",
+            "combat-effect-gun-empty",
+            "combat-effect-gun-victim-carrier",
+            "combat-effect-create-minion_protection",
+            "combat-effect-create-minion_defeat_bounty",
+            "combat-effect-terminal",
+        ] {
+            let root = NativeSession::compile(source(name)).unwrap();
+            assert_eq!(
+                run_instruction_restores(root.clone(), true),
+                run_instruction_restores(root, false),
+                "{name}"
+            );
+        }
+    }
+    #[test]
+    fn effect_reaction_and_illusion_traces_restore_every_instruction() {
+        let base =
+            std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures"));
+        let index: Value =
+            serde_json::from_reader(std::fs::File::open(base.join("stack-traces.json")).unwrap())
+                .unwrap();
+        let names = index["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|case| case["name"].as_str())
+            .filter(|name| name.starts_with("reaction-effect-"))
+            .collect::<Vec<_>>();
+        assert!(!names.is_empty());
+        for name in names {
+            let root = NativeSession::compile(source(name)).unwrap();
+            assert_eq!(
+                run_instruction_restores(root.clone(), true),
+                run_instruction_restores(root, false),
+                "{name}"
+            );
+        }
+    }
+    #[test]
+    fn illusion_defense_uses_each_workers_live_actor_and_restores_it() {
+        let root = NativeSession::compile(source("reaction-effect-illusion-plain-True")).unwrap();
+        let before = root.semantic_state().unwrap();
+        let mut same_actor = root.clone();
+        let mut different_actor = root.clone();
+        different_actor.planning.actor = Some(different_actor.symbols.lookup("hero_hanu").unwrap());
+        let a = same_actor
+            .advance(&ExecutionBudget::default())
+            .unwrap()
+            .request
+            .unwrap();
+        let b = different_actor
+            .advance(&ExecutionBudget::default())
+            .unwrap()
+            .request
+            .unwrap();
+        assert_eq!(
+            same_actor.request_json(&a)["context"]["minion_modifier"],
+            -2
+        );
+        assert_eq!(
+            different_actor.request_json(&b)["context"]["minion_modifier"],
+            0
+        );
+        let mut restored =
+            NativeSession::compile(different_actor.export_envelope().unwrap()).unwrap();
+        let req = restored.advance_prefix(1).unwrap().request.unwrap();
+        assert_eq!(
+            restored.request_json(&req),
+            different_actor.request_json(&b)
+        );
+        assert_eq!(root.semantic_state().unwrap(), before);
+    }
+    #[test]
+    fn shield_defense_and_pass_workers_keep_cards_and_linked_effects_private() {
+        let mut root =
+            NativeSession::compile(source("reaction-effect-shield-plain-shield")).unwrap();
+        let request = root
+            .advance(&ExecutionBudget::default())
+            .unwrap()
+            .request
+            .unwrap();
+        let before = root.semantic_state().unwrap();
+        let mut shield = root.clone();
+        let mut pass = root.clone();
+        let selection = shield.import_selection(&json!("stone_carapace")).unwrap();
+        shield.submit(request.id, selection).unwrap();
+        let selection = pass.import_selection(&json!("PASS")).unwrap();
+        pass.submit(request.id, selection).unwrap();
+        // Observe the discard before the passed attack goes on to defeat the
+        // hero and correctly expire its card-owned shield effect.
+        shield.advance_prefix(2).unwrap();
+        pass.advance_prefix(1).unwrap();
+        let id = shield.symbols.lookup("shield").unwrap();
+        assert!(
+            shield
+                .world
+                .effects
+                .instances
+                .iter()
+                .all(|effect| effect.id != id)
+        );
+        assert!(
+            pass.world
+                .effects
+                .instances
+                .iter()
+                .any(|effect| effect.id == id)
+        );
+        assert_eq!(root.semantic_state().unwrap(), before);
+    }
+    #[test]
+    fn expired_shield_is_rejected_when_its_waiting_reaction_is_submitted() {
+        let mut session =
+            NativeSession::compile(source("reaction-effect-shield-plain-shield")).unwrap();
+        let request = session
+            .advance(&ExecutionBudget::default())
+            .unwrap()
+            .request
+            .unwrap();
+        session.world.effects.instances.remove(0);
+        let value = session.import_selection(&json!("stone_carapace")).unwrap();
+        session.submit(request.id, value).unwrap();
+        let next = session
+            .advance(&ExecutionBudget::default())
+            .unwrap()
+            .request
+            .unwrap();
+        assert_ne!(request.id, next.id);
+        assert!(
+            session.request_json(&next)["options"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|option| option["id"] != "stone_carapace")
+        );
+    }
+    #[test]
+    fn effect_targeting_pre_actions_and_projectiles_restore_every_instruction() {
+        let base =
+            std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures"));
+        let index: Value =
+            serde_json::from_reader(std::fs::File::open(base.join("stack-traces.json")).unwrap())
+                .unwrap();
+        let names = index["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|entry| entry["name"].as_str())
+            .filter(|name| name.starts_with("targeting-"))
+            .collect::<Vec<_>>();
+        assert!(!names.is_empty());
+        for name in names {
+            let root = NativeSession::compile(source(name)).unwrap();
+            assert_eq!(
+                run_instruction_restores(root.clone(), true),
+                run_instruction_restores(root, false),
+                "{name}"
+            );
+        }
+    }
+    #[test]
+    fn disruptor_requeue_and_consumption_remain_private_while_discard_input_waits() {
+        let mut root =
+            NativeSession::compile(source("targeting-pre-discard-multiple-first")).unwrap();
+        let request = root
+            .advance(&ExecutionBudget::default())
+            .unwrap()
+            .request
+            .unwrap();
+        let wire = root.request_json(&request);
+        let before = root.semantic_state().unwrap();
+        let mut first = root.clone();
+        let mut last = NativeSession::compile(root.export_envelope().unwrap()).unwrap();
+        let restored_request = last.advance_prefix(1).unwrap().request.unwrap();
+        assert_eq!(wire, last.request_json(&restored_request));
+        let first_value = first.import_selection(&wire["options"][0]["id"]).unwrap();
+        let last_value = last
+            .import_selection(&wire["options"].as_array().unwrap().last().unwrap()["id"])
+            .unwrap();
+        first.submit(request.id, first_value).unwrap();
+        last.submit(restored_request.id, last_value).unwrap();
+        assert!(
+            first
+                .advance(&ExecutionBudget::default())
+                .unwrap()
+                .request
+                .is_some()
+        );
+        assert!(
+            last.advance(&ExecutionBudget::default())
+                .unwrap()
+                .request
+                .is_some()
+        );
+        let hero = root.symbols.lookup("hero_mrak").unwrap();
+        assert_ne!(
+            first.world.hero(hero).unwrap().hand,
+            last.world.hero(hero).unwrap().hand
+        );
+        assert_eq!(root.semantic_state().unwrap(), before);
+        let second = root.symbols.lookup("disrupt-two").unwrap();
+        assert!(
+            root.world
+                .effects
+                .instances
+                .iter()
+                .any(|effect| effect.id == second)
+        );
+        assert!(
+            first
+                .world
+                .effects
+                .instances
+                .iter()
+                .all(|effect| effect.id != second)
+        );
+    }
+    #[test]
+    fn bounty_counters_are_private_and_export_the_decremented_value() {
+        let root = NativeSession::compile(source("combat-effect-bounty-twice")).unwrap();
+        let before = root.semantic_state().unwrap();
+        let mut paid = root.clone();
+        let mut exhausted = root.clone();
+        exhausted.world.effects.instances[0].remaining_bounty = Some(0);
+        paid.advance(&ExecutionBudget::default()).unwrap();
+        exhausted.advance(&ExecutionBudget::default()).unwrap();
+        let hero = root.symbols.lookup("hero_swift").unwrap();
+        assert_eq!(paid.world.hero(hero).unwrap().gold, 2);
+        assert_eq!(exhausted.world.hero(hero).unwrap().gold, 0);
+        assert_eq!(paid.world.effects.instances[0].remaining_bounty, Some(0));
+        assert_eq!(
+            paid.semantic_state().unwrap()["active_effects"][0]["max_value"],
+            0
+        );
+        assert_eq!(root.semantic_state().unwrap(), before);
+        assert!(Arc::ptr_eq(
+            &paid.world.definitions,
+            &exhausted.world.definitions
+        ));
+    }
+    #[test]
+    fn protection_rechecks_the_live_provider_before_accepting_a_waiting_card() {
+        let mut root =
+            NativeSession::compile(source("combat-effect-protection-card-False")).unwrap();
+        let req = root
+            .advance(&ExecutionBudget::default())
+            .unwrap()
+            .request
+            .unwrap();
+        let selection = root.request_json(&req)["options"][0]["id"].clone();
+        let before = root.semantic_state().unwrap();
+        let mut accepted = root.clone();
+        let mut expired = root.clone();
+        expired.world.effects.instances.remove(0);
+        for session in [&mut accepted, &mut expired] {
+            let value = session.import_selection(&selection).unwrap();
+            session.submit(req.id, value).unwrap();
+            session.advance(&ExecutionBudget::default()).unwrap();
+        }
+        let minion = root
+            .symbols
+            .lookup(
+                before["execution_stack"]
+                    .as_array()
+                    .unwrap()
+                    .last()
+                    .unwrap()["minion_id"]
+                    .as_str()
+                    .unwrap(),
+            )
+            .unwrap();
+        assert!(accepted.world.position(minion).is_some());
+        assert!(expired.world.position(minion).is_none());
+        assert_eq!(root.semantic_state().unwrap(), before);
+    }
+    #[test]
+    fn forced_filtered_shield_selection_keeps_its_original_allowed_hand_snapshot() {
+        let mut session = NativeSession::compile(source("discard-effect-non-basic-last")).unwrap();
+        session.advance_prefix(1).unwrap();
+        let hero = session.symbols.lookup("hero_mrak").unwrap();
+        let index = session.world.hero_index(hero).unwrap();
+        let before = session.world.heroes[index].hand.clone();
+        let extra = session.world.heroes[index]
+            .deck
+            .iter()
+            .copied()
+            .find(|id| {
+                !before.contains(id)
+                    && session.world.card(*id).unwrap().lifecycle
+                        == crate::world::CardLifecycle::Deck
+                    && !session.world.definitions.cards[session.world.card(*id).unwrap().definition]
+                        .basic
+            })
+            .unwrap();
+        let printed = session.world.definitions.cards
+            [session.world.card(extra).unwrap().definition]
+            .printed_id;
+        session.world.heroes[index].hand.push(extra);
+        let req = session.advance_prefix(1).unwrap().request.unwrap();
+        let wire = session.request_json(&req);
+        assert!(
+            wire["options"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|o| o["id"] != session.symbols.name(printed))
+        );
+        let mut restored = NativeSession::compile(session.export_envelope().unwrap()).unwrap();
+        let restored_req = restored.advance_prefix(1).unwrap().request.unwrap();
+        assert_eq!(wire, restored.request_json(&restored_req));
+    }
+    #[test]
+    fn blast_discard_dynamic_effect_closure_remains_explicit() {
+        let mut active = source("mine-trigger-dud-effects");
+        let step = active.state["execution_stack"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|s| s["type"] == "trigger_mine")
+            .unwrap();
+        step["mine_ids"] = json!(["mine_b"]);
+        assert!(NativeSession::compile(active).is_ok());
+        let mut after_create = source("mine-trigger-blast");
+        let created = source("effect-step-plain");
+        let create = created.state["execution_stack"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|s| s["type"] == "create_effect")
+            .unwrap()
+            .clone();
+        after_create.state["execution_stack"]
+            .as_array_mut()
+            .unwrap()
+            .push(create);
+        assert!(
+            matches!(NativeSession::compile(after_create),Err(EngineError::Unsupported(message)) if message.contains("blast mine dynamically-created effect"))
+        );
+    }
+    #[test]
+    fn effect_movement_sequences_restore_every_instruction() {
+        for variant in [
+            "base-plain",
+            "base-blocked",
+            "base-bound-piece",
+            "base-topology-split",
+            "base-actor-immunity",
+            "barrier",
+            "barrier-outside",
+            "empty",
+            "map-gap",
+            "restriction-cap-negative",
+            "restriction-actions-only",
+            "aura-active",
+            "aura-inactive",
+            "aura-no-grant",
+            "aura-outside",
+            "aura-immune",
+            "aura-bound-piece",
+        ] {
+            for mode in ["normal", "straight", "full"] {
+                let name = format!("movement-sequence-{variant}-{mode}");
+                let root = NativeSession::compile(source(&name)).unwrap();
+                assert_eq!(
+                    run_instruction_restores(root.clone(), true),
+                    run_instruction_restores(root, false),
+                    "{name}"
+                );
+            }
+        }
+    }
+    #[test]
+    fn controlled_prompts_restore_original_actor_metadata_and_request_identity() {
+        for variant in [
+            "active",
+            "inactive-cardless",
+            "expired-active",
+            "future-active",
+            "wrong-card",
+            "wrong-origin",
+            "no-owner",
+            "other-owner",
+            "other-actor",
+            "different-performed-card",
+            "first-controller",
+            "source-offboard",
+            "unknown-controller",
+            "self-controller",
+            "no-current-card",
+            "bound-owner",
+        ] {
+            for kind in ["number", "discard-number", "hex", "confirm"] {
+                let name = format!("controlled-{variant}-{kind}");
+                let root = NativeSession::compile(source(&name)).unwrap();
+                assert_eq!(
+                    run_instruction_restores(root.clone(), true),
+                    run_instruction_restores(root, false),
+                    "{name}"
+                );
+            }
+        }
+    }
+    #[test]
+    fn movement_zone_permission_is_frozen_at_expansion_and_survives_restore() {
+        let mut root =
+            NativeSession::compile(source("movement-sequence-aura-active-normal")).unwrap();
+        let actor = root.symbols.lookup("hero_brogan").unwrap();
+        let origin = root.symbols.lookup("hero_arien").unwrap();
+        assert!(root.world.movement_zone_passes(actor).unwrap());
+        root.advance_prefix(1).unwrap();
+        root.world
+            .move_entity(origin, crate::geometry::Hex::new(-3, 0, 3).unwrap())
+            .unwrap();
+        assert!(!root.world.movement_zone_passes(actor).unwrap());
+        let envelope = root.export_envelope().unwrap();
+        let frames = envelope.state["execution_stack"].as_array().unwrap();
+        let movement = frames.iter().find(|s| s["type"] == "move_unit").unwrap();
+        assert_eq!(movement["pass_through_obstacles"], true);
+        assert_eq!(movement["range_val"], 3);
+        let restored = NativeSession::compile(envelope).unwrap();
+        assert_eq!(
+            run_instruction_restores(root, false),
+            run_instruction_restores(restored, true)
+        );
+    }
+    #[test]
+    fn controlled_decision_workers_keep_controller_and_actor_separate() {
+        let root = NativeSession::compile(source("controlled-active-discard-number")).unwrap();
+        let before = root.semantic_state().unwrap();
+        let mut controlled = root.clone();
+        let mut own = root.clone();
+        own.planning.owner = own.symbols.lookup("hero_brogan");
+        let request = controlled
+            .advance(&ExecutionBudget::default())
+            .unwrap()
+            .request
+            .unwrap();
+        let original = own
+            .advance(&ExecutionBudget::default())
+            .unwrap()
+            .request
+            .unwrap();
+        assert_eq!(controlled.symbols.name(request.owner), "hero_hanu");
+        assert_eq!(own.symbols.name(original.owner), "hero_arien");
+        let wire = controlled.request_json(&request);
+        assert_eq!(wire["context"]["controlled_hero_id"], "hero_arien");
+        assert_eq!(wire["decision_context"]["actor_id"], "hero_arien");
+        assert_eq!(wire["options"], own.request_json(&original)["options"]);
+        assert_eq!(root.semantic_state().unwrap(), before);
+        assert!(Arc::ptr_eq(
+            &controlled.world.definitions,
+            &own.world.definitions
+        ));
+        let mut restored = NativeSession::compile(controlled.export_envelope().unwrap()).unwrap();
+        let again = restored
+            .advance(&ExecutionBudget::default())
+            .unwrap()
+            .request
+            .unwrap();
+        assert_eq!(restored.request_json(&again), wire);
+    }
+    #[test]
+    fn unported_effect_fast_travel_filter_rejects_before_any_resolution() {
+        let mut envelope = source("movement-sequence-base-plain-normal");
+        let filter =
+            crate::templates::instructions().unwrap()["templates"]["travel_filter"].clone();
+        envelope.state["execution_stack"] = json!([
+            {"type":"select_step","target_type":"HEX","prompt":"Unported travel","output_key":"choice","filters":[filter],"step_id":"fixture/unsafe-effect-travel"},
+            {"type":"set_context_flag","key":"before","value":true,"step_id":"fixture/unsafe-before"}
+        ]);
+        assert!(
+            matches!(NativeSession::compile(envelope),Err(EngineError::Unsupported(message)) if message.contains("Fast Travel action/topology effect closure"))
+        );
+    }
+    #[test]
+    fn effect_aware_movement_restores_at_every_instruction() {
+        for name in [
+            "base-plain",
+            "base-blocked",
+            "base-offboard",
+            "base-actor-immunity",
+            "base-type-topology_split",
+            "base-type-topology_isolation",
+            "barrier",
+            "barrier-outside",
+            "barrier-piece-origin",
+            "barrier-inactive",
+            "empty",
+            "empty-scope-ignored",
+            "restriction-cap-negative",
+            "restriction-cap-none",
+            "restriction-actions-only",
+            "petrify",
+            "map-gap",
+        ] {
+            for mode in ["mandatory", "optional", "action", "straight"] {
+                let name = format!("terrain-move-{name}-{mode}");
+                let root = NativeSession::compile(source(&name)).unwrap();
+                assert_eq!(
+                    run_instruction_restores(root.clone(), true),
+                    run_instruction_restores(root, false),
+                    "{name}"
+                );
+            }
+        }
+    }
+    #[test]
+    fn active_repeat_validation_restores_at_every_instruction() {
+        for variant in [
+            "blocked",
+            "plain",
+            "offboard",
+            "bound-piece",
+            "source-token",
+            "actor-immunity",
+            "attack-shield",
+            "duration-NEXT_TURN-current",
+            "prerequisite-order",
+            "bound-owner",
+            "one-piece-free",
+            "both-pieces-blocked",
+            "no-pieces",
+            "cap-negative",
+            "scope-zone-all_units",
+        ] {
+            let name = format!("action-rule-repeat-{variant}");
+            let root = NativeSession::compile(source(&name)).unwrap();
+            assert_eq!(
+                run_instruction_restores(root.clone(), true),
+                run_instruction_restores(root, false),
+                "{name}"
+            );
+        }
+    }
+    #[test]
     fn repeat_workers_keep_counts_and_nested_copies_private() {
         let mut root = NativeSession::compile(source("repeat-nested")).unwrap();
         let request = root
@@ -6317,7 +9118,7 @@ mod tests {
         assert_eq!(root.semantic_state().unwrap(), before);
     }
     #[test]
-    fn repeat_validation_guards_unported_effects_and_aggregate_aliases() {
+    fn repeat_validation_guards_aggregate_aliases() {
         let root = NativeSession::compile(source("repeat-validation-true")).unwrap();
         let before = root.semantic_state().unwrap();
         let mut worker = root.clone();
@@ -6334,8 +9135,7 @@ mod tests {
             worker
                 .world
                 .can_repeat_action(worker.planning.actor)
-                .unwrap_err()
-                .contains("repeat-prevention")
+                .unwrap()
         );
     }
 
@@ -6598,12 +9398,81 @@ mod tests {
     }
 
     #[test]
+    fn effect_aware_cleanup_upgrades_and_reset_restore_every_instruction() {
+        let base =
+            std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures"));
+        let index: Value =
+            serde_json::from_reader(std::fs::File::open(base.join("stack-traces.json")).unwrap())
+                .unwrap();
+        let names = index["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|entry| entry["name"].as_str())
+            .filter(|name| name.starts_with("round-effect-"))
+            .collect::<Vec<_>>();
+        assert!(
+            names.len() >= 216,
+            "retain durations, links, tokens, upgrades and maps"
+        );
+        for name in names {
+            let root = NativeSession::compile(source(name)).unwrap();
+            assert_eq!(
+                run_round_instruction_restores(root.clone(), true),
+                run_round_instruction_restores(root, false),
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
+    fn round_boundary_planning_commands_require_complete_effect_and_continuation_closures() {
+        for (name, persistent) in [
+            ("round-effect-regression-round-cleanup-ordinary", true),
+            ("round-effect-cleanup-THIS_ROUND-True-None", false),
+        ] {
+            let mut root = NativeSession::compile(source(name)).unwrap();
+            root.advance(&ExecutionBudget::default()).unwrap();
+            assert_eq!(root.planning.phase, Phase::Planning);
+            assert_eq!(root.world.has_effects, persistent);
+            let before = root.semantic_state().unwrap();
+            let hero = root.world.heroes[0].id;
+            let card = root.world.heroes[0].hand[0];
+            for command in 0..4 {
+                let result = match command {
+                    0 => root.commit_card(hero, card),
+                    1 => root.uncommit_card(hero),
+                    2 => root.pass_planning(hero),
+                    _ => root.finish_planning(hero),
+                };
+                assert!(matches!(result, Err(EngineError::Unsupported(_))));
+                assert_eq!(root.semantic_state().unwrap(), before);
+            }
+            let mut restored = NativeSession::compile(root.export_envelope().unwrap()).unwrap();
+            assert_eq!(restored.semantic_state().unwrap(), before);
+            let hero = restored.world.heroes[0].id;
+            let card = restored.world.heroes[0].hand[0];
+            if persistent {
+                assert!(matches!(
+                    restored.commit_card(hero, card),
+                    Err(EngineError::Unsupported(_))
+                ));
+                assert_eq!(restored.semantic_state().unwrap(), before);
+            } else {
+                // A fresh boundary with no effects compiles full ordinary flow.
+                restored.commit_card(hero, card).unwrap();
+            }
+        }
+    }
+
+    #[test]
     fn ordinary_round_cleanup_advances_into_planning() {
         let mut root = NativeSession::compile(source("turn-advance-round-end")).unwrap();
         let result = root.advance(&ExecutionBudget::default()).unwrap();
         assert!(result.request.is_none());
         let state = root.semantic_state().unwrap();
         assert_eq!(state["round"], 2);
+        assert_eq!(root.world.combat.round, 2);
         assert_eq!(state["turn"], 1);
         assert_eq!(state["phase"], "PLANNING");
     }
@@ -6631,40 +9500,61 @@ mod tests {
         ])
     }
 
-    #[test]
-    fn round_cleanup_upgrades_and_ultimate_unlocks_restore_at_every_instruction() {
-        fn run(mut session: NativeSession, restore: bool) -> (Value, Vec<Value>) {
-            let mut events = Vec::new();
-            for _ in 0..100 {
-                let result = session.advance_prefix(1).unwrap();
-                events.extend(result.events.iter().map(|e| session.event_json(e)));
-                let answer = result
-                    .request
-                    .as_ref()
-                    .map(|r| upgrade_answer(&session, r, 0).to_json(&session.symbols));
+    fn run_round_instruction_restores(
+        mut session: NativeSession,
+        restore: bool,
+    ) -> (Value, Vec<Value>) {
+        let mut events = Vec::new();
+        for _ in 0..100 {
+            let result = session.advance_prefix(1).unwrap();
+            events.extend(result.events.iter().map(|e| session.event_json(e)));
+            let answer = result.request.as_ref().and_then(|r| {
+                let RequestChoices::Upgrades(players) = &r.choices else {
+                    panic!("upgrade prompt expected");
+                };
+                players
+                    .iter()
+                    .any(|p| p.remaining > 0 && !p.options.is_empty())
+                    .then(|| upgrade_answer(&session, r, 0).to_json(&session.symbols))
+            });
+            let paused = result.request.is_some() && answer.is_none();
+            if restore {
+                session = NativeSession::compile(session.export_envelope().unwrap()).unwrap();
+            }
+            if paused {
+                let request = if restore {
+                    session.advance_prefix(1).unwrap().request.unwrap()
+                } else {
+                    result.request.unwrap()
+                };
+                return (
+                    json!({"state": session.semantic_state().unwrap(),
+                    "request": session.request_json(&request)}),
+                    events,
+                );
+            }
+            if let Some(value) = answer {
+                let request = if restore {
+                    session.advance_prefix(1).unwrap().request.unwrap()
+                } else {
+                    result.request.unwrap()
+                };
+                // Symbol IDs are private to each compiled session.
+                let value = session.import_selection(&value).unwrap();
+                session.submit(request.id, value).unwrap();
                 if restore {
                     session = NativeSession::compile(session.export_envelope().unwrap()).unwrap();
                 }
-                if let Some(value) = answer {
-                    let request = if restore {
-                        session.advance_prefix(1).unwrap().request.unwrap()
-                    } else {
-                        result.request.unwrap()
-                    };
-                    // Symbol IDs are private to each compiled session.
-                    let value = session.import_selection(&value).unwrap();
-                    session.submit(request.id, value).unwrap();
-                    if restore {
-                        session =
-                            NativeSession::compile(session.export_envelope().unwrap()).unwrap();
-                    }
-                }
-                if session.stack.is_empty() {
-                    return (session.semantic_state().unwrap(), events);
-                }
             }
-            panic!("round did not finish");
+            if session.stack.is_empty() {
+                return (session.semantic_state().unwrap(), events);
+            }
         }
+        panic!("round did not finish");
+    }
+
+    #[test]
+    fn round_cleanup_upgrades_and_ultimate_unlocks_restore_at_every_instruction() {
         for name in [
             "round-cleanup-played-discard-current",
             "round-cleanup-markers",
@@ -6675,7 +9565,11 @@ mod tests {
             "round-ultimate-Takahide-unlock-six",
         ] {
             let root = NativeSession::compile(source(name)).unwrap();
-            assert_eq!(run(root.clone(), true), run(root, false), "{name}");
+            assert_eq!(
+                run_round_instruction_restores(root.clone(), true),
+                run_round_instruction_restores(root, false),
+                "{name}"
+            );
         }
     }
 
@@ -6732,36 +9626,41 @@ mod tests {
 
     #[test]
     fn upgrade_workers_share_rules_but_keep_cards_items_and_reveal_state_private() {
-        let mut root = NativeSession::compile(source("round-gold-3-batch-False")).unwrap();
-        let request = root
-            .advance(&ExecutionBudget::default())
-            .unwrap()
-            .request
-            .unwrap();
-        let before = root.semantic_state().unwrap();
-        let mut left = root.clone();
-        let mut right = root.clone();
-        let a = upgrade_answer(&left, &request, 0);
-        let b = upgrade_answer(&right, &request, 1);
-        left.submit(request.id, a).unwrap();
-        right.submit(request.id, b).unwrap();
-        left.advance(&ExecutionBudget::default()).unwrap();
-        right.advance(&ExecutionBudget::default()).unwrap();
-        assert_ne!(left.world.heroes[0].hand, right.world.heroes[0].hand);
-        assert_ne!(left.world.heroes[0].items, right.world.heroes[0].items);
-        assert_eq!(root.semantic_state().unwrap(), before);
-        assert!(Arc::ptr_eq(
-            left.round_rules.as_ref().unwrap(),
-            right.round_rules.as_ref().unwrap()
-        ));
-        assert!(Arc::ptr_eq(
-            left.flow_program.as_ref().unwrap(),
-            right.flow_program.as_ref().unwrap()
-        ));
-        assert!(Arc::ptr_eq(
-            &left.world.definitions,
-            &right.world.definitions
-        ));
+        for name in [
+            "round-gold-3-batch-False",
+            "round-effect-regression-round-gold-3-batch-False",
+        ] {
+            let mut root = NativeSession::compile(source(name)).unwrap();
+            let request = root
+                .advance(&ExecutionBudget::default())
+                .unwrap()
+                .request
+                .unwrap();
+            let before = root.semantic_state().unwrap();
+            let mut left = root.clone();
+            let mut right = root.clone();
+            let a = upgrade_answer(&left, &request, 0);
+            let b = upgrade_answer(&right, &request, 1);
+            left.submit(request.id, a).unwrap();
+            right.submit(request.id, b).unwrap();
+            left.advance(&ExecutionBudget::default()).unwrap();
+            right.advance(&ExecutionBudget::default()).unwrap();
+            assert_ne!(left.world.heroes[0].hand, right.world.heroes[0].hand);
+            assert_ne!(left.world.heroes[0].items, right.world.heroes[0].items);
+            assert_eq!(root.semantic_state().unwrap(), before);
+            assert!(Arc::ptr_eq(
+                left.round_rules.as_ref().unwrap(),
+                right.round_rules.as_ref().unwrap()
+            ));
+            assert!(Arc::ptr_eq(
+                left.flow_program.as_ref().unwrap(),
+                right.flow_program.as_ref().unwrap()
+            ));
+            assert!(Arc::ptr_eq(
+                &left.world.definitions,
+                &right.world.definitions
+            ));
+        }
     }
 
     #[test]
@@ -6919,6 +9818,66 @@ mod tests {
     }
 
     #[test]
+    fn effect_aware_battles_restore_every_instruction() {
+        let base =
+            std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures"));
+        let index: Value =
+            serde_json::from_reader(std::fs::File::open(base.join("stack-traces.json")).unwrap())
+                .unwrap();
+        let names = index["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|entry| entry["name"].as_str())
+            .filter(|name| name.starts_with("battle-effect-"))
+            .collect::<Vec<_>>();
+        assert!(
+            names.len() >= 322,
+            "retain exclusion, push and displacement cases"
+        );
+        for name in names {
+            let root = NativeSession::compile(source(name)).unwrap();
+            assert_eq!(
+                run_instruction_restores(root.clone(), true),
+                run_instruction_restores(root, false),
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
+    fn effect_aware_battle_casualty_choices_are_private_to_workers() {
+        let mut root = NativeSession::compile(source("battle-effect-exclusion-ordinary")).unwrap();
+        let request = root
+            .advance(&ExecutionBudget::default())
+            .unwrap()
+            .request
+            .unwrap();
+        let RequestChoices::Units { ref values, .. } = request.choices else {
+            panic!("casualty choice expected");
+        };
+        assert!(values.len() > 1);
+        let before = root.semantic_state().unwrap();
+        let mut a = root.clone();
+        let mut b = root.clone();
+        a.submit(request.id, Datum::Text(values[0].0)).unwrap();
+        b.submit(request.id, Datum::Text(values.last().unwrap().0))
+            .unwrap();
+        a.advance(&ExecutionBudget::default()).unwrap();
+        b.advance(&ExecutionBudget::default()).unwrap();
+        assert_ne!(
+            a.semantic_state().unwrap()["entity_locations"],
+            b.semantic_state().unwrap()["entity_locations"]
+        );
+        assert_eq!(root.semantic_state().unwrap(), before);
+        assert!(Arc::ptr_eq(
+            a.battle_rules.as_ref().unwrap(),
+            b.battle_rules.as_ref().unwrap()
+        ));
+        assert!(Arc::ptr_eq(&a.world.definitions, &b.world.definitions));
+    }
+
+    #[test]
     fn minion_return_restores_every_generated_boundary() {
         for name in [
             "return-prefix",
@@ -6979,34 +9938,64 @@ mod tests {
     }
 
     #[test]
-    fn minion_return_choices_are_private_to_workers() {
-        let mut root = NativeSession::compile(source("return-choice")).unwrap();
-        let req = root
-            .advance(&ExecutionBudget::default())
+    fn effect_aware_minion_returns_restore_every_instruction() {
+        let base =
+            std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures"));
+        let index: Value =
+            serde_json::from_reader(std::fs::File::open(base.join("stack-traces.json")).unwrap())
+                .unwrap();
+        let names = index["cases"]
+            .as_array()
             .unwrap()
-            .request
-            .unwrap();
-        let RequestChoices::Hexes(ref hexes) = req.choices else {
-            panic!("return destination");
-        };
-        assert!(hexes.len() > 1);
-        let before = root.semantic_state().unwrap();
-        let mut a = root.clone();
-        let mut b = root.clone();
-        a.submit(req.id, native_hex(hexes[0], a.coordinates))
-            .unwrap();
-        b.submit(req.id, native_hex(*hexes.last().unwrap(), b.coordinates))
-            .unwrap();
-        a.advance(&ExecutionBudget::default()).unwrap();
-        b.advance(&ExecutionBudget::default()).unwrap();
-        assert_ne!(
-            a.semantic_state().unwrap()["entity_locations"],
-            b.semantic_state().unwrap()["entity_locations"]
+            .iter()
+            .filter_map(|entry| entry["name"].as_str())
+            .filter(|name| name.starts_with("return-effect-"))
+            .collect::<Vec<_>>();
+        assert!(
+            names.len() >= 234,
+            "effect return corpus must retain terrain and cap coverage"
         );
-        assert_eq!(root.semantic_state().unwrap(), before);
-        assert!(Arc::ptr_eq(&a.steps, &b.steps));
-        assert!(Arc::ptr_eq(&a.return_rules, &b.return_rules));
-        assert!(Arc::ptr_eq(&a.world.definitions, &b.world.definitions));
+        for name in names {
+            let root = NativeSession::compile(source(name)).unwrap();
+            assert_eq!(
+                run_instruction_restores(root.clone(), true),
+                run_instruction_restores(root, false),
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
+    fn minion_return_choices_are_private_to_workers() {
+        for name in ["return-choice", "return-effect-cap-0-hero_arien-False"] {
+            let mut root = NativeSession::compile(source(name)).unwrap();
+            let req = root
+                .advance(&ExecutionBudget::default())
+                .unwrap()
+                .request
+                .unwrap();
+            let RequestChoices::Hexes(ref hexes) = req.choices else {
+                panic!("return destination");
+            };
+            assert!(hexes.len() > 1);
+            let before = root.semantic_state().unwrap();
+            let mut a = root.clone();
+            let mut b = root.clone();
+            a.submit(req.id, native_hex(hexes[0], a.coordinates))
+                .unwrap();
+            b.submit(req.id, native_hex(*hexes.last().unwrap(), b.coordinates))
+                .unwrap();
+            a.advance(&ExecutionBudget::default()).unwrap();
+            b.advance(&ExecutionBudget::default()).unwrap();
+            assert_ne!(
+                a.semantic_state().unwrap()["entity_locations"],
+                b.semantic_state().unwrap()["entity_locations"]
+            );
+            assert_eq!(root.semantic_state().unwrap(), before);
+            assert!(Arc::ptr_eq(&a.steps, &b.steps));
+            assert!(Arc::ptr_eq(&a.return_rules, &b.return_rules));
+            assert!(Arc::ptr_eq(&a.world.definitions, &b.world.definitions));
+        }
     }
 
     #[test]
@@ -7571,17 +10560,6 @@ mod tests {
         }
     }
     #[test]
-    fn unported_combat_effect_closure_rejects_before_rewards_or_removal() {
-        let mut envelope = source("combat-hit");
-        // NativeWorld only inspects the non-empty effect collection here; full
-        // effect compilation is deliberately unavailable, so no transition runs.
-        envelope.state["active_effects"] = json!([{"effect_type":"MINION_PROTECTION"}]);
-        assert!(matches!(
-            NativeSession::compile(envelope),
-            Err(EngineError::Unsupported(_))
-        ));
-    }
-    #[test]
     fn restored_identifier_counters_fail_explicitly_instead_of_overflowing() {
         let mut envelope = source("travel-sequence");
         envelope.state["execution_stack"][0]["step_id"] =
@@ -8106,5 +11084,170 @@ mod tests {
         let state = session.semantic_state().unwrap();
         assert_eq!(state["execution_context"]["enabled"], true);
         assert!(state["execution_context"].get("count").is_none());
+    }
+    #[test]
+    fn token_linked_effect_removal_restores_at_instruction_boundaries() {
+        for name in [
+            "token-effect-prefix",
+            "token-effect-create-remove",
+            "token-effect-duplicate-id",
+            "token-effect-offboard",
+            "token-effect-card-flags",
+            "token-effect-barrier-only",
+        ] {
+            let root = NativeSession::compile(source(name)).unwrap();
+            assert_eq!(
+                run_instruction_restores(root.clone(), true),
+                run_instruction_restores(root, false),
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
+    fn token_removal_keeps_other_workers_and_unlinked_same_id_effects() {
+        let root = NativeSession::compile(source("token-effect-duplicate-id")).unwrap();
+        let before = root.semantic_state().unwrap();
+        let mut placed = root.clone();
+        let mut offboard = root.clone();
+        let token = root.symbols.lookup("effect_token").unwrap();
+        offboard.world.remove_entity(token).unwrap();
+        let before_offboard = offboard.world.effects.instances.len();
+        let a = placed.advance(&ExecutionBudget::default()).unwrap();
+        let b = offboard.advance(&ExecutionBudget::default()).unwrap();
+        assert_eq!(placed.world.effects.instances.len(), before_offboard - 1);
+        assert_eq!(offboard.world.effects.instances.len(), before_offboard);
+        assert!(b.events.is_empty());
+        assert!(a.events.iter().any(|event| matches!(
+            event,
+            NativeEvent::TokenRemoved {
+                effects_removed: 1,
+                ..
+            }
+        )));
+        assert_eq!(root.semantic_state().unwrap(), before);
+        assert!(Arc::ptr_eq(&root.steps, &placed.steps));
+        assert!(Arc::ptr_eq(
+            &root.world.definitions,
+            &placed.world.definitions
+        ));
+    }
+    #[test]
+    fn effect_topology_adjacency_restores_at_every_instruction() {
+        for name in [
+            "effect-adjacency-isolation-in",
+            "effect-adjacency-isolation-out",
+            "effect-adjacency-shield",
+            "effect-adjacency-shield-except",
+            "effect-adjacency-prefix",
+        ] {
+            let root = NativeSession::compile(source(name)).unwrap();
+            assert_eq!(
+                run_instruction_restores(root.clone(), true),
+                run_instruction_restores(root, false),
+                "{name}"
+            );
+        }
+    }
+    #[test]
+    fn recursive_reference_immunity_topology_is_explicitly_unsupported() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/fixtures/effect-errors.json");
+        let fixture: Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+        for case in fixture["cases"].as_array().unwrap() {
+            assert_eq!(case["reference_error"], "RecursionError");
+            let root =
+                NativeSession::compile(serde_json::from_value(case["envelope"].clone()).unwrap())
+                    .unwrap();
+            let before = root.semantic_state().unwrap();
+            let mut worker = root.clone();
+            assert!(
+                matches!(worker.advance(&ExecutionBudget::default()),Err(EngineError::Unsupported(message)) if message.contains("recursive topology/immunity"))
+            );
+            assert_eq!(root.semantic_state().unwrap(), before);
+        }
+    }
+    #[test]
+    fn created_effect_stats_use_live_typed_payload_after_restore() {
+        let mut source = source("effect-step-type-area_stat_modifier");
+        let step = &mut source.state["execution_stack"][0];
+        step["stat_type"] = json!("ATTACK");
+        step["stat_value"] = json!(3);
+        step["scope"]["shape"] = json!("global");
+        let mut root = NativeSession::compile(source).unwrap();
+        let actor = root.symbols.lookup("hero_arien").unwrap();
+        let before = root.world.computed_stat(actor, Stat::Attack, 4).unwrap();
+        root.advance(&ExecutionBudget::default()).unwrap();
+        assert_eq!(
+            root.world.computed_stat(actor, Stat::Attack, 4).unwrap(),
+            before + 3
+        );
+        let restored = NativeSession::compile(root.export_envelope().unwrap()).unwrap();
+        assert_eq!(
+            restored
+                .world
+                .computed_stat(actor, Stat::Attack, 4)
+                .unwrap(),
+            before + 3
+        );
+    }
+    #[test]
+    fn effect_placement_and_swap_restore_at_every_instruction() {
+        for name in [
+            "displacement-place-blocked",
+            "displacement-swap-swap-second",
+            "displacement-place-mandatory",
+            "displacement-place-live-origin",
+            "displacement-swap-live-piece-origin",
+            "displacement-place-target-token-empty-actor",
+            "displacement-place-target-owner",
+            "displacement-swap-same-swap",
+        ] {
+            let root = NativeSession::compile(source(name)).unwrap();
+            assert_eq!(
+                run_instruction_restores(root.clone(), true),
+                run_instruction_restores(root, false),
+                "{name}"
+            );
+        }
+    }
+    #[test]
+    fn placement_workers_use_private_live_effect_origins() {
+        let root = NativeSession::compile(source("displacement-place-blocked")).unwrap();
+        let before = root.semantic_state().unwrap();
+        let mut a = root.clone();
+        let mut b = root.clone();
+        let origin = root.symbols.lookup("hero_arien").unwrap();
+        let target = root.symbols.lookup("hero_brogan").unwrap();
+        b.world
+            .move_entity(origin, Hex::new(-3, 0, 3).unwrap())
+            .unwrap();
+        let blocked = a.advance(&ExecutionBudget::default()).unwrap();
+        let allowed = b.advance(&ExecutionBudget::default()).unwrap();
+        assert!(blocked.events.is_empty());
+        assert!(
+            allowed
+                .events
+                .iter()
+                .any(|e| matches!(e,NativeEvent::UnitPlaced{unit,..} if *unit==target))
+        );
+        assert_ne!(a.world.position(target), b.world.position(target));
+        assert_eq!(root.semantic_state().unwrap(), before);
+        assert!(Arc::ptr_eq(&a.steps, &b.steps));
+    }
+    #[test]
+    fn blocked_swap_checks_both_units_before_mutating_occupancy() {
+        let mut session = NativeSession::compile(source("displacement-swap-swap-second")).unwrap();
+        let a = session.symbols.lookup("hero_brogan").unwrap();
+        let b = session.symbols.lookup("hero_hanu").unwrap();
+        let before = (session.world.position(a), session.world.position(b));
+        let result = session.advance(&ExecutionBudget::default()).unwrap();
+        assert!(result.events.is_empty());
+        assert_eq!(
+            (session.world.position(a), session.world.position(b)),
+            before
+        );
+        assert_eq!(session.world.occupant(before.0.unwrap()), Some(a));
+        assert_eq!(session.world.occupant(before.1.unwrap()), Some(b));
     }
 }

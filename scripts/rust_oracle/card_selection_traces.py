@@ -5,7 +5,7 @@ from __future__ import annotations
 from state_codec import export_state
 
 
-def cases(advance, answer):
+def cases(advance, answer, active_projectiles=False):
     from model_traces import setup
     from stack_traces import reference_trace
 
@@ -40,6 +40,20 @@ def cases(advance, answer):
         return state, hero
 
     def add(name, state, steps, ops):
+        if active_projectiles and name.startswith("projectile-"):
+            from combat_effect_traces import effect
+
+            from goa2.domain.models.effect import EffectType
+
+            state.active_effects.append(
+                effect(
+                    state,
+                    "projectile-context",
+                    EffectType.MOVEMENT_ZONE,
+                    source=str(state.current_actor_id),
+                    max_value=8,
+                )
+            )
         for i, step in enumerate(steps):
             step.step_id = f"fixture/card-select/{name}/{i}"
         push_steps(state, steps)

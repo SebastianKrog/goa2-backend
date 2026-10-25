@@ -1,4 +1,173 @@
 {
+  "pre_action_movement": [
+    {
+      "type": "select_step",
+      "step_id": "template",
+      "pending_input": null,
+      "pending_request_id": null,
+      "is_mandatory": false,
+      "active_if_key": null,
+      "skip_if_key": null,
+      "target_type": "HEX",
+      "prompt": "Pre-action movement (up to 1 space)",
+      "output_key": "pre_action_move_hex",
+      "decision_purpose": null,
+      "filters": [
+        {
+          "type": "occupied_filter",
+          "is_obstacle": false,
+          "exclude_id": "template",
+          "exclude_id_key": null
+        },
+        {
+          "type": "movement_path_filter",
+          "range_val": 1,
+          "unit_id": "template",
+          "unit_key": null,
+          "pass_through_obstacles": false
+        }
+      ],
+      "auto_select_if_one": false,
+      "context_hero_id": null,
+      "context_hero_id_key": null,
+      "card_container": "HAND",
+      "card_containers": null,
+      "restrict_played_to_shields": false,
+      "include_facedown": false,
+      "number_options": [],
+      "number_labels": {},
+      "skip_immunity_filter": false,
+      "skip_self_filter": false,
+      "override_player_id": null,
+      "override_player_id_key": null,
+      "card_action_types": null,
+      "card_colors": null,
+      "card_color_key": null,
+      "card_tier_key": null,
+      "card_is_basic": null,
+      "card_is_active": null,
+      "card_has_item": null,
+      "allowed_card_ids": null,
+      "exclude_card_id_keys": null,
+      "card_states": null,
+      "exclude_card_states": null,
+      "selected_card_color_key": null,
+      "selected_card_tier_key": null
+    },
+    {
+      "type": "move_unit",
+      "step_id": "template",
+      "pending_input": null,
+      "pending_request_id": null,
+      "is_mandatory": false,
+      "active_if_key": null,
+      "skip_if_key": null,
+      "unit_id": "template",
+      "unit_key": null,
+      "destination_key": "pre_action_move_hex",
+      "target_hex_arg": null,
+      "range_val": 1,
+      "is_movement_action": false,
+      "pass_through_obstacles": false,
+      "force_straight_line": false,
+      "crossed_obstacles_output_key": null,
+      "success_output_key": null,
+      "mine_path_prechosen": false
+    }
+  ],
+  "passive_bodies": {
+    "wild_hunt": [
+      {
+        "type": "select_step",
+        "step_id": "template",
+        "pending_input": null,
+        "pending_request_id": null,
+        "is_mandatory": false,
+        "active_if_key": null,
+        "skip_if_key": null,
+        "target_type": "HEX",
+        "prompt": "Wild Hunt: Select a straight-line destination",
+        "output_key": "wild_hunt_dest",
+        "decision_purpose": null,
+        "filters": [
+          {
+            "type": "range_filter",
+            "max_range": 2,
+            "min_range": 2,
+            "origin_id": "template-passive-owner",
+            "origin_key": null,
+            "origin_hex_key": null,
+            "max_range_key": null,
+            "min_range_key": null,
+            "distance_mode": "topology"
+          },
+          {
+            "type": "in_straight_line_filter",
+            "origin_id": "template-passive-owner",
+            "origin_key": null
+          },
+          {
+            "type": "straight_line_path_filter",
+            "origin_id": "template-passive-owner",
+            "origin_key": null,
+            "pass_through_obstacles": false
+          },
+          {
+            "type": "occupied_filter",
+            "is_obstacle": false,
+            "exclude_id": null,
+            "exclude_id_key": null
+          }
+        ],
+        "auto_select_if_one": false,
+        "context_hero_id": null,
+        "context_hero_id_key": null,
+        "card_container": "HAND",
+        "card_containers": null,
+        "restrict_played_to_shields": false,
+        "include_facedown": false,
+        "number_options": [],
+        "number_labels": {},
+        "skip_immunity_filter": false,
+        "skip_self_filter": false,
+        "override_player_id": null,
+        "override_player_id_key": null,
+        "card_action_types": null,
+        "card_colors": null,
+        "card_color_key": null,
+        "card_tier_key": null,
+        "card_is_basic": null,
+        "card_is_active": null,
+        "card_has_item": null,
+        "allowed_card_ids": null,
+        "exclude_card_id_keys": null,
+        "card_states": null,
+        "exclude_card_states": null,
+        "selected_card_color_key": null,
+        "selected_card_tier_key": null
+      },
+      {
+        "type": "move_unit",
+        "step_id": "template",
+        "pending_input": null,
+        "pending_request_id": null,
+        "is_mandatory": true,
+        "active_if_key": "wild_hunt_dest",
+        "skip_if_key": null,
+        "unit_id": "template-passive-owner",
+        "unit_key": null,
+        "destination_key": "wild_hunt_dest",
+        "target_hex_arg": null,
+        "range_val": 2,
+        "is_movement_action": false,
+        "pass_through_obstacles": false,
+        "force_straight_line": true,
+        "crossed_obstacles_output_key": null,
+        "success_output_key": null,
+        "mine_path_prechosen": false
+      }
+    ]
+  },
   "schema_version": 1,
   "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
   "two_card_effects": [
@@ -41,6 +210,9 @@
     "big_sodding_gun",
     "metamorphosis",
     "unlimited_firepower",
+    "witching_hour"
+  ],
+  "action_prevention_effects": [
     "witching_hour"
   ],
   "registered_effects": [
@@ -1504,6 +1676,15 @@
       "actor_id": null,
       "save_key": "saved_actor_id"
     },
+    "finished_expiring_effect": {
+      "type": "finished_expiring_effect",
+      "step_id": "template",
+      "pending_input": null,
+      "pending_request_id": null,
+      "is_mandatory": true,
+      "active_if_key": null,
+      "skip_if_key": null
+    },
     "discard_card": {
       "type": "discard_card",
       "step_id": "template",
@@ -1567,6 +1748,18 @@
       "victim_key": null,
       "killer_id": null,
       "assist_multiplier": 1
+    },
+    "minion_protection": {
+      "type": "check_minion_protection",
+      "step_id": "template",
+      "pending_input": null,
+      "pending_request_id": null,
+      "is_mandatory": true,
+      "active_if_key": null,
+      "skip_if_key": null,
+      "minion_id": "template",
+      "killer_id": null,
+      "tried_effect_ids": []
     },
     "remove_unit": {
       "type": "remove_unit",
@@ -1674,6 +1867,19 @@
       "hero_key": null,
       "abort_on_defeat": true,
       "processed_effect_ids": []
+    },
+    "pre_force_discard": {
+      "type": "force_discard",
+      "step_id": "template",
+      "pending_input": null,
+      "pending_request_id": null,
+      "is_mandatory": true,
+      "active_if_key": null,
+      "skip_if_key": null,
+      "victim_id": null,
+      "victim_key": "pre_action_discard_victim",
+      "card_is_basic": null,
+      "immunity_source_id": null
     },
     "card_text": {
       "type": "resolve_card_text",
@@ -1877,6 +2083,33 @@
       "crossed_obstacles_output_key": null,
       "success_output_key": null,
       "mine_path_prechosen": false
+    },
+    "mine_path_choice": {
+      "type": "mine_path_choice",
+      "step_id": "template",
+      "pending_input": null,
+      "pending_request_id": null,
+      "is_mandatory": true,
+      "active_if_key": null,
+      "skip_if_key": null,
+      "destination_key": "target_hex",
+      "range_val": 1,
+      "output_key": "triggered_mine_ids",
+      "unit_id": null,
+      "unit_key": null
+    },
+    "trigger_mine": {
+      "type": "trigger_mine",
+      "step_id": "template",
+      "pending_input": null,
+      "pending_request_id": null,
+      "is_mandatory": true,
+      "active_if_key": null,
+      "skip_if_key": null,
+      "mine_ids": null,
+      "victim_id": null,
+      "mine_ids_key": "triggered_mine_ids",
+      "victim_key": "mine_victim_id"
     },
     "place_unit": {
       "type": "place_unit",

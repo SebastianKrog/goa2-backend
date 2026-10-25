@@ -12,6 +12,7 @@ pub enum CardAura {
     Metamorphosis,
     UnlimitedFirepower,
     BigSoddingGun,
+    WitchingHour,
     Uncompiled,
 }
 impl CardAura {
@@ -23,6 +24,7 @@ impl CardAura {
             "metamorphosis" => Self::Metamorphosis,
             "unlimited_firepower" => Self::UnlimitedFirepower,
             "big_sodding_gun" => Self::BigSoddingGun,
+            "witching_hour" => Self::WitchingHour,
             _ => Self::Uncompiled,
         }
     }
@@ -61,27 +63,31 @@ impl NativeWorld {
             && self.entity(unit).is_some_and(|e| e.multi_piece)
             && (stat == Stat::Initiative || self.resolved_actor(unit) == unit);
         let actor = self.resolved_actor(unit);
-        let adjacent_enemies = || {
-            self.locations
-                .iter()
-                .filter(|(target, hex)| {
-                    let Some(team) = self.entity(*target).and_then(|e| e.team) else {
-                        return false;
-                    };
-                    if team == hero.team {
-                        return false;
+        let adjacent_enemies = || -> Result<usize, String> {
+            let mut count = 0;
+            for (target, hex) in &self.locations {
+                let Some(team) = self.entity(*target).and_then(|e| e.team) else {
+                    continue;
+                };
+                if team == hero.team {
+                    continue;
+                }
+                let origins = if aggregate {
+                    self.piece_ids(hero.id).collect::<Vec<_>>()
+                } else {
+                    vec![actor]
+                };
+                for id in origins {
+                    if let Some(from) = self.position(id)
+                        && from.distance(*hex) <= 1
+                        && self.effect_connected(from, *hex, &[id, *target])?
+                    {
+                        count += 1;
+                        break;
                     }
-                    if aggregate {
-                        self.piece_ids(hero.id).any(|p| {
-                            self.position(p)
-                                .is_some_and(|from| from.distance(*hex) <= 1)
-                        })
-                    } else {
-                        self.position(actor)
-                            .is_some_and(|from| from.distance(*hex) <= 1)
-                    }
-                })
-                .count()
+                }
+            }
+            Ok(count)
         };
         let mut total = 0i64;
         for id in self.active_aura_cards(hero) {
@@ -89,7 +95,7 @@ impl NativeWorld {
             let value = match aura {
                 CardAura::UnlimitedFirepower if matches!(stat, Stat::Range | Stat::Radius) => 1,
                 CardAura::Metamorphosis if matches!(stat, Stat::Movement | Stat::Initiative) => {
-                    i64::try_from(adjacent_enemies()).map_err(|_| "aura count exceeds i64")?
+                    i64::try_from(adjacent_enemies()?).map_err(|_| "aura count exceeds i64")?
                 }
                 CardAura::BigSoddingGun if matches!(stat, Stat::Attack | Stat::Range) => {
                     if let Some(c) = performing.and_then(|id| self.card(id)) {

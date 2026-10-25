@@ -50,6 +50,7 @@ pub enum HexFilter {
         min_key: Option<Symbol>,
         max_key: Option<Symbol>,
         frame_range: bool,
+        geometric: bool,
     },
     Movement {
         origin: Origin,
@@ -113,39 +114,70 @@ impl HexFilter {
         candidates: &[Hex],
         accepted: &mut [bool],
     ) -> Result<(), String> {
+        self.apply_scan_with_unit(context, candidates, accepted, None)
+    }
+    pub(crate) fn accept_unit(
+        &self,
+        context: &SpatialContext<'_>,
+        unit: Symbol,
+    ) -> Result<bool, String> {
+        let Some(hex) = context.world.position(unit) else {
+            return Ok(false);
+        };
+        let mut accepted = [true];
+        self.apply_scan_with_unit(context, &[hex], &mut accepted, Some(unit))?;
+        Ok(accepted[0])
+    }
+    fn apply_scan_with_unit(
+        &self,
+        context: &SpatialContext<'_>,
+        candidates: &[Hex],
+        accepted: &mut [bool],
+        target_unit: Option<Symbol>,
+    ) -> Result<(), String> {
         match self {
             Self::AdjacentTags(tags) => {
-                let actor = context.actor.and_then(|id| context.world.entity(id));
                 for (hex, value) in candidates.iter().zip(accepted.iter_mut()) {
-                    *value &= actor.is_some_and(|actor| {
-                        hex.neighbors()
-                            .iter()
-                            .filter(|n| context.world.on_map(**n))
-                            .filter_map(|n| {
-                                context
-                                    .world
-                                    .occupant(*n)
-                                    .and_then(|id| context.world.entity(id))
-                            })
-                            .any(|unit| {
-                                tags.iter().all(|tag| match tag {
-                                    AdjacencyTag::Friendly => {
-                                        unit.team.is_some()
-                                            && actor.team == unit.team
-                                            && unit.id != actor.id
-                                    }
-                                    AdjacencyTag::Enemy => {
-                                        unit.team.is_some()
-                                            && actor.team.is_some()
-                                            && actor.team != unit.team
-                                    }
-                                    AdjacencyTag::Hero => {
-                                        matches!(unit.kind, EntityKind::Hero | EntityKind::Piece)
-                                    }
-                                    AdjacencyTag::Minion => unit.kind == EntityKind::Minion,
-                                })
-                            })
-                    });
+                    if !*value {
+                        continue;
+                    }
+                    let mut found = false;
+                    if let Some(actor) = context.actor.and_then(|id| context.world.entity(id)) {
+                        for neighbor in hex.neighbors() {
+                            if !context.world.on_map(neighbor)
+                                || !context.world.effect_connected(*hex, neighbor, &[])?
+                            {
+                                continue;
+                            }
+                            let Some(unit) = context
+                                .world
+                                .occupant(neighbor)
+                                .and_then(|id| context.world.entity(id))
+                            else {
+                                continue;
+                            };
+                            if tags.iter().all(|tag| match tag {
+                                AdjacencyTag::Friendly => {
+                                    unit.team.is_some()
+                                        && actor.team == unit.team
+                                        && unit.id != actor.id
+                                }
+                                AdjacencyTag::Enemy => {
+                                    unit.team.is_some()
+                                        && actor.team.is_some()
+                                        && actor.team != unit.team
+                                }
+                                AdjacencyTag::Hero => {
+                                    matches!(unit.kind, EntityKind::Hero | EntityKind::Piece)
+                                }
+                                AdjacencyTag::Minion => unit.kind == EntityKind::Minion,
+                            }) {
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+                    *value &= found;
                 }
             }
             Self::Spawn {
@@ -153,8 +185,7 @@ impl HexFilter {
                 minion_only,
             } => {
                 for (hex, value) in candidates.iter().zip(accepted.iter_mut()) {
-                    *value &= context.world.on_map(*hex)
-                        && context.world.spawn_at(*hex, *minion_only) == *wanted;
+                    *value &= context.world.spawn_at(*hex, *minion_only) == *wanted;
                 }
             }
             Self::AdjacentSpawn {
@@ -163,16 +194,30 @@ impl HexFilter {
                 battle_only,
                 minion_only,
             } => {
-                if context.world.has_effects || *battle_only && context.world.has_uncompiled_auras {
-                    return Err("spawn adjacency topology/aura closure not compiled".into());
-                }
+                let all_zones = context.world.tide_of_darkness(context.actor);
                 for (hex, value) in candidates.iter().zip(accepted.iter_mut()) {
-                    let found = hex.neighbors().iter().any(|n| {
-                        context.world.on_map(*n)
-                            && context.world.spawn_at(*n, *minion_only)
-                            && (!*battle_only || context.world.tile_in_battle_zone(*n))
-                            && (!*empty || !context.world.obstacle(*n))
-                    });
+                    if !*value {
+                        continue;
+                    }
+                    let mut found = false;
+                    for neighbor in hex.neighbors() {
+                        if !context.world.effect_connected(*hex, neighbor, &[])?
+                            || !context.world.spawn_at(neighbor, *minion_only)
+                        {
+                            continue;
+                        }
+                        if *battle_only
+                            && !all_zones
+                            && !context.world.tile_in_battle_zone(neighbor)
+                        {
+                            continue;
+                        }
+                        if *empty && context.world.obstacle_for_actor(neighbor, context.actor)? {
+                            continue;
+                        }
+                        found = true;
+                        break;
+                    }
                     *value &= found != *forbidden;
                 }
             }
@@ -189,7 +234,7 @@ impl HexFilter {
                 let except = context.origin(exclude, false)?;
                 for (i, &hex) in candidates.iter().enumerate() {
                     accepted[i] &= except.is_some_and(|id| context.world.occupant(hex) == Some(id))
-                        || context.world.obstacle(hex) == *wanted;
+                        || context.world.obstacle_for_actor(hex, context.actor)? == *wanted;
                 }
             }
             Self::Movement {
@@ -197,19 +242,26 @@ impl HexFilter {
                 range,
                 through,
             } => {
-                context.world.ensure_move_closure(false)?;
-                let start = context
-                    .origin(origin, true)?
-                    .and_then(|id| context.world.position(id));
-                let reachable = start.map(|start| {
-                    context.world.reachable(
-                        start,
-                        context.range_override.unwrap_or(*range),
-                        context.through_override.unwrap_or(*through),
-                    )
-                });
-                for (i, value) in accepted.iter_mut().enumerate() {
-                    *value &= reachable.as_ref().is_some_and(|values| values[i]);
+                let unit = context.origin(origin, true)?;
+                let start = unit.and_then(|id| context.world.position(id));
+                let reachable = if let (Some(unit), Some(start)) = (unit, start) {
+                    context.world.movement_reachable(
+                        &crate::geometry::MovementQuery {
+                            start,
+                            ends: candidates.to_vec(),
+                            max_steps: context.range_override.unwrap_or(*range),
+                            ignore_obstacles: false,
+                            pass_through_obstacles: context.through_override.unwrap_or(*through),
+                        },
+                        context.actor,
+                        Some(&[unit]),
+                        &[unit],
+                    )?
+                } else {
+                    vec![false; candidates.len()]
+                };
+                for (value, reachable) in accepted.iter_mut().zip(reachable) {
+                    *value &= reachable;
                 }
             }
             Self::Range {
@@ -220,19 +272,26 @@ impl HexFilter {
                 min_key,
                 max_key,
                 frame_range,
+                geometric,
             } => {
                 let from_hex = hex_key
                     .and_then(|key| context.registers.get(key))
                     .filter(|v| matches!(v, Datum::Object(_)))
                     .map(|v| v.hex(context.coordinates, context.symbols))
                     .transpose()?;
-                let from = if from_hex.is_some() {
-                    from_hex
+                let origin_unit = if from_hex.is_none() {
+                    context.origin(origin, true)?
                 } else {
-                    context
-                        .origin(origin, true)?
-                        .and_then(|id| context.world.resolved_position(id))
+                    None
                 };
+                let from = from_hex
+                    .or_else(|| origin_unit.and_then(|id| context.world.resolved_position(id)));
+                let mut units = [context.world.definitions.effect_empty; 2];
+                let mut unit_count = 0;
+                for id in [origin_unit, target_unit].into_iter().flatten() {
+                    units[unit_count] = id;
+                    unit_count += 1;
+                }
                 let frame_range = if *frame_range {
                     context.range_override.map(i64::from)
                 } else {
@@ -241,11 +300,20 @@ impl HexFilter {
                 let min = context.int_override(*min_key, frame_range.or(*min));
                 let max = context.int_override(*max_key, frame_range.or(*max));
                 for (i, &hex) in candidates.iter().enumerate() {
-                    accepted[i] &= from.is_some_and(|from| {
+                    if !accepted[i] {
+                        continue;
+                    }
+                    accepted[i] &= if let Some(from) = from {
                         let distance = i64::from(from.distance(hex));
-                        min.is_none_or(|min| distance >= min)
+                        (*geometric
+                            || context
+                                .world
+                                .effect_connected(from, hex, &units[..unit_count])?)
+                            && min.is_none_or(|min| distance >= min)
                             && max.is_none_or(|max| distance <= max)
-                    });
+                    } else {
+                        false
+                    };
                 }
             }
             Self::Straight { origin, invert } => {
@@ -253,24 +321,39 @@ impl HexFilter {
                     .origin(origin, true)?
                     .and_then(|id| context.world.resolved_position(id));
                 for (i, &hex) in candidates.iter().enumerate() {
-                    accepted[i] &= from.is_some_and(|from| from.straight(hex) != *invert);
+                    if !accepted[i] {
+                        continue;
+                    }
+                    accepted[i] &= if let Some(from) = from {
+                        (from.straight(hex) && context.world.effect_connected(from, hex, &[])?)
+                            != *invert
+                    } else {
+                        false
+                    };
                 }
             }
             Self::ClearLine { origin, through } => {
-                let from = context
-                    .origin(origin, true)?
-                    .and_then(|id| context.world.resolved_position(id));
+                let unit = context.origin(origin, true)?;
+                let from = unit.and_then(|id| context.world.resolved_position(id));
                 for (i, &hex) in candidates.iter().enumerate() {
                     if !accepted[i] {
                         continue;
                     }
-                    accepted[i] &= from.and_then(|from| from.line_to(hex)).is_some_and(|path| {
-                        path.iter().take(path.len().saturating_sub(1)).all(|hex| {
-                            context.world.on_map(*hex)
-                                && (context.through_override.unwrap_or(*through)
-                                    || !context.world.obstacle(*hex))
-                        })
-                    });
+                    let mut clear = false;
+                    if let Some(path) = from.and_then(|from| from.line_to(hex)) {
+                        clear = true;
+                        for point in path.iter().take(path.len().saturating_sub(1)) {
+                            if !context.world.on_map(*point)
+                                || (!context.through_override.unwrap_or(*through)
+                                    && context.world.obstacle_for_actor(*point, unit)?
+                                    && !context.world.passable_token(*point, unit.as_slice()))
+                            {
+                                clear = false;
+                                break;
+                            }
+                        }
+                    }
+                    accepted[i] &= clear;
                 }
             }
         }
@@ -321,6 +404,11 @@ pub fn compile_filter(raw: &Value, symbols: &mut Symbols) -> Result<HexFilter, S
             min_key: optional(raw, "min_range_key", symbols)?,
             max_key: optional(raw, "max_range_key", symbols)?,
             frame_range: false,
+            geometric: match raw["distance_mode"].as_str().unwrap_or("topology") {
+                "topology" => false,
+                "geometric" => true,
+                _ => return Err("invalid range distance mode".into()),
+            },
         }),
         "movement_path_filter" => Ok(HexFilter::Movement {
             origin: origin(symbols, "unit_id", "unit_key")?,

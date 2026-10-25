@@ -26,6 +26,7 @@ impl Duration {
 }
 #[derive(Clone, Debug)]
 pub struct EffectDefinition {
+    pub(crate) behavior: crate::effect_rules::Behavior,
     /// Complete typed payload, immutable and shared by worker clones.
     pub(crate) fields: Vec<(Symbol, Datum)>,
     pub kind: Symbol,
@@ -51,6 +52,9 @@ pub struct EffectInstance {
     pub created_turn: i64,
     pub created_round: i64,
     pub active: bool,
+    pub(crate) granted_passive: Option<Symbol>,
+    pub(crate) passive_uses: i64,
+    pub(crate) remaining_bounty: Option<i64>,
     pub scope_origin: Option<Symbol>,
     pub barrier_origin: Option<Symbol>,
     pub origin_basic: Option<bool>,
@@ -123,6 +127,7 @@ impl EffectInstance {
             .collect::<Result<_, _>>()?;
         Ok(Self {
             definition: Arc::new(EffectDefinition {
+                behavior: crate::effect_rules::Behavior::compile(value, symbols)?,
                 fields: payload,
                 kind,
                 affects,
@@ -136,6 +141,14 @@ impl EffectInstance {
                 after_cards_played: kind_name == "after_cards_played_trigger",
             }),
             id,
+            granted_passive: optional_symbol(value, "granted_passive_effect_id", symbols)?,
+            remaining_bounty: match &value["max_value"] {
+                Value::Null => None,
+                v => Some(v.as_i64().ok_or("invalid bounty limit")?),
+            },
+            passive_uses: value["passive_uses_this_turn"]
+                .as_i64()
+                .ok_or("invalid effect passive usage")?,
             scope_origin,
             barrier_origin,
             origin_basic,
@@ -205,6 +218,17 @@ impl EffectInstance {
         set("source_card_id", self.card.map_or(Datum::Null, Datum::Text));
         set("token_id", self.token.map_or(Datum::Null, Datum::Text));
         set("is_active", Datum::Bool(self.active));
+        if self.definition.behavior.kind == crate::effect_rules::Kind::MinionBounty {
+            set(
+                "max_value",
+                self.remaining_bounty.map_or(Datum::Null, Datum::Int),
+            );
+        }
+        set("passive_uses_this_turn", Datum::Int(self.passive_uses));
+        set(
+            "granted_passive_effect_id",
+            self.granted_passive.map_or(Datum::Null, Datum::Text),
+        );
         set("created_at_turn", Datum::Int(self.created_turn));
         set("created_at_round", Datum::Int(self.created_round));
         set("scope", Datum::Object(scope));
@@ -265,6 +289,22 @@ impl EffectStore {
         }
         result
     }
+    pub(crate) fn duration_indices(&self, duration: Duration) -> Vec<usize> {
+        self.instances
+            .iter()
+            .enumerate()
+            .filter_map(|(index, effect)| {
+                (effect.token.is_none() && effect.duration == duration).then_some(index)
+            })
+            .collect()
+    }
+    pub(crate) fn turn_expiry_indices(&self, round: i64, turn: i64) -> Vec<usize> {
+        self.instances
+            .iter()
+            .enumerate()
+            .filter_map(|(index, effect)| effect.expires_this_turn(round, turn).then_some(index))
+            .collect()
+    }
     pub fn collect_turn_expiry(&self, round: i64, turn: i64) -> Expiry {
         self.collect(|e| e.expires_this_turn(round, turn))
     }
@@ -324,6 +364,16 @@ impl NativeWorld {
         self.has_effects = !self.effects.instances.is_empty();
         self.refresh_card_auras();
     }
+    /// Removing a placed token ends its own effects without finishing payloads
+    /// or card-flag refreshes. Match instances, never all rows sharing an ID.
+    pub fn remove_token_effects(&mut self, token: Symbol) -> usize {
+        let before = self.effects.instances.len();
+        self.effects.instances.retain(|e| {
+            e.token != Some(token) && e.source != token && e.scope_origin != Some(token)
+        });
+        self.has_effects = !self.effects.instances.is_empty();
+        before - self.effects.instances.len()
+    }
     pub fn expire_effects_by_source(&mut self, source: Symbol) {
         let mut expiring = Vec::new();
         let mut cards = Vec::new();
@@ -373,6 +423,21 @@ impl NativeWorld {
         self.update_effect_card_flags(cards);
         expiry
     }
+    /// Revelation removes trigger instances by type, never by their possibly
+    /// duplicated IDs. All linked cards are refreshed, including stale triggers.
+    pub(crate) fn remove_after_cards_played_effects(&mut self) {
+        let cards = self
+            .effects
+            .instances
+            .iter()
+            .filter(|effect| effect.definition.after_cards_played)
+            .filter_map(|effect| effect.linked_card)
+            .collect();
+        self.effects
+            .instances
+            .retain(|effect| !effect.definition.after_cards_played);
+        self.update_effect_card_flags(cards);
+    }
     pub fn cleanup_stale_effects(&mut self) {
         self.effects.cleanup_stale();
         self.has_effects = !self.effects.instances.is_empty();
@@ -417,6 +482,9 @@ impl NativeWorld {
             return Ok(index);
         }
         let mut effect = template.clone();
+        if effect.definition.behavior.kind == crate::effect_rules::Kind::MinionBounty {
+            effect.remaining_bounty = effect.definition.behavior.maximum;
+        }
         if !effect.definition.global_scope && !effect.definition.fixed_origin {
             let origin = effect
                 .scope_origin

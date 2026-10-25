@@ -86,24 +86,30 @@ fn fast_travel_uses_each_workers_current_locations() {
     ));
 }
 #[test]
-fn unported_action_effect_closure_never_becomes_an_unrestricted_menu() {
-    let source = corpus();
-    let case = &source["cases"][0];
-    let mut envelope: StateEnvelope = serde_json::from_value(case["envelope"].clone()).unwrap();
-    let effects: Value = serde_json::from_str(
-        &std::fs::read_to_string(
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("../../tests/fixtures/effects.json"),
-        )
-        .unwrap(),
-    )
-    .unwrap();
-    envelope.state["active_effects"] =
-        effects["cases"][0]["envelope"]["state"]["active_effects"].clone();
-    let op = case["operations"][0].clone();
-    assert!(
-        action_trace(envelope, vec![op])
-            .unwrap_err()
-            .contains("action prevention")
-    );
+fn effect_restrictions_and_card_hooks_match_full_menu_and_recipe_records() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/fixtures/action-validation.json");
+    let data: Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+    for case in data["menus"].as_array().unwrap() {
+        let envelope = serde_json::from_value(case["envelope"].clone()).unwrap();
+        let mut actual = action_trace(envelope, case["operations"].as_array().unwrap().clone())
+            .unwrap_or_else(|error| panic!("{}: {error}", case["name"]));
+        let records = actual["records"].as_array_mut().unwrap();
+        let expected = case["expected"].as_array().unwrap();
+        assert_eq!(records.len(), expected.len());
+        for (i, (got, want)) in records.iter_mut().zip(expected).enumerate() {
+            if !got["request"].is_null() {
+                got["request"]["id"] = json!("request/1");
+            }
+            let mut ids = HashMap::new();
+            for step in got["steps"].as_array_mut().unwrap() {
+                normalize_step(step, &mut ids);
+            }
+            assert_eq!(
+                got, want,
+                "{} operation {i}: {}",
+                case["name"], case["operations"][i]
+            );
+        }
+    }
 }

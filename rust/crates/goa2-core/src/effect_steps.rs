@@ -165,6 +165,7 @@ impl EffectStepSpec {
     }
     pub fn bind_primary(&mut self, mut bind: impl FnMut(&mut Datum) -> Result<()>) -> Result<()> {
         let def = Arc::make_mut(&mut self.base.template.definition);
+        def.behavior.bind_primary(&mut bind)?;
         for (_, v) in &mut def.fields {
             bind(v)?;
         }
@@ -278,6 +279,9 @@ impl EffectStepSpec {
                 };
                 if !values.contains(&Datum::Text(extra)) {
                     values.push(Datum::Text(extra));
+                }
+                if !def.behavior.except_attackers.contains(&extra) {
+                    def.behavior.except_attackers.push(extra);
                 }
                 put(&mut def.fields, self.body_keys[0], Datum::List(values));
             }

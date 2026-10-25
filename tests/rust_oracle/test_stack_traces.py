@@ -221,7 +221,7 @@ def test_atomic_reference_boundaries_preserve_events_and_generated_hooks():
     assert records[2]["semantic_state"]["markers"]["venom"]["target_id"] is None
 
 
-def test_trace_export_prunes_only_superseded_generated_hash_files(tmp_path):
+def test_trace_export_retains_superseded_snapshots_for_active_readers(tmp_path):
     from oracle import digest
     from stack_traces import read_case, write_corpus
 
@@ -240,7 +240,8 @@ def test_trace_export_prunes_only_superseded_generated_hash_files(tmp_path):
     notes = path.parent / path.stem / "notes.txt"
     notes.write_text("keep")
     second = write_corpus(path, source("after"))
-    assert not old.exists()
+    assert old.exists()
+    assert read_case(path, first["cases"][0])["expected"] == ["before"]
     assert notes.read_text() == "keep"
     assert read_case(path, second["cases"][0])["expected"] == ["after"]
 
@@ -279,7 +280,7 @@ def test_streaming_merge_preserves_full_semantic_digest_and_order(tmp_path, monk
     assert index["semantic_sha256"] == source([first, new, last])["corpus_sha256"]
     assert [read_case(path, entry) for entry in index["cases"]] == [first, new, last]
     assert unchanged.read_bytes() == original_bytes
-    assert not (path.parent / original["cases"][1]["path"]).exists()
+    assert read_case(path, original["cases"][1]) == old
 
 
 def test_streaming_merge_rejects_metadata_and_case_corruption_before_index_swap(tmp_path):

@@ -2,6 +2,7 @@
 //! A successfully decoded envelope does not imply native transition coverage.
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
+use std::collections::HashSet;
 
 pub const ORACLE_REVISION: &str = "00becf4a68615afa410f8eabe0c841809af0427b";
 const REFERENCE_KEY: &str = "$goa2_instance";
@@ -25,6 +26,48 @@ pub struct Instance {
     pub definition: u32,
     pub fields: Map<String, Value>,
 }
+
+/// Paths refer to the compact state tree, retaining physical instance references.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ObjectPathPart {
+    Key(String),
+    Index(usize),
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ObjectKind {
+    List,
+    Dict,
+    Model,
+    FrozenModel,
+    Step,
+}
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ObjectBinding {
+    pub kind: ObjectKind,
+    pub paths: Vec<Vec<ObjectPathPart>>,
+    /// The source deepcopy returns this immutable object unchanged (plain Hex).
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub deepcopy_shared: bool,
+}
+fn is_false(value: &bool) -> bool {
+    !value
+}
+
+pub fn object_at_path<'a>(root: &'a Value, path: &[ObjectPathPart]) -> Result<&'a Value, String> {
+    let mut value = root;
+    for part in path {
+        value = match part {
+            ObjectPathPart::Key(key) => value.as_object().and_then(|fields| fields.get(key)),
+            ObjectPathPart::Index(index) => value.as_array().and_then(|items| items.get(*index)),
+        }
+        .ok_or("shared object path does not exist or has wrong container type")?;
+    }
+    Ok(value)
+}
+
 /// Native transport identity history, separate from rule/search state.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -43,6 +86,8 @@ pub struct StateEnvelope {
     pub definitions: Vec<Definition>,
     pub instances: Vec<Instance>,
     pub state: Value,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub object_bindings: Vec<ObjectBinding>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub native_resume: Option<NativeResume>,
 }
@@ -101,12 +146,100 @@ impl StateEnvelope {
             reject_reference(&Value::Object(definition.fields.clone()))?;
             reject_reference(&Value::Object(instance.fields.clone()))?;
         }
+        self.validate_object_bindings()?;
         let expanded = self.materialize()?;
         let header: StateHeader = serde_json::from_value(expanded).map_err(|e| e.to_string())?;
         if header.rules_version != self.rules_version {
             return Err("state/header rules version mismatch".into());
         }
         Ok(header)
+    }
+    /// Visible physical identity topology, independent of table allocation order.
+    /// Diagnostic/export only; never used while advancing game rules.
+    pub fn instance_bindings(&self) -> Result<Vec<Vec<Vec<ObjectPathPart>>>, String> {
+        fn walk(
+            value: &Value,
+            path: &mut Vec<ObjectPathPart>,
+            indices: &mut std::collections::HashMap<u32, usize>,
+            result: &mut Vec<Vec<Vec<ObjectPathPart>>>,
+        ) -> Result<(), String> {
+            match value {
+                Value::Object(fields) if fields.contains_key(REFERENCE_KEY) => {
+                    let id = fields[REFERENCE_KEY]
+                        .as_u64()
+                        .and_then(|id| u32::try_from(id).ok())
+                        .ok_or("invalid physical reference")?;
+                    let next = result.len();
+                    let index = *indices.entry(id).or_insert_with(|| {
+                        result.push(Vec::new());
+                        next
+                    });
+                    result[index].push(path.clone());
+                }
+                Value::Object(fields) => {
+                    for (key, child) in fields {
+                        path.push(ObjectPathPart::Key(key.clone()));
+                        walk(child, path, indices, result)?;
+                        path.pop();
+                    }
+                }
+                Value::Array(values) => {
+                    for (index, child) in values.iter().enumerate() {
+                        path.push(ObjectPathPart::Index(index));
+                        walk(child, path, indices, result)?;
+                        path.pop();
+                    }
+                }
+                _ => {}
+            }
+            Ok(())
+        }
+        let mut result = Vec::new();
+        walk(
+            &self.state,
+            &mut Vec::new(),
+            &mut std::collections::HashMap::new(),
+            &mut result,
+        )?;
+        Ok(result)
+    }
+    pub fn validate_object_bindings(&self) -> Result<(), String> {
+        let mut used = HashSet::new();
+        for object in &self.object_bindings {
+            if object.deepcopy_shared && object.kind != ObjectKind::FrozenModel {
+                return Err("shared deepcopy requires an immutable model".into());
+            }
+            if object.paths.is_empty() {
+                return Err("object binding requires at least one path".into());
+            }
+            let first = object_at_path(&self.state, &object.paths[0])?;
+            let valid = match object.kind {
+                ObjectKind::List => first.is_array(),
+                ObjectKind::Dict | ObjectKind::Model | ObjectKind::FrozenModel => first
+                    .as_object()
+                    .is_some_and(|f| !f.contains_key(REFERENCE_KEY)),
+                ObjectKind::Step => first.as_object().is_some_and(|f| {
+                    f.get("type").is_some_and(Value::is_string)
+                        && f.get("step_id").is_some_and(Value::is_string)
+                }),
+            };
+            if !valid {
+                return Err("shared object kind does not match its value".into());
+            }
+            let ordered = serde_json::to_string(first).map_err(|e| e.to_string())?;
+            for path in &object.paths {
+                if !used.insert(path.clone()) {
+                    return Err("shared object paths overlap or repeat".into());
+                }
+                if serde_json::to_string(object_at_path(&self.state, path)?)
+                    .map_err(|e| e.to_string())?
+                    != ordered
+                {
+                    return Err("shared object paths contain different ordered values".into());
+                }
+            }
+        }
+        Ok(())
     }
     pub fn materialize(&self) -> Result<Value, String> {
         self.expand(&self.state)

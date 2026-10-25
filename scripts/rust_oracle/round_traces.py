@@ -5,7 +5,7 @@ from __future__ import annotations
 from state_codec import export_state
 
 
-def cases(advance, answer):
+def cases(advance, answer, *, effect_factory=None, cleanup_only=False):
     import copy
 
     from model_traces import setup
@@ -70,6 +70,8 @@ def cases(advance, answer):
         name, state, step=None, batch=False, side=0, invalid=None, only_first=False, prefix=None
     ):
         step = step or EndPhaseCleanupStep()
+        if effect_factory is not None:
+            effect_factory(state, name)
         steps = [step, SetContextFlagStep(key="round_done", value=True)]
         for i, frame in enumerate(steps):
             frame.step_id = f"fixture/round/{name}/{i}"
@@ -340,5 +342,13 @@ def cases(advance, answer):
                 hero.play_card(card)
                 hero.resolve_current_card(turn_number=4)
         state.get_hero("hero_arien").gold = 1
-        add(f"map-{path.stem}", state, FindNextActorStep(), batch=True, prefix=1)
+        if cleanup_only:
+            state.phase = GamePhase.CLEANUP
+        add(
+            f"map-{path.stem}",
+            state,
+            EndPhaseCleanupStep() if cleanup_only else FindNextActorStep(),
+            batch=True,
+            prefix=1,
+        )
     return result

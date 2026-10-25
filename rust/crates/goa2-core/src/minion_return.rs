@@ -1,8 +1,9 @@
 //! Automatic after-action returns to each minion's own lane Battle Zone.
-//! Plain topology only; effect-dependent movement/placement must be ported first.
+//! Actor-aware topology, traversal, displacement and placement legality.
 use crate::{
-    data::{Symbol, Symbols},
+    data::{Registers, Symbol, Symbols},
     geometry::Hex,
+    validation::DisplacementKind,
     world::{EntityKind, NativeWorld},
 };
 use std::collections::{HashSet, VecDeque};
@@ -56,6 +57,8 @@ impl ReturnRules {
         symbols: &Symbols,
         processed: &[Symbol],
         favored: Symbol,
+        actor: Option<Symbol>,
+        context: &Registers,
     ) -> Result<Option<ReturnPlan>, String> {
         let mut outside = world
             .definitions
@@ -88,14 +91,18 @@ impl ReturnRules {
         let Some((unit, _, position, zone)) = outside.first() else {
             return Ok(None);
         };
-        if world.has_effects || world.has_uncompiled_auras {
-            return Err("minion return effect/topology/placement closure not compiled".into());
+        if world.has_uncompiled_auras {
+            return Err("minion return card aura restrictions are not compiled".into());
         }
-        world.ensure_move_closure(false)?;
-        let (mut candidates, mut distance) = nearest(world, *position, &zone.hexes, true);
+        let actor = actor
+            .filter(|id| *id != world.definitions.effect_empty)
+            .unwrap_or(*unit);
+        let (mut candidates, mut distance) =
+            effect_nearest(world, *position, &zone.hexes, *unit, actor, context, true)?;
         let placement = candidates.is_empty();
         if placement {
-            (candidates, distance) = nearest(world, *position, &zone.hexes, false);
+            (candidates, distance) =
+                effect_nearest(world, *position, &zone.hexes, *unit, actor, context, false)?;
         }
         let (_, owner, prompt) = self
             .prompts
@@ -142,4 +149,71 @@ pub(crate) fn nearest(
         }
     }
     (candidates, found.unwrap_or(0))
+}
+
+// Keep selection order and the distinction between bare landing obstacles and
+// actor-aware traversal. Rejected destinations must not stop the BFS layer.
+fn effect_nearest(
+    world: &NativeWorld,
+    start: Hex,
+    zone: &HashSet<Hex>,
+    unit: Symbol,
+    actor: Symbol,
+    context: &Registers,
+    walk: bool,
+) -> Result<(Vec<Hex>, i32), String> {
+    let mut queue = VecDeque::from([(start, 0)]);
+    let mut visited = HashSet::from([start]);
+    let mut found = None;
+    let mut candidates = Vec::new();
+    while let Some((hex, distance)) = queue.pop_front() {
+        if found.is_some_and(|d| distance > d) {
+            break;
+        }
+        if distance > 0 && zone.contains(&hex) && world.on_map(hex) && !world.obstacle(hex) {
+            let allowed = if walk {
+                world
+                    .can_displace(unit, Some(actor), DisplacementKind::Move, None)?
+                    .allowed
+                    && world
+                        .movement_legality(
+                            unit,
+                            i64::from(start.distance(hex)),
+                            false,
+                            None,
+                            context,
+                        )?
+                        .allowed
+            } else {
+                world.effect_connected(start, hex, &[unit])?
+                    && world
+                        .can_displace(unit, Some(actor), DisplacementKind::Place, Some(hex))?
+                        .allowed
+            };
+            if allowed {
+                candidates.push(hex);
+                found = Some(distance);
+            }
+        }
+        if found.is_none() {
+            for next in hex.neighbors() {
+                if visited.contains(&next)
+                    || !world.on_map(next)
+                    || !world.effect_connected(hex, next, &[unit])?
+                {
+                    continue;
+                }
+                if walk
+                    && (!world.effect_connected(start, next, &[unit])?
+                        || (world.obstacle_for_actor(next, Some(unit))?
+                            && !world.passable_token(next, &[])))
+                {
+                    continue;
+                }
+                visited.insert(next);
+                queue.push_back((next, distance + 1));
+            }
+        }
+    }
+    Ok((candidates, found.unwrap_or(0)))
 }

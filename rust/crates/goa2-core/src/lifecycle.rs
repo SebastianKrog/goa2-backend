@@ -59,11 +59,6 @@ impl NativeWorld {
     }
     /// Script-side premature expiry, kept separate from ordinary Hero methods.
     pub(crate) fn expire_card_effects(&mut self, printed: Symbol) -> Result<()> {
-        if self.has_effects {
-            return Err(CardError::Unsupported(
-                "card-linked effect expiry not compiled",
-            ));
-        }
         self.expire_effects_by_card(printed);
         Ok(())
     }

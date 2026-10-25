@@ -159,8 +159,8 @@ impl ActionRules {
         if card.spell {
             return Err("spell current-face action recipes not compiled".into());
         }
-        if world.has_effects || world.has_uncompiled_auras {
-            return Err("action prevention effect/aura closure not compiled".into());
+        if world.has_uncompiled_auras {
+            return Err("action prevention aura closure not compiled".into());
         }
         context.set(self.current_card, Datum::Text(card.printed_id));
         let primary = if instance.facedown {
@@ -175,10 +175,15 @@ impl ActionRules {
                 k
             }
         });
-        let available = |kind| kind != ActionKind::FastTravel || world.has_safe_travel_zone(hero);
+        let available = |kind| -> Result<bool, String> {
+            Ok(world
+                .action_legality(hero, kind, Some(id), context)?
+                .allowed
+                && (kind != ActionKind::FastTravel || world.has_safe_travel_zone(hero)))
+        };
         let mut options = Vec::new();
         let mut add = |kind: ActionKind, base: Option<i64>, primary_label| -> Result<(), String> {
-            if !available(kind) {
+            if !available(kind)? {
                 return Ok(());
             }
             let stat = match kind {
@@ -418,11 +423,7 @@ impl NativeWorld {
         if actor.is_none() {
             return Ok(false);
         }
-        if self.has_effects {
-            return Err("repeat-prevention effect closure not compiled".into());
-        }
-        // With no active effects the reference permits on/off-board units and
-        // both bound/unbound multi-piece owners; it does not require a live hero.
-        Ok(true)
+        self.repeat_legality(actor.unwrap())
+            .map(|result| result.allowed)
     }
 }

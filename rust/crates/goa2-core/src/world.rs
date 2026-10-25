@@ -51,6 +51,7 @@ pub struct CardDefinition {
     pub effect: Symbol,
     pub has_effect: bool,
     pub aura: crate::auras::CardAura,
+    pub action_prevention: bool,
     pub has_item: bool,
     pub item: Option<crate::stats::Stat>,
     pub color: Option<Symbol>,
@@ -108,6 +109,12 @@ pub struct WorldDefinitions {
     pub cards: Vec<CardDefinition>,
     pub zones: crate::zones::ZoneGraph,
     pub(crate) stat_context: crate::stats::PerformingCardKeys,
+    pub(crate) effect_empty: Symbol,
+    pub(crate) tide_of_darkness: Symbol,
+    pub(crate) illusion_token: Symbol,
+    pub(crate) targeting: crate::targeting::TargetingKeys,
+    pub(crate) supply_passable: Vec<(Symbol, bool)>,
+    pub(crate) mine_supply: Vec<(Symbol, bool, Option<Symbol>)>,
     geometry: BoardGeometry,
     tile_keys: Vec<String>,
     tile_zones: Vec<Option<Symbol>>,
@@ -141,6 +148,9 @@ pub struct NativeWorld {
 }
 impl NativeWorld {
     pub fn compile(source: &StateEnvelope, symbols: &mut Symbols) -> Result<Self, String> {
+        if !source.object_bindings.is_empty() {
+            return Err("dense world shared-object bindings are not yet compiled".into());
+        }
         source.validate()?;
         let semantic = source.materialize()?;
         let mut entities = Vec::new();
@@ -169,6 +179,29 @@ impl NativeWorld {
                     EntityKind::Other
                 };
                 entities.push(entity(value, kind, symbols)?);
+            }
+        }
+        let mut supply_passable = Vec::new();
+        let mut mine_supply = Vec::new();
+        for tokens in semantic["token_pool"]
+            .as_object()
+            .ok_or("token supply missing")?
+            .values()
+        {
+            for token in tokens.as_array().ok_or("token supply list missing")? {
+                supply_passable.push((
+                    symbols.intern(token["id"].as_str().ok_or("token id missing")?),
+                    token["is_passable"]
+                        .as_bool()
+                        .ok_or("token passability missing")?,
+                ));
+                mine_supply.push((
+                    symbols.intern(token["id"].as_str().ok_or("token id missing")?),
+                    token["is_passable"]
+                        .as_bool()
+                        .ok_or("token passability missing")?,
+                    token["owner_id"].as_str().map(|id| symbols.intern(id)),
+                ));
             }
         }
         let aura_catalog = crate::templates::instructions()?["aura_effects"]
@@ -202,6 +235,11 @@ impl NativeWorld {
                     fields["effect_id"].as_str().unwrap_or(""),
                     aura_catalog.iter().any(|id| id == &fields["effect_id"]),
                 ),
+                action_prevention: crate::templates::instructions()?["action_prevention_effects"]
+                    .as_array()
+                    .ok_or("action prevention catalog missing")?
+                    .iter()
+                    .any(|id| id == &fields["effect_id"]),
                 color,
                 tier,
                 range,
@@ -405,6 +443,12 @@ impl NativeWorld {
                 entities,
                 zones,
                 stat_context: crate::stats::PerformingCardKeys::compile(symbols),
+                tide_of_darkness: symbols.intern("tide_of_darkness"),
+                illusion_token: symbols.intern("illusion"),
+                targeting: crate::targeting::TargetingKeys::compile(symbols),
+                supply_passable,
+                mine_supply,
+                effect_empty: symbols.intern(""),
                 cards: card_definitions,
                 geometry,
                 tile_keys,
@@ -479,6 +523,9 @@ impl NativeWorld {
                 fields.shift_remove("initiative_override");
             }
         }
+    }
+    pub(crate) fn entity_index(&self, id: Symbol) -> Option<usize> {
+        self.entity_by_symbol.get(id.0).and_then(|index| *index)
     }
     pub fn entity(&self, id: Symbol) -> Option<&EntityDefinition> {
         self.entity_by_symbol
@@ -583,20 +630,15 @@ impl NativeWorld {
         if is_action && self.has_uncompiled_auras {
             return Err("card aura action restrictions are not compiled".into());
         }
-        if self
-            .definitions
-            .entities
-            .iter()
-            .any(|entity| entity.passable && self.position(entity.id).is_some())
-        {
-            return Err("passable token/mine movement is not compiled".into());
-        }
         Ok(())
     }
     pub fn path(&self, start: Hex, end: Hex, range: i32, through: bool) -> bool {
         self.definitions
             .geometry
             .stateful_path(&self.occupancy, start, end, range, through)
+    }
+    pub(crate) fn tile_index(&self, hex: Hex) -> Option<usize> {
+        self.definitions.geometry.id(hex).map(|id| id.index())
     }
     pub fn on_map(&self, hex: Hex) -> bool {
         self.definitions.geometry.id(hex).is_some()

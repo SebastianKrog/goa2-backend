@@ -76,8 +76,8 @@ impl Planning {
         }
         Self::compile_effect_boundary(source, symbols)
     }
-    /// Parse bookkeeping for a resolution-only lifecycle diagnostic. Callers
-    /// must reject all gameplay/input operations while effects are unported.
+    /// Parse bookkeeping for the bounded effect-aware resolution interpreter.
+    /// Callers must reject all unported phase, gameplay and input consumers.
     pub(crate) fn compile_effect_boundary(
         source: &StateEnvelope,
         symbols: &mut Symbols,

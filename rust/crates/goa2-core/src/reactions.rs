@@ -172,6 +172,7 @@ impl ReactionRules {
         ctx: &mut Registers,
         symbols: &Symbols,
         target: Symbol,
+        actor: Option<Symbol>,
         selected: Option<&Datum>,
     ) -> Result<Window, String> {
         for key in &self.reset {
@@ -184,9 +185,6 @@ impl ReactionRules {
             self.pass(ctx, target);
             return Ok(Window::Done);
         };
-        if world.has_effects {
-            return Err("effect-aware reaction shields not compiled".into());
-        }
         let truth = |key| ctx.get(key).is_some_and(|v| v.truthy(symbols));
         let block_primary = truth(self.block_primary);
         let initiative = truth(self.initiative);
@@ -196,7 +194,13 @@ impl ReactionRules {
             Stat::Defense
         };
         let mut cards = Vec::new();
-        for id in &hero.hand {
+        let mut candidates = hero.hand.clone();
+        for shield in world.active_shield_cards(hero.id) {
+            if !candidates.contains(&shield) {
+                candidates.push(shield);
+            }
+        }
+        for id in &candidates {
             let card = world.card(*id).ok_or("reaction card missing")?;
             if card.facedown {
                 continue;
@@ -223,7 +227,8 @@ impl ReactionRules {
             } else {
                 secondary.unwrap_or(0)
             };
-            let total = world.computed_stat_in_context(target, stat, base, ctx)?;
+            let total =
+                world.computed_stat_for_card_in_context(target, stat, base, Some(*id), ctx)?;
             cards.push(DefenseCard {
                 physical: *id,
                 id: def.printed_id,
@@ -261,7 +266,7 @@ impl ReactionRules {
                 });
             }
         }
-        let modifier = world.minion_defense(target)?;
+        let modifier = world.minion_defense(target, actor)?;
         ctx.set(self.modifier, Datum::Int(modifier));
         let attack = match ctx.get(self.attack) {
             None | Some(Datum::Null) => None,
@@ -292,9 +297,6 @@ impl ReactionRules {
         printed: Symbol,
         played_first: bool,
     ) -> Result<bool, String> {
-        if world.has_effects {
-            return Err("discard effect expiry not compiled".into());
-        }
         let Some(h) = world.hero(hero) else {
             return Ok(false);
         };

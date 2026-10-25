@@ -69,6 +69,12 @@ def test_aura_capabilities_match_frozen_registry_method_implementations():
     assert frozen["aura_effects"] == actual
     assert "noble_blade" not in actual
     assert "witching_hour" in actual
+    action_hooks = sorted(
+        key
+        for key, effect in CardEffectRegistry._effects.items()
+        if type(effect).get_action_prevention_reason is not CardEffect.get_action_prevention_reason
+    )
+    assert frozen["action_prevention_effects"] == action_hooks == ["witching_hour"]
 
 
 def test_ultimate_unlock_catalog_matches_frozen_registered_hooks():
@@ -136,18 +142,32 @@ def test_passive_config_catalog_matches_frozen_public_api():
     register_all_effects()
     root = Path(__file__).resolve().parents[2]
     frozen = json.loads((root / "rust/tests/fixtures/instruction-templates.json").read_text())
-    actual = {
-        key: [
-            {
-                "trigger": c.trigger.value,
-                "uses": c.uses_per_turn,
-                "optional": c.is_optional,
-                "prompt": c.prompt,
-            }
-            for c in effect.get_passive_configs()
-        ]
-        for key, effect in CardEffectRegistry._effects.items()
-    }
+    import os
+    import subprocess
+
+    # Effect tests register helper abilities at collection time. The catalog is
+    # the production bootstrap, so inspect it in a clean registry/process.
+    program = """
+import json
+from goa2.bootstrap import register_all_effects
+from goa2.engine.effects import CardEffectRegistry
+register_all_effects()
+print(json.dumps({
+    key: [{"trigger": c.trigger.value, "uses": c.uses_per_turn,
+           "optional": c.is_optional, "prompt": c.prompt}
+          for c in effect.get_passive_configs()]
+    for key, effect in CardEffectRegistry._effects.items()
+}))
+"""
+    child = subprocess.run(
+        [sys.executable, "-c", program],
+        cwd=root,
+        check=True,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "PYTHONPATH": str(root / "src")},
+    )
+    actual = json.loads(child.stdout)
     assert frozen["passive_configs"] == actual
     effect = CardEffectRegistry.get("big_sodding_gun")
     assert type(effect).should_offer_passive is CardEffect.should_offer_passive

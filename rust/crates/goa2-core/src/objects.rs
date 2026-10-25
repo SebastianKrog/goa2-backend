@@ -1,0 +1,992 @@
+//! Worker-local mutable object identity. JSON conversion is boundary-only.
+//! Live context/frame bindings use these handles; dense world slots remain separate.
+use crate::{
+    codec::{ObjectBinding, ObjectKind, ObjectPathPart, StateEnvelope},
+    data::{Datum, Symbol, Symbols},
+};
+use serde_json::{Value, json};
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct ObjectId(usize);
+#[derive(Clone, Debug)]
+pub enum ObjectValue {
+    Atom(Datum),
+    Object(ObjectId),
+    Request(u64),
+    GeneratedStep(u64),
+}
+#[derive(Clone, Debug)]
+enum Contents {
+    List(Vec<ObjectValue>),
+    Fields(Vec<(Symbol, ObjectValue)>),
+}
+#[derive(Clone, Debug)]
+struct Object {
+    kind: ObjectKind,
+    tracked: bool,
+    deepcopy_shared: bool,
+    contents: Contents,
+}
+#[derive(Clone, Copy, Debug)]
+pub enum Target {
+    Context,
+    Alias(usize),
+    Object(ObjectId),
+}
+#[derive(Clone, Debug)]
+pub enum Input {
+    Literal(Datum),
+    Alias(usize),
+    Existing(ObjectValue),
+}
+#[derive(Clone, Debug)]
+pub enum Mutation {
+    Append {
+        target: Target,
+        value: Input,
+    },
+    Set {
+        target: Target,
+        key: Symbol,
+        value: Input,
+    },
+    Delete {
+        target: Target,
+        key: Symbol,
+    },
+    Pop {
+        target: Target,
+        index: i64,
+    },
+    Snapshot {
+        key: Symbol,
+    },
+}
+#[derive(Clone, Debug)]
+struct PhysicalCopy {
+    base: u32,
+    fields: Vec<(Symbol, Datum)>,
+}
+#[derive(Clone, Debug)]
+pub struct ObjectArena {
+    pub(crate) symbols: Arc<Symbols>,
+    objects: Vec<Object>,
+    aliases: Vec<ObjectId>,
+    root: ObjectValue,
+    context: ObjectId,
+    base_instances: usize,
+    physical_copies: Vec<PhysicalCopy>,
+    physical_fields: HashMap<u32, Vec<(Symbol, Datum)>>,
+}
+impl ObjectArena {
+    pub fn compile(source: &StateEnvelope) -> Result<Self, String> {
+        source.validate()?;
+        let mut arena = Self {
+            symbols: Arc::new(Symbols::default()),
+            objects: Vec::new(),
+            aliases: Vec::new(),
+            root: ObjectValue::Atom(Datum::Null),
+            context: ObjectId(0),
+            base_instances: source.instances.len(),
+            physical_copies: Vec::new(),
+            physical_fields: HashMap::new(),
+        };
+        let paths = source
+            .object_bindings
+            .iter()
+            .enumerate()
+            .flat_map(|(index, object)| {
+                object
+                    .paths
+                    .iter()
+                    .cloned()
+                    .map(move |path| (path, (index, object.kind, object.deepcopy_shared)))
+            })
+            .collect::<HashMap<_, _>>();
+        let mut shared = vec![None; source.object_bindings.len()];
+        arena.root = arena.import(&source.state, &mut Vec::new(), &paths, &mut shared)?;
+        arena.aliases = shared
+            .into_iter()
+            .map(|id| id.ok_or("unresolved shared object".to_string()))
+            .collect::<Result<_, _>>()?;
+        let ObjectValue::Object(root) = arena.root else {
+            return Err("object arena state root must be an object".into());
+        };
+        let Contents::Fields(fields) = &arena.objects[root.0].contents else {
+            return Err("object arena state root must have fields".into());
+        };
+        arena.context = fields
+            .iter()
+            .find(|(key, _)| arena.symbols.name(*key) == "execution_context")
+            .and_then(|(_, value)| {
+                if let ObjectValue::Object(id) = value {
+                    Some(*id)
+                } else {
+                    None
+                }
+            })
+            .ok_or("object arena execution context missing")?;
+        if arena.objects[arena.context.0].kind != ObjectKind::Dict {
+            return Err("object arena execution context must be a dictionary".into());
+        }
+        Ok(arena)
+    }
+    fn import(
+        &mut self,
+        value: &Value,
+        path: &mut Vec<ObjectPathPart>,
+        paths: &HashMap<Vec<ObjectPathPart>, (usize, ObjectKind, bool)>,
+        shared: &mut [Option<ObjectId>],
+    ) -> Result<ObjectValue, String> {
+        let binding = paths.get(path).copied();
+        if let Some((index, _, _)) = binding
+            && let Some(id) = shared[index]
+        {
+            return Ok(ObjectValue::Object(id));
+        }
+        if value.is_array() || (value.is_object() && value.get("$goa2_instance").is_none()) {
+            let kind = binding.map_or(
+                if value.is_array() {
+                    ObjectKind::List
+                } else {
+                    ObjectKind::Dict
+                },
+                |(_, kind, _)| kind,
+            );
+            let id = ObjectId(self.objects.len());
+            self.objects.push(Object {
+                kind,
+                tracked: binding.is_some(),
+                deepcopy_shared: binding.is_some_and(|(_, _, shared)| shared),
+                contents: Contents::List(Vec::new()),
+            });
+            if let Some((index, _, _)) = binding {
+                shared[index] = Some(id);
+            }
+            let contents = match value {
+                Value::Array(items) => {
+                    let mut result = Vec::new();
+                    for (index, item) in items.iter().enumerate() {
+                        path.push(ObjectPathPart::Index(index));
+                        result.push(self.import(item, path, paths, shared)?);
+                        path.pop();
+                    }
+                    Contents::List(result)
+                }
+                Value::Object(fields) => {
+                    let mut result = Vec::new();
+                    for (key, item) in fields {
+                        let symbol = Arc::make_mut(&mut self.symbols).intern(key);
+                        path.push(ObjectPathPart::Key(key.clone()));
+                        result.push((symbol, self.import(item, path, paths, shared)?));
+                        path.pop();
+                    }
+                    Contents::Fields(result)
+                }
+                _ => unreachable!(),
+            };
+            self.objects[id.0].contents = contents;
+            Ok(ObjectValue::Object(id))
+        } else {
+            Ok(ObjectValue::Atom(Datum::from_json(
+                value,
+                Arc::make_mut(&mut self.symbols),
+            )?))
+        }
+    }
+    fn target(&self, target: Target) -> Result<ObjectId, String> {
+        match target {
+            Target::Context => Ok(self.context),
+            Target::Object(id) => self
+                .objects
+                .get(id.0)
+                .map(|_| id)
+                .ok_or("object handle outside arena".into()),
+            Target::Alias(index) => self
+                .aliases
+                .get(index)
+                .copied()
+                .ok_or("alias index outside table".into()),
+        }
+    }
+    fn literal(&mut self, value: &Datum) -> ObjectValue {
+        let (kind, contents) = match value {
+            Datum::List(items) => (
+                ObjectKind::List,
+                Contents::List(items.iter().map(|v| self.literal(v)).collect()),
+            ),
+            Datum::Object(fields) => (
+                ObjectKind::Dict,
+                Contents::Fields(fields.iter().map(|(k, v)| (*k, self.literal(v))).collect()),
+            ),
+            _ => return ObjectValue::Atom(value.clone()),
+        };
+        let id = ObjectId(self.objects.len());
+        self.objects.push(Object {
+            kind,
+            tracked: true,
+            deepcopy_shared: false,
+            contents,
+        });
+        ObjectValue::Object(id)
+    }
+    fn input(&mut self, value: &Input) -> Result<ObjectValue, String> {
+        match value {
+            Input::Literal(v) => Ok(self.literal(v)),
+            Input::Existing(value) => Ok(value.clone()),
+            Input::Alias(index) => Ok(ObjectValue::Object(self.target(Target::Alias(*index))?)),
+        }
+    }
+    fn reaches(&self, value: &ObjectValue, target: ObjectId) -> bool {
+        if !matches!(value, ObjectValue::Object(_)) {
+            return false;
+        }
+        let mut queue = vec![value];
+        let mut seen = HashSet::new();
+        while let Some(value) = queue.pop() {
+            let ObjectValue::Object(id) = value else {
+                continue;
+            };
+            if *id == target {
+                return true;
+            }
+            if !seen.insert(*id) {
+                continue;
+            }
+            match &self.objects[id.0].contents {
+                Contents::List(items) => queue.extend(items),
+                Contents::Fields(fields) => queue.extend(fields.iter().map(|(_, v)| v)),
+            }
+        }
+        false
+    }
+    fn check_input(&self, value: &Input, target: ObjectId) -> Result<(), String> {
+        let existing = match value {
+            Input::Alias(index) => Some(ObjectValue::Object(self.target(Target::Alias(*index))?)),
+            Input::Existing(value) => Some(value.clone()),
+            Input::Literal(_) => None,
+        };
+        if existing
+            .as_ref()
+            .is_some_and(|value| self.reaches(value, target))
+        {
+            return Err("cyclic aggregate mutation".into());
+        }
+        Ok(())
+    }
+    pub fn value_at_path(&self, path: &[ObjectPathPart]) -> Result<ObjectValue, String> {
+        let mut value = self.root.clone();
+        for part in path {
+            let ObjectValue::Object(id) = value else {
+                return Err("path crosses an atomic value".into());
+            };
+            value = match (part, &self.objects[id.0].contents) {
+                (ObjectPathPart::Key(key), Contents::Fields(fields)) => fields
+                    .iter()
+                    .find(|(symbol, _)| self.symbols.name(*symbol) == key)
+                    .map(|(_, value)| value.clone()),
+                (ObjectPathPart::Index(index), Contents::List(items)) => items.get(*index).cloned(),
+                _ => None,
+            }
+            .ok_or("object path missing")?;
+        }
+        Ok(value)
+    }
+    /// Objects reachable from immutable world/step parameters cannot yet be
+    /// mutated by the scalar executor. Set.value and pending input are live
+    /// arena payloads; all other step operands still compile as definitions.
+    pub(crate) fn readonly_objects(&self) -> HashSet<ObjectId> {
+        let ObjectValue::Object(root) = self.root else {
+            return HashSet::new();
+        };
+        let Contents::Fields(fields) = &self.objects[root.0].contents else {
+            return HashSet::new();
+        };
+        let roots = fields
+            .iter()
+            .filter(|(key, _)| self.symbols.name(*key) != "execution_context")
+            .filter_map(|(_, value)| {
+                if let ObjectValue::Object(id) = value {
+                    Some(*id)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        self.readonly_reachable(roots)
+    }
+    pub(crate) fn readonly_step_objects(&self, step: ObjectId) -> HashSet<ObjectId> {
+        self.readonly_reachable(vec![step])
+    }
+    fn readonly_reachable(&self, mut queue: Vec<ObjectId>) -> HashSet<ObjectId> {
+        let mut protected = HashSet::new();
+        while let Some(id) = queue.pop() {
+            if !protected.insert(id) {
+                continue;
+            }
+            let object = &self.objects[id.0];
+            match &object.contents {
+                Contents::List(items) => {
+                    for value in items {
+                        if let ObjectValue::Object(id) = value {
+                            queue.push(*id);
+                        }
+                    }
+                }
+                Contents::Fields(fields) => {
+                    for (key, value) in fields {
+                        if object.kind == ObjectKind::Step
+                            && matches!(
+                                self.symbols.name(*key),
+                                "value" | "pending_input" | "expire_effect_ids"
+                            )
+                        {
+                            continue;
+                        }
+                        if let ObjectValue::Object(id) = value {
+                            queue.push(*id);
+                        }
+                    }
+                }
+            }
+        }
+        protected
+    }
+    pub fn sequence(&self, object: ObjectId) -> Option<&[ObjectValue]> {
+        match &self.objects.get(object.0)?.contents {
+            Contents::List(values) => Some(values),
+            _ => None,
+        }
+    }
+    /// Python deepcopy uses one memo per template root, not per iteration.
+    /// New physical identities share immutable definitions and snapshot current
+    /// mutable overrides; later writes to the original cannot change a copy.
+    pub(crate) fn deep_copy(
+        &mut self,
+        value: &ObjectValue,
+    ) -> Result<(ObjectValue, HashMap<ObjectId, ObjectId>), String> {
+        let mut objects = HashMap::new();
+        let mut instances = HashMap::new();
+        let value = self.copy_value(value, &mut objects, &mut instances)?;
+        Ok((value, objects))
+    }
+    fn copy_value(
+        &mut self,
+        value: &ObjectValue,
+        objects: &mut HashMap<ObjectId, ObjectId>,
+        instances: &mut HashMap<u32, u32>,
+    ) -> Result<ObjectValue, String> {
+        Ok(match value {
+            ObjectValue::Atom(Datum::Instance(id)) => {
+                if let Some(copy) = instances.get(id) {
+                    return Ok(ObjectValue::Atom(Datum::Instance(*copy)));
+                }
+                let next = self
+                    .base_instances
+                    .checked_add(self.physical_copies.len())
+                    .ok_or("physical instance counter exhausted")?;
+                if *id as usize >= next {
+                    return Err("physical copy source outside table".into());
+                }
+                let next =
+                    u32::try_from(next).map_err(|_| "physical instance counter exhausted")?;
+                let mut copy = if (*id as usize) < self.base_instances {
+                    PhysicalCopy {
+                        base: *id,
+                        fields: Vec::new(),
+                    }
+                } else {
+                    self.physical_copies[*id as usize - self.base_instances].clone()
+                };
+                if let Some(fields) = self.physical_fields.get(id) {
+                    for (key, value) in fields {
+                        Self::set_physical_override(&mut copy.fields, *key, value.clone());
+                    }
+                }
+                self.physical_copies.push(copy);
+                instances.insert(*id, next);
+                ObjectValue::Atom(Datum::Instance(next))
+            }
+            ObjectValue::Object(id) => {
+                if let Some(copy) = objects.get(id) {
+                    return Ok(ObjectValue::Object(*copy));
+                }
+                if self.objects[id.0].deepcopy_shared {
+                    objects.insert(*id, *id);
+                    return Ok(ObjectValue::Object(*id));
+                }
+                let original = self.objects[id.0].clone();
+                let copy = ObjectId(self.objects.len());
+                self.objects.push(Object {
+                    kind: original.kind,
+                    tracked: original.tracked,
+                    deepcopy_shared: original.deepcopy_shared,
+                    contents: Contents::List(Vec::new()),
+                });
+                objects.insert(*id, copy);
+                let contents = match original.contents {
+                    Contents::List(values) => Contents::List(
+                        values
+                            .iter()
+                            .map(|value| self.copy_value(value, objects, instances))
+                            .collect::<Result<_, _>>()?,
+                    ),
+                    Contents::Fields(fields) => Contents::Fields(
+                        fields
+                            .iter()
+                            .map(|(key, value)| {
+                                Ok((*key, self.copy_value(value, objects, instances)?))
+                            })
+                            .collect::<Result<_, String>>()?,
+                    ),
+                };
+                self.objects[copy.0].contents = contents;
+                ObjectValue::Object(copy)
+            }
+            value => value.clone(),
+        })
+    }
+    fn set_physical_override(fields: &mut Vec<(Symbol, Datum)>, key: Symbol, value: Datum) {
+        if let Some((_, old)) = fields.iter_mut().find(|(field, _)| *field == key) {
+            *old = value;
+        } else {
+            fields.push((key, value));
+        }
+    }
+    pub(crate) fn set_physical_field(
+        &mut self,
+        instance: u32,
+        key: Symbol,
+        value: Datum,
+    ) -> Result<(), String> {
+        if instance as usize >= self.base_instances + self.physical_copies.len() {
+            return Err("physical field target outside table".into());
+        }
+        if matches!(
+            value,
+            Datum::List(_) | Datum::Object(_) | Datum::Instance(_)
+        ) {
+            return Err("physical aggregate field bindings are not implemented".into());
+        }
+        Self::set_physical_override(
+            self.physical_fields.entry(instance).or_default(),
+            key,
+            value,
+        );
+        Ok(())
+    }
+    pub(crate) fn root_field(&self, key: Symbol) -> Option<ObjectValue> {
+        let ObjectValue::Object(root) = self.root else {
+            return None;
+        };
+        self.field(root, key)
+    }
+    pub(crate) fn list(&mut self, values: Vec<ObjectValue>) -> ObjectValue {
+        let id = ObjectId(self.objects.len());
+        self.objects.push(Object {
+            kind: ObjectKind::List,
+            tracked: true,
+            deepcopy_shared: false,
+            contents: Contents::List(values),
+        });
+        ObjectValue::Object(id)
+    }
+    pub(crate) fn fields(&self, object: ObjectId) -> Option<&[(Symbol, ObjectValue)]> {
+        match &self.objects.get(object.0)?.contents {
+            Contents::Fields(fields) => Some(fields),
+            _ => None,
+        }
+    }
+    pub(crate) fn set_index(
+        &mut self,
+        object: ObjectId,
+        index: usize,
+        value: ObjectValue,
+    ) -> Result<(), String> {
+        if self.reaches(&value, object) {
+            return Err("aggregate cycle".into());
+        }
+        let Contents::List(values) = &mut self
+            .objects
+            .get_mut(object.0)
+            .ok_or("list missing")?
+            .contents
+        else {
+            return Err("indexed assignment requires a list".into());
+        };
+        let target = values
+            .get_mut(index)
+            .ok_or("list assignment index out of range")?;
+        *target = value;
+        Ok(())
+    }
+    pub fn field(&self, object: ObjectId, key: Symbol) -> Option<ObjectValue> {
+        let Contents::Fields(fields) = &self.objects.get(object.0)?.contents else {
+            return None;
+        };
+        fields
+            .iter()
+            .find(|(k, _)| *k == key)
+            .map(|(_, value)| value.clone())
+    }
+    pub(crate) fn set_root(&mut self, key: Symbol, value: ObjectValue) -> Result<(), String> {
+        let ObjectValue::Object(root) = self.root else {
+            return Err("state root missing".into());
+        };
+        self.set_field(root, key, value)
+    }
+    pub(crate) fn dictionary(
+        &mut self,
+        fields: Vec<(Symbol, ObjectValue)>,
+    ) -> Result<ObjectValue, String> {
+        let value = self.allocate(&Datum::Object(Vec::new()));
+        let ObjectValue::Object(id) = value else {
+            unreachable!()
+        };
+        for (key, value) in fields {
+            self.set_field(id, key, value)?;
+        }
+        Ok(ObjectValue::Object(id))
+    }
+    pub(crate) fn context_id(&self) -> ObjectId {
+        self.context
+    }
+    pub fn context_value(&self, key: Symbol) -> Option<ObjectValue> {
+        self.field(self.context, key)
+    }
+    /// Unclassified arrays can be source tuples. Only captured Python lists
+    /// and freshly allocated native lists support in-place list operations.
+    pub fn is_mutable_list(&self, object: ObjectId) -> bool {
+        self.objects[object.0].tracked && self.objects[object.0].kind == ObjectKind::List
+    }
+    pub fn kind(&self, object: ObjectId) -> ObjectKind {
+        self.objects[object.0].kind
+    }
+    pub fn truthy(&self, value: &ObjectValue) -> bool {
+        match value {
+            ObjectValue::Atom(value) => value.truthy(&self.symbols),
+            ObjectValue::Request(_) | ObjectValue::GeneratedStep(_) => true,
+            ObjectValue::Object(id) => {
+                match (&self.objects[id.0].kind, &self.objects[id.0].contents) {
+                    (ObjectKind::List, Contents::List(items)) => !items.is_empty(),
+                    (ObjectKind::Dict, Contents::Fields(fields)) => !fields.is_empty(),
+                    _ => true,
+                }
+            }
+        }
+    }
+    /// Instantiate a cold-compiled step recipe without serializing game state.
+    pub(crate) fn step(&mut self, value: &Datum) -> Result<ObjectId, String> {
+        let ObjectValue::Object(id) = self.literal(value) else {
+            return Err("step recipe must have fields".into());
+        };
+        if !matches!(self.objects[id.0].contents, Contents::Fields(_)) {
+            return Err("step recipe must have fields".into());
+        }
+        self.objects[id.0].kind = ObjectKind::Step;
+        Ok(id)
+    }
+    pub fn allocate(&mut self, value: &Datum) -> ObjectValue {
+        self.literal(value)
+    }
+    pub fn set_field(
+        &mut self,
+        object: ObjectId,
+        key: Symbol,
+        value: ObjectValue,
+    ) -> Result<(), String> {
+        self.apply(&Mutation::Set {
+            target: Target::Object(object),
+            key,
+            value: Input::Existing(value),
+        })
+    }
+    pub fn set_context(&mut self, key: Symbol, value: ObjectValue) -> Result<(), String> {
+        self.set_field(self.context, key, value)
+    }
+    pub fn remove_context(&mut self, key: Symbol) -> Result<(), String> {
+        if self.context_value(key).is_some() {
+            self.apply(&Mutation::Delete {
+                target: Target::Context,
+                key,
+            })?;
+        }
+        Ok(())
+    }
+    pub fn append(&mut self, object: ObjectId, value: ObjectValue) -> Result<(), String> {
+        self.apply(&Mutation::Append {
+            target: Target::Object(object),
+            value: Input::Existing(value),
+        })
+    }
+    pub fn list_pop(&mut self, object: ObjectId) -> Result<Option<ObjectValue>, String> {
+        let Contents::List(items) = &mut self.objects[object.0].contents else {
+            return Err("stack binding is not a list".into());
+        };
+        Ok(items.pop())
+    }
+    pub fn clear_list(&mut self, object: ObjectId) -> Result<(), String> {
+        let Contents::List(items) = &mut self.objects[object.0].contents else {
+            return Err("stack binding is not a list".into());
+        };
+        items.clear();
+        Ok(())
+    }
+    pub fn apply(&mut self, mutation: &Mutation) -> Result<(), String> {
+        match mutation {
+            Mutation::Append { target, value } => {
+                let id = self.target(*target)?;
+                if !matches!(self.objects[id.0].contents, Contents::List(_)) {
+                    return Err("append target must be a list".into());
+                }
+                self.check_input(value, id)?;
+                let value = self.input(value)?;
+                let Contents::List(items) = &mut self.objects[id.0].contents else {
+                    unreachable!()
+                };
+                items.push(value);
+            }
+            Mutation::Set { target, key, value } => {
+                let id = self.target(*target)?;
+                if self.objects[id.0].kind == ObjectKind::FrozenModel {
+                    return Err("frozen model cannot be mutated".into());
+                }
+                let Contents::Fields(fields) = &self.objects[id.0].contents else {
+                    return Err("set target must have fields".into());
+                };
+                if matches!(
+                    self.objects[id.0].kind,
+                    ObjectKind::Model | ObjectKind::Step
+                ) && !fields.iter().any(|(k, _)| k == key)
+                {
+                    return Err("model field does not exist".into());
+                }
+                self.check_input(value, id)?;
+                let value = self.input(value)?;
+                let Contents::Fields(fields) = &mut self.objects[id.0].contents else {
+                    unreachable!()
+                };
+                if let Some((_, item)) = fields.iter_mut().find(|(k, _)| k == key) {
+                    *item = value;
+                } else {
+                    fields.push((*key, value));
+                }
+            }
+            Mutation::Delete { target, key } => {
+                let id = self.target(*target)?;
+                if self.objects[id.0].kind != ObjectKind::Dict {
+                    return Err("delete target must be a dictionary".into());
+                }
+                let Contents::Fields(fields) = &mut self.objects[id.0].contents else {
+                    unreachable!()
+                };
+                let index = fields
+                    .iter()
+                    .position(|(k, _)| k == key)
+                    .ok_or("dictionary key missing")?;
+                fields.remove(index);
+            }
+            Mutation::Pop { target, index } => {
+                let id = self.target(*target)?;
+                let Contents::List(items) = &mut self.objects[id.0].contents else {
+                    return Err("pop target must be a list".into());
+                };
+                let count = i64::try_from(items.len()).map_err(|_| "list length exceeds i64")?;
+                let index = if *index < 0 {
+                    count
+                        .checked_add(*index)
+                        .ok_or("list index outside range")?
+                } else {
+                    *index
+                };
+                let index = usize::try_from(index)
+                    .ok()
+                    .filter(|i| *i < items.len())
+                    .ok_or("list index outside range")?;
+                items.remove(index);
+            }
+            Mutation::Snapshot { key } => {
+                let copy = self.objects[self.context.0].clone();
+                let id = ObjectId(self.objects.len());
+                self.objects.push(copy);
+                let Contents::Fields(fields) = &mut self.objects[self.context.0].contents else {
+                    unreachable!()
+                };
+                if let Some((_, value)) = fields.iter_mut().find(|(k, _)| k == key) {
+                    *value = ObjectValue::Object(id);
+                } else {
+                    fields.push((*key, ObjectValue::Object(id)));
+                }
+            }
+        }
+        Ok(())
+    }
+    /// Compile a diagnostic input at the boundary; apply() consumes typed data.
+    pub fn compile_mutation(&mut self, value: &Value) -> Result<Mutation, String> {
+        let fields = value.as_object().ok_or("mutation must be an object")?;
+        let kind = value["kind"].as_str().ok_or("mutation kind missing")?;
+        let allowed: &[&str] = match kind {
+            "append" => &["kind", "target", "value"],
+            "set" => &["kind", "target", "key", "value"],
+            "delete" => &["kind", "target", "key"],
+            "pop" => &["kind", "target", "index"],
+            "snapshot" => &["kind", "key"],
+            _ => return Err("unknown aggregate mutation".into()),
+        };
+        if fields.keys().any(|key| !allowed.contains(&key.as_str())) {
+            return Err("unknown aggregate mutation field".into());
+        }
+        let key = |this: &mut Self| {
+            value["key"]
+                .as_str()
+                .map(|key| Arc::make_mut(&mut this.symbols).intern(key))
+                .ok_or("mutation key missing".to_string())
+        };
+        if kind == "snapshot" {
+            return Ok(Mutation::Snapshot { key: key(self)? });
+        }
+        let target = if value["target"] == "context" {
+            Target::Context
+        } else {
+            Target::Alias(
+                value["target"]
+                    .as_u64()
+                    .and_then(|i| usize::try_from(i).ok())
+                    .ok_or("mutation alias target missing")?,
+            )
+        };
+        self.target(target)?;
+        let input = |this: &mut Self| -> Result<Input, String> {
+            let raw = value["value"]
+                .as_object()
+                .ok_or("mutation value must use literal/alias wrapper")?;
+            if raw.len() != 1 {
+                return Err("mutation value must have one wrapper".into());
+            }
+            if let Some(value) = raw.get("literal") {
+                reject_literal_references(value)?;
+                Ok(Input::Literal(Datum::from_json(
+                    value,
+                    Arc::make_mut(&mut this.symbols),
+                )?))
+            } else if let Some(index) = raw
+                .get("alias")
+                .and_then(Value::as_u64)
+                .and_then(|i| usize::try_from(i).ok())
+            {
+                this.target(Target::Alias(index))?;
+                Ok(Input::Alias(index))
+            } else {
+                Err("unknown mutation value wrapper".into())
+            }
+        };
+        Ok(match kind {
+            "append" => Mutation::Append {
+                target,
+                value: input(self)?,
+            },
+            "set" => Mutation::Set {
+                target,
+                key: key(self)?,
+                value: input(self)?,
+            },
+            "delete" => Mutation::Delete {
+                target,
+                key: key(self)?,
+            },
+            "pop" => Mutation::Pop {
+                target,
+                index: value
+                    .get("index")
+                    .map_or(Ok(-1), |v| v.as_i64().ok_or("pop index must be an integer"))?,
+            },
+            _ => unreachable!(),
+        })
+    }
+    fn expand(&self, value: &ObjectValue, depth: usize) -> Result<Value, String> {
+        if depth > 256 {
+            return Err("aggregate depth exceeds limit".into());
+        }
+        Ok(match value {
+            ObjectValue::Atom(value) => value.to_json(&self.symbols),
+            ObjectValue::Request(id) => Value::String(format!("native-request-{id}")),
+            ObjectValue::GeneratedStep(id) => Value::String(format!("native-step-{id}")),
+            ObjectValue::Object(id) => match &self.objects[id.0].contents {
+                Contents::List(items) => Value::Array(
+                    items
+                        .iter()
+                        .map(|v| self.expand(v, depth + 1))
+                        .collect::<Result<_, _>>()?,
+                ),
+                Contents::Fields(fields) => Value::Object(
+                    fields
+                        .iter()
+                        .map(|(k, v)| {
+                            Ok((self.symbols.name(*k).into(), self.expand(v, depth + 1)?))
+                        })
+                        .collect::<Result<_, String>>()?,
+                ),
+            },
+        })
+    }
+    pub fn compact_state(&self) -> Result<Value, String> {
+        self.expand(&self.root, 0)
+    }
+    pub fn boundary(&self, source: &StateEnvelope) -> Result<StateEnvelope, String> {
+        if source.instances.len() != self.base_instances {
+            return Err("arena physical base table mismatch".into());
+        }
+        let mut result = source.clone();
+        for copy in &self.physical_copies {
+            let mut instance = source
+                .instances
+                .get(copy.base as usize)
+                .ok_or("physical copy base outside table")?
+                .clone();
+            for (key, value) in &copy.fields {
+                instance
+                    .fields
+                    .insert(self.symbols.name(*key).into(), value.to_json(&self.symbols));
+            }
+            result.instances.push(instance);
+        }
+        for (id, fields) in &self.physical_fields {
+            let instance = result
+                .instances
+                .get_mut(*id as usize)
+                .ok_or("physical override outside table")?;
+            for (key, value) in fields {
+                instance
+                    .fields
+                    .insert(self.symbols.name(*key).into(), value.to_json(&self.symbols));
+            }
+        }
+        result.state = self.compact_state()?;
+        result.object_bindings = self.object_bindings()?;
+        result.validate()?;
+        Ok(result)
+    }
+    pub fn object_keys(&self) -> Result<Vec<Option<Vec<String>>>, String> {
+        let bindings = self.object_bindings()?;
+        let compact = self.compact_state()?;
+        bindings
+            .iter()
+            .map(|binding| {
+                Ok(crate::codec::object_at_path(&compact, &binding.paths[0])?
+                    .as_object()
+                    .map(|fields| fields.keys().cloned().collect()))
+            })
+            .collect()
+    }
+    pub fn object_bindings(&self) -> Result<Vec<ObjectBinding>, String> {
+        let mut occurrences: Vec<Vec<Vec<ObjectPathPart>>> = vec![Vec::new(); self.objects.len()];
+        self.visit(&self.root, &mut Vec::new(), &mut occurrences, 0)?;
+        // Source capture emits aliases in first-occurrence traversal order.
+        let mut order = Vec::new();
+        self.order(&self.root, &mut HashSet::new(), &mut order);
+        let mut result = Vec::new();
+        for id in order {
+            if self.objects[id.0].tracked && !occurrences[id.0].is_empty() {
+                result.push(ObjectBinding {
+                    kind: self.objects[id.0].kind,
+                    deepcopy_shared: self.objects[id.0].deepcopy_shared,
+                    paths: std::mem::take(&mut occurrences[id.0]),
+                });
+            }
+        }
+        Ok(result)
+    }
+
+    fn visit(
+        &self,
+        value: &ObjectValue,
+        path: &mut Vec<ObjectPathPart>,
+        occurrences: &mut [Vec<Vec<ObjectPathPart>>],
+        depth: usize,
+    ) -> Result<(), String> {
+        if depth > 256 {
+            return Err("aggregate depth exceeds limit".into());
+        }
+        let ObjectValue::Object(id) = value else {
+            return Ok(());
+        };
+        occurrences[id.0].push(path.clone());
+        match &self.objects[id.0].contents {
+            Contents::List(items) => {
+                for (index, value) in items.iter().enumerate() {
+                    path.push(ObjectPathPart::Index(index));
+                    self.visit(value, path, occurrences, depth + 1)?;
+                    path.pop();
+                }
+            }
+            Contents::Fields(fields) => {
+                for (key, value) in fields {
+                    path.push(ObjectPathPart::Key(self.symbols.name(*key).into()));
+                    self.visit(value, path, occurrences, depth + 1)?;
+                    path.pop();
+                }
+            }
+        }
+        Ok(())
+    }
+    fn order(&self, value: &ObjectValue, seen: &mut HashSet<ObjectId>, order: &mut Vec<ObjectId>) {
+        let ObjectValue::Object(id) = value else {
+            return;
+        };
+        if !seen.insert(*id) {
+            return;
+        }
+        order.push(*id);
+        match &self.objects[id.0].contents {
+            Contents::List(items) => {
+                for value in items {
+                    self.order(value, seen, order);
+                }
+            }
+            Contents::Fields(fields) => {
+                for (_, value) in fields {
+                    self.order(value, seen, order);
+                }
+            }
+        }
+    }
+}
+
+pub fn aggregate_trace(envelope: StateEnvelope, operations: Vec<Value>) -> Result<Value, String> {
+    let mut arena = ObjectArena::compile(&envelope)?;
+    let operations = operations
+        .iter()
+        .map(|op| arena.compile_mutation(op))
+        .collect::<Result<Vec<_>, _>>()?;
+    let mut records = Vec::new();
+    for operation in &operations {
+        let error = arena.apply(operation).err().map(|_| "invalid_operation");
+        records.push(
+            json!({"semantic_state": envelope.expand(&arena.compact_state()?)?,
+            "object_bindings": arena.object_bindings()?, "object_keys": arena.object_keys()?, "error": error}),
+        );
+    }
+    Ok(json!({"records": records}))
+}
+
+fn reject_literal_references(value: &Value) -> Result<(), String> {
+    match value {
+        Value::Object(fields) => {
+            if fields.contains_key("$goa2_instance") {
+                return Err("physical references are reserved in literal input".into());
+            }
+            for value in fields.values() {
+                reject_literal_references(value)?;
+            }
+        }
+        Value::Array(items) => {
+            for value in items {
+                reject_literal_references(value)?;
+            }
+        }
+        _ => {}
+    }
+    Ok(())
+}

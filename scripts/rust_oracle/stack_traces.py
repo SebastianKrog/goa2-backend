@@ -968,6 +968,18 @@ def corpus():
 
     cases.extend(minion_return_cases(advance, answer))
 
+    from minion_return_effect_traces import cases as minion_return_effect_cases
+
+    cases.extend(minion_return_effect_cases())
+
+    from battle_effect_traces import cases as battle_effect_cases
+
+    cases.extend(battle_effect_cases())
+
+    from round_effect_traces import cases as round_effect_cases
+
+    cases.extend(round_effect_cases())
+
     from battle_traces import cases as battle_cases
 
     cases.extend(battle_cases(advance, answer))
@@ -1022,6 +1034,52 @@ def corpus():
 
     cases.extend(effect_step_cases(advance, answer))
 
+    from token_effect_traces import cases as token_effect_cases
+
+    cases.extend(token_effect_cases(advance, answer))
+
+    from effect_adjacency_traces import cases as effect_adjacency_cases
+
+    cases.extend(effect_adjacency_cases(advance, answer))
+
+    from displacement_effect_traces import cases as displacement_effect_cases
+
+    cases.extend(displacement_effect_cases(advance, answer))
+
+    from action_rule_traces import cases as action_rule_cases
+
+    cases.extend(action_rule_cases(advance, answer))
+
+    from terrain_traces import cases as terrain_cases
+
+    cases.extend(terrain_cases(advance, answer))
+
+    from movement_sequence_traces import cases as movement_sequence_cases
+
+    cases.extend(movement_sequence_cases(advance, answer))
+
+    from mine_traces import cases as mine_cases
+
+    cases.extend(mine_cases(advance, answer))
+    from mine_movement_traces import cases as mine_movement_cases
+
+    cases.extend(mine_movement_cases(advance, answer))
+    from discard_effect_traces import cases as discard_effect_cases
+
+    cases.extend(discard_effect_cases(advance, answer))
+    from passive_provider_traces import cases as passive_provider_cases
+
+    cases.extend(passive_provider_cases(advance, answer))
+    from combat_effect_traces import cases as combat_effect_cases
+
+    cases.extend(combat_effect_cases(advance, answer))
+    from reaction_effect_traces import cases as reaction_effect_cases
+
+    cases.extend(reaction_effect_cases(advance, answer))
+    from targeting_effect_traces import cases as targeting_effect_cases
+
+    cases.extend(targeting_effect_cases(advance, answer))
+
     payload = {
         "schema_version": 1,
         "oracle_revision": manifest["oracle_revision"],
@@ -1056,24 +1114,14 @@ def write_corpus(path, source):
 
 
 def _install_index(path, source):
-    directory = path.parent / path.stem
-    entries = source["cases"]
     identity = digest(source)
     result = {**source, "corpus_sha256": identity}
     temporary = path.with_suffix(path.suffix + ".tmp")
     temporary.write_text(json.dumps(result, indent=2) + "\n")
     temporary.replace(path)
-    # This directory contains generated, content-addressed snapshots. Prune
-    # superseded hashes only after the new index is safely in place.
-    if not directory.is_symlink() and directory.resolve().parent == path.parent.resolve():
-        keep = {Path(entry["path"]).name for entry in entries}
-        for old in directory.glob("*.json"):
-            if (
-                old.name not in keep
-                and len(old.stem) == 64
-                and all(c in "0123456789abcdef" for c in old.stem)
-            ):
-                old.unlink()
+    # Readers retain an index snapshot while streaming its cases. Publishing a
+    # new index must not remove any immutable case those readers still need.
+    # Reclaim obsolete content only in a separate, explicitly offline cleanup.
     return result
 
 
@@ -1178,6 +1226,13 @@ def verify(path, command):
             )["records"]
             normalizer = TraceNormalizer()
             actual = [normalizer.record(record) for record in actual]
+            if case.get("unordered_mine_keys"):
+                from mine_traces import normalize_choice_record
+
+                actual = [
+                    normalize_choice_record(record, case["unordered_mine_keys"])
+                    for record in actual
+                ]
             if actual != case["expected"]:
                 failure = ROOT / "rust/artifacts/stack-trace-mismatch.json"
                 failure.parent.mkdir(parents=True, exist_ok=True)

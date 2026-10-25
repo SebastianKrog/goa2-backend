@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+  "errors": [
+    {
+      "kind": "literal-destination-lost-in-mine-choice",
+      "generated_choice_destination_key": "target_hex",
+      "choice_context_destination_present": false,
+      "chosen_mines": [],
+      "destination_reached": true,
+      "mine_remains_deployed": true
+    },
+    {
+      "kind": "hash-dependent-mine-order",
+      "hash_seed_outputs": {
+        "1": [
+          "blast-a",
+          "blast-b"
+        ],
+        "2": [
+          "blast-b",
+          "blast-a"
+        ]
+      },
+      "meaning": "identical mine sets become different trigger lists; implicit ordering is not deterministic"
+    },
+    {
+      "kind": "mine-option-helper-coercion",
+      "helper_value": 0,
+      "raw_option_id": "0",
+      "helper_value_accepted": false,
+      "raw_id_accepted": true,
+      "wire_metadata_keys": [
+        "metadata"
+      ]
+    }
+  ],
+  "native_policy": "mine path identity is an unordered set with stable native order; explicit trigger/event order is preserved; literal-destination loss remains a documented source compatibility defect",
+  "corpus_sha256": "db96e31f88d9bf82582f48369836ae03ab1fc7e7fcb9c86a585b2b6477908de8"
+}

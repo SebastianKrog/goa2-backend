@@ -55,3 +55,15 @@ pub mod retrieval;
 pub mod effects;
 
 pub mod effect_steps;
+
+mod effect_rules;
+
+pub mod validation;
+
+pub mod terrain;
+
+pub mod mines;
+
+mod protection;
+
+pub mod objects;

@@ -5,7 +5,7 @@ from __future__ import annotations
 from state_codec import export_state
 
 
-def cases(advance, answer):
+def cases(advance, answer, *, effect_factory=None):
     import copy
 
     from model_traces import setup
@@ -96,6 +96,8 @@ def cases(advance, answer):
                 state.place_entity(m.id, available.pop(0))
 
     def add(name, state, step, invalid=None, prefix=False, winner=None, condition=None):
+        if effect_factory is not None:
+            effect_factory(state, name)
         steps = [step, SetContextFlagStep(key="battle_done", value=True)]
         for i, step in enumerate(steps):
             step.step_id = f"fixture/battle/{name}/{i}"

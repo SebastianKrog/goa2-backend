@@ -7,7 +7,7 @@ use crate::{
     world::{EntityKind, MinionKind, NativeWorld},
 };
 use serde_json::{Value, json};
-use std::collections::HashSet;
+use std::collections::{HashSet, VecDeque};
 #[derive(Clone, Debug)]
 pub enum BattleError {
     Rule(String),
@@ -248,11 +248,6 @@ impl BattleRules {
         selected: Option<&Datum>,
         favored: Symbol,
     ) -> Result<Resolution> {
-        if world.has_effects {
-            return Err(BattleError::Unsupported(
-                "battle effect/exclusion closure not compiled",
-            ));
-        }
         match step {
             BattleStep::Check(lane) => self.check(world, lane),
             BattleStep::Push(spec) => self.push(world, spec),
@@ -494,8 +489,13 @@ impl BattleRules {
             });
             if (world.on_map(sp.hex) && occupant.is_none()) || token.is_some() {
                 if let Some(id) = Self::candidate(world, lane, &sp, &reserved) {
-                    if let Some(token) = token {
-                        world.remove_entity(token).map_err(BattleError::Rule)?;
+                    if let Some(token) = token
+                        && world
+                            .remove_entity(token)
+                            .map_err(BattleError::Rule)?
+                            .is_some()
+                    {
+                        world.remove_token_effects(token);
                     }
                     world.place_entity(id, sp.hex).map_err(BattleError::Rule)?;
                 }
@@ -545,6 +545,9 @@ impl BattleRules {
                     count[self.team(team)?] += 1;
                 }
             }
+            let excluded = self.exclusions(world, &zone.hexes)?;
+            count[0] -= excluded[0];
+            count[1] -= excluded[1];
             if count[0] != count[1] {
                 ops.push(BattleOp::Step(BattleStep::Casualties(RemovalSpec {
                     loser: if count[0] < count[1] {
@@ -558,6 +561,66 @@ impl BattleRules {
             }
         }
         Ok(Resolution::Done(ops))
+    }
+    // Source order matters when several origins overlap: sum caps by raw source
+    // identity first, then reserve adjacent minions for each enemy team. This
+    // consumer uses the stored active flag, not duration/scope/immunity rules.
+    fn exclusions(&self, world: &NativeWorld, zone: &HashSet<Hex>) -> Result<[i64; 2]> {
+        let mut caps: Vec<(Symbol, i64)> = Vec::new();
+        for effect in &world.effects.instances {
+            if effect.definition.behavior.kind != crate::effect_rules::Kind::BattleExclusion
+                || !effect.active
+            {
+                continue;
+            }
+            let cap = effect.definition.behavior.maximum.unwrap_or(0);
+            if let Some((_, total)) = caps.iter_mut().find(|(id, _)| *id == effect.source) {
+                *total = total
+                    .checked_add(cap)
+                    .ok_or_else(|| BattleError::Rule("battle exclusion cap overflow".into()))?;
+            } else {
+                caps.push((effect.source, cap));
+            }
+        }
+        let mut excluded: [HashSet<Symbol>; 2] = [HashSet::new(), HashSet::new()];
+        let mut reductions = [0, 0];
+        for (origin, cap) in caps {
+            if cap <= 0 {
+                continue;
+            }
+            let Some((team, position)) = world
+                .entity(origin)
+                .and_then(|e| e.team)
+                .zip(world.position(origin))
+            else {
+                continue;
+            };
+            let enemy = if team == self.red { 1 } else { 0 };
+            let enemy_team = if enemy == 0 { self.red } else { self.blue };
+            let mut adjacent = Vec::new();
+            for hex in position.neighbors() {
+                if !zone.contains(&hex)
+                    || !world
+                        .effect_connected(position, hex, &[])
+                        .map_err(BattleError::Rule)?
+                {
+                    continue;
+                }
+                if let Some(unit) = world.occupant(hex).and_then(|id| world.entity(id))
+                    && unit.kind == EntityKind::Minion
+                    && unit.team == Some(enemy_team)
+                    && !excluded[enemy].contains(&unit.id)
+                {
+                    adjacent.push(unit.id);
+                }
+            }
+            let take = usize::try_from(cap)
+                .unwrap_or(usize::MAX)
+                .min(adjacent.len());
+            excluded[enemy].extend(adjacent.into_iter().take(take));
+            reductions[enemy] += take as i64;
+        }
+        Ok(reductions)
     }
     fn casualties(
         &self,
@@ -731,9 +794,9 @@ impl BattleRules {
             .zones
             .iter()
             .find(|z| z.id == zone)
-            .map_or_else(Vec::new, |z| {
-                crate::minion_return::nearest(world, origin, &z.hexes, false).0
-            });
+            .map(|z| Self::displacement_destinations(world, origin, &z.hexes))
+            .transpose()?
+            .unwrap_or_default();
         let destination = selected_hex
             .filter(|h| candidates.contains(h))
             .or_else(|| (candidates.len() == 1).then(|| candidates[0]));
@@ -758,5 +821,41 @@ impl BattleRules {
             unit: Some(unit),
             clear_pending: true,
         }))
+    }
+    // Spawn displacement searches connected neighbors without an actor or an
+    // origin-to-each-space constraint. The generated Place step separately
+    // validates placement; do not prefilter or alter its mandatory semantics.
+    fn displacement_destinations(
+        world: &NativeWorld,
+        start: Hex,
+        zone: &HashSet<Hex>,
+    ) -> Result<Vec<Hex>> {
+        let mut queue = VecDeque::from([(start, 0)]);
+        let mut visited = HashSet::from([start]);
+        let mut found = None;
+        let mut candidates = Vec::new();
+        while let Some((hex, distance)) = queue.pop_front() {
+            if found.is_some_and(|d| distance > d) {
+                break;
+            }
+            if distance > 0 && zone.contains(&hex) && world.on_map(hex) && !world.obstacle(hex) {
+                candidates.push(hex);
+                found = Some(distance);
+            }
+            if found.is_none() {
+                for next in hex.neighbors() {
+                    if world.on_map(next)
+                        && !visited.contains(&next)
+                        && world
+                            .effect_connected(hex, next, &[])
+                            .map_err(BattleError::Rule)?
+                    {
+                        visited.insert(next);
+                        queue.push_back((next, distance + 1));
+                    }
+                }
+            }
+        }
+        Ok(candidates)
     }
 }

@@ -15,10 +15,12 @@ pub enum Container {
     Discard,
     Deck,
 }
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct ForceBinding {
     pub victim: Symbol,
     pub basic: Option<bool>,
+    pub shields: bool,
+    pub allowed: Option<std::sync::Arc<[Symbol]>>,
 }
 #[derive(Clone, Debug)]
 pub struct CardSelectSpec {
@@ -121,7 +123,7 @@ impl CardSelectSpec {
         actor: Option<Symbol>,
         ctx: &Registers,
         symbols: &Symbols,
-        forced: Option<ForceBinding>,
+        forced: Option<&ForceBinding>,
     ) -> Result<Option<Symbol>, String> {
         if let Some(f) = forced {
             return Ok(Some(f.victim));
@@ -138,7 +140,7 @@ impl CardSelectSpec {
         ctx: &Registers,
         symbols: &Symbols,
         owner: Option<Symbol>,
-        forced: Option<ForceBinding>,
+        forced: Option<&ForceBinding>,
     ) -> Result<Vec<CardId>, String> {
         let hero = if let Some(f) = forced {
             Some(f.victim)
@@ -153,14 +155,18 @@ impl CardSelectSpec {
             return Ok(Vec::new());
         };
         let mut cards = Vec::new();
-        for c in &self.containers {
+        let forced_containers = [Container::Hand, Container::Played];
+        let containers = if forced.is_some_and(|f| f.shields) {
+            &forced_containers[..]
+        } else {
+            &self.containers
+        };
+        for c in containers {
             match c {
                 Container::Hand => cards.extend(hero.hand.iter().copied()),
                 Container::Played => {
-                    if self.shields {
-                        if world.has_effects {
-                            return Err("effect-aware discard shields not compiled".into());
-                        }
+                    if self.shields || forced.is_some_and(|f| f.shields) {
+                        cards.extend(world.active_shield_cards(hero.id));
                     } else {
                         cards.extend(hero.played.iter().flatten().copied());
                     }
@@ -180,11 +186,13 @@ impl CardSelectSpec {
         {
             return Err("invalid card tier context".into());
         }
-        let basic = forced.map_or(self.basic, |f| f.basic);
+        let basic = forced.map_or(self.basic, |f| if f.shields { None } else { f.basic });
+        let allowed = forced
+            .filter(|f| f.shields)
+            .map_or(self.allowed.as_deref(), |f| f.allowed.as_deref());
         let identity =
             self.actions.is_some() || !colors.is_empty() || tier.is_some() || basic.is_some();
-        let hide = self
-            .containers
+        let hide = containers
             .iter()
             .any(|c| matches!(c, Container::Played | Container::Discard));
         let excluded = self
@@ -225,10 +233,7 @@ impl CardSelectSpec {
             if self.item.is_some_and(|i| i != d.has_item) {
                 continue;
             }
-            if self
-                .allowed
-                .as_ref()
-                .is_some_and(|a| !a.contains(&d.printed_id))
+            if allowed.is_some_and(|a| !a.contains(&d.printed_id))
                 || excluded.contains(&Some(d.printed_id))
             {
                 continue;
@@ -288,5 +293,41 @@ pub(crate) fn validate_color(s: &str) -> Result<(), String> {
         Ok(())
     } else {
         Err("invalid card color".into())
+    }
+}
+
+impl NativeWorld {
+    /// Direct active-flag/creator lookup; shield cards are not temporal scopes.
+    pub(crate) fn active_shield_cards(&self, owner: Symbol) -> Vec<CardId> {
+        let Some(hero) = self.hero(owner) else {
+            return Vec::new();
+        };
+        let shields = self
+            .effects
+            .instances
+            .iter()
+            .filter(|e| {
+                e.active
+                    && e.source == hero.id
+                    && e.definition.behavior.kind == crate::effect_rules::Kind::DiscardShield
+            })
+            .filter_map(|e| e.linked_card)
+            .collect::<Vec<_>>();
+        let mut seen = Vec::new();
+        hero.played
+            .iter()
+            .flatten()
+            .chain(hero.current.iter())
+            .copied()
+            .filter(|id| {
+                let printed = self.definitions.cards[self.card(*id).unwrap().definition].printed_id;
+                if shields.contains(&printed) && !seen.contains(&printed) {
+                    seen.push(printed);
+                    true
+                } else {
+                    false
+                }
+            })
+            .collect()
     }
 }

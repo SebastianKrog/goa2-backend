@@ -35,15 +35,29 @@ pub struct UpgradeChoice {
 }
 #[derive(Clone, Debug)]
 pub enum RoundEvent {
-    TokenRemoved { token: Symbol, from: Hex },
-    DeckSwapped { hero: Symbol, card: Symbol },
-    Retrieved { hero: Symbol, card: Symbol },
+    TokenRemoved {
+        token: Symbol,
+        from: Hex,
+        effects_removed: usize,
+    },
+    DeckSwapped {
+        hero: Symbol,
+        card: Symbol,
+    },
+    Retrieved {
+        hero: Symbol,
+        card: Symbol,
+    },
 }
 impl RoundEvent {
     pub fn to_json(&self, s: &Symbols) -> Value {
         match self {
-            Self::TokenRemoved { token, from } => {
-                json!({"event_type":"TOKEN_REMOVED","actor_id":null,"target_id":s.name(*token),"from_hex":from,"to_hex":null,"metadata":{"effects_removed":0}})
+            Self::TokenRemoved {
+                token,
+                from,
+                effects_removed,
+            } => {
+                json!({"event_type":"TOKEN_REMOVED","actor_id":null,"target_id":s.name(*token),"from_hex":from,"to_hex":null,"metadata":{"effects_removed":effects_removed}})
             }
             Self::DeckSwapped { hero, card } => {
                 json!({"event_type":"DECK_CARD_SWAPPED","actor_id":s.name(*hero),"target_id":null,"from_hex":null,"to_hex":null,"metadata":{"outgoing_card_id":s.name(*card),"incoming_card_id":null,"source":"ready_for_war"}})
@@ -310,16 +324,15 @@ impl RoundRules {
         world: &mut NativeWorld,
         state: &mut RoundState,
     ) -> Result<(bool, Vec<RoundEvent>)> {
-        if world.has_effects {
-            return Err(CardError::Unsupported(
-                "round effect expiry/finishing closure not compiled",
-            ));
-        };
+        // The cleanup source intentionally discards returned finishing payloads.
+        // Their scheduled execution belongs to EndPhase, not this second sweep.
+        world.expire_duration_effects(crate::effects::Duration::ThisRound);
         for marker in &mut world.markers {
             marker.target = None;
             marker.source = None;
             marker.value = 0;
         }
+        world.cleanup_stale_effects();
         for h in 0..world.heroes.len() {
             let expiring = world.heroes[h]
                 .played
@@ -331,9 +344,7 @@ impl RoundRules {
             for id in expiring {
                 let printed =
                     world.definitions.cards[world.card(id).unwrap().definition].printed_id;
-                if let Some(card) = world.card_by_printed(printed) {
-                    world.card_mut(card).unwrap().active = false;
-                }
+                world.expire_effects_by_card(printed);
             }
             world.retrieve_cards(world.heroes[h].id)?;
         }
@@ -344,9 +355,11 @@ impl RoundRules {
                     .remove_entity(*token)
                     .map_err(|_| CardError::Illegal("token removal failed"))?
             {
+                let effects_removed = world.remove_token_effects(*token);
                 events.push(RoundEvent::TokenRemoved {
                     token: *token,
                     from,
+                    effects_removed,
                 });
             }
         }
@@ -552,6 +565,7 @@ impl RoundState {
             .checked_add(1)
             .filter(|n| *n <= i64::from(u32::MAX))
             .ok_or(CardError::Unsupported("round counter outside u32"))?;
+        world.combat.round = self.round;
         world.combat.turn = 1;
         if clear_defeated {
             world.combat.defeated.clear();

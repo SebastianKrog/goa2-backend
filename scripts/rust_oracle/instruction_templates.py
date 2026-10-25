@@ -18,6 +18,7 @@ from goa2.engine.steps import (
     AdvanceTurnStep,
     AttackSequenceStep,
     CheckLanePushStep,
+    CheckMinionProtectionStep,
     CheckPassiveAbilitiesStep,
     ChooseActingPieceStep,
     ChooseMinionRemovalStep,
@@ -30,6 +31,7 @@ from goa2.engine.steps import (
     FastTravelUnitStep,
     FinalizeHeroTurnStep,
     FindNextActorStep,
+    FinishedExpiringEffectStep,
     FlipTieBreakerCoinStep,
     ForceDiscardOrDefeatStep,
     ForceDiscardStep,
@@ -38,6 +40,7 @@ from goa2.engine.steps import (
     LogMessageStep,
     MarkPassiveUsedStep,
     MayRepeatNTimesStep,
+    MinePathChoiceStep,
     MinionBattleStep,
     MoveSequenceStep,
     MoveUnitStep,
@@ -67,6 +70,7 @@ from goa2.engine.steps import (
     SetActorStep,
     SetContextFlagStep,
     TriggerGameOverStep,
+    TriggerMineStep,
     ValidateRepeatStep,
 )
 
@@ -91,12 +95,14 @@ def export():
         "select_unit": SelectStep(step_id="template", target_type=TargetType.UNIT, prompt=""),
         "resolve_combat": ResolveCombatStep(step_id="template", damage=1),
         "set_actor": SetActorStep(step_id="template"),
+        "finished_expiring_effect": FinishedExpiringEffectStep(step_id="template"),
         "discard_card": DiscardCardStep(step_id="template"),
         "reaction": ReactionWindowStep(step_id="template"),
         "defense_text": ResolveDefenseTextStep(step_id="template"),
         "on_block": ResolveOnBlockEffectStep(step_id="template"),
         "restore_action": RestoreActionTypeStep(step_id="template"),
         "defeat": DefeatUnitStep(step_id="template"),
+        "minion_protection": CheckMinionProtectionStep(step_id="template", minion_id="template"),
         "remove_unit": RemoveUnitStep(step_id="template"),
         "game_over": TriggerGameOverStep(
             step_id="template", winner="RED", condition="ANNIHILATION"
@@ -112,6 +118,9 @@ def export():
         "passive": CheckPassiveAbilitiesStep(step_id="template", trigger="before_action"),
         "pre_movement": ResolvePreActionMovementStep(step_id="template", hero_id="template"),
         "pre_discard": ResolvePreActionDiscardStep(step_id="template", hero_id="template"),
+        "pre_force_discard": ForceDiscardStep(
+            step_id="template", victim_key="pre_action_discard_victim"
+        ),
         "card_text": ResolveCardTextStep(
             step_id="template", hero_id="template", card_id="template"
         ),
@@ -131,6 +140,8 @@ def export():
         "context": SetContextFlagStep(step_id="template", key="template", value=None),
         "select_hex": SelectStep(step_id="template", target_type=TargetType.HEX, prompt=""),
         "move_unit": MoveUnitStep(step_id="template"),
+        "mine_path_choice": MinePathChoiceStep(step_id="template"),
+        "trigger_mine": TriggerMineStep(step_id="template"),
         "place_unit": PlaceUnitStep(step_id="template"),
         "lane_push": LanePushStep(step_id="template", losing_team="RED"),
         "repeat": MayRepeatNTimesStep(step_id="template"),
@@ -164,7 +175,40 @@ def export():
         "straight_path": StraightLinePathFilter(),
     }
     values["clear_select"].step_id = "template"
+    from types import SimpleNamespace
+
+    wild_hunt_steps = CardEffectRegistry.get("wild_hunt").get_passive_steps(
+        None,
+        SimpleNamespace(id="template-passive-owner"),
+        None,
+        PassiveTrigger.BEFORE_ACTION,
+        {},
+    )
+    for step in wild_hunt_steps:
+        step.step_id = "template"
+    from goa2.domain.models.effect import ActiveEffect, DurationType, EffectScope, EffectType, Shape
+
+    movement_provider = ActiveEffect(
+        id="template",
+        source_id="template",
+        effect_type=EffectType.PRE_ACTION_MOVEMENT,
+        scope=EffectScope(shape=Shape.GLOBAL),
+        duration=DurationType.PASSIVE,
+        max_value=1,
+        is_active=True,
+        created_at_turn=1,
+        created_at_round=1,
+    )
+    pre_action_moves = (
+        ResolvePreActionMovementStep(hero_id="template")
+        .resolve(SimpleNamespace(active_effects=[movement_provider], round=1, turn=1), {})
+        .new_steps
+    )
+    for step in pre_action_moves:
+        step.step_id = "template"
     payload = {
+        "pre_action_movement": [step.model_dump(mode="json") for step in pre_action_moves],
+        "passive_bodies": {"wild_hunt": [step.model_dump(mode="json") for step in wild_hunt_steps]},
         "schema_version": 1,
         "source_sha256": manifest["source_sha256"],
         "two_card_effects": sorted(
@@ -193,6 +237,12 @@ def export():
                     "get_action_prevention_reason",
                 )
             )
+        ),
+        "action_prevention_effects": sorted(
+            key
+            for key, effect in CardEffectRegistry._effects.items()
+            if type(effect).get_action_prevention_reason
+            is not CardEffect.get_action_prevention_reason
         ),
         "registered_effects": sorted(CardEffectRegistry._effects),
         "passive_configs": {

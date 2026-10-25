@@ -1,5 +1,4 @@
-//! Passive providers are scanned now; offers re-resolve their card when executed.
-//! Immutable configs/prompts are shared, while usage counters live on physical cards.
+//! Passive offers retain provider identities; execution re-resolves live cards.
 use crate::{
     cards::CardId,
     data::{Datum, Registers, Symbol, Symbols},
@@ -13,20 +12,30 @@ pub struct Offer {
     pub optional: bool,
     pub prompt: Symbol,
     pub hero: Option<Symbol>,
+    pub provider: Option<Symbol>,
+}
+struct PassiveSource {
+    definition: usize,
+    card: Symbol,
+    effect: Symbol,
+    uses: i64,
+    provider: Option<Symbol>,
 }
 #[derive(Clone, Debug)]
 struct Config {
     trigger: Symbol,
     limit: i64,
     optional: bool,
-    prompt: Option<String>,
+    prompt: Option<Symbol>,
 }
 #[derive(Clone, Debug)]
 pub struct PassiveRules {
     configs: Vec<(Symbol, Vec<Config>)>,
-    prompts: Vec<Vec<Symbol>>,
+    prompts: Vec<Symbol>,
     triggers: Vec<Symbol>,
     gun: Symbol,
+    wild: Symbol,
+    before_action: Symbol,
     after_push: Symbol,
     victim: Symbol,
 }
@@ -38,9 +47,11 @@ impl PassiveRules {
             .as_object()
             .ok_or("missing passive configs")?
         {
+            let rows = rows.as_array().ok_or("invalid passive configs")?;
+            if rows.is_empty() {
+                continue;
+            }
             let rows = rows
-                .as_array()
-                .ok_or("invalid passive configs")?
                 .iter()
                 .map(|row| {
                     Ok(Config {
@@ -52,7 +63,9 @@ impl PassiveRules {
                             .ok_or("invalid passive optional flag")?,
                         prompt: match &row["prompt"] {
                             serde_json::Value::Null => None,
-                            serde_json::Value::String(s) => Some(s.clone()),
+                            serde_json::Value::String(s) => {
+                                (!s.is_empty()).then(|| symbols.intern(s))
+                            }
                             _ => return Err("invalid passive prompt".into()),
                         },
                     })
@@ -64,25 +77,7 @@ impl PassiveRules {
             .definitions
             .cards
             .iter()
-            .map(|card| {
-                configs
-                    .iter()
-                    .find(|(effect, _)| *effect == card.effect)
-                    .map_or_else(Vec::new, |(_, rows)| {
-                        rows.iter()
-                            .map(|c| {
-                                let prompt = c
-                                    .prompt
-                                    .clone()
-                                    .filter(|s| !s.is_empty())
-                                    .unwrap_or_else(|| {
-                                        format!("Use {} passive ability?", symbols.name(card.name))
-                                    });
-                                symbols.intern(&prompt)
-                            })
-                            .collect()
-                    })
-            })
+            .map(|c| symbols.intern(&format!("Use {} passive ability?", symbols.name(c.name))))
             .collect();
         let triggers = source["passive_triggers"]
             .as_array()
@@ -99,6 +94,8 @@ impl PassiveRules {
             prompts,
             triggers,
             gun: symbols.intern("big_sodding_gun"),
+            wild: symbols.intern("wild_hunt"),
+            before_action: symbols.intern("before_action"),
             after_push: symbols.intern("after_push"),
             victim: symbols.intern("push_victim_id"),
         })
@@ -116,12 +113,10 @@ impl PassiveRules {
         if !self.triggers.contains(&trigger) {
             return Err("unknown passive trigger".into());
         }
-        if world.has_effects {
-            return Err("effect-backed passive providers not compiled".into());
-        }
         let mut offers = Vec::new();
-        // Do not deduplicate played/ultimate aliases: the reference only deduplicates
-        // the later active-effect provider scan against these two ordinary sources.
+        let mut seen = Vec::new();
+        // Ordinary aliases are intentionally not deduplicated. The seen set only
+        // suppresses the later active-effect source scan, as in Python.
         for id in h
             .played
             .iter()
@@ -134,31 +129,89 @@ impl PassiveRules {
             .chain(h.ultimate.iter().filter(|_| h.level >= 8))
         {
             let c = world.card(*id).ok_or("passive card missing")?;
+            let d = &world.definitions.cards[c.definition];
+            seen.push(d.printed_id);
             if c.facedown {
                 continue;
             }
-            let d = &world.definitions.cards[c.definition];
-            if let Some((_, configs)) = self.configs.iter().find(|(e, _)| *e == d.effect) {
-                for (index, config) in configs.iter().enumerate() {
-                    if config.trigger != trigger
-                        || (config.limit > 0 && c.passive_uses >= config.limit)
-                    {
-                        continue;
-                    }
-                    if d.effect != self.gun {
-                        return Err("eligible passive execution not compiled".into());
-                    }
-                    offers.push(Offer {
-                        card: d.printed_id,
-                        trigger,
-                        optional: config.optional,
-                        prompt: self.prompts[c.definition][index],
-                        hero: hero.map(|_| h.id),
-                    });
-                }
+            self.add_offers(
+                &mut offers,
+                PassiveSource {
+                    definition: c.definition,
+                    card: d.printed_id,
+                    effect: d.effect,
+                    uses: c.passive_uses,
+                    provider: None,
+                },
+                trigger,
+                hero.map(|_| h.id),
+            )?;
+        }
+        for e in &world.effects.instances {
+            if e.source != h.id || !e.active {
+                continue;
             }
+            let Some(card) = e.linked_card.filter(|id| !seen.contains(id)) else {
+                continue;
+            };
+            let Some(granted) = e
+                .granted_passive
+                .filter(|id| *id != world.definitions.effect_empty)
+            else {
+                continue;
+            };
+            let Some(id) = world.card_by_printed(card) else {
+                continue;
+            };
+            seen.push(card);
+            self.add_offers(
+                &mut offers,
+                PassiveSource {
+                    definition: world.card(id).unwrap().definition,
+                    card,
+                    effect: granted,
+                    uses: e.passive_uses,
+                    provider: Some(e.id),
+                },
+                trigger,
+                hero.map(|_| h.id),
+            )?;
         }
         Ok(offers)
+    }
+    fn add_offers(
+        &self,
+        offers: &mut Vec<Offer>,
+        source: PassiveSource,
+        trigger: Symbol,
+        hero: Option<Symbol>,
+    ) -> Result<(), String> {
+        let PassiveSource {
+            definition,
+            card,
+            effect,
+            uses,
+            provider,
+        } = source;
+        if let Some((_, configs)) = self.configs.iter().find(|(e, _)| *e == effect) {
+            for config in configs {
+                if config.trigger != trigger || config.limit > 0 && uses >= config.limit {
+                    continue;
+                }
+                if effect != self.gun && effect != self.wild {
+                    return Err("eligible passive execution not compiled".into());
+                }
+                offers.push(Offer {
+                    card,
+                    trigger,
+                    hero,
+                    provider,
+                    optional: config.optional,
+                    prompt: config.prompt.unwrap_or(self.prompts[definition]),
+                });
+            }
+        }
+        Ok(())
     }
     pub fn card(world: &NativeWorld, owner: Symbol, printed: Symbol) -> Option<CardId> {
         let hero = world.hero(owner)?;
@@ -173,24 +226,43 @@ impl PassiveRules {
                     .is_some_and(|c| world.definitions.cards[c.definition].printed_id == printed)
             })
     }
+    /// Re-resolve the provider at execution; scans never retain physical pointers.
+    pub fn resolve(
+        &self,
+        world: &NativeWorld,
+        owner: Symbol,
+        offer: Offer,
+    ) -> Option<(CardId, Symbol)> {
+        if let Some(provider) = offer.provider {
+            let e = world.effects.instances.iter().find(|e| {
+                e.id == provider
+                    && e.active
+                    && e.source == owner
+                    && e.card == Some(offer.card)
+                    && e.granted_passive
+                        .is_some_and(|id| id != world.definitions.effect_empty)
+            })?;
+            Some((world.card_by_printed(offer.card)?, e.granted_passive?))
+        } else {
+            let id = Self::card(world, owner, offer.card)?;
+            let c = world.card(id)?;
+            let d = &world.definitions.cards[c.definition];
+            (!c.facedown && d.has_effect).then_some((id, d.effect))
+        }
+    }
     pub fn body(
         &self,
         world: &NativeWorld,
         ctx: &Registers,
         symbols: &Symbols,
         owner: Symbol,
-        card: CardId,
+        effect: Symbol,
         trigger: Symbol,
     ) -> Result<bool, String> {
-        let c = world.card(card).ok_or("passive card missing")?;
-        if c.facedown {
-            return Ok(false);
+        if effect == self.wild {
+            return Ok(trigger == self.before_action);
         }
-        let d = &world.definitions.cards[c.definition];
-        if !d.has_effect {
-            return Ok(false);
-        }
-        if d.effect != self.gun {
+        if effect != self.gun {
             return Err("eligible passive execution not compiled".into());
         }
         if trigger != self.after_push {
@@ -213,8 +285,21 @@ impl PassiveRules {
         world: &mut NativeWorld,
         actor: Option<Symbol>,
         printed: Symbol,
+        provider: Option<Symbol>,
     ) -> Result<(), String> {
-        if let Some(card) = actor.and_then(|a| Self::card(world, a, printed)) {
+        if let Some(provider) = provider {
+            if let Some(e) = world
+                .effects
+                .instances
+                .iter_mut()
+                .find(|e| e.id == provider && e.card == Some(printed))
+            {
+                e.passive_uses = e
+                    .passive_uses
+                    .checked_add(1)
+                    .ok_or("effect passive usage overflow")?;
+            }
+        } else if let Some(card) = actor.and_then(|a| Self::card(world, a, printed)) {
             let c = world.card_mut(card).ok_or("passive card missing")?;
             c.passive_uses = c
                 .passive_uses

@@ -19,6 +19,9 @@ pub fn stats_batch(envelope: StateEnvelope, queries: Vec<Value>) -> Result<Value
         let key = symbols.intern(key);
         context.set(key, Datum::from_json(value, &mut symbols)?);
     }
+    let actor = envelope.state["current_actor_id"]
+        .as_str()
+        .map(|id| symbols.intern(id));
     let mut results = Vec::new();
     for query in queries {
         let unit = symbols.intern(query["unit"].as_str().ok_or("unit missing")?);
@@ -30,7 +33,7 @@ pub fn stats_batch(envelope: StateEnvelope, queries: Vec<Value>) -> Result<Value
                 &context
             )?),
             Some("card") => json!(world.card_stats(unit, card_id(&query, "card")?)?),
-            Some("minion_defense") => json!(world.minion_defense(unit)?),
+            Some("minion_defense") => json!(world.minion_defense(unit, actor)?),
             _ => return Err("unknown stat query".into()),
         });
     }
@@ -405,4 +408,340 @@ pub fn effect_trace(envelope: StateEnvelope, operations: Vec<Value>) -> Result<V
         }
     }
     Ok(json!({"records":records}))
+}
+
+pub fn displacement_batch(envelope: StateEnvelope, queries: Vec<Value>) -> Result<Value, String> {
+    let mut symbols = Symbols::default();
+    let world = NativeWorld::compile(&envelope, &mut symbols)?;
+    let mut results = Vec::with_capacity(queries.len());
+    for query in queries {
+        let kind = crate::validation::DisplacementKind::parse(
+            query["kind"].as_str().ok_or("displacement kind missing")?,
+        )?;
+        let unit = symbols.intern(query["unit"].as_str().ok_or("displacement unit missing")?);
+        let actor = match &query["actor"] {
+            Value::Null => None,
+            Value::String(value) => Some(symbols.intern(value)),
+            _ => return Err("invalid displacement actor".into()),
+        };
+        let destination = if query["destination"].is_null() {
+            None
+        } else {
+            Some(serde_json::from_value(query["destination"].clone()).map_err(|e| e.to_string())?)
+        };
+        results.push(
+            world
+                .can_displace(unit, actor, kind, destination)?
+                .export(&symbols),
+        );
+    }
+    Ok(json!({"results":results}))
+}
+
+pub fn action_legality_batch(
+    envelope: StateEnvelope,
+    queries: Vec<Value>,
+) -> Result<Value, String> {
+    let mut symbols = Symbols::default();
+    let world = NativeWorld::compile(&envelope, &mut symbols)?;
+    let mut initial = Vec::new();
+    for (key, value) in envelope.state["execution_context"]
+        .as_object()
+        .ok_or("context missing")?
+    {
+        let key = symbols.intern(key);
+        initial.push((key, Datum::from_json(value, &mut symbols)?));
+    }
+    let mut context = Registers::new(&symbols);
+    for (key, value) in initial {
+        context.set(key, value);
+    }
+    let mut results = Vec::with_capacity(queries.len());
+    for query in queries {
+        let unit = symbols.intern(query["unit"].as_str().ok_or("actor missing")?);
+        let card = if query["card"].is_null() {
+            None
+        } else {
+            Some(card_id(&query, "card")?)
+        };
+        let result = match query["kind"].as_str() {
+            Some("action") => world.action_legality(
+                unit,
+                serde_json::from_value(query["action"].clone()).map_err(|e| e.to_string())?,
+                card,
+                &context,
+            )?,
+            Some("repeat") => world.repeat_legality(unit)?,
+            Some("move") => world.movement_legality(
+                unit,
+                query["distance"].as_i64().ok_or("distance missing")?,
+                query["is_action"]
+                    .as_bool()
+                    .ok_or("movement action flag missing")?,
+                card,
+                &context,
+            )?,
+            _ => return Err("unknown action validation query".into()),
+        };
+        results.push(result.export(&symbols));
+    }
+    Ok(json!({"results":results}))
+}
+
+pub fn terrain_batch(envelope: StateEnvelope, queries: Vec<Value>) -> Result<Value, String> {
+    let mut symbols = Symbols::default();
+    let world = NativeWorld::compile(&envelope, &mut symbols)?;
+    let current = envelope.state["current_actor_id"]
+        .as_str()
+        .filter(|s| !s.is_empty())
+        .map(|s| symbols.intern(s));
+    let mut results = Vec::with_capacity(queries.len());
+    for query in queries {
+        let actor = query["actor"].as_str().map(|s| symbols.intern(s));
+        let effective_actor = actor.or(current);
+        let ids =
+            |field: &str, symbols: &mut Symbols| -> Result<Vec<crate::data::Symbol>, String> {
+                query[field]
+                    .as_array()
+                    .ok_or("invalid movement identities")?
+                    .iter()
+                    .map(|v| {
+                        v.as_str()
+                            .map(|s| symbols.intern(s))
+                            .ok_or("invalid movement identity".into())
+                    })
+                    .collect()
+            };
+        let moved = ids("moved", &mut symbols)?;
+        let value = match query["kind"].as_str() {
+            Some("obstacle") => json!(world.obstacle_for_actor(
+                serde_json::from_value(query["hex"].clone()).map_err(|e| e.to_string())?,
+                effective_actor
+            )?),
+            Some("terrain") => json!(world.terrain_hex(
+                serde_json::from_value(query["hex"].clone()).map_err(|e| e.to_string())?
+            )?),
+            Some("passable") => json!(world.passable_token(
+                serde_json::from_value(query["hex"].clone()).map_err(|e| e.to_string())?,
+                &moved
+            )),
+            Some("paths" | "reachable") => {
+                let units = if query["units"].is_null() {
+                    actor.into_iter().collect()
+                } else {
+                    ids("units", &mut symbols)?
+                };
+                let movement =
+                    serde_json::from_value(query["query"].clone()).map_err(|e| e.to_string())?;
+                json!(if query["kind"] == "paths" {
+                    world.movement_paths(&movement, effective_actor, Some(&units), &moved)?
+                } else {
+                    world.movement_reachable(&movement, effective_actor, Some(&units), &moved)?
+                })
+            }
+            _ => return Err("unknown terrain query".into()),
+        };
+        results.push(value);
+    }
+    Ok(json!({"results":results}))
+}
+
+pub fn hex_filter_batch(envelope: StateEnvelope, queries: Vec<Value>) -> Result<Value, String> {
+    let mut symbols = Symbols::default();
+    let world = NativeWorld::compile(&envelope, &mut symbols)?;
+    let actor = envelope.state["current_actor_id"]
+        .as_str()
+        .filter(|s| !s.is_empty())
+        .map(|s| symbols.intern(s));
+    let coordinates = ["q", "r", "s"].map(|s| symbols.intern(s));
+    let mut entries = Vec::new();
+    for (key, value) in envelope.state["execution_context"]
+        .as_object()
+        .ok_or("context missing")?
+    {
+        entries.push((symbols.intern(key), Datum::from_json(value, &mut symbols)?));
+    }
+    let mut context = Registers::new(&symbols);
+    for (key, value) in entries {
+        context.set(key, value);
+    }
+    let mut results = Vec::new();
+    for query in queries {
+        let filter = crate::spatial::compile_filter(&query["filter"], &mut symbols)?;
+        let candidates =
+            serde_json::from_value::<Vec<crate::geometry::Hex>>(query["candidates"].clone())
+                .map_err(|e| e.to_string())?;
+        let mut accepted = vec![true; candidates.len()];
+        filter.apply_scan(
+            &crate::spatial::SpatialContext {
+                world: &world,
+                registers: &context,
+                symbols: &symbols,
+                actor,
+                frame: None,
+                coordinates,
+                range_override: None,
+                through_override: None,
+            },
+            &candidates,
+            &mut accepted,
+        )?;
+        results.push(accepted);
+    }
+    Ok(json!({"results":results}))
+}
+
+pub fn mine_path_batch(envelope: StateEnvelope, queries: Vec<Value>) -> Result<Value, String> {
+    let mut symbols = Symbols::default();
+    let world = NativeWorld::compile(&envelope, &mut symbols)?;
+    let current = envelope.state["current_actor_id"]
+        .as_str()
+        .filter(|v| !v.is_empty())
+        .map(|v| symbols.intern(v));
+    let mut results = Vec::new();
+    for query in queries {
+        let start = serde_json::from_value(query["start"].clone()).map_err(|e| e.to_string())?;
+        let range = i32::try_from(query["range"].as_i64().ok_or("mine range missing")?)
+            .map_err(|_| "mine range outside i32")?;
+        let actor = query["actor"]
+            .as_str()
+            .map(|v| symbols.intern(v))
+            .or(current);
+        let team = query["team"].as_str().map(|v| symbols.intern(v));
+        let units = if query["units"].is_null() {
+            Vec::new()
+        } else {
+            query["units"]
+                .as_array()
+                .ok_or("mine unit list missing")?
+                .iter()
+                .map(|v| {
+                    v.as_str()
+                        .map(|v| symbols.intern(v))
+                        .ok_or("invalid mine unit".into())
+                })
+                .collect::<Result<Vec<_>, String>>()?
+        };
+        let paths = world.mine_paths(start, range, actor, team, &units)?;
+        let ends = serde_json::from_value::<Vec<crate::geometry::Hex>>(query["ends"].clone())
+            .map_err(|e| e.to_string())?;
+        results.push(
+            ends.iter()
+                .map(|hex| {
+                    world
+                        .tile_index(*hex)
+                        .map(|index| {
+                            paths[index]
+                                .iter()
+                                .map(|option| {
+                                    let mut ids = option
+                                        .mines
+                                        .iter()
+                                        .map(|id| symbols.name(*id))
+                                        .collect::<Vec<_>>();
+                                    ids.sort();
+                                    json!({"mine_ids":ids,"path":option.path})
+                                })
+                                .collect::<Vec<_>>()
+                        })
+                        .unwrap_or_default()
+                })
+                .collect::<Vec<_>>(),
+        );
+    }
+    Ok(json!({"results":results}))
+}
+
+/// Comparison boundary for explicitly tagged mathematical mine-choice sets.
+/// Ordered trigger queues, event order, option order and path order are untouched.
+pub fn normalize_mine_choice_record(record: &mut Value, keys: &[String]) {
+    for key in keys {
+        if let Some(values) = record
+            .get_mut("semantic_state")
+            .and_then(|s| s.get_mut("execution_context"))
+            .and_then(|s| s.get_mut(key))
+            .and_then(Value::as_array_mut)
+            && values.iter().all(Value::is_string)
+        {
+            values.sort_by(|a, b| a.as_str().cmp(&b.as_str()));
+        }
+    }
+    if record["request"]["prompt"] == "Choose which mines to move through"
+        && let Some(options) = record["request"]["options"].as_array_mut()
+    {
+        for option in options {
+            if let Some(hexes) = option["metadata"]["metadata"]["mine_hexes"].as_array_mut() {
+                hexes.sort_by_key(|h| (h["q"].as_i64(), h["r"].as_i64(), h["s"].as_i64()));
+            }
+        }
+    }
+}
+
+/// Batch source-compatible targeting/filter diagnostics; JSON stays at the boundary.
+pub fn targeting_batch(envelope: StateEnvelope, queries: Vec<Value>) -> Result<Value, String> {
+    use crate::targeting::{UnitCandidates, compile_effective_unit_filters};
+    let mut symbols = Symbols::default();
+    let world = NativeWorld::compile(&envelope, &mut symbols)?;
+    let actor = envelope.state["current_actor_id"]
+        .as_str()
+        .map(|id| symbols.intern(id));
+    let mut registers = Registers::new(&symbols);
+    for (key, value) in envelope.state["execution_context"]
+        .as_object()
+        .ok_or("context missing")?
+    {
+        let key = symbols.intern(key);
+        registers.set(key, Datum::from_json(value, &mut symbols)?);
+    }
+    let coordinates = ["q", "r", "s"].map(|key| symbols.intern(key));
+    let mut results = Vec::with_capacity(queries.len());
+    for query in queries {
+        let mode = query["mode"].as_str().ok_or("targeting mode missing")?;
+        if mode == "target" {
+            let from = query["actor"].as_str().map(|id| symbols.intern(id));
+            let to = query["unit"].as_str().map(|id| symbols.intern(id));
+            results.push(world.can_target(from, to)?.export(&symbols));
+            continue;
+        }
+        if !matches!(mode, "select" | "multi" | "count" | "collect") {
+            return Err("targeting mode not compiled".into());
+        }
+        let pool = match query["target_type"].as_str() {
+            Some("UNIT_OR_TOKEN") => UnitCandidates::UnitsAndTokens,
+            Some("UNIT") if mode == "select" => UnitCandidates::UnitsWithIllusions,
+            Some("UNIT") => UnitCandidates::Units,
+            _ => return Err("targeting candidate type not compiled".into()),
+        };
+        let target_actor = if matches!(mode, "select" | "multi") {
+            query["target_actor"]
+                .as_str()
+                .map(|id| symbols.intern(id))
+                .or(actor)
+        } else {
+            None
+        };
+        let filters = compile_effective_unit_filters(&query, &mut symbols, mode == "count")?;
+        let context = crate::spatial::SpatialContext {
+            world: &world,
+            registers: &registers,
+            symbols: &symbols,
+            actor,
+            frame: None,
+            coordinates,
+            range_override: None,
+            through_override: None,
+        };
+        let choices = world.select_units(pool, target_actor, &filters, &context)?;
+        results.push(if mode == "count" {
+            json!(choices.len())
+        } else {
+            json!(
+                choices
+                    .into_iter()
+                    .map(|id| symbols.name(id))
+                    .collect::<Vec<_>>()
+            )
+        });
+    }
+    Ok(json!({"results":results}))
 }

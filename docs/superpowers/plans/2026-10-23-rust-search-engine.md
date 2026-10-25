@@ -661,7 +661,8 @@ Shared MultiSelect supports ordered UNIT/UNIT_OR_TOKEN choices, minimum/maximum
 counts, DONE/SKIP, duplicates, invalid retries, saved selections, no-actor and
 empty-candidate paths. Clear uses its actual repeated-selection/ForEach/removal
 children. Token removal updates occupancy, retains the supply entity and emits
-the ordinary TOKEN_REMOVED event; active-effect cleanup remains unsupported.
+the ordinary TOKEN_REMOVED event. Linked active-effect cleanup is implemented
+in later milestones below.
 Generated templates and per-iteration copies preserve distinct identities.
 
 Facedown card text is a no-op as in Python; registered primary bodies and the
@@ -787,8 +788,10 @@ the shortest path length for the generated MoveUnitStep; no repeated path query
 is needed to rediscover that distance. If walking fails, a separate connected-map
 search finds nearest empty placement destinations. Favored-team/ID ordering,
 team-owned retryable prompts, processed-minion continuations, no-op cases and
-nonmandatory relocation match the reference. Active effects, aura restrictions
-and passable-token movement still reject instead of being approximated.
+nonmandatory relocation match the reference. The original plain-only guard has
+since been replaced by actor-aware traversal, movement/displacement legality and
+connected placement fallback (see the effect-aware minion return update below).
+Uncompiled card aura restrictions still reject explicitly.
 
 Generated move/place/return frames carry typed bindings, folded into ordinary
 wire records on export. Restoration is checked before every instruction,
@@ -832,7 +835,10 @@ favored-team order, origin/unit selection, own-lane placement and exact prompt
 context. Invalid group choices retain pending input as Python does; invalid
 single-unit destinations and casualty choices clear it. Minion battle counts
 include One Man Army and removal prompts recalculate ordinary/heavy eligibility.
-Active-effect exclusions/topology/protections remain explicitly unsupported.
+The original active-effect battle guard has since been replaced by source-verified
+exclusion counting, token-linked cleanup during pushes and topology-aware spawn
+displacement (see the effect-aware battle update below). Casualty removal follows
+the existing RemoveUnit semantics; battle removals do not invent defeat protection.
 
 Seventy-six independent real-handler cases add 232 operations, including all
 six maps, cleanup-phase roots, simultaneous victory/tie remedies, counter edge
@@ -1531,3 +1537,1269 @@ work includes active-effect gameplay consumers and finishing scheduling, other
 card/passive/spell rules, aggregate aliases, make/unmake and hashing, evaluation,
 iterative team-aware search, hidden/simultaneous planning, parallelism, optional
 validated integration and full-simulation performance/strength gates.
+
+
+### 2026-10-24: token-linked effect removal and Linux-local oracle
+
+Implemented real RemoveTokenStep effect cleanup: remove instances linked by
+token_id, source_id or scope.origin_id only when the token has a board position.
+Independent barrier anchors do not count. Preserve unrelated duplicate-ID rows,
+card-active flags and finishing payloads; report the actual removed count in the
+TOKEN_REMOVED event. Inactive and temporally expired rows are still removed.
+Resolution-only create/remove/context/log stacks can restore active rows; other
+unported gameplay/controller paths remain guarded. Native tests verify each
+instruction boundary, create/remove composition and private worker state.
+
+Added 51 full handler cases / 53 operations, including every effect category,
+link type, no-op target, gates/context precedence, off-board tokens, repeats,
+card flags, fixed scope origins and premature finishing suppression. Both frozen
+Windows and Linux runtimes generated identical cases. The actual release worker
+passed every new state/request/event comparison. Canonical corpus now contains
+2,203 cases / 8,870 operations, SHA-256:
+9c776a5c734ce4d2437135291afbebbf2f47dbb7a305ddfdfdfccb73c37a4352.
+The full locked release workspace run passed all 114 native tests, including
+the complete corpus (CLI comparison 103.98 seconds).
+
+Created a Linux-local reference environment at
+/home/sebastian/.cache/goa2-rust/oracle-venv using the already installed CPython
+3.11.17 and exact frozen Pydantic 2.13.4, pydantic_core 2.46.4 and jsonpatch 1.33.
+Source/runtime verification retained the unchanged manifest identity. All 60
+focused Python oracle/EffectManager tests passed there. This avoids repeated
+Windows-to-WSL source reads; the Windows runtime remains a backup/cross-check.
+Strict Clippy, Rust formatting, Black, Ruff and whitespace checks passed.
+No NN dependencies/tests, live service changes, commits or pushes in this slice.
+
+Remaining full objective is unchanged: active-effect gameplay consumers and
+finishing scheduling, remaining card/passive/spell rules, aggregate aliases,
+make/unmake and hashing, evaluation, iterative team-aware search, hidden and
+simultaneous planning, parallelism, validated integration, strength tests and
+1,000 complete two-turn simulations/sec. General transition/search flags remain
+false; token-removal parity does not establish those broader requirements.
+
+
+### 2026-10-24: native effect stats, immunity and topology consumers
+
+Added shared typed effect behavior compiled at the state/program boundary.
+Native queries use no JSON/Python: all effect scope shapes/relations, positive
+item doubling, area stat modifiers, basic-action bonuses, and ordered conditional
+modifiers. Item/marker/card-aura contributions precede conditional thresholds.
+Multi-piece owner/piece recursion preserves performed-card fallback and counts
+each positional effect once for aggregate initiative. Explicit card queries keep
+the reference's recursion precedence. Dynamic exceptions/primary operand binding
+update the shared-definition projection through copy-on-write.
+
+Implemented split/isolation connectivity, including source live-position versus
+isolated-hex fallback and one-way caster interaction. Heavy/action/attack immunity
+is shared by effect stat/scoping checks, including token controllers, named
+subjects, basic/nonbasic attacks and attacker exceptions. Topology intentionally
+ignores effect activity/duration as the frozen reference does; action immunity
+uses the explicit active flag while attack immunity also checks duration.
+Card aura positional counts and minion defense now consult topology. Illusion
+minion equivalence and unported card aura hooks remain explicit guards.
+
+Effect activity reads live world round/turn. Round reset synchronizes this clock;
+a native full-round regression checks the synchronization. Added real
+CheckAdjacencyStep execution through the same topology implementation, with
+restore-at-instruction and private-state regressions. Other unported gameplay
+and action controllers remain guarded; this does not enable general search.
+
+New source-verified stat corpus: 134 cases / 28,675 queries, SHA-256:
+7c8768ef68aeaef25b8da643a698f8837d67929f3a51508eb0e9fb814d581450.
+The actual release worker matches every scalar/card/minion-defense result.
+Added 17 full adjacency handler cases / 18 operations, including literal/context
+IDs, one-way isolation, immunity exceptions, off-board/unknown endpoints and
+instruction prefixes. Actual release worker matches full state/request/events.
+Main corpus: 2,220 cases / 8,888 operations, SHA-256:
+a76430a1fc10dd2d5e3f04d2a0ff1cd3e3392def789c9ec9258c1e3f7f238c96.
+
+Reference defect discovered: radius immunity combined with topology can recurse
+until Python raises RecursionError. Preserved one source-verified rejected case
+in effect-errors.json. Native scope resolution returns an explicit unsupported
+error at bounded recursion depth; this case is not counted as a correct gameplay
+transition. Do not silently repair/re-pin the frozen Python reference.
+
+All 60 focused Python oracle/manager tests, strict Clippy and exporter linting
+pass. The full locked release workspace regression passed all 119 native tests,
+including all 2,220 handler cases / 8,888 operations (CLI comparison 128.00 seconds).
+Rust formatting and whitespace checks also pass. No NN tests,
+Python engine changes, live restarts, commits or pushes in this slice.
+
+Remaining objective is unchanged: other gameplay effect consumers, finishing
+scheduling and remaining card/passive/spell rules; aggregate aliases; make/unmake
+and hashing; evaluation, iterative team-aware search, hidden/simultaneous
+planning and parallelism; optional validated integration; full-game strength and
+1,000 full two-turn simulations/sec. Completion is not established by these
+bounded rule/transition correctness tests.
+
+
+### 2026-10-24: native displacement legality and real placement/swap
+
+Added typed validation.rs with shared can_displace verdicts corresponding to
+Python can_be_moved/pushed/swapped/placed. Native queries consume typed effect
+behavior, not JSON: placement-prevention category, live timing/scope, immunity,
+requested displacement type, and source/actor team and self flags. Preserve the
+source's evaluation order and first blocking effect ID/reason/source. Off-board
+entities bypass effect checks; missing entities/occupied placement destinations
+produce the exact plain denial. Token immunity/controller and raw actor-team
+semantics remain distinct as in the source.
+
+The displacement_legality worker operation compiles one world for a query batch
+and emits full diagnostic verdicts only at the boundary. This is displacement
+restriction checking, not full path/action legality. Move/push path/terrain,
+action availability and passive-consumer closures remain unfinished.
+
+Enabled PlaceUnitStep, SwapUnitsStep and primitive SetActorStep in guarded
+resolution roots containing active effects. Placement preserves occupancy
+prechecks, missing/skip targets, optional/mandatory failure and token events;
+swap validates both participants before either occupancy mutation. Actor false
+values use Python truthiness: placement falls back to the target, swap to literal
+system, token event actors become null, and SetActor saves null for empty actors.
+Live/fixed/multi-piece effect origins are resolved after each mutation/restore.
+
+Source-verified displacement-validation.json: 159 cases / 85,701 full verdicts,
+SHA-256 b77bcc19d464633b0922593fdb2a2d3f38a6b07d99a79d64a99f5007890e7f9d.
+Actual release worker matches all allowed flags, reasons, blocker/source IDs.
+Added 318 real placement/swap cases / 636 operations, SHA-256:
+4a5957f32a96b2126fb3485e8b59ff3116970945670de5ddb72fa52a49bc6c1f.
+Actual worker matches complete state/request/event records, including prefixes.
+Added native full-verdict parity, private-origin workers, instruction restoration
+and blocked-second-swap-participant atomicity tests. Canonical corpus now has
+2,538 cases / 9,524 operations, SHA-256:
+2fc6967645d5c8bd59430d2a625120a202d28b527f23d020efbfa6fd1475d912.
+The full locked release workspace regression passed all 124 native tests,
+including all 2,538 transition cases / 9,524 operations (CLI comparison 110.49
+seconds). Strict Clippy, Rust formatting, whitespace and Python formatting/lint
+checks pass, as do all 60 focused oracle/EffectManager Python tests. Also passed all
+27 selected reference validation/displacement/placement rules tests (87 Python
+tests total in this slice).
+
+No Python engine changes, NN tests, live service restarts, commits or pushes.
+The full engine/search objective remains unchanged and unfinished: other effect
+consumers and finishing orchestration, remaining card/passive/spell rules,
+aggregate aliases, make/unmake and hashing, evaluation, iterative team-aware
+search, hidden/simultaneous planning, parallelism, validated integration,
+strength gates and 1,000 full two-turn simulations/sec. General transition/search
+flags remain false.
+
+
+### 2026-10-24: native action restrictions, repeat prevention and movement caps
+
+Added native action/repeat/movement verdicts using typed immutable effect
+payloads and each worker's live position/context. Preserve replacement-action
+prerequisites, effect-before-card-hook precedence, explicit card-color exceptions,
+first blocking effect metadata, bound owner identity and unbound any-piece
+permission. Movement caps preserve raw board-presence requirements, action-only
+flags, negative/zero maxima and stable first-winner ties. The action_legality
+batch diagnostic compiles a world once and exports JSON only at the boundary.
+
+Ported Witching Hour's card-specific prevention hook, with source-derived hook
+catalog coverage. Ordinary negative attacks remain legal: reference cases compute
+and offer ATTACK values -16 and -14, and native tests require negative-valued
+options to remain present. Witching Hour explicitly prohibits negative attacks
+within its radius; that exception is not generalized. If Python blocks negative
+attacks without a specific rule, record a reference defect rather than reproducing
+it. No such general prohibition appeared in these reference cases.
+
+Action-menu/recipe diagnostics can evaluate active effects. Actual general
+ResolveCard execution with effects remains guarded pending movement, targeting,
+passive and other consumers. Enabled real ValidateRepeatStep inside the bounded
+effect-aware resolution closure, retaining scalar AND behavior and context order.
+Added per-instruction restore and worker-isolation tests with moving sources.
+The aggregate context-alias gate remains in place.
+
+Source-verified action-validation.json contains 198 states / 306,816 complete
+verdicts and 31 menus / 1,169 menu/action-recipe operations. SHA-256:
+bd8ceee56244fc816ca6bf24abfd67dfe885d2def968fd352299e0e56fde4c6c.
+175 real repeat-validation cases / 350 operations are now in the canonical
+transition corpus (2,713 cases / 9,874 operations), SHA-256:
+432e5cb1557be5421c6f832ed42893733ef775117bb2a36b9d0eac76d750d67a.
+The standalone transition subset SHA-256 is:
+30d65463649dfa3584e64b94f0b8b6a1622f37c7fc72fca34580f207c396475e.
+
+New source cases exposed an origin-zone lookup mismatch: existing concrete tile
+zone IDs (including null) take precedence over membership fallback at both scope
+ends. Fixed it; effect-stats.json now covers 136 states / 29,103 queries, SHA-256:
+f1fa19af6b73f2f6b28535f9e3641bc623f9f2206ff867ad72545c33da01ebe5.
+Release-worker checks match every new verdict/menu/transition and all 85,701
+previous displacement verdicts. The full locked Rust workspace regression passed
+128 tests; complete CLI transition comparison took 104.10 seconds. Strengthened
+negative-value assertions passed a further focused test. All 87 focused Python
+oracle/rules tests, strict Clippy, format/lint and whitespace checks pass.
+
+No frozen Python rule changes, NN tests, live service restarts, commits or pushes.
+The full objective remains unfinished: remaining effect consumers and finishing
+scheduling, remaining card/passive/spell behavior, aggregate aliases, make/unmake
+and hashing, evaluation and iterative team-aware minimax/alpha-beta,
+hidden/simultaneous planning and parallelism, optional validated integration,
+strength gates and 1,000 complete two-turn simulations/sec. General engine/search
+capabilities remain false; these correctness timings are not search throughput.
+
+
+### 2026-10-24: actor terrain, stateful walking and real movement with effects
+
+Added native terrain.rs: actor-relative static barriers, enemy empty-space
+obstacles, petrified occupied terrain, passable token lookup and token supply
+fallback. Preserve raw source/actor teams, timing/immunity, separate barrier and
+scope origins, fixed-scope exceptions and entity-versus-pool precedence. Existing
+map tiles and virtual missing tiles retain the Python board contracts. A new
+reference case exposed the virtual missing-tile terrain behavior; native terrain
+queries now match it instead of incorrectly treating missing tiles as non-terrain.
+
+Native movement path/reachability batches share one BFS per query. Every edge
+must respect topology connectivity and visibility from the movement's original
+space, so ZERO cannot bridge a complete crossing of a reality split. Preserve
+explicit empty topology identity lists, actors that differ from moved units,
+off-map origins, final-obstacle exemptions and passable intermediate tokens.
+A moved token cannot traverse a mine when moved identity is provided, matching
+rule version 9's validator. The batch converts no JSON in its traversal and
+retains no query cache after a mutation.
+
+Real MoveUnitStep now composes displacement permission, optional action
+permission, movement caps, topology-aware paths, straight-line checks and
+actor-specific crossed obstacles. Preserve mandatory-abort versus optional
+continuation, ordinary invalid-path no-ops, success/context behavior, live source
+movement and exact movement events. Enabled direct MoveUnit within the bounded
+active-effect resolution closure; full movement sequences, selection filters,
+other effect consumers and mine-path choice/trigger payloads remain separate
+work. Actual movement still rejects on-board passable tokens, including tokens
+found only in supply, until the mine execution closure is ported.
+
+terrain-validation.json: 196 states / 42,728 queries / 183,848 scalar answers,
+SHA-256 0c3ab5625215eccff4d9c38b347105a54de2a764ba0b1d7a545c3bfc76a094da.
+756 full movement cases / 1,512 operations, standalone SHA-256:
+25fb9ac6196acce721492f39e9cf37d6332950c83464d0a0c326a35e15f5c9b5.
+Export asserts actual successful ordinary moves and mandatory/optional abort
+outcomes. The release worker matches complete states/events, including reality
+crossing attempts and straight moves. Native tests add full query parity, live
+private barrier origins, mutation-fresh batches, a passable-token corridor,
+supply-only mine guards and restoration at every instruction for 68 traces.
+Canonical corpus now contains 3,469 cases / 11,386 operations, SHA-256:
+e2f006255c3266c0937d9ed557e382fc1e400ad96081f58db64ab0ecc50e2f98.
+
+Focused reference suite passes 166 Python oracle, rules, barrier, terrain,
+topology and mine-pathfinding tests. Strict Clippy and formatting/lint checks
+pass. No frozen Python engine changes, NN tests, live service restarts, commits
+or pushes. Full locked release workspace regression passed all 134 native tests,
+including all 3,469 full handler cases / 11,386 operations. The complete CLI
+comparison took 112.36 seconds; this is a correctness-boundary workload, not
+search throughput. All prior action/stat/displacement/model/geometry/planning
+corpora and the new terrain/restore tests pass.
+
+The full engine/search objective remains unchanged: remaining gameplay effect
+consumers, mine/finishing scheduling, card/passive/spell behavior, aggregate
+aliases, make/unmake and hashing, evaluator and iterative team-aware
+minimax/alpha-beta, hidden/simultaneous planning and parallelism, optional
+validated integration, strength tests and 1,000 full two-turn simulations/sec.
+General game/search flags remain false. These correctness checks do not establish
+full-game execution or search throughput.
+
+
+### 2026-10-24: movement sequences, hex filters and controlled input
+
+MoveSequenceStep now combines computed movement stats, scoped movement caps,
+card auras and movement-aura-zone grants at expansion. Freeze effective range
+and pass-through permission into generated selection/movement frames and preserve
+them across continuation export/restore. MoveUnit still checks current
+movement/displacement permission at execution. Preselected destinations, optional
+skips, straight/full-distance constraints and invalid/retried choices match the
+source. Actual mine choice/trigger execution remains separately gated before a
+movement sequence can issue an unexecutable prompt.
+
+Ported the existing compiled HEX filter set's effect consumers: actor obstacles,
+movement paths with explicit moved-unit identities, topology-aware range,
+adjacency, spawn adjacency and straight-line predicates. Physical/geometric
+ranges deliberately bypass topology. Inverse straight-line predicates negate
+the complete topology-aware condition. Tide of Darkness uses the source's
+unlocked ultimate/static-effect-ID test, including facedown ultimates. Pure
+filter/path scans can inspect passable tokens without running mine payloads.
+Unit-targeting/card selections and other unported filter families remain gates.
+
+Added common CONTROL_NEXT_ACTION request routing using the exact actor,
+resolution-owner, original turn-card, scope-origin and explicit active-flag
+checks. Do not substitute generic temporal activity: the frozen source uses
+only the control row's is_active flag here. First matching effect wins. The
+native request owner becomes the controller, but choices/legality and discard
+actor metadata retain the original hero; wire context adds controlled_hero_id.
+Request identity and routing reconstruct after restore. Bounded effect-aware
+roots now admit HEX/NUMBER selections and confirmation prompts. The existing
+compile-time Fast Travel filter guard remains authoritative; an initially
+added duplicate check was removed rather than maintained alongside it.
+
+hex-filters.json: 201 states / 19,497 scans / 1,208,717 candidate verdicts,
+SHA-256 b19d529d1d577aab8194dbdf6dc47f199c5da07d3cd359c7a96bfc673ee932aa.
+movement_sequence_traces.py adds 1,045 real handler cases / 5,347 operations,
+including 64 controlled-prompt cases / 352 operations. Standalone SHA-256:
+2431d2c4c5214cdd092fb19e8d048920aea548550d21703136deaa10dbfa7e30.
+All new filter and full state/request/event records match the release worker.
+Success/skip source assertions reproduce their frozen cases exactly when using
+the generator's identical deepcopy boundary (zone set iteration order is
+preserved rather than sorted). Native tests add restoration of 51 sequence and
+64 controlled-prompt traces at every instruction, live source movement after
+aura expansion, worker-private control ownership/original metadata, explicit
+geometric/inverse-line rules and early unsupported-filter rejection.
+
+Canonical transition corpus: 4,514 cases / 16,733 operations, SHA-256:
+e35a4b118d1bed6254ad44fa5dda4dd4f2486b46747193fe70242d772c401de3.
+All 290 focused Python oracle, movement, topology, battle-zone and Hanu effect
+tests pass. Strict Clippy and Python lint/format checks pass. The complete locked
+release workspace regression passed all 142 native tests, including every one
+of the 4,514 transition cases / 16,733 operations. Full CLI comparison took
+161.39 seconds; this is a correctness-boundary timing, not search throughput.
+All prior model/stat/displacement/planning/movement corpora and the new
+filter/restoration tests pass.
+
+No frozen Python rule changes, NN tests, live restarts, commits or pushes.
+The complete engine/search objective remains unfinished: mine paths/triggers,
+remaining targeting/gameplay/phase/finishing consumers, remaining card/passive/
+spell rules, aggregate context aliases, make/unmake and hashing, evaluator,
+iterative team-aware minimax/alpha-beta, hidden/simultaneous planning,
+parallelism, optional validated integration, strength gates and 1,000 complete
+two-turn simulations/sec. General game/search flags remain false; these
+correctness checks do not establish full-game execution or search throughput.
+
+
+### 2026-10-24: standalone mine paths and explicit trigger closure
+
+Ported one-pass mine-aware BFS with shared immutable sets and parent-linked
+paths. Preserve per-edge source topology (distinct from ordinary movement's
+original-space restriction), actor obstacles, raw moving identity/team and
+entity-first passable supply fallback. Stable entity/supply ranks prevent
+symbol-interning history changing native set order. No cached result crosses a
+world mutation. Exact path/option ordering and mathematical sets match 920
+queries across 23 states.
+
+Ported standalone MinePathChoice and explicit TriggerMine instructions. Choice
+prompts preserve raw string IDs, nested source wire metadata and invalid-input
+retry identity. Ordered triggers preserve literal/context precedence, arbitrary
+ID removal, token-linked effect expiration, event order, rollback flags and
+forced-discard chains, including duplicate/off-board blast source quirks.
+World-aware linking compiles discard consumers only for possible blast queues;
+dud-only active-effect queues avoid unreachable combat dependencies. Possible
+blast queues with active/potential effects reject before mutation until the
+effect-aware discard/shield/passive closure is implemented. Continuations carry
+victim/source bindings explicitly across export/restore, and workers keep their
+mine choices private.
+
+The source-reproduced mine-reference-errors fixture records implicit multi-mine
+hash-order nondeterminism and generic numeric option-ID conversion rejected by
+MinePathChoice. Choice-only fixtures normalize declared mathematical sets;
+explicit trigger queues/events and all option/path order remain exact. Frozen
+Python sources and their pin are unchanged. Ordinary negative attacks remain
+legal; a general Python prohibition is a reference defect, not a porting target.
+
+Automatic MoveUnit detection and mine-choice/requeue integration remain gated.
+Remaining gameplay/phase/finishing consumers, card/passive/spell rules, aggregate
+aliases, make/unmake and hashing, evaluator, iterative team-aware minimax,
+hidden/simultaneous planning, parallelism, validated integration, strength gates
+and 1,000 complete two-game-turn simulations/sec remain unfinished. General
+game/search capability flags remain false. No live services were restarted.
+
+
+Latest mine verification: all 150 locked release workspace tests pass, including
+4,631 complete transition cases / 17,261 operations. Canonical corpus SHA-256:
+6fa1afe326791dadc91163e24909172ef7986129c01abd505e5f9db5471211be.
+The full CLI comparison took 154.63 seconds; this measures correctness-boundary
+work, not search throughput. All 307 focused Python oracle/rules/effect tests,
+strict Clippy, Python lint and formatting checks pass. Automatic movement/mine
+integration and the full engine/search requirements remain unfinished.
+
+
+### 2026-10-24: automatic movement/mine scheduling
+
+MoveUnit now integrates the mine BFS and explicit trigger closure: source supply
+ownership detection, straight crossings, flexible path choices, requeue with a
+step-scoped prechosen flag, relocated-unit events and literal victim/queue
+snapshots for TriggerMine. Frozen sequence range/unit bindings and fresh runtime
+copy identities survive export/restore. Imported labels remain explicit, while
+generated copied frames receive independent ephemeral identities. A second move
+still detects its own mines. Ordinary movement no longer blanket-rejects all
+on-board passable tokens, including supply-only identities.
+
+Link potential blast discards from deployed entities, explicit prechosen queues
+and potential placements; do not compile irrelevant off-board roster blast
+consumers for ordinary dud-only effect roots. Runtime uncompiled blast checks
+remain before relocation. Effect-aware blast discard/shield/passive rules are
+still gated. General game/search capability flags remain false.
+
+Source fixture coverage adds 66 cases / 396 operations, including exact ordered
+multi-mine straight/explicit queues. Flexible detected paths contain at most one
+enemy mine, avoiding the source's known implicit hash-order nondeterminism;
+ordered events are never normalized away. Three source defects now reproduce in
+mine-reference-errors.json: the previous hash-order and numeric-helper failures,
+and literal destination loss when generating a mine path choice. The latter is
+an explicit compatibility fixture. Frozen Python source and pin are unchanged.
+
+Remaining scope still includes effect-aware mine discards, other gameplay/phase/
+finishing consumers, remaining card/passive/spell rules, aggregate context alias
+arena, make/unmake plus hashing, evaluation, iterative team-aware minimax,
+hidden/simultaneous planning, parallelism, validated integration, strength gates
+and 1,000 complete two-game-turn simulations/sec. NN tests remain excluded;
+live lab/backend/bot services are untouched.
+
+
+Automatic movement verification: all 153 locked release workspace tests pass,
+including 4,697 full transition cases / 17,657 operations. Canonical SHA-256:
+afb2455e6068ae5a945acbda59570931cba40ff6031dc4eb649f10f486b5bac3.
+Full CLI comparison took 151.26 seconds; this is correctness-boundary work,
+not search throughput. All 307 focused Python oracle/rules/effect tests pass,
+including reproduction of the three mine reference defects. Strict Rust/Python
+lint, formatting and whitespace checks pass. No NN tests, frozen Python source
+changes, live restarts, commits or pushes. Full engine/search requirements and
+effect-aware blast discard closure remain unfinished.
+
+
+### 2026-10-24: effect-aware forced discard and shield closure
+
+Ported creator-owned active discard-shield lookup, exact played/current ordering
+and printed-ID deduplication, forced-discard actor immunity, eligible-hand-first
+behavior and filtered shield alternatives. Basic/nonbasic forced selections
+snapshot the eligible hand IDs plus shield IDs, disable the basic predicate for
+shield alternatives, and serialize that state with the generated selection.
+Unfiltered selections retain live hand behavior. Discard can find the selected
+played/current shield even from nominal HAND, record public reveal/discard
+history/context and expire all linked effects prematurely without finishing
+steps. Card flags and physical aliases remain worker-local.
+
+Blast discards now admit supported existing active effects. Compile passive
+providers only when an eligible offer requires them; unrelated active effects
+or grants for other triggers no longer force unreachable combat compilation.
+Provider eligibility preserves creator/active/card/trigger/usage rules and
+ordinary played/ultimate seen-ID precedence. Eligible unported passive bodies
+remain explicit, with preflight for supported initial roots. Dynamically created
+blast-effect closures remain gated, as do complete reaction windows and other
+unported gameplay/phase/finishing consumers.
+
+Reference coverage adds 103 real handler cases / 680 operations, SHA-256:
+94c596b194f80ede9896ad7e78107236175d6d5145f258f5d28ccc4b436d6182.
+Registered Mrak physical cards cover hand/shield choices, filtered hand snapshots,
+current/facedown/duplicate/multiple shields, inactive/old-active/off-scope rows,
+empty hands, immunity, linked expiry and explicit/movement blast chains. Source
+assertions prove nonbasic shields can absorb basic-card discards without touching
+the hand or running finishing steps, and grants are offered only for matching
+triggers. NN tests, source modifications, live restarts, commits and pushes are
+excluded. Ordinary negative attacks remain legal; general Python prohibition
+would be a reference defect.
+
+Full scope remains open: eligible passive/remaining card/spell bodies, complete
+reaction/combat/phase/finishing consumers and dynamic effect closure, aggregate
+context aliases, make/unmake and hashing, evaluation, iterative team-aware
+minimax/alpha-beta, hidden/simultaneous planning, parallelism, validated
+integration, strength gates and 1,000 complete two-game-turn simulations/sec.
+
+
+Effect-aware discard verification: all 158 locked release workspace tests pass,
+including 4,800 full transition cases / 18,337 operations. Canonical SHA-256:
+5983b21fe85936de3500fa767da69b7c1b4cde880f6f35e98b2a64449025b656.
+Full CLI comparison took 180.31 seconds; this is correctness-boundary execution,
+not search throughput. All 353 focused Python oracle/rules/effect tests pass,
+including the real Mrak shield tests. Strict Rust/Python lint, formatting and
+patch whitespace checks pass. Frozen Python sources, their pin and live services
+are unchanged. No NN tests, commits or pushes. The full engine/search objective,
+eligible unported passive bodies and dynamic blast-effect closure remain open.
+
+
+### 2026-10-24: granted provider execution and Wild Hunt
+
+Added live provider IDs to passive offers/usage markers and typed mutable effect
+usage/grant fields. Scanning preserves source creator/active/grant/card/usage
+and seen-card rules; executing a waiting offer re-resolves the current provider
+and global carrier card. Copied abilities use their creator, not the physical
+card owner. Explicit markers require only matching provider/card IDs, including
+inactive rows and absent global carriers. Provider usage never increments the
+foreign physical card and remains private across search-worker clones. Future
+make/unmake and hashing must track this mutable effect counter independently of
+the immutable definition payload. Hero finalization's counter reset includes
+its own provider rows; full active-effect phase execution remains a separate gate.
+
+Refactored body dispatch into immutable per-effect/per-owner programs compiled
+only for relevant trigger families. Wild Hunt's exact source recipe is frozen
+from its registered get_passive_steps method. It performs an optional exact
+straight two-space selection and effect-side move, with no movement-action aura
+inheritance. Generated frames retain literal owner origins and restore them at
+instruction boundaries. Other eligible bodies remain guarded, instead of fabricating an empty passive result. The subsequent combat milestone
+adds active-effect Big Sodding Gun support.
+
+The provider corpus contributes 202 complete handler cases / 1,267 operations,
+SHA-256 74700ceaff60f72f2d366dcf8a680bd66fd8a29a74a814a91314b854158cdea2.
+Coverage includes copied/facedown foreign carriers, direct/scanned offers,
+active/scope/creator/card flags, unlimited and negative usage, deduplication,
+missing actors/positions, exact movement, action-only/non-action caps, mine
+crossing and provider removal before marking. All full worker records match
+Python. Source assertions prove creator ownership, independent usage and
+inactive/missing-carrier marking; no NN packages or tests are involved.
+
+Full scope remains open: remaining passive/card/spell bodies, complete dynamic
+active-effect gameplay/combat/phase/finishing consumers, aggregate context arena,
+make/unmake plus hashing, evaluator, iterative team-aware minimax/alpha-beta,
+hidden/simultaneous planning, parallelism, validated integration, strength gates
+and 1,000 complete two-game-turn simulations/sec. These are correctness checks,
+not evidence for full-game/search completion or throughput. Live lab/backend/bot
+services and frozen Python engine sources remain unchanged.
+
+
+Provider/Wild Hunt verification: all 162 locked release workspace tests pass,
+including 5,002 full transition cases / 19,604 operations. Canonical SHA-256:
+2959d73e4ead1d8a9c7d344f9a88706b4a848b13f04ff9f9c7cc44135bacd03b.
+Full CLI comparison took 154.59 seconds; this measures correctness-boundary
+serialization/execution, not search throughput. All 359 focused Python oracle,
+rules and real card-effect tests pass, including Mrak and Silverarrow tests.
+Strict Rust/Python lint and formatting checks pass. Frozen Python source/pin,
+live services and NN dependencies are unchanged; no commits or pushes. The full
+engine/search objective, remaining passive/card/spell bodies and complete
+active-effect phase/combat/dynamic-effect closure remain unfinished.
+
+
+### 2026-10-24: effect-aware defeat, minion saves, bounties and granted Gun
+
+Ported source/card ownership expiry on defeat without finishing steps, preserving
+all token-bound rows (including an empty non-null token ID). Minion protection
+preempts defeat mutation and prioritizes mandatory totem sacrifice. Card-save
+prompts re-evaluate live providers and qualifying hands; accept/skip/invalid
+results retain Python's different scoring/removal/bounty paths. Retry frames
+carry only minion, killer and tried IDs, so imported pending flags do not leak
+into a different provider. Granted Big Sodding Gun can execute hand-only forced
+discard or defeat; provider removal before marking remains visible.
+
+Bounty beneficiary is the existing subject-or-source property, not a separately
+serialized protected_unit_id. Payout uses live positions, team and topology,
+with typed mutable per-row max_value. Deduplicated creation cannot reset spent
+coins. Future make/unmake and hashing must track this counter along with passive
+usage. Empty-stack game-over states with effects can restore. Remaining illusion
+minion-defense consumers reject explicitly; complete attack/reaction and phase
+consumers remain unfinished.
+
+Added 132 frozen Python handler cases / 542 ordered operations, subset SHA-256
+71639d8299f0ef59aea9f77f805a88337b772d3dc22df24102bf3d36db0ef7bc.
+Coverage includes dynamic creation, all minion types, source/card/token ownership,
+stale/declined/imported protection choices, live provider removal, bounty
+exhaustion/topology/order, terminal restore and signed negative combat.
+Explicit source assertions confirm ordinary negative attacks are legal; no
+general negative-attack Python defect appeared. All 433 focused non-NN Python
+oracle/rules/card-effect tests pass.
+
+The full engine/search objective remains active. Outstanding requirements include
+remaining card/passive/spell bodies, complete effects/phase/finishing semantics,
+aggregate aliases, make/unmake and hashing, evaluator, iterative team-aware
+minimax/alpha-beta, hidden/simultaneous planning, parallel workers, validated
+integration, strength gates and 1,000 complete two-game-turn simulations/sec.
+Frozen Python engine source/pin and live services are unchanged.
+
+
+Fixture publication now keeps superseded immutable snapshots. A full verification
+run exposed that pruning after an index swap could delete a file still needed by
+a reader holding the previous index. Export/merge regression tests now require
+both old readers and the new index to remain readable; reclamation belongs in
+an explicitly offline cleanup. No active fixtures are pruned during publication.
+
+
+Effect-aware combat verification: all 164 locked release workspace tests pass,
+including all 5,134 complete handler traces / 20,146 operations. Canonical index
+SHA-256: 2bfec22f0ae454a3039d23b91e1de67cc76722d138291cf1b3fa55ffd1453bc3.
+Independent full CLI state/request/event comparison also passes (409.97 seconds
+while running the native suite concurrently); this is correctness-boundary
+serialization/execution, not a search-throughput measurement. All 433 focused
+Python tests pass, including negative combat, real Brogan/Swift/Sabina effects
+and safe snapshot publication. Strict Clippy, Rust formatting, Black/Ruff and
+patch whitespace checks pass. Frozen source/pin and live lab/backend/bot services
+are unchanged. NN tests/dependencies remain excluded; no commits or pushes.
+The complete engine/search objective remains unfinished with the scope above.
+
+
+### 2026-10-25: actor-bound illusion defense and effect-aware reaction windows
+
+Ported illusion-minion defense using the live actor's canonical hero identity,
+provider source/direct-active flag, connected first ring and source team. No
+hardcoded hero, token owner, temporal/scope/subject restriction or second-ring
+bonus is introduced. All combat, reaction and offline diagnostic consumers pass
+the actor explicitly, so worker branches and temporary defense actors remain
+independent without duplicate cached actor state.
+
+Reaction menus now append active played/current shield cards in source order and
+compute stats with the actual offered physical card, including basic-action and
+Initiative bonuses. Accepting a shield uses ordinary discard/expiry/passive
+handling; a stale provider reopens the reaction prompt. Supported primary defense
+flags, marker bodies, combat outcomes and actor restoration work with effects.
+Body programs link projectile dependencies only when a card can reach that
+on-block consumer. Bounded active-effect roots exclude locked upgrades; ordinary
+phase roots still include all possible future upgrades. Relevant active-effect
+projectile targeting remains guarded rather than replaced by a no-op.
+
+Added 200 frozen real-handler cases / 1,425 operations; subset SHA-256
+23f95fc058c7e4fbecf1ee3a3c360a350f967841b0fd292fa98614f6d96f82c8.
+Coverage spans all 33 hero decks with Defense/Initiative effects, shield paths,
+source/piece/actor/topology/ring variants and complete supported Arien, Wasp and
+Bain defense chains. Source tests assert selected-card bonuses and live shield
+invalidation. Native tests restore every new case and isolate actors, cards,
+providers and pending choices between workers.
+
+Full objective remains open: complete effect-aware targeting/attacks/projectile
+reactions, remaining card/passive/spell/phase/finishing bodies, aggregate aliases,
+make/unmake, hashing, evaluator, iterative team-aware minimax/alpha-beta,
+hidden/simultaneous planning, parallelism, validated integration, strength gates
+and 1,000 complete two-game-turn simulations/sec. This milestone is correctness
+coverage, not proof of full-game support or search throughput.
+
+
+Illusion/reaction verification: all 168 locked release workspace tests pass,
+including every canonical handler transition and instruction restoration for all
+200 new cases. All 600 focused non-NN Python oracle/rules/card-effect tests pass.
+The production passive-catalog comparison runs in an isolated process so effects
+registered by test modules during collection cannot pollute the source catalog.
+The private shield/pass test observes the discard before a later passed attack
+correctly defeats the hero and expires its remaining card-owned effects.
+
+Full CLI comparison passes all 5,334 cases / 21,571 operations. Canonical index
+SHA-256: 1c602cb333606d1ef140fbe1765a5f4db600c768c671f53bf857e15e2fab1cba.
+It took 427.99 seconds alongside the native suite; this measures correctness
+serialization/execution, not search throughput. Strict Clippy, Rust formatting,
+Black/Ruff and whitespace checks pass. Frozen Python source/pin and live services
+are unchanged; no NN tests/dependencies, commits or pushes. Full engine/search
+capability flags remain false and the complete objective remains unfinished.
+
+
+### 2026-10-25: effect-aware targeting, resumable pre-actions and projectile attacks
+
+Implemented source-specific ordered candidate pools, illusion type/team handling,
+LOS targeting, actor/attack immunity, movement/placement predicates and topology
+identity propagation. Intrinsic validation uses the override actor but predicate
+filters retain the current actor; unit tokens bypass intrinsic validation. Single
+UNIT selectors append Illusions, while multi/query UNIT pools do not. Source
+activation distinctions (direct flags versus validator timing) are preserved.
+
+Replaced the pre-action no-op stubs needed by full attacks. Movement children
+come from the real Python resolver and bind typed hero/range values and exact
+prompts; source fields restore without opaque custom gameplay metadata.
+Disruptors keep processed IDs on the same requeued frame, consume matching rows
+without finishing steps, update carrier activation, and re-evaluate hand, scope,
+immunity and board presence. Empty-hand defeat credits the provider; defender
+abort policy preserves the attacker. Existing Reflect/Deflect targeting now runs
+with active effects. Full attack traces cover movement, leaving scope, linked
+expiry, multiple costs, defeat and mine discards during a defense chain.
+
+Frozen source batch: 66 states / 29,780 complete results, SHA-256
+a12410da81f268fdce8c63b7138c0ad51861714e82a823e415449dea2853e4e3.
+Added 482 real-handler traces / 2,902 operations, SHA-256
+69dc87592a7d2680f03dd5ac295e2953a1ab450a3059aac129400888dde4119e.
+All these source/native comparisons pass. Native tests add full batch comparison,
+private worlds, instruction restoration and forked pending-disruptor continuations.
+
+The original objective remains active: remaining card/passive/spell/filter
+implementations, all phase/dynamic-effect/finishing semantics, aggregate aliases,
+make/unmake and hashing, evaluator, iterative team-aware minimax/alpha-beta,
+hidden/simultaneous planning, parallel workers, validated integration, strength
+gates and 1,000 complete two-game-turn simulations/sec. Full-game/search flags
+remain false; source-comparison timings are not throughput claims.
+
+
+Targeting/pre-action verification: all 171 locked release workspace tests pass,
+including every canonical transition and instruction restoration for all 482 new
+cases. All 657 focused non-NN Python oracle/rules/card-effect tests pass. The
+66-state / 29,780-result targeting batch also matches the native worker exactly.
+Generic effect creation already preserves the pre-action payload fields; no
+special-case compiler copy or frozen Python engine edit was needed.
+
+The full independent CLI comparison passes 5,816 cases / 24,473 operations.
+Canonical index SHA-256:
+890b01218bb6efe0ab8482a9f383d4e17305a1aac2456e5e9e72c81e69049659.
+It took 395.44 seconds alongside native verification; this is correctness-boundary
+serialization/execution, not search throughput. Strict Clippy, Rust formatting,
+Black/Ruff and patch whitespace checks pass. The frozen source/pin and live
+lab/backend/bot services are unchanged; no NN tests/dependencies, commits or
+pushes. Ordinary negative attacks remain legal. The full engine/search objective
+and all remaining gates above remain open.
+
+
+## Effect-aware automatic minion return
+
+The native return instruction now handles active effects using the existing typed
+legality, terrain and topology rules. Walking destinations check displacement
+permission and non-action movement caps; traversal uses the minion's actor-aware
+obstacles, passable tokens and start-to-each-space connectivity. If no legal walk
+exists, placement searches through connected map spaces and checks the destination's
+placement permission. The current actor governs displacement restrictions, with
+missing/empty actors falling back to the returning minion. Bare tile obstacles
+still govern landing candidates, matching the source's intentional distinction.
+The generated move reuses the BFS path length rather than rerunning shortest-path
+queries. Uncompiled card aura restrictions remain explicit failures.
+
+`scripts/rust_oracle/minion_return_effect_traces.py` adds 238 real-handler cases /
+695 operations, including displacement/immunity scopes and duration variants,
+movement caps with action-only toggles and missing/empty actors, topology, terrain,
+barriers and passable-token variants. Four forced corridors assert actual relocation
+and distinguish walking from placement when a token blocks the only route. All
+238 cases match the release CLI's full state, requests and event order. Permanent
+native checks restore every instruction and fork independent waiting return choices.
+
+```sh
+PYTHONPATH=scripts/rust_oracle:src "$oracle_python" scripts/rust_oracle/minion_return_effect_traces.py export
+PYTHONPATH=scripts/rust_oracle:src "$oracle_python" scripts/rust_oracle/minion_return_effect_traces.py verify -- "$worker"
+```
+
+This removes one turn-finalization dependency; full effect-aware phase orchestration
+still requires scheduled expiry/finishing and remaining gameplay consumers.
+The full engine/search, alias arena, make/unmake and hashing, evaluator, hidden and
+simultaneous planning, iterative team-aware search, parallel workers, validated
+integration, strength gates and 1,000 complete two-game-turn simulations/sec remain
+required. Negative attacks remain legal. The frozen Python source is unchanged;
+NN tests/dependencies and live lab/backend/bot processes are untouched.
+
+
+Effect-aware return verification: all 172 locked release workspace tests pass,
+including complete state/request/event comparison for 6,054 canonical cases /
+25,168 operations and every-instruction restoration of the new return cases.
+The full CLI regression test finished in 184.03 seconds; this is correctness
+verification, not search throughput. The separate release-worker comparison
+passes all 238 new cases / 695 operations. All 657 focused non-NN Python tests,
+strict Clippy, Rust formatting, Black/Ruff and patch whitespace checks pass.
+Canonical index SHA-256:
+91e5f72204b7fdf44348c9722e1a7f63294c6a3f86599e26aac7276e90bf3470.
+The standalone return corpus SHA-256 is
+7eeb1a14310352dca879b91bcff1c9defbbe905beec28e1b085365f30c5f0932.
+Full engine/search completion and performance remain unproven and open.
+
+
+## Effect-aware minion battle and lane pushes
+
+Battle primitives now run with active effects in resolution and cleanup phases;
+immediate cleanup, upgrades and reset are implemented below. Scheduled turn/end-phase
+finishing orchestration remains guarded. Native counting implements MINION_BATTLE_EXCLUSION:
+sum caps by raw source ID in effect order, find adjacent enemy minions connected
+to that source, and reserve excluded IDs per enemy team across sources. This
+consumer deliberately uses the stored active flag and raw entity team/position;
+it does not apply temporal expiry, effect scope, subject or immunity filtering.
+Overlapping origins can therefore produce different totals when effect order
+changes. Nonpositive summed caps do nothing. One Man Army remains additive.
+
+Lane pushes remove token-, source- and scope-origin-linked effects when a directly
+spawned minion overwrites a placed token. This uses the existing token-removal
+semantics without inventing events, finishing payloads or carrier-card resets.
+Blocked-spawn displacement searches connected neighbors without an actor or an
+origin-to-every-space constraint. It offers bare empty landing spaces first,
+then the generated mandatory Place instruction validates the chosen destination;
+placement prevention can abort the remaining steps, matching Python.
+
+`scripts/rust_oracle/battle_effect_traces.py` adds 322 real-handler cases / 1,375
+operations. These rerun the original 76 battle/lane/spawn scenarios with active
+effects, check three kinds of linked token effects, cover 159 displacement-rule
+states, and exercise exclusion caps, summed/overlapping origins, scope/duration,
+raw-team/token ownership, immunity, topology and One Man Army. All new records
+match the release worker's complete state, requests and event order. Source-only
+contract tests pin the order-sensitive overlap counts and direct activation rule.
+Native tests cover restoration after every generated instruction and independent
+casualty choices in cloned workers sharing immutable definitions.
+
+```sh
+PYTHONPATH=scripts/rust_oracle:src "$oracle_python" scripts/rust_oracle/battle_effect_traces.py export
+PYTHONPATH=scripts/rust_oracle:src "$oracle_python" scripts/rust_oracle/battle_effect_traces.py verify -- "$worker"
+```
+
+This removes the battle dependency of effect-aware phase progression. Remaining
+work still includes scheduled expiry/finishing, all remaining card/passive/
+spell/filter bodies, aggregate context aliases, make/unmake and hashing, evaluator,
+iterative team-aware minimax/alpha-beta, hidden and simultaneous planning, parallel
+workers, validated integration, strength gates and 1,000 complete two-game-turn
+simulations/sec. Ordinary negative attacks remain legal. The frozen Python engine
+and live lab/backend/bot services are unchanged; NN tests/dependencies are excluded.
+
+
+Effect-aware battle verification: all 174 locked release workspace tests pass,
+including complete state/request/event comparison for 6,376 canonical cases /
+26,543 operations. The full CLI regression took 188.83 seconds; it measures
+correctness-boundary replay, not search throughput. The independent release-worker
+comparison passes all 322 new cases / 1,375 operations. All 758 focused non-NN
+Python rules/oracle/card-effect tests pass, including Wuk exclusions, end phase,
+lane pushes, lane-bound respawns and double-lane endgames. Strict Clippy,
+Rust formatting, Black/Ruff and patch whitespace checks pass.
+Canonical index SHA-256:
+a22adaf54a29ac948f6ad441407064e6d16b48427fd5634791214461dfa7f8cb.
+Standalone battle corpus SHA-256:
+496ac2c27a1b253901f365093fa562361b1d22f8654d7f42588e33b69e53bb37.
+The frozen source/pin remains unchanged. No live-service restarts, NN dependencies,
+commits or pushes were needed. The full engine/search goal and all remaining
+requirements above remain open.
+
+
+## Immediate effect-aware round cleanup, upgrades and reset
+
+EndPhaseCleanup now composes the native lifecycle consumers in source order:
+expire THIS_ROUND effects, reset markers, sweep stale effects, expire effects
+linked to played/current cards, retrieve cards, clear temporary pooled tokens,
+then purchase levels and handle upgrades/reset. Its second duration sweep
+intentionally ignores returned finishing payloads, as Python does; it does not
+own THIS_TURN expiry or scheduled end-phase finishing execution. Token-bound
+effects retain their duration exemption, including a non-null empty token ID.
+Card expiration still removes matching token-bound card effects when required.
+Stale sweeps preserve the source's carrier-flag behavior, and discarded cards are
+not treated as played/current cards during the explicit card-expiry sweep.
+
+Each TOKEN_REMOVED event now contains the actual count of linked effects removed
+at that token's position in pool order. Persistent/unpooled/unplaced tokens and
+duplicate physical pool references follow the same source behavior. Effects that
+survive cleanup remain in the private world throughout upgrade previews, chosen
+cards, item gains, ultimate hooks and reset into planning.
+
+The compiler now builds only reachable upgrade/reset continuations for these
+active-effect phase roots, avoiding irrelevant future action/Fast Travel programs.
+Ordinary full phase roots retain their full continuation set. Reaction dependency
+selection accounts for cleanup/upgrade roots that can introduce deck cards. Active
+effect planning boundaries can be saved/restored; commit/uncommit/pass/finish
+commands still reject the unported planning effect closure before mutation.
+Cleanup-only sessions also reject planning when their last effect expires but
+full planning continuations were not compiled; restoring that effect-free saved
+boundary compiles ordinary planning and enables its commands. Scheduled
+turn/end-phase finishing remains a separate, explicit requirement.
+
+`scripts/rust_oracle/round_effect_traces.py` adds 216 real-handler cases / 602
+operations: 138 cleanup/upgrade scenarios rerun with persistent effects, plus 78
+duration/activation/card-link/token/finishing cases. All registered heroes and
+both upgrade faces are retained; the six map cases enter directly at cleanup,
+while the existing ordinary full-flow map cases remain unchanged. All new cases
+match complete release-worker state, requests and events. Source contracts verify
+ignored versus retained finishing payloads, ordered token event counts and empty
+token bindings. Native tests restore every instruction, fork upgrade choices and
+verify planning guards reject each command without mutating persistent state.
+
+```sh
+PYTHONPATH=scripts/rust_oracle:src "$oracle_python" scripts/rust_oracle/round_effect_traces.py export
+PYTHONPATH=scripts/rust_oracle:src "$oracle_python" scripts/rust_oracle/round_effect_traces.py verify -- "$worker"
+```
+
+The full engine/search objective remains open: scheduled expiry/finishing and
+remaining phase/dynamic-effect consumers, all remaining card/passive/spell/filter
+bodies, aggregate context/step aliases, make/unmake and hashing, evaluator,
+iterative team-aware minimax/alpha-beta, hidden and simultaneous planning,
+parallel workers, optional validated integration, strength gates and 1,000 complete
+two-game-turn simulations/sec. Negative attacks remain legal. No frozen Python
+source change, NN dependency, live-service restart, commit or push is required.
+
+
+Immediate cleanup verification: all 176 locked release workspace tests pass,
+including full state/request/event comparison for 6,592 canonical cases / 27,145
+operations. The final CLI replay took 199.35 seconds; this is correctness-boundary
+replay, not search throughput. The independent release-worker comparison passes
+all 216 new cases / 602 operations. All 760 focused non-NN Python rules/oracle
+checks pass. Strict Clippy, Rust formatting, Black/Ruff and patch whitespace
+checks pass. Canonical index SHA-256:
+c05a749a999471caa67b1eec2105257ea7d5482516fd58bbe4529437ea0b49d8.
+Standalone cleanup corpus SHA-256:
+87cebeead6b5a617c71767019d777d1cc3d2d72576d26d8888da79e51e66a7f4.
+Source/pin integrity is unchanged. Scheduled finishing/alias identity and all
+remaining full engine/search requirements remain open. No NN dependencies,
+live-service restarts, commits or pushes were introduced.
+
+
+## Typed object identity arena foundation
+
+`objects.rs` adds worker-local typed object handles, ordered list/dictionary/model
+storage, shallow context snapshots, alias assignment, field updates, list append/
+pop and dictionary deletion. Mutation application consumes interned symbols and
+typed values; JSON is confined to import/export/diagnostic boundaries. Equal
+values are never used as object identity. A cloned arena preserves sharing within
+the worker and copies mutable nodes privately, including handles detached from
+the visible state. Frozen models reject writes; model/step setters require an
+existing field; cycle-producing assignments reject before semantic mutation.
+
+The opt-in source exporter in `scripts/rust_oracle/shared_objects.py` records
+`object_bindings`: kind plus compact-state paths for each list, dictionary and
+live/frozen model object. Singleton bindings retain kind information before a
+snapshot or assignment makes an object shared. Cards/tokens retain the existing
+physical instance table. Tuple containers remain immutable value data while
+their mutable children retain identity. This stage does not implement generic set
+mutation. Validation checks paths, kinds, overlap and identical ordered contents.
+Ordinary source exporters remain unchanged until runtime bindings are migrated.
+
+`scripts/rust_oracle/object_arena_traces.py` supplies 12 real-source scenes / 49
+mutations. They cover shared and independent equal lists/steps, duplicate textual
+step IDs, one step shared by stack and effect finishing payloads, shared pending
+input dictionaries, hero/hand/effect objects, shallow snapshots, immutable tuples,
+frozen models, detached handles and dictionary insertion order. Expected values,
+identity paths and ordered keys come from actual Python objects, not Rust. The
+`aggregate_trace` diagnostic matches all records. Native tests also check private
+forks, visible-identity boundary roundtrips and malformed/cyclic/frozen rejection.
+
+```sh
+PYTHONPATH=scripts/rust_oracle:src "$oracle_python" scripts/rust_oracle/object_arena_traces.py export
+PYTHONPATH=scripts/rust_oracle:src "$oracle_python" scripts/rust_oracle/object_arena_traces.py verify -- "$worker"
+```
+
+Live arena execution now accepts identity-bearing resolution envelopes for
+SetContextFlag, AddContextValue, RecordTarget, static LogMessage, NUMBER
+SelectStep, ForEach, SetActor, RestoreActionType and RestoreActionContext
+instructions with recursively compiled template bodies. These sessions read/write context and step pending state
+through arena handles. Dense-world compilation still rejects direct identity-
+bearing imports; this closed executor uses a read-only ownership/controller
+projection and guards writes through aliases to unbound world/step-operand lists.
+A context dictionary that itself aliases unbound world data also rejects.
+Other instructions and phase flows retain their import guards. Boundary binding
+indices remain local to each import and are rebound on restore. Private cloned
+checkpoints retain their handles. Dense world slots, other mutable operands,
+aggregate repeats and scheduled finishing execution still need integration.
+
+The original full engine/search scope remains open: remaining phase/dynamic-
+effect consumers, card/passive/spell/filter bodies, make/unmake and hashing,
+evaluator, iterative team-aware minimax/alpha-beta, hidden/simultaneous planning,
+parallel workers, optional validated integration, strength gates and 1,000 complete
+two-game-turn simulations/sec. Negative attacks remain legal. The frozen Python
+engine and live lab/backend/bot processes are unchanged; no NN dependencies,
+commits or pushes are introduced by this foundation.
+
+
+### Required arena integration contract
+
+- Use one symbol namespace per worker for arena values, native registers, world
+  slots and frame operands. Runtime binding must not serialize/reparse JSON.
+- Bind model/list fields to the authoritative dense storage or migrate them to
+  arena storage. A second by-value copy would reintroduce the alias bug. Include
+  hero collections, effect counters, marker fields and mutable step operands.
+- Rebind a position slot when movement gives it a new immutable Hex value; do
+  not change an older frozen object retained by a snapshot or context variable.
+- Frames that represent the same physical step must share a mutable handle.
+  Independent copied steps may have equal data and identical textual step IDs.
+  Read live mutable operands through that handle when source semantics require it.
+- Stored effect steps and executing frames must share pending-input/step data
+  while rule-version-9 turn effects linger. Preserve source actor wrappers,
+  FinishedExpiringEffect abort boundaries and deferred AdvanceTurn removal.
+- Rebind handles on a fresh boundary import. Private cloned checkpoints retain
+  their own handles, including detached nodes; exported visible binding indices
+  are not persistent program identities.
+- Replace aggregate repeat/snapshot guards only after shallow-reference behavior
+  and source value equality are verified, including physical card/model cases.
+- Promote alias-aware capture in gameplay oracle exports and revalidate full
+  phase traces before removing the dense-world/frame import guards.
+- Journal arena allocation/slot/link changes for make/unmake; include copied
+  physical instance rows, copied-program bindings and operand-protection entries.
+  Hash rule-relevant mutable alias topology, not allocation/table order, and
+  exclude immutable definition data. When world/card mutation binds, physical
+  deepcopy must read current runtime payloads rather than the import snapshot.
+  The final performance gate remains complete two-turn game simulations, not
+  aggregate mutation or serialization throughput.
+
+
+Object arena verification: all 179 locked release workspace tests pass, including
+all 6,592 canonical gameplay traces / 27,145 operations and the separate 12 arena
+scenes / 49 mutations. The full CLI gameplay replay took 207.07 seconds; it is a
+correctness replay, not search throughput. The final release worker independently
+matches arena values, identity topology and ordered keys. All 762 focused non-NN
+Python tests pass. Strict Clippy, Rust formatting, Black/Ruff and patch whitespace
+checks pass. The gameplay index remains unchanged:
+c05a749a999471caa67b1eec2105257ea7d5482516fd58bbe4529437ea0b49d8.
+Arena index SHA-256:
+d137bf6846416caf5b2dff0f537dcb31a5654261b561e9274343964126bcbe23.
+Frozen Python source/pin and live services remain unchanged. Runtime arena
+bindings, scheduled finishing and the full engine/search requirements remain
+open; this storage milestone does not advertise gameplay alias or search support.
+No NN dependencies, commits or pushes were introduced.
+
+
+## Live shared-object scalar execution
+
+`interpreter/object_execution.rs` binds actual execution-stack steps, context
+containers and pending request/input fields to worker-local arena handles. Shared
+stored effect steps observe pending-state changes immediately; independently
+copied steps with equal textual IDs remain distinct. Successful, automatic and
+skipped number choices clear both pending fields. Reusing a shared step later in
+the stack requests input again with a new request ID. Invalid input preserves the
+pending payload and repeated requests reuse their current ID, as in Python.
+
+SetContextFlag assigns the live payload reference; RecordTarget appends that same
+reference to an existing or newly allocated list. Future Set payloads therefore
+observe earlier list mutations. Tuple targets remain immutable, models retain
+Python truthiness, and shallow snapshots keep shared children. Symbols use one
+namespace; generated request IDs stay numeric internally. Mutable nodes are
+private to worker clones and immutable protected-slot metadata is shared. Runtime
+execution does not serialize JSON or clone aggregate Set payloads.
+
+The supported live binding is deliberately closed to scalar/context operations
+and NUMBER selections in resolution. An arena remains authoritative for context,
+stack and stored step state. The dense projection is used only for read-only
+ownership/controller lookup; planning commands and writes through context aliases
+to world/compiled-operand lists reject until those consumers bind. General dense
+world mutation, dynamic scheduling, aggregate repeats and finishing-step execution
+remain unfinished. Ordinary gameplay traces retain their current exporter.
+
+`object-execution.json` adds 18 frozen-source stack scenarios / 41 operations.
+It compares full state, requests, events, errors and explicit object identity,
+including duplicate textual step IDs, stored finishing references, invalid/stale
+input, repeated prompts, auto/skip/abort, condition skips, shared/new lists, tuple
+and model behavior, future Set payloads and numeric addition. Native tests restore
+every boundary, rebind transport IDs, fork different choices, check early budgets
+and reject world-list writes and context roots aliasing world dictionaries.
+Five source tests check the underlying contracts, narrowly typed request
+normalization and physical-instance capture boundaries. Generic references into
+mutable card/token payload descendants reject during source capture until those
+slots have identity bindings; direct physical card/token references still work.
+
+```sh
+PYTHONPATH=scripts/rust_oracle:src "$oracle_python" scripts/rust_oracle/object_execution_traces.py export
+PYTHONPATH=scripts/rust_oracle:src "$oracle_python" scripts/rust_oracle/object_execution_traces.py verify -- "$worker"
+```
+
+Live-execution corpus SHA-256:
+472b7e0d268c41e888a268d7c27abfcd55f514bb396b331a83bcbbcf407d8a31.
+The full engine/search objective and complete two-game-turn performance gate
+remain open. Negative attack values remain legal; a general Python rejection
+must be recorded as a source bug, not copied into Rust. No frozen Python changes,
+NN dependencies, service restarts, commits or pushes are part of this work.
+
+
+Live arena execution verification: all 186 locked release workspace Rust tests
+pass, including all 6,592 canonical gameplay traces / 27,145 operations and the
+18 live-identity scenarios / 41 operations. The full CLI test replay took 205.75
+seconds, a correctness measurement rather than search throughput. The final
+release worker independently matches both the live-execution corpus and the
+12 storage scenes / 49 mutations. All 767 focused non-NN Python rules/oracle
+tests pass. Strict Clippy, Rust fmt, Black/Ruff and whitespace checks pass.
+Frozen Python source/pin integrity and the canonical gameplay index are unchanged.
+Full dense-world bindings (including physical-payload child links), scheduled
+finishing, remaining rule bodies and the full search/performance gates remain
+open. Capability flags stay false for complete game transitions and search.
+No live services, NN dependencies, commits or pushes were changed.
+
+
+## Live ForEach execution and template deepcopy
+
+The arena executor now runs ForEach against live context list/tuple sources and stores
+current_index on the actual shared step. Each item assignment retains its original
+object/physical-instance reference. Subsequent iterations re-read the live list;
+the final iteration decides whether to requeue before its body executes, matching
+Python when a body appends/replaces items. Negative indices, missing/empty sources,
+tuple items, conditions, nested loops and shared versus independent loop counters
+are covered.
+
+Each template is deep-copied separately, with a fresh memo per template root.
+Copies preserve internal sharing and retain textual step IDs while receiving
+private mutable handles. Nested copied programs reuse immutable compiled
+instructions. Pending payloads belong only to arena nodes, so frame templates no
+longer retain or clone stale aggregate input. Operand protection is computed by
+the copied role: detached copies of world lists are mutable payloads, while
+unbound compiled operands remain guarded.
+
+Physical card/spell/token copies receive distinct runtime instance handles and
+share immutable definitions. Their payloads are immutable within this closed
+executor; private instance rows are materialized only at export. Boundary restore
+and worker forks preserve these identities without using printed IDs as object
+identity. The diagnostic instance_bindings groups visible reference paths
+independently of physical table allocation order, so comparisons check physical
+sharing as well as values and generic object topology.
+
+Object bindings now record deepcopy_shared for plain Hex, whose source custom
+__deepcopy__ returns itself. This behavior is captured by exact source type, not
+inferred from coordinate-shaped values or frozen status. Frozen subclasses still
+deep-copy their fields and mutable descendants. Alias-aware corpora were
+regenerated with that metadata; frozen Python source remains unchanged.
+
+The live corpus now has 43 source scenarios / 159 operations, including nine
+payload-copy variants, physical card/token copies, nested copies, dirty/prompting
+templates, list mutation, shared counters and a 1,200-step loop stopped/resumed at
+the real 1,000-step boundary. Native checks restore every operation and verify
+private physical allocations and input choices. Source checks verify reference
+and copy semantics directly.
+
+Current live corpus SHA-256:
+fba6da46d7ecfc94b6ff73b0e2a4c3dc89074cc9a32e233a986859ddd3e5779a.
+Current 12-scene / 49-mutation storage corpus SHA-256:
+1001eb3d2c8202ef1a3f9070e5983b9701a8506e69ac65a41a569c15e77361a9.
+
+This expands context/control execution. Dense world slots, physical-payload child
+links, other mutable step operands, repeats, other dynamic scheduling, finishing,
+remaining phase/card/passive/spell/filter rules and all original search/strength/
+performance requirements remain open. The final gate is still 1,000 complete
+two-game-turn simulations per second. Complete game-transition/search capability
+flags remain false. Negative attacks remain legal, and general Python rejection
+must be noted as a source bug instead of copied into Rust. No NN tests/dependencies,
+live-service restarts, commits or pushes are introduced.
+
+
+ForEach verification: all 189 locked WSL release workspace Rust tests pass,
+including all 6,592 canonical gameplay traces / 27,145 operations and the expanded
+43 live-identity scenarios / 159 operations. The final CLI replay took 204.49
+seconds; this is correctness/serialization replay, not search throughput. The
+final release worker independently matches the live and 12-scene / 49-mutation
+storage identity corpora. All 773 focused non-NN Python rules/oracle tests pass.
+Strict Clippy, Rust fmt, Black/Ruff and whitespace checks pass. Frozen Python
+source/pin and the canonical gameplay index remain unchanged. The full original
+engine/search objective remains open; capability gates stay false. No live
+services were restarted and no commits or pushes were made.
+
+
+## Nested action scopes and actor header binding
+
+The live executor implements push_action_context, RestoreActionContextStep and
+RestoreActionTypeStep. Scope pushes save exactly the eight source action fields,
+using separate present/value entries and retaining references to lists, models
+and physical instances. Restoration distinguishes absence from present-null,
+restores original references and leaves unrelated context changes intact. Scope
+stack mutations are visible through retained aliases; action-type restoration
+pops its shared list without deleting the empty key. The diagnostic push operation
+calls this actual engine bookkeeping helper; nested card/action legality and body
+construction remain separate work.
+
+Mandatory aborts now discard remaining steps while restoring discarded action
+scopes. A RestoreActionContextStep with other_hero_action retains the boundary so
+that action can unwind and the outer text resumes. Own-action failures continue
+unwinding the outer text. Remaining scopes without explicit restore frames unwind
+after the stack is exhausted. Copied loop bodies use the same logic. This is the
+closed context/control program: combat/finalization/finishing boundaries retain
+their guards until those consumers bind, rather than being discarded by this
+limited abort path.
+
+SetActor binds current_actor_id in the authoritative arena state and updates the
+derived planning actor used by prompt/controller lookup. It saves the previous
+actor before reading actor_key, including when the key and save key coincide.
+Ordinary and arena execution share actor and prompt-owner rules. Empty literal/
+key overrides follow source truthiness; a missing actor-key target leaves the
+actor unchanged, while a missing prompt-owner key falls back to the current actor.
+Controller remapping is verified across actor swaps. Other dense world slots,
+collections and effects remain unbound/read-only in this execution mode.
+
+The live corpus expands to 86 real-source scenarios / 258 operations. New checks
+cover scope pushes/restores, shallow aliases, nullable/missing fields, shared
+stacks, nested own/other aborts, a paused abort boundary, copied-loop failures,
+action-type stacks, actor changes, save/read ordering, empty override strings and
+controller ownership. Trace records now also compare ordered context keys, in
+addition to full state, request/event/error data and generic/physical identity.
+Every boundary restores; native tests additionally verify private forked scope
+rows, source parity in ordinary execution and rejection of unsupported helpers
+before state mutation.
+
+Current live corpus SHA-256:
+bd7543443c99beec4716d4331383746e30a1d708c2c9eaa1ae132a9e33c6bc9f.
+The storage corpus remains 12 scenarios / 49 mutations, SHA-256:
+1001eb3d2c8202ef1a3f9070e5983b9701a8506e69ac65a41a569c15e77361a9.
+
+The full original engine/search objective remains active: other dense-world and
+physical-child bindings, complete dynamic/finishing/phase and rule bodies,
+make/unmake and hashing, evaluation, iterative team-aware minimax/alpha-beta,
+hidden/simultaneous planning, parallel workers, optional validated integration,
+strength gates and 1,000 complete two-game-turn simulations/sec. No NN work or
+live-service restarts are part of this checkpoint. Frozen Python source remains
+the unchanged oracle; negative attacks remain legal.
+
+
+Action-scope verification: all 193 locked WSL release workspace Rust tests pass,
+including full state/request/event replay for 6,592 canonical cases / 27,145
+operations and the 86-case / 258-operation live identity corpus. The final CLI
+replay took 204.05 seconds, a correctness/serialization measurement rather than
+search throughput. The final release worker independently matches both live and
+12-case / 49-mutation storage identity corpora. All 779 focused non-NN Python
+rules/oracle tests pass. Strict Clippy, Rust fmt, Black/Ruff, patch whitespace and
+frozen-source integrity checks pass. The Python engine/pin and canonical gameplay
+index are unchanged. Remaining full world/finishing/rule/search and performance
+requirements stay open; complete game-transition/search capability flags remain
+false. Negative attacks remain legal. No live services, commits or pushes were
+changed.
+
+
+## Live effect lifecycle and after-reveal scheduling
+
+The arena now owns effect collection replacement, linked physical-card active
+flags, and stored finishing-step execution. Natural duration expiry returns the
+original finishing-list handles; premature ID removal returns no finishing text.
+Old collection aliases remain detached lists of the original effect models.
+Physical-card copies snapshot scalar overrides at copy time, so later activation
+changes do not rewrite a copied card. Reimport binds every reachable stored step,
+including steps retained through aliases to removed effects.
+
+Turn expiry has a read-only collector returning ordered IDs and original
+finishing lists, plus the source's remove-now helper. The collector preserves
+rule-v9 semantics: callers must leave effects active while their finishing text
+runs and remove the collected IDs in deferred AdvanceTurn. Automatic turn
+advancement and the complete arena phase scheduler are still unfinished.
+
+The after-cards-played helper now removes all trigger instances by effect type,
+refreshes linked cards, and queues only payloads due exactly one turn later in
+the same round. It retains original mutable steps and wraps each runnable payload
+in fresh SetActor/FinishedExpiringEffect steps. Repeated IDs never remove unrelated
+non-trigger effects; repeated references to one effect schedule its same payload
+again. Stale/future/cross-round triggers fizzle, and token-bound after-reveal
+triggers follow the source's dedicated firing path. This is the real source helper
+used by revelation; wiring all revelation/retrieval/next-actor transitions into
+the authoritative arena remains required.
+
+Generated wrapper recipes compile once on import. Runtime scheduling uses typed
+arena allocations and numeric generation IDs, with no JSON compilation or state
+reconstruction. Finishing abort markers preserve the following payload or outer
+tail after a mandatory failure. Selection state remains shared through effect,
+context and stack references while worker clones stay private. Detached numeric
+option lists are read live if they change before a stored selection is requeued.
+Freshly queued programs regain immutable-operand guards for the still-unbound
+instruction families.
+
+The live corpus contains 142 source scenarios / 428 operations, comparing full
+state, requests, events, errors, context key order, physical references and generic
+object identity. Its SHA-256 is
+42fe944b2089a9c6da719abe66b76c5bfbca02651a4784c6be565eba118e5c39.
+The 12-case / 49-mutation storage corpus and the 6,592-case / 27,145-operation
+ordinary gameplay corpus are unchanged. All 202 locked release workspace Rust
+tests and 791 focused non-NN Python rules/oracle tests pass. The final CLI replay
+took 204.52 seconds, a correctness/serialization measurement rather than search
+throughput. The final release worker independently matches both identity corpora.
+Strict Clippy, Rust fmt, Black/Ruff, whitespace and frozen-source integrity checks
+pass. No frozen Python source, lockfile or source pin changed.
+
+Remaining scope includes all dense-world/physical-child bindings, complete
+turn/round/finishing and dynamic rule execution, remaining card/passive/spell and
+filter bodies, make/unmake, canonical hashing, evaluation, iterative team-aware
+minimax/alpha-beta, hidden/simultaneous planning, parallel workers, validated
+integration and strength gates. The performance requirement remains 1,000
+complete two-game-turn simulations per second; correctness replay time is not
+search throughput. Full game-transition and search capabilities remain false.
+Negative attacks remain legal; a general Python rejection must be recorded as an
+oracle defect. No NN work, source repinning, live-service restarts, commits or
+pushes are part of this checkpoint.
+
+
+## Arena turn boundaries
+
+The live arena now executes rule-v9 `end_turn`, deferred `AdvanceTurnStep`,
+empty-hand auto-pass and all-pass revelation. Turn finishing text runs before its
+collected effects are removed. Position snapshots use a new dictionary containing
+the original Hex objects; discard logs and completed planning buffers detach their
+old containers. Played-card slots mutate their original lists, including fixed
+empty turn slots and physical-card state changes during auto-pass.
+
+Round-end entry expires THIS_ROUND effects before queuing their original finishing
+steps and the battle/check/cleanup tail. Those remaining consumers, nonempty
+initiative/card-resolution continuations and automatic revelation of committed
+cards still reject explicitly. Parked round work restores and rejects execution
+before popping a step or mutating rule state. Public planning commands remain
+guarded until their authoritative arena bindings are complete.
+
+The live corpus now contains 170 current-oracle scenarios / 512 operations,
+SHA-256 `fe48993ec034e02dc8eeaed919afcebd0eb4109932d9beed449cc2dbb69f4592`.
+The final release worker independently matches both live and storage identity
+corpora. All 208 locked release workspace Rust tests and 797 focused non-NN
+Python rules/oracle tests pass. The final CLI gameplay replay took 200.51 seconds,
+a correctness/serialization result rather than search throughput. Strict Clippy,
+Rust fmt, Black/Ruff, whitespace and frozen-source integrity checks pass. Only rule
+version 9 is supported; the frozen Python source/pin and older corpora are unchanged.
+
+Complete rules/phase execution, remaining dense-world/physical-child bindings,
+make/unmake, hashing, evaluation, iterative team-aware search, hidden/simultaneous
+planning, parallel workers, validated integration/strength gates and 1,000 complete
+two-game-turn simulations/sec remain open. Full transition/search flags stay false.
+Negative attack values remain legal. No NN work or live-service restart is included.
+
+The scheduler uses one cold-compiled actor/abort wrapper recipe across natural
+turn, round and after-reveal finishing. Deferred expiry IDs are read from their
+actual live list, including shared-list modifications before execution. Generated
+counter reservations precede changes to effects/logs; every automatic instruction
+continues to obey the real step/deadline budget. Arena ownership is temporarily
+held by one execution helper and restored on errors, allowing stack-internal
+lifecycle calls without a second mutable step-state representation.
+
+All-pass revelation binds the source hero model and its played-card list rather
+than rebuilding a JSON state. It records the physical current card in the fixed
+turn slot, preserves pre-existing slots, clears the current-card field, and updates
+the derived world lookup. Repeated passes can advance to Cleanup synchronously;
+due after-reveal payloads instead pause that progression until their queued
+FindNextActor executes. New frames use numeric private generation IDs and retain
+all original mutable finishing-step handles. The frozen source remains untouched.
+
+Remaining phase work is concrete: bind actual committed-card reveal/history and
+two-card retrieval, nonempty actor/tie/card/confirmation/finalization continuations,
+minion battle, lane push, cleanup/upgrades/reset, and every world/model collection
+those steps mutate. Lift each guard only after full state/request/event/identity
+comparisons, every-boundary restoration and private-worker mutation checks pass.
+The full original engine/search objective remains active; this checkpoint is not
+complete phase closure or a throughput result.

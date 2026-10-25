@@ -1,5 +1,5 @@
-//! Ordinary combat and defeat consequences. Active effects remain a closed
-//! unsupported root until their full protection/expiry/bounty logic is native.
+//! Combat and defeat consequences, including effect expiry, minion saves and bounties.
+//! Minion defense includes actor-bound illusion equivalence.
 use crate::{
     cards::CardError,
     data::{Datum, Registers, Symbol, Symbols},
@@ -36,6 +36,7 @@ pub struct TeamCounter {
 }
 #[derive(Clone, Debug)]
 pub struct CombatState {
+    pub(crate) round: i64,
     pub(crate) turn: i64,
     teams: Vec<TeamCounter>,
     pub(crate) unresolved: Vec<Symbol>,
@@ -71,6 +72,7 @@ impl CombatState {
         };
         Ok(Self {
             turn: state["turn"].as_i64().ok_or("turn missing")?,
+            round: state["round"].as_i64().ok_or("round missing")?,
             teams,
             unresolved: ids("unresolved_hero_ids")?,
             defeated: ids("heroes_defeated_this_round")?,
@@ -136,6 +138,17 @@ pub enum CombatEvent {
         target: Symbol,
         from: Option<crate::geometry::Hex>,
     },
+    Bounty {
+        hero: Symbol,
+        minion: Symbol,
+    },
+    Protected {
+        hero: Symbol,
+        minion: Symbol,
+        effect: Symbol,
+        card: Option<Symbol>,
+        token: Option<Symbol>,
+    },
     GameOver(GameOutcome),
 }
 impl CombatEvent {
@@ -184,6 +197,30 @@ impl CombatEvent {
             Self::Removed { target, from } => {
                 ("UNIT_REMOVED", None, Some(*target), *from, json!({}))
             }
+            Self::Bounty { hero, minion } => (
+                "GOLD_GAINED",
+                Some(*hero),
+                Some(*minion),
+                None,
+                json!({"amount":1,"reason":"minion_defeat_bounty"}),
+            ),
+            Self::Protected {
+                hero,
+                minion,
+                effect,
+                card,
+                token,
+            } => (
+                "MINION_PROTECTED",
+                Some(*hero),
+                Some(*minion),
+                None,
+                if let Some(card) = card {
+                    json!({"discarded_card_id":symbols.name(*card),"effect_id":symbols.name(*effect)})
+                } else {
+                    json!({"sacrificed_token_id":token.map(|id| symbols.name(id)),"effect_id":symbols.name(*effect)})
+                },
+            ),
             Self::GameOver(outcome) => (
                 "GAME_OVER",
                 None,
@@ -197,6 +234,7 @@ impl CombatEvent {
 }
 #[derive(Clone, Debug)]
 pub struct DefeatResult {
+    pub protection: bool,
     pub removals: Vec<Symbol>,
     pub events: Vec<CombatEvent>,
     pub outcome: Option<GameOutcome>,
@@ -291,7 +329,11 @@ impl CombatRules {
                     .cloned()
                 {
                     Some(value) => value,
-                    None => Datum::Int(world.minion_defense(id).map_err(|e| unsupported(&e))?),
+                    None => Datum::Int(
+                        world
+                            .minion_defense(id, actor)
+                            .map_err(|e| unsupported(&e))?,
+                    ),
                 }
             };
             let bonus = if initiative {
@@ -315,7 +357,7 @@ impl CombatRules {
         };
         context.set(self.block, Datum::Bool(blocked));
         let event = CombatEvent::Resolved {
-            actor,
+            actor: actor.filter(|id| *id != self.empty),
             target: id,
             attack: damage,
             defense: shown_defense,
@@ -338,7 +380,6 @@ impl CombatRules {
         killer: Option<Symbol>,
         assist_multiplier: i64,
     ) -> Result<DefeatResult> {
-        world.ensure_combat_closure().map_err(|e| unsupported(&e))?;
         let victim = world
             .entity(victim_id)
             .filter(|e| {
@@ -352,6 +393,7 @@ impl CombatRules {
         let mut victim_id = victim_id;
         let mut removals = vec![victim_id];
         let empty = || DefeatResult {
+            protection: false,
             removals: Vec::new(),
             events: Vec::new(),
             outcome: None,
@@ -369,6 +411,19 @@ impl CombatRules {
                 .ok_or_else(|| rule("piece has no owner hero"))?;
             victim_id = hero.id;
             removals = world.piece_ids(hero.id).collect();
+        }
+        if victim.kind == EntityKind::Minion
+            && world
+                .protection_candidate(victim_id, &[])
+                .map_err(|e| unsupported(&e))?
+                .is_some()
+        {
+            return Ok(DefeatResult {
+                protection: true,
+                removals: Vec::new(),
+                events: Vec::new(),
+                outcome: None,
+            });
         }
         let hero_index = world.heroes.iter().position(|h| h.id == victim_id);
         let mut victims = vec![victim_id];
@@ -415,6 +470,7 @@ impl CombatRules {
                 marker.source = None;
             }
         }
+        world.expire_effects_by_source(victim_id);
         if let Some(index) = hero_index {
             world
                 .resolve_current_card(victim_id, Some(world.combat.turn))
@@ -496,6 +552,7 @@ impl CombatRules {
                 });
                 if team.life == 0 {
                     return Ok(DefeatResult {
+                        protection: false,
                         removals,
                         events,
                         outcome: Some(GameOutcome {
@@ -530,11 +587,71 @@ impl CombatRules {
                 });
             }
         }
+        if hero_index.is_none() {
+            events.extend(
+                world
+                    .award_minion_bounties(victim_id)
+                    .map_err(|e| unsupported(&e))?,
+            );
+        }
         Ok(DefeatResult {
+            protection: false,
             removals,
             events,
             outcome: None,
         })
+    }
+    pub(crate) fn protection_defeat(
+        &self,
+        world: &mut NativeWorld,
+        context: &mut Registers,
+        minion: Symbol,
+        killer: Option<Symbol>,
+        bounty: bool,
+    ) -> Result<Vec<CombatEvent>> {
+        context.set(self.last_minion, Datum::Text(minion));
+        let mut log = match context.get(self.log) {
+            None => Vec::new(),
+            Some(Datum::List(v)) => v.clone(),
+            _ => return Err(rule("defeat log is not a list")),
+        };
+        log.push(Datum::List(vec![
+            Datum::Text(minion),
+            killer.map_or(Datum::Null, Datum::Text),
+        ]));
+        context.set(self.log, Datum::List(log));
+        let mut events = vec![CombatEvent::Defeated {
+            actor: killer,
+            target: minion,
+        }];
+        if let Some(killer) = killer.filter(|id| {
+            world
+                .entity(*id)
+                .is_some_and(|e| e.kind == EntityKind::Hero)
+        }) {
+            let reward = if world
+                .entity(minion)
+                .is_some_and(|e| e.minion_kind == Some(MinionKind::Heavy))
+            {
+                4
+            } else {
+                2
+            };
+            gain(world, killer, reward)?;
+            events.push(CombatEvent::Gold {
+                hero: killer,
+                amount: reward,
+                reason: GoldReason::MinionKill,
+            });
+        }
+        if bounty {
+            events.extend(
+                world
+                    .award_minion_bounties(minion)
+                    .map_err(|e| unsupported(&e))?,
+            );
+        }
+        Ok(events)
     }
 }
 fn integer(value: &Datum) -> Result<i64> {
@@ -558,13 +675,6 @@ fn gain(world: &mut NativeWorld, hero: Symbol, amount: i64) -> Result<()> {
     Ok(())
 }
 impl NativeWorld {
-    pub fn ensure_combat_closure(&self) -> std::result::Result<(), String> {
-        if self.has_effects {
-            Err("combat protection/expiry/bounty effect closure not compiled".into())
-        } else {
-            Ok(())
-        }
-    }
     pub fn export_combat(&self, state: &mut Value, symbols: &Symbols) {
         self.combat.export(state, symbols);
         self.history.export(state, symbols);

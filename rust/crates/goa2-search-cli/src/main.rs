@@ -235,6 +235,16 @@ fn stack_trace(envelope: StateEnvelope, operations: Vec<Value>) -> Result<Value,
                     Err(e) => return Err(e.to_string()),
                 }
             }
+            Some("start_revelation") => {
+                session
+                    .start_revelation()
+                    .map_err(|error| error.to_string())?;
+            }
+            Some("next_actor") => {
+                session
+                    .resolve_next_actor()
+                    .map_err(|error| error.to_string())?;
+            }
             Some("end_turn") => {
                 session.end_turn().map_err(|error| error.to_string())?;
             }
@@ -479,7 +489,7 @@ mod trace_tests {
     }
     #[test]
     fn live_shared_steps_and_context_match_python_values_requests_and_identity() {
-        verify_index("object-execution.json", Some(170));
+        verify_index("object-execution.json", Some(211));
     }
     #[test]
     fn every_native_transition_matches_python_full_state_request_and_event_order() {

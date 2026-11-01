@@ -564,3 +564,135 @@ def test_round_expiry_removes_effects_before_scheduling_their_original_finishing
     assert step in state.execution_stack
     assert state.execution_context["effect"] is effect
     assert not state.execution_context["card"].is_active
+
+
+def _revelation_cases():
+    from model_traces import setup
+    from object_execution_traces import revelation_scenes
+
+    return revelation_scenes(lambda red=None: setup(red=red))
+
+
+def test_revelation_detaches_buffers_but_preserves_known_frozen_record_identity():
+    from object_execution_traces import reference
+
+    _, state, operations = next(
+        scene for scene in _revelation_cases() if scene[0] == "revelation-known-card"
+    )
+    pending = state.pending_inputs
+    known = state.public_revealed_cards[0]
+    reference(state, operations)
+    assert state.pending_inputs is not pending
+    assert state.execution_context["old_pending"] is pending
+    assert isinstance(state.public_revealed_cards, tuple)
+    assert state.public_revealed_cards[0] is known is state.execution_context["known"]
+    assert len(state.public_revealed_cards) == 4
+    assert all(not card.is_facedown for card in pending.values())
+
+
+def test_two_card_retrieval_precedes_scheduled_trigger_and_retains_the_same_hand():
+    from object_execution_traces import reference
+
+    _, state, operations = next(
+        scene for scene in _revelation_cases() if scene[0] == "revelation-dual-trigger-after"
+    )
+    first = state.execution_context["first"]
+    hand = state.execution_context["hand"]
+    records = reference(state, operations)
+    assert records[1]["request"]["request_type"] == "SELECT_CARD"
+    assert first in hand
+    assert state.execution_context["returned_hand"] is hand
+    assert state.get_hero("hero_emmitt").extra_turn_card is None
+    assert first.initiative_override is None
+
+
+def test_reverse_initiative_uses_only_its_global_activation_and_due_turn_predicate():
+    from object_execution_traces import reference
+
+    expected = {
+        "reversed": "hero_tigerclaw",
+        "token-passive": "hero_tigerclaw",
+        "inactive": "hero_arien",
+        "stale": "hero_arien",
+        "cross-round": "hero_arien",
+    }
+    checked = set()
+    for name, state, operations in _revelation_cases():
+        variant = name.removeprefix("revelation-rank-")
+        if variant not in expected:
+            continue
+        reference(state, operations)
+        assert state.current_actor_id == expected[variant]
+        checked.add(variant)
+    assert checked == expected.keys()
+
+
+def test_cross_team_tie_only_queues_the_coin_flip_after_confirmation():
+    from object_execution_traces import reference
+
+    from goa2.domain.models import TeamColor
+    from goa2.engine.steps.utility import FlipTieBreakerCoinStep
+
+    _, state, operations = next(
+        scene for scene in _revelation_cases() if scene[0] == "revelation-tie-cross"
+    )
+    original = state.tie_breaker_team
+    reference(state, operations)
+    steps = list(reversed(state.execution_stack))
+    assert state.tie_breaker_team is original is TeamColor.RED
+    assert any(isinstance(step, FlipTieBreakerCoinStep) for step in steps)
+    assert steps[1].type.value == "confirm_resolution"
+    assert isinstance(steps[2], FlipTieBreakerCoinStep)
+    assert steps[3].type.value == "finalize_hero_turn"
+
+
+def test_tie_consumer_reads_the_live_candidate_list_and_preserves_pool_identity():
+    from object_execution_traces import reference
+
+    _, state, operations = next(
+        scene for scene in _revelation_cases() if scene[0] == "revelation-tie-append-candidate"
+    )
+    pool = state.unresolved_hero_ids
+    ties = state.execution_context["ties"]
+    reference(state, operations)
+    assert state.current_actor_id == "hero_tigerclaw"
+    assert state.unresolved_hero_ids is pool
+    assert state.execution_context["tie"].tied_hero_ids is ties
+    assert "hero_tigerclaw" in ties
+
+
+def test_retrieval_keeps_finished_step_input_and_omits_cleared_override_without_changing_copy():
+    from object_execution_traces import reference
+
+    _, state, operations = next(
+        scene for scene in _revelation_cases() if scene[0] == "revelation-retrieve-override"
+    )
+    step = state.execution_context["step"]
+    first = state.execution_context["first"]
+    reference(state, operations)
+    assert step.pending_input == {"selection": first.id}
+    assert step.pending_request_id == "fixture/dirty-retrieval"
+    assert first.state.value == "HAND"
+    assert "initiative_override" not in first.model_dump(mode="json")
+    assert state.execution_context["card_copy"].initiative_override == 30
+
+
+def test_auto_pass_observes_the_two_card_open_gate_and_explicit_done_signal():
+    from object_execution_traces import reference
+
+    checked = set()
+    for name, state, operations in _revelation_cases():
+        variant = name.removeprefix("revelation-auto-pass-")
+        if variant not in ("open", "done", "two"):
+            continue
+        records = reference(state, operations)
+        if variant == "open":
+            assert state.phase.value == "PLANNING"
+            assert state.execution_context["first"].is_facedown
+        else:
+            assert state.phase.value == "RESOLUTION"
+            assert not state.execution_context["first"].is_facedown
+            if variant == "two":
+                assert records[-1]["request"]["request_type"] == "SELECT_CARD"
+        checked.add(variant)
+    assert checked == {"open", "done", "two"}

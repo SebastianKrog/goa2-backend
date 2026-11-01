@@ -2,6 +2,7 @@
 //! Other world-changing instructions stay guarded until their dense slots bind.
 use super::*;
 mod phases;
+mod revelation;
 use crate::{
     codec::{ObjectKind, ObjectPathPart},
     objects::{ObjectArena, ObjectId, ObjectValue},
@@ -159,7 +160,14 @@ impl BoundObjects {
                 | "end_phase"
                 | "minion_battle"
                 | "check_lane_push"
-                | "end_phase_cleanup",
+                | "end_phase_cleanup"
+                | "retrieve_unresolved_card"
+                | "resolve_tie_breaker"
+                | "resolve_card"
+                | "confirm_resolution"
+                | "finalize_hero_turn"
+                | "respawn_hero"
+                | "flip_tie_breaker_coin",
             ) => true,
             Some("select_step") => step["target_type"] == "NUMBER",
             Some("for_each") => step["steps_template"]
@@ -168,6 +176,56 @@ impl BoundObjects {
             _ => false,
         }
     }
+    fn parked_type(step: &Value) -> bool {
+        matches!(
+            step["type"].as_str(),
+            Some("resolve_card" | "confirm_resolution" | "finalize_hero_turn" | "respawn_hero")
+        )
+    }
+    pub fn compile_wire(
+        wire: &Value,
+        steps: &mut Vec<CompiledStep>,
+        symbols: &mut Symbols,
+    ) -> Result<usize> {
+        fn sanitize(wire: &mut Value) {
+            if BoundObjects::parked_type(wire) {
+                wire["type"] = json!("finished_expiring_effect");
+            }
+            if let Some(templates) = wire.get_mut("steps_template").and_then(Value::as_array_mut) {
+                for child in templates {
+                    sanitize(child);
+                }
+            }
+        }
+        fn restore(
+            index: usize,
+            wire: &Value,
+            steps: &mut [CompiledStep],
+            symbols: &mut Symbols,
+        ) -> Result<()> {
+            steps[index].wire = wire.clone();
+            if BoundObjects::parked_type(wire) {
+                steps[index].instruction =
+                    Instruction::ParkedPhase(symbols.intern(wire["type"].as_str().unwrap()));
+            }
+            if let Instruction::ForEach { templates, .. } = &steps[index].instruction {
+                let children = templates.clone();
+                for (index, child) in children.into_iter().zip(
+                    wire["steps_template"]
+                        .as_array()
+                        .ok_or_else(|| unsupported("loop templates missing"))?,
+                ) {
+                    restore(index, child, steps, symbols)?;
+                }
+            }
+            Ok(())
+        }
+        let mut sanitized = wire.clone();
+        sanitize(&mut sanitized);
+        let index = compile_step(&sanitized, steps, symbols)?;
+        restore(index, wire, steps, symbols)?;
+        Ok(index)
+    }
     pub fn compile_scheduler(
         &mut self,
         steps: &mut Vec<CompiledStep>,
@@ -175,7 +233,7 @@ impl BoundObjects {
     ) -> Result<()> {
         let mut recipe = |name: &str| -> Result<StepRecipe> {
             let wire = combat_template(name)?;
-            let instruction = compile_step(&wire, steps, symbols)?;
+            let instruction = Self::compile_wire(&wire, steps, symbols)?;
             let fields = Datum::from_json(&wire, symbols).map_err(unsupported)?;
             Ok(StepRecipe {
                 instruction,
@@ -192,6 +250,13 @@ impl BoundObjects {
                 "minion_battle",
                 "check_lane_push",
                 "end_cleanup",
+                "retrieve_unresolved",
+                "tie",
+                "resolve_card",
+                "confirm_resolution",
+                "finalize_hero",
+                "respawn",
+                "flip_coin",
             ]
             .into_iter()
             .map(|name| Ok((name, recipe(name)?)))
@@ -296,7 +361,7 @@ impl BoundObjects {
                 continue;
             }
             let before = steps.len();
-            match compile_step(wire, steps, symbols) {
+            match Self::compile_wire(wire, steps, symbols) {
                 Ok(instruction) => self.bind_program(object, instruction, steps)?,
                 Err(_) => steps.truncate(before), // Unused unsupported payloads remain data.
             }
@@ -674,6 +739,15 @@ impl NativeSession {
                     .context_value(key)
                     .is_some_and(|value| !matches!(value, ObjectValue::Atom(Datum::Null)))
             });
+            let actor_choice = if !skipped
+                && matches!(
+                    self.steps[top.instruction].instruction,
+                    Instruction::Flow(crate::turn::FlowStep::Next)
+                ) {
+                Some(self.actor_choice_bound(objects)?)
+            } else {
+                None
+            };
             if !skipped {
                 if matches!(
                     self.steps[top.instruction].instruction,
@@ -685,7 +759,11 @@ impl NativeSession {
                             .ok_or_else(|| unsupported("live advance step missing"))?,
                     )?;
                 }
-                self.check_bound_phase(objects, &self.steps[top.instruction].instruction)?;
+                self.check_bound_phase(
+                    objects,
+                    &self.steps[top.instruction].instruction,
+                    actor_choice.as_ref(),
+                )?;
             }
             result.steps += 1;
             let mut frame = self.stack.pop().unwrap();
@@ -780,7 +858,41 @@ impl NativeSession {
                     self.advance_turn_bound(objects)?;
                 }
                 Instruction::Flow(crate::turn::FlowStep::Next) => {
-                    self.end_turn_bound(objects)?;
+                    self.apply_actor_choice_bound(
+                        objects,
+                        actor_choice.ok_or_else(|| unsupported("actor decision missing"))?,
+                    )?;
+                }
+                Instruction::Flow(crate::turn::FlowStep::Tie(_)) => {
+                    request = self.tie_bound(objects, id)?;
+                }
+                Instruction::RetrieveUnresolved { prompt, .. } => {
+                    let prompt = *prompt;
+                    let (next, event) = self.retrieve_bound(objects, id, prompt)?;
+                    request = next;
+                    result.events.extend(event);
+                }
+                Instruction::FlipCoin => {
+                    self.team = if self.team == Team::Red {
+                        Team::Blue
+                    } else {
+                        Team::Red
+                    };
+                    let color = if self.team == Team::Blue {
+                        phases::Field::Blue
+                    } else {
+                        phases::Field::Red
+                    };
+                    objects
+                        .arena
+                        .set_root(
+                            objects.phases.k(phases::Field::Coin),
+                            ObjectValue::Atom(Datum::Text(objects.phases.k(color))),
+                        )
+                        .map_err(unsupported)?;
+                    result.events.push(NativeEvent::TieBreakerFlipped {
+                        blue: self.team == Team::Blue,
+                    });
                 }
                 Instruction::Flow(crate::turn::FlowStep::EndPhase) => {
                     self.end_phase_bound(objects)?;

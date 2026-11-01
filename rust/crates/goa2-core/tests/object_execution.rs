@@ -66,6 +66,12 @@ fn apply(session: &mut NativeSession, operation: &Value) -> Value {
                 .map(|event| session.event_json(event))
                 .collect();
         }
+        "start_revelation" => {
+            session.start_revelation().unwrap();
+        }
+        "next_actor" => {
+            session.resolve_next_actor().unwrap();
+        }
         "end_turn" => {
             session.end_turn().unwrap();
         }
@@ -158,7 +164,7 @@ fn every_shared_execution_boundary_restores_values_aliases_and_request_generatio
             operations += 1;
         }
     }
-    assert_eq!(operations, 512);
+    assert_eq!(operations, 598);
 }
 
 #[test]
@@ -968,4 +974,181 @@ fn end_turn_generation_exhaustion_rejects_before_resetting_the_log_or_effects() 
         serde_json::to_value(session.export_envelope().unwrap()).unwrap(),
         serde_json::to_value(before).unwrap()
     );
+}
+
+#[test]
+fn revelation_keeps_known_frozen_record_identity_and_detaches_the_source_buffers() {
+    let mut session =
+        NativeSession::compile(source("object-execution-revelation-known-card")).unwrap();
+    session.start_revelation().unwrap();
+    let envelope = session.export_envelope().unwrap();
+    let state = envelope.materialize().unwrap();
+    assert!(state["pending_inputs"].as_object().unwrap().is_empty());
+    assert_eq!(state["public_revealed_cards"].as_array().unwrap().len(), 4);
+    assert!(envelope.object_bindings.iter().any(|binding| {
+        binding.paths.contains(
+            &vec!["execution_context", "known"]
+                .into_iter()
+                .map(|key| goa2_core::codec::ObjectPathPart::Key(key.into()))
+                .collect(),
+        ) && binding.paths.iter().any(|path| {
+            path.first()
+                == Some(&goa2_core::codec::ObjectPathPart::Key(
+                    "public_revealed_cards".into(),
+                ))
+        })
+    }));
+    assert!(
+        !envelope
+            .object_bindings
+            .iter()
+            .any(|binding| binding
+                .paths
+                .contains(&vec![goa2_core::codec::ObjectPathPart::Key(
+                    "public_revealed_cards".into()
+                )]))
+    );
+    assert!(
+        state["execution_context"]["old_pending"]
+            .as_object()
+            .unwrap()
+            .values()
+            .all(|card| card["is_facedown"] == false)
+    );
+}
+
+#[test]
+fn dual_retrieval_workers_mutate_the_same_hand_only_within_their_private_fork() {
+    let mut root =
+        NativeSession::compile(source("object-execution-revelation-dual-first")).unwrap();
+    root.start_revelation().unwrap();
+    let request = root
+        .advance(&ExecutionBudget::default())
+        .unwrap()
+        .request
+        .unwrap();
+    let before = root.export_envelope().unwrap();
+    let state = before.materialize().unwrap();
+    for name in ["first", "second"] {
+        let mut worker = root.clone();
+        let selection = worker
+            .import_selection(&state["execution_context"][name]["id"])
+            .unwrap();
+        worker.submit(request.id, selection).unwrap();
+        let result = worker.advance_prefix(1).unwrap();
+        assert_eq!(result.events.len(), 1);
+        let after = worker.semantic_state().unwrap();
+        assert_eq!(after["execution_context"][name]["state"], "HAND");
+        assert_eq!(
+            after["execution_context"]["hand"]
+                .as_array()
+                .unwrap()
+                .last()
+                .unwrap()["id"],
+            state["execution_context"][name]["id"]
+        );
+        if name == "first" {
+            assert!(
+                after["execution_context"][name]
+                    .get("initiative_override")
+                    .is_none()
+            );
+        }
+    }
+    assert_eq!(root.export_envelope().unwrap().state, before.state);
+    assert_eq!(
+        root.export_envelope().unwrap().object_bindings,
+        before.object_bindings
+    );
+}
+
+#[test]
+fn global_reverse_initiative_matches_source_activation_including_token_passive_effects() {
+    for (variant, hero) in [
+        ("reversed", "hero_tigerclaw"),
+        ("token-passive", "hero_tigerclaw"),
+        ("inactive", "hero_arien"),
+        ("stale", "hero_arien"),
+        ("cross-round", "hero_arien"),
+    ] {
+        let mut session = NativeSession::compile(source(&format!(
+            "object-execution-revelation-rank-{variant}"
+        )))
+        .unwrap();
+        session.advance_prefix(1).unwrap();
+        assert_eq!(session.semantic_state().unwrap()["current_actor_id"], hero);
+    }
+}
+
+#[test]
+fn rejected_tie_input_reissues_without_installing_a_wrong_team_actor_or_flipping_coin() {
+    let mut session =
+        NativeSession::compile(source("object-execution-revelation-tie-wrong-choice")).unwrap();
+    let first = session.advance_prefix(1).unwrap().request.unwrap();
+    assert_eq!(session.request_json(&first)["player_id"], "team:RED");
+    let wrong = session.import_selection(&json!("hero_brogan")).unwrap();
+    session.submit(first.id, wrong).unwrap();
+    let next = session.advance_prefix(1).unwrap().request.unwrap();
+    assert_ne!(
+        session.request_token(first.id),
+        session.request_token(next.id)
+    );
+    let chosen = session.import_selection(&json!("hero_arien")).unwrap();
+    session.submit(next.id, chosen).unwrap();
+    session.advance_prefix(1).unwrap();
+    let state = session.semantic_state().unwrap();
+    assert_eq!(state["current_actor_id"], "hero_arien");
+    assert_eq!(state["tie_breaker_team"], "RED");
+    assert!(state["execution_context"]["tie"]["pending_input"].is_null());
+    assert!(
+        state["execution_stack"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|step| step["type"] == "flip_tie_breaker_coin")
+    );
+}
+
+#[test]
+fn retrieval_omits_cleared_override_without_mutating_copy_or_finished_step_payload() {
+    let mut session =
+        NativeSession::compile(source("object-execution-revelation-retrieve-override")).unwrap();
+    session.advance_prefix(1).unwrap();
+    let state = session.semantic_state().unwrap();
+    assert!(
+        state["execution_context"]["first"]
+            .get("initiative_override")
+            .is_none()
+    );
+    assert_eq!(
+        state["execution_context"]["card_copy"]["initiative_override"],
+        30
+    );
+    assert_eq!(
+        state["execution_context"]["step"]["pending_input"]["selection"],
+        state["execution_context"]["first"]["id"]
+    );
+    assert_eq!(
+        state["execution_context"]["step"]["pending_request_id"],
+        "fixture/dirty-retrieval"
+    );
+    let restored = NativeSession::compile(session.export_envelope().unwrap()).unwrap();
+    assert_eq!(restored.semantic_state().unwrap(), state);
+}
+
+#[test]
+fn parked_actor_action_restores_without_compiling_or_popping_the_unbound_card_body() {
+    let mut session = NativeSession::compile(source("object-execution-revelation-basic")).unwrap();
+    session.start_revelation().unwrap();
+    let before = session.export_envelope().unwrap();
+    let mut restored = NativeSession::compile(before.clone()).unwrap();
+    for worker in [&mut session, &mut restored] {
+        assert!(
+            matches!(worker.advance(&ExecutionBudget::default()),Err(EngineError::Unsupported(message)) if message.contains("resolve_card"))
+        );
+        assert_eq!(
+            serde_json::to_value(worker.export_envelope().unwrap()).unwrap(),
+            serde_json::to_value(&before).unwrap()
+        );
+    }
 }

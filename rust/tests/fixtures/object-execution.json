@@ -2,7 +2,7 @@
   "schema_version": 2,
   "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
   "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
-  "semantic_sha256": "d65db3ced86fb224aba7d9b0b16adab76228c7967fdf6cb227f2ac8638cd5076",
+  "semantic_sha256": "7381af5f91d821bf2194f7dcb4e7dceb35291413ed56062bd6294e913a142cda",
   "cases": [
     {
       "name": "object-execution-shared-pending-step",
@@ -853,7 +853,212 @@
       "name": "object-execution-turn-boundary-end-phase-after-cards",
       "path": "object-execution/ebe217e65419548682db7757d5102c94430f7d03aa2d320cc1339580836ee027.json",
       "case_sha256": "ebe217e65419548682db7757d5102c94430f7d03aa2d320cc1339580836ee027"
+    },
+    {
+      "name": "object-execution-revelation-basic",
+      "path": "object-execution/79d4e58e14ec6fa5a931d7ee0e503b3f41d50abd468eb4b849a9e447789ca13c.json",
+      "case_sha256": "79d4e58e14ec6fa5a931d7ee0e503b3f41d50abd468eb4b849a9e447789ca13c"
+    },
+    {
+      "name": "object-execution-revelation-known-card",
+      "path": "object-execution/e5b97461f08ab48fe78831b74cbc306994dd641f242f29735c38f90b86320408.json",
+      "case_sha256": "e5b97461f08ab48fe78831b74cbc306994dd641f242f29735c38f90b86320408"
+    },
+    {
+      "name": "object-execution-revelation-unknown-player",
+      "path": "object-execution/aee61cf71f8cf308958c951f3ab9a77f12e0256e5fbeb29e9b0522fffd51ebb1.json",
+      "case_sha256": "aee61cf71f8cf308958c951f3ab9a77f12e0256e5fbeb29e9b0522fffd51ebb1"
+    },
+    {
+      "name": "object-execution-revelation-passed-current",
+      "path": "object-execution/5ee537c457509761e81a32da19a0cb2e3c6f0d7a7404cda2c1b84d8199f50df0.json",
+      "case_sha256": "5ee537c457509761e81a32da19a0cb2e3c6f0d7a7404cda2c1b84d8199f50df0"
+    },
+    {
+      "name": "object-execution-revelation-initiative-override",
+      "path": "object-execution/22fe60283d939e7dabc198b55041810bff7cf17ce5b21df2dea20a2d2c04fe00.json",
+      "case_sha256": "22fe60283d939e7dabc198b55041810bff7cf17ce5b21df2dea20a2d2c04fe00"
+    },
+    {
+      "name": "object-execution-revelation-no-candidates",
+      "path": "object-execution/578045314a09d5ab4649ca2e295a80343c8e0fde6bea1ec5472365f8e9fcf7d6.json",
+      "case_sha256": "578045314a09d5ab4649ca2e295a80343c8e0fde6bea1ec5472365f8e9fcf7d6"
+    },
+    {
+      "name": "object-execution-revelation-dual-first",
+      "path": "object-execution/6850a16ffa4d32a17475f4d9c1d61804833f1cf47418d4aedc2ce476b0be1ca7.json",
+      "case_sha256": "6850a16ffa4d32a17475f4d9c1d61804833f1cf47418d4aedc2ce476b0be1ca7"
+    },
+    {
+      "name": "object-execution-revelation-dual-second",
+      "path": "object-execution/60f92b9d24f58068a5c2b80d211a2b6fc9f75d0a816c7e998e6da85581f7056b.json",
+      "case_sha256": "60f92b9d24f58068a5c2b80d211a2b6fc9f75d0a816c7e998e6da85581f7056b"
+    },
+    {
+      "name": "object-execution-revelation-dual-invalid",
+      "path": "object-execution/5979337f9a4189e2f60f1625ee9378a4c0f7ad118a096eaf518241e516dee9ac.json",
+      "case_sha256": "5979337f9a4189e2f60f1625ee9378a4c0f7ad118a096eaf518241e516dee9ac"
+    },
+    {
+      "name": "object-execution-revelation-dual-same-object",
+      "path": "object-execution/4808a49a498cac02b9451aaabcce58bad16d2b15a97d7fb22a7ac6c54acc4a3e.json",
+      "case_sha256": "4808a49a498cac02b9451aaabcce58bad16d2b15a97d7fb22a7ac6c54acc4a3e"
+    },
+    {
+      "name": "object-execution-revelation-dual-trigger-after",
+      "path": "object-execution/ddc847f5b6993c697eb36f24eb8df70d39aee0ed74b6ab82f84ca125bb7d49d3.json",
+      "case_sha256": "ddc847f5b6993c697eb36f24eb8df70d39aee0ed74b6ab82f84ca125bb7d49d3"
+    },
+    {
+      "name": "object-execution-revelation-dual-old-history",
+      "path": "object-execution/ec342df18398a2f45f2aa464ec02bb5e93e12f33a296461064b5c946a8bc1b96.json",
+      "case_sha256": "ec342df18398a2f45f2aa464ec02bb5e93e12f33a296461064b5c946a8bc1b96"
+    },
+    {
+      "name": "object-execution-revelation-rank-normal",
+      "path": "object-execution/a9bbaf9b39ab1741f83064c16209844b0d7e3112c39ef70ce2a41c771dcad7da.json",
+      "case_sha256": "a9bbaf9b39ab1741f83064c16209844b0d7e3112c39ef70ce2a41c771dcad7da"
+    },
+    {
+      "name": "object-execution-revelation-rank-reversed",
+      "path": "object-execution/810bcc2bd6da0ea92418a7760a3a3d56265fbc745c172583db9a9c14063aa37a.json",
+      "case_sha256": "810bcc2bd6da0ea92418a7760a3a3d56265fbc745c172583db9a9c14063aa37a"
+    },
+    {
+      "name": "object-execution-revelation-rank-inactive",
+      "path": "object-execution/24412415e23ce493c4efd94f645077aee56b69ac02bfe1d89c43eeb6dae57d7c.json",
+      "case_sha256": "24412415e23ce493c4efd94f645077aee56b69ac02bfe1d89c43eeb6dae57d7c"
+    },
+    {
+      "name": "object-execution-revelation-rank-stale",
+      "path": "object-execution/699efdb32688db92b774e9df404212a058cb9779a589d78d3b371126305f24c0.json",
+      "case_sha256": "699efdb32688db92b774e9df404212a058cb9779a589d78d3b371126305f24c0"
+    },
+    {
+      "name": "object-execution-revelation-rank-cross-round",
+      "path": "object-execution/4b6212d66e75f3bdfd71f9b13651aeb30b672f10c23efe702ecfbf91ddd285aa.json",
+      "case_sha256": "4b6212d66e75f3bdfd71f9b13651aeb30b672f10c23efe702ecfbf91ddd285aa"
+    },
+    {
+      "name": "object-execution-revelation-rank-token-passive",
+      "path": "object-execution/a117d25de2523550d8f3cf26be9332b19bb4255ebeb8e853476f3d12dd84dbf8.json",
+      "case_sha256": "a117d25de2523550d8f3cf26be9332b19bb4255ebeb8e853476f3d12dd84dbf8"
+    },
+    {
+      "name": "object-execution-revelation-rank-no-card",
+      "path": "object-execution/7d79c0b2d913e069791cc8e383dada049ff27162026b6d2ab5d107c7e5b87903.json",
+      "case_sha256": "7d79c0b2d913e069791cc8e383dada049ff27162026b6d2ab5d107c7e5b87903"
+    },
+    {
+      "name": "object-execution-revelation-rank-unknown",
+      "path": "object-execution/2c11f93abfbd78e7b021e963964078a19bbcd66bf685195bd1a2ddbab0c7391c.json",
+      "case_sha256": "2c11f93abfbd78e7b021e963964078a19bbcd66bf685195bd1a2ddbab0c7391c"
+    },
+    {
+      "name": "object-execution-revelation-rank-duplicate-pool",
+      "path": "object-execution/66eb6f98cbb1d96f87aaf769f3114fe88fd3ef4a49f047b3c2e2cfabd04cf29b.json",
+      "case_sha256": "66eb6f98cbb1d96f87aaf769f3114fe88fd3ef4a49f047b3c2e2cfabd04cf29b"
+    },
+    {
+      "name": "object-execution-revelation-tie-cross",
+      "path": "object-execution/4baed60cc52d220c3d04b2e7b23be79b0b7f3eee4e5e93a36349b9c1c2134e87.json",
+      "case_sha256": "4baed60cc52d220c3d04b2e7b23be79b0b7f3eee4e5e93a36349b9c1c2134e87"
+    },
+    {
+      "name": "object-execution-revelation-tie-same-team",
+      "path": "object-execution/39b1db6a3f7e1db8cefb3bd80b96567ab8054b165a1efa749331d8c219934700.json",
+      "case_sha256": "39b1db6a3f7e1db8cefb3bd80b96567ab8054b165a1efa749331d8c219934700"
+    },
+    {
+      "name": "object-execution-revelation-tie-favored-choice",
+      "path": "object-execution/6f17fc80a749f3f115516cfdbdcd68cfaa7cf59735c109417327d1bf251a9af1.json",
+      "case_sha256": "6f17fc80a749f3f115516cfdbdcd68cfaa7cf59735c109417327d1bf251a9af1"
+    },
+    {
+      "name": "object-execution-revelation-tie-wrong-choice",
+      "path": "object-execution/8f34ebd5fe36c2def563863427b52860f61b936bba0449ef325a26f09e35d0e7.json",
+      "case_sha256": "8f34ebd5fe36c2def563863427b52860f61b936bba0449ef325a26f09e35d0e7"
+    },
+    {
+      "name": "object-execution-revelation-tie-pending-manual",
+      "path": "object-execution/5adc7bafb7ffae27e0000ac278bca17cfa90616e2c4269dea90bf4167ef63fc2.json",
+      "case_sha256": "5adc7bafb7ffae27e0000ac278bca17cfa90616e2c4269dea90bf4167ef63fc2"
+    },
+    {
+      "name": "object-execution-revelation-tie-append-candidate",
+      "path": "object-execution/2549e74c83b22212b65ac34990e36e3060888a52943317cf9039e713706af60e.json",
+      "case_sha256": "2549e74c83b22212b65ac34990e36e3060888a52943317cf9039e713706af60e"
+    },
+    {
+      "name": "object-execution-revelation-tie-empty",
+      "path": "object-execution/df8275913ea25c1543f401da26fa87424441f9d13f09292ca35827efadfd70c6.json",
+      "case_sha256": "df8275913ea25c1543f401da26fa87424441f9d13f09292ca35827efadfd70c6"
+    },
+    {
+      "name": "object-execution-revelation-tie-piece-owner",
+      "path": "object-execution/405d0d1bf04735fe5f91746ed0994bbbd14b66273853ddb716bf57c731d33faa.json",
+      "case_sha256": "405d0d1bf04735fe5f91746ed0994bbbd14b66273853ddb716bf57c731d33faa"
+    },
+    {
+      "name": "object-execution-revelation-retrieve-first",
+      "path": "object-execution/da46278ce318afa2e52865bc3df6056ddb150d3d5c4a51dd835d027655f28f05.json",
+      "case_sha256": "da46278ce318afa2e52865bc3df6056ddb150d3d5c4a51dd835d027655f28f05"
+    },
+    {
+      "name": "object-execution-revelation-retrieve-second",
+      "path": "object-execution/e6a1ff0ada9bfd31e0195175207c0d9d9eab89efa58808478b02151b9356d62f.json",
+      "case_sha256": "e6a1ff0ada9bfd31e0195175207c0d9d9eab89efa58808478b02151b9356d62f"
+    },
+    {
+      "name": "object-execution-revelation-retrieve-dirty-request",
+      "path": "object-execution/23902ba8c2c82b84fc33217b7f33578d87c31be6c5898c664a7388f5ddd83140.json",
+      "case_sha256": "23902ba8c2c82b84fc33217b7f33578d87c31be6c5898c664a7388f5ddd83140"
+    },
+    {
+      "name": "object-execution-revelation-retrieve-invalid-pending",
+      "path": "object-execution/da5b95fbd1eb0401ad6a385dbd0ba1cf9783c3c3c2ad2e31fee284f6a41fb1df.json",
+      "case_sha256": "da5b95fbd1eb0401ad6a385dbd0ba1cf9783c3c3c2ad2e31fee284f6a41fb1df"
+    },
+    {
+      "name": "object-execution-revelation-retrieve-no-extra",
+      "path": "object-execution/10d6f424d26b90d4a5b94968d3502b87a8860e98aa850643064c8256b6c450e6.json",
+      "case_sha256": "10d6f424d26b90d4a5b94968d3502b87a8860e98aa850643064c8256b6c450e6"
+    },
+    {
+      "name": "object-execution-revelation-retrieve-missing-hero",
+      "path": "object-execution/bb986e983c48c6cb8515c4e4e9d53a04c584eb2609e35fde1bd5ce50b6e55934.json",
+      "case_sha256": "bb986e983c48c6cb8515c4e4e9d53a04c584eb2609e35fde1bd5ce50b6e55934"
+    },
+    {
+      "name": "object-execution-revelation-retrieve-override",
+      "path": "object-execution/71c8d72020e3b98eccf61a27758a3da246763fca6348acca2399f9bb3efa2a8e.json",
+      "case_sha256": "71c8d72020e3b98eccf61a27758a3da246763fca6348acca2399f9bb3efa2a8e"
+    },
+    {
+      "name": "object-execution-revelation-auto-pass-open",
+      "path": "object-execution/0e79a10dfdb4ddec5c8e90823295fc836ea915fc00a73b04163edff7042c1385.json",
+      "case_sha256": "0e79a10dfdb4ddec5c8e90823295fc836ea915fc00a73b04163edff7042c1385"
+    },
+    {
+      "name": "object-execution-revelation-auto-pass-done",
+      "path": "object-execution/a739f08ea47492490022342eee326b84acbe6e751ac8d5e2f0aa7b491919a484.json",
+      "case_sha256": "a739f08ea47492490022342eee326b84acbe6e751ac8d5e2f0aa7b491919a484"
+    },
+    {
+      "name": "object-execution-revelation-auto-pass-two",
+      "path": "object-execution/e16564fc7218573b3327045886755fc8056521ab864d3373592d8f1ebe50620d.json",
+      "case_sha256": "e16564fc7218573b3327045886755fc8056521ab864d3373592d8f1ebe50620d"
+    },
+    {
+      "name": "object-execution-revelation-flip",
+      "path": "object-execution/316715134a4c7e3de7280620634eed40b32e4bb3de9a390147741e69524c4fc9.json",
+      "case_sha256": "316715134a4c7e3de7280620634eed40b32e4bb3de9a390147741e69524c4fc9"
+    },
+    {
+      "name": "object-execution-revelation-skipped-parked-action",
+      "path": "object-execution/094753b79017cf93314b3167ac425168425046fb183a7cab80d8a9e0d64a72bd.json",
+      "case_sha256": "094753b79017cf93314b3167ac425168425046fb183a7cab80d8a9e0d64a72bd"
     }
   ],
-  "corpus_sha256": "fe48993ec034e02dc8eeaed919afcebd0eb4109932d9beed449cc2dbb69f4592"
+  "corpus_sha256": "be1972ce5f667f0eefb37fe270f20e0b4354ded3cfc0ecb6ac4e89be3e0382f2"
 }

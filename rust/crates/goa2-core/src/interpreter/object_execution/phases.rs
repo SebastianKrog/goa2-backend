@@ -2,7 +2,7 @@
 use super::*;
 
 #[derive(Clone, Copy)]
-enum Field {
+pub(super) enum Field {
     Phase,
     Turn,
     DiscardLog,
@@ -22,8 +22,24 @@ enum Field {
     Cleanup,
     Resolved,
     Hand,
+    Extra,
+    Facedown,
+    Revealed,
+    HeroId,
+    CardId,
+    Owner,
+    Tied,
+    Coin,
+    Red,
+    Blue,
+    Revelation,
+    InitiativeOverride,
+    Discard,
+    HandState,
+    TeamRed,
+    TeamBlue,
 }
-const NAMES: [&str; 19] = [
+const NAMES: [&str; 35] = [
     "phase",
     "turn",
     "turn_discard_log",
@@ -43,11 +59,27 @@ const NAMES: [&str; 19] = [
     "CLEANUP",
     "RESOLVED",
     "hand",
+    "extra_turn_card",
+    "is_facedown",
+    "public_revealed_cards",
+    "hero_id",
+    "card_id",
+    "resolution_owner_id",
+    "tied_hero_ids",
+    "tie_breaker_team",
+    "RED",
+    "BLUE",
+    "REVELATION",
+    "initiative_override",
+    "discard_pile",
+    "HAND",
+    "team:RED",
+    "team:BLUE",
 ];
 #[derive(Clone, Debug)]
 pub(super) struct PhaseBindings {
-    keys: [Symbol; 19],
-    heroes: Vec<(Symbol, ObjectId)>,
+    keys: [Symbol; 35],
+    pub(super) heroes: Vec<(Symbol, ObjectId)>,
 }
 impl PhaseBindings {
     pub fn compile(source: &StateEnvelope, arena: &mut ObjectArena) -> Result<Self> {
@@ -87,10 +119,10 @@ impl PhaseBindings {
         }
         Ok(Self { keys, heroes })
     }
-    fn k(&self, field: Field) -> Symbol {
+    pub(super) fn k(&self, field: Field) -> Symbol {
         self.keys[field as usize]
     }
-    fn root(&self, arena: &ObjectArena, field: Field) -> Result<ObjectId> {
+    pub(super) fn root(&self, arena: &ObjectArena, field: Field) -> Result<ObjectId> {
         match arena.root_field(self.k(field)) {
             Some(ObjectValue::Object(id)) => Ok(id),
             _ => Err(unsupported("phase collection binding missing")),
@@ -112,7 +144,11 @@ impl PhaseBindings {
     }
 }
 impl NativeSession {
-    fn phase_step(&mut self, objects: &mut BoundObjects, name: &str) -> Result<ObjectId> {
+    pub(super) fn phase_step(
+        &mut self,
+        objects: &mut BoundObjects,
+        name: &str,
+    ) -> Result<ObjectId> {
         let program = objects.scheduler.as_ref().unwrap().clone();
         let recipe = &program
             .phase_recipes
@@ -168,10 +204,11 @@ impl NativeSession {
         }
         Ok(queued)
     }
-    fn phase_set(&mut self, objects: &mut BoundObjects, phase: Phase) -> Result<()> {
+    pub(super) fn phase_set(&mut self, objects: &mut BoundObjects, phase: Phase) -> Result<()> {
         let field = match phase {
             Phase::Planning => Field::Planning,
             Phase::Resolution => Field::Resolution,
+            Phase::Revelation => Field::Revelation,
             Phase::Cleanup => Field::Cleanup,
             _ => return Err(unsupported("unbound phase header")),
         };
@@ -198,44 +235,22 @@ impl NativeSession {
     pub(super) fn preflight_bound_advance(&self, objects: &BoundObjects) -> Result<()> {
         let p = &objects.phases;
         let pending = p.root(&objects.arena, Field::Pending)?;
-        let mut pending = objects
+        objects
             .arena
             .fields(pending)
-            .ok_or_else(|| unsupported("pending inputs must be a dictionary"))?
-            .to_vec();
+            .ok_or_else(|| unsupported("pending inputs must be a dictionary"))?;
         let locations = p.root(&objects.arena, Field::Locations)?;
         if objects.arena.fields(locations).is_none() {
             return Err(unsupported("positions must be a dictionary"));
         }
-        let mut auto_passed = false;
-        for (hero, model) in &p.heroes {
+        for (_, model) in &p.heroes {
             let Some(ObjectValue::Object(hand)) = objects.arena.field(*model, p.k(Field::Hand))
             else {
                 return Err(unsupported("hero hand missing"));
             };
-            if objects
-                .arena
-                .sequence(hand)
-                .is_some_and(|hand| hand.is_empty())
-            {
-                auto_passed = true;
-                if let Some((_, value)) = pending.iter_mut().find(|(id, _)| id == hero) {
-                    *value = ObjectValue::Atom(Datum::Null);
-                } else {
-                    pending.push((*hero, ObjectValue::Atom(Datum::Null)));
-                }
+            if objects.arena.sequence(hand).is_none() {
+                return Err(unsupported("hero hand must be a sequence"));
             }
-        }
-        if self.world.combat.turn < 4
-            && auto_passed
-            && pending.len() >= p.heroes.len()
-            && pending
-                .iter()
-                .any(|(_, card)| !matches!(card, ObjectValue::Atom(Datum::Null)))
-        {
-            return Err(unsupported(
-                "automatic revelation of committed cards not yet arena-bound",
-            ));
         }
         self.phase_generation_check(0, 1)
     }
@@ -243,24 +258,30 @@ impl NativeSession {
         &self,
         objects: &BoundObjects,
         instruction: &Instruction,
+        actor_choice: Option<&crate::planning::ActorChoice>,
     ) -> Result<()> {
         use crate::turn::FlowStep;
         match instruction {
             Instruction::Battle(_) | Instruction::Flow(FlowStep::Cleanup) => Err(unsupported(
                 "arena round battle/cleanup consumers not yet bound",
             )),
+            Instruction::ParkedPhase(family) => Err(unsupported(format!(
+                "arena {} consumer not yet bound",
+                self.symbols.name(*family)
+            ))),
+            Instruction::ResolveCard { .. }
+            | Instruction::Flow(
+                FlowStep::Confirm(_) | FlowStep::Finalize(_) | FlowStep::Respawn(_),
+            ) => Err(unsupported(
+                "arena card-resolution/confirmation/finalization/respawn consumers not yet bound",
+            )),
+            Instruction::RetrieveUnresolved { .. } => Ok(()),
             Instruction::Flow(FlowStep::Next) => {
-                let unresolved = objects.phases.root(&objects.arena, Field::Unresolved)?;
-                if objects
-                    .arena
-                    .sequence(unresolved)
-                    .is_none_or(|list| !list.is_empty())
-                {
-                    return Err(unsupported(
-                        "arena initiative/card-resolution continuation not yet bound",
-                    ));
+                if matches!(actor_choice, Some(crate::planning::ActorChoice::Finished)) {
+                    self.preflight_end_turn_bound(objects)
+                } else {
+                    self.phase_generation_check(0, 5)
                 }
-                self.preflight_end_turn_bound(objects)
             }
             Instruction::Flow(FlowStep::Advance) => self.preflight_bound_advance(objects),
             Instruction::Flow(FlowStep::EndPhase) => {
@@ -361,6 +382,7 @@ impl NativeSession {
             }
         }
         if passed
+            && !self.pending_planning_open_bound(objects)?
             && objects
                 .arena
                 .fields(pending)
@@ -374,115 +396,16 @@ impl NativeSession {
     fn reveal_all_passes_bound(
         &mut self,
         objects: &mut BoundObjects,
-        pending: ObjectId,
+        _pending: ObjectId,
     ) -> Result<()> {
-        // Every first commit is None in this bound path; committed-card revelation
-        // remains explicitly guarded until its physical/header bindings land.
-        let entries = objects
-            .arena
-            .fields(pending)
-            .ok_or_else(|| unsupported("pending input fields missing"))?
-            .to_vec();
-        for (hero, value) in entries {
-            if !matches!(value, ObjectValue::Atom(Datum::Null)) {
-                return Err(unsupported("committed-card revelation not yet bound"));
-            }
-            if let Some((_, model)) = objects
-                .phases
-                .heroes
-                .iter()
-                .find(|(id, _)| *id == hero)
-                .copied()
-            {
-                let current = objects
-                    .arena
-                    .field(model, objects.phases.k(Field::Current))
-                    .ok_or_else(|| unsupported("current card missing"))?;
-                self.world
-                    .resolve_current_card(hero, Some(self.world.combat.turn))
-                    .map_err(card_error)?;
-                let Some(ObjectValue::Object(played)) =
-                    objects.arena.field(model, objects.phases.k(Field::Played))
-                else {
-                    return Err(unsupported("played list missing"));
-                };
-                while objects
-                    .arena
-                    .sequence(played)
-                    .is_some_and(|cards| cards.len() < self.world.combat.turn as usize)
-                {
-                    objects
-                        .arena
-                        .append(played, ObjectValue::Atom(Datum::Null))
-                        .map_err(unsupported)?;
-                }
-                if let ObjectValue::Atom(Datum::Instance(card)) = current {
-                    objects
-                        .arena
-                        .set_physical_field(
-                            card,
-                            objects.phases.k(Field::CardState),
-                            Datum::Text(objects.phases.k(Field::Resolved)),
-                        )
-                        .map_err(unsupported)?;
-                    objects
-                        .arena
-                        .set_index(
-                            played,
-                            self.world.combat.turn as usize - 1,
-                            ObjectValue::Atom(Datum::Instance(card)),
-                        )
-                        .map_err(unsupported)?;
-                    objects
-                        .arena
-                        .set_field(
-                            model,
-                            objects.phases.k(Field::Current),
-                            ObjectValue::Atom(Datum::Null),
-                        )
-                        .map_err(unsupported)?;
-                }
-                let count = self
-                    .world
-                    .hero(hero)
-                    .ok_or_else(|| unsupported("hero lookup missing"))?
-                    .resolved_turns;
-                objects
-                    .arena
-                    .set_field(
-                        model,
-                        objects.phases.k(Field::ResolvedCount),
-                        ObjectValue::Atom(Datum::Int(count)),
-                    )
-                    .map_err(unsupported)?;
-            }
-        }
-        for field in [Field::Pending, Field::Second] {
-            let empty = objects.arena.dictionary(Vec::new()).map_err(unsupported)?;
-            objects
-                .arena
-                .set_root(objects.phases.k(field), empty)
-                .map_err(unsupported)?;
-        }
-        for field in [Field::Done, Field::Unresolved] {
-            let empty = objects.arena.list(Vec::new());
-            objects
-                .arena
-                .set_root(objects.phases.k(field), empty)
-                .map_err(unsupported)?;
-        }
-        self.world.combat.unresolved.clear();
-        self.phase_set(objects, Phase::Resolution)?;
-        let mut steps = self.collect_after_cards_played_bound(objects)?;
-        if !steps.is_empty() {
-            steps.push(self.phase_step(objects, "find_actor")?);
-            self.push_live_steps_bound(objects, &steps)
-        } else {
-            self.end_turn_bound(objects)
-        }
+        self.start_revelation_bound(objects)
     }
     pub(super) fn end_phase_bound(&mut self, objects: &mut BoundObjects) -> Result<()> {
-        self.check_bound_phase(objects, &Instruction::Flow(crate::turn::FlowStep::EndPhase))?;
+        self.check_bound_phase(
+            objects,
+            &Instruction::Flow(crate::turn::FlowStep::EndPhase),
+            None,
+        )?;
         let finishing = self.expire_effects_bound(objects, crate::effects::Duration::ThisRound)?;
         let groups = self.finishing_payloads(objects, &finishing)?;
         let mut steps = self.wrap_finishings(objects, groups)?;

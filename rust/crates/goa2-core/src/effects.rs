@@ -39,6 +39,7 @@ pub struct EffectDefinition {
     attack: Symbol,
     pub finishing: Vec<Datum>,
     pub after_cards_played: bool,
+    pub reversed_initiative: bool,
 }
 #[derive(Clone, Debug)]
 pub struct EffectInstance {
@@ -139,6 +140,7 @@ impl EffectInstance {
                 attack,
                 finishing,
                 after_cards_played: kind_name == "after_cards_played_trigger",
+                reversed_initiative: kind_name == "reversed_initiative",
             }),
             id,
             granted_passive: optional_symbol(value, "granted_passive_effect_id", symbols)?,
@@ -297,6 +299,15 @@ impl EffectStore {
                 (effect.token.is_none() && effect.duration == duration).then_some(index)
             })
             .collect()
+    }
+    /// The global initiative rule ignores immunity, duration and token binding.
+    pub(crate) fn initiative_reversed(&self, round: i64, turn: i64) -> bool {
+        self.instances.iter().any(|effect| {
+            effect.definition.reversed_initiative
+                && effect.active
+                && effect.created_round == round
+                && turn.checked_sub(1) == Some(effect.created_turn)
+        })
     }
     pub(crate) fn turn_expiry_indices(&self, round: i64, turn: i64) -> Vec<usize> {
         self.instances

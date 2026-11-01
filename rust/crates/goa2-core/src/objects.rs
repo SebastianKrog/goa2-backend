@@ -67,7 +67,7 @@ pub enum Mutation {
 #[derive(Clone, Debug)]
 struct PhysicalCopy {
     base: u32,
-    fields: Vec<(Symbol, Datum)>,
+    fields: Vec<(Symbol, Option<Datum>)>,
 }
 #[derive(Clone, Debug)]
 pub struct ObjectArena {
@@ -78,7 +78,7 @@ pub struct ObjectArena {
     context: ObjectId,
     base_instances: usize,
     physical_copies: Vec<PhysicalCopy>,
-    physical_fields: HashMap<u32, Vec<(Symbol, Datum)>>,
+    physical_fields: HashMap<u32, Vec<(Symbol, Option<Datum>)>>,
 }
 impl ObjectArena {
     pub fn compile(source: &StateEnvelope) -> Result<Self, String> {
@@ -340,7 +340,7 @@ impl ObjectArena {
                         if object.kind == ObjectKind::Step
                             && matches!(
                                 self.symbols.name(*key),
-                                "value" | "pending_input" | "expire_effect_ids"
+                                "value" | "pending_input" | "expire_effect_ids" | "tied_hero_ids"
                             )
                         {
                             continue;
@@ -448,7 +448,11 @@ impl ObjectArena {
             value => value.clone(),
         })
     }
-    fn set_physical_override(fields: &mut Vec<(Symbol, Datum)>, key: Symbol, value: Datum) {
+    fn set_physical_override(
+        fields: &mut Vec<(Symbol, Option<Datum>)>,
+        key: Symbol,
+        value: Option<Datum>,
+    ) {
         if let Some((_, old)) = fields.iter_mut().find(|(field, _)| *field == key) {
             *old = value;
         } else {
@@ -473,8 +477,19 @@ impl ObjectArena {
         Self::set_physical_override(
             self.physical_fields.entry(instance).or_default(),
             key,
-            value,
+            Some(value),
         );
+        Ok(())
+    }
+    pub(crate) fn remove_physical_field(
+        &mut self,
+        instance: u32,
+        key: Symbol,
+    ) -> Result<(), String> {
+        if instance as usize >= self.base_instances + self.physical_copies.len() {
+            return Err("physical field target outside table".into());
+        }
+        Self::set_physical_override(self.physical_fields.entry(instance).or_default(), key, None);
         Ok(())
     }
     pub(crate) fn root_field(&self, key: Symbol) -> Option<ObjectValue> {
@@ -482,6 +497,25 @@ impl ObjectArena {
             return None;
         };
         self.field(root, key)
+    }
+    /// A source tuple has no mutable container identity; its model children do.
+    pub(crate) fn tuple(&mut self, values: Vec<ObjectValue>) -> ObjectValue {
+        let ObjectValue::Object(id) = self.list(values) else {
+            unreachable!()
+        };
+        self.objects[id.0].tracked = false;
+        ObjectValue::Object(id)
+    }
+    pub(crate) fn frozen_model(
+        &mut self,
+        fields: Vec<(Symbol, ObjectValue)>,
+    ) -> Result<ObjectValue, String> {
+        let value = self.dictionary(fields)?;
+        let ObjectValue::Object(id) = value else {
+            unreachable!()
+        };
+        self.objects[id.0].kind = ObjectKind::FrozenModel;
+        Ok(ObjectValue::Object(id))
     }
     pub(crate) fn list(&mut self, values: Vec<ObjectValue>) -> ObjectValue {
         let id = ObjectId(self.objects.len());
@@ -505,6 +539,9 @@ impl ObjectArena {
         index: usize,
         value: ObjectValue,
     ) -> Result<(), String> {
+        if !self.is_mutable_list(object) {
+            return Err("indexed assignment requires a mutable list".into());
+        }
         if self.reaches(&value, object) {
             return Err("aggregate cycle".into());
         }
@@ -846,9 +883,16 @@ impl ObjectArena {
                 .ok_or("physical copy base outside table")?
                 .clone();
             for (key, value) in &copy.fields {
-                instance
-                    .fields
-                    .insert(self.symbols.name(*key).into(), value.to_json(&self.symbols));
+                match value {
+                    Some(value) => {
+                        instance
+                            .fields
+                            .insert(self.symbols.name(*key).into(), value.to_json(&self.symbols));
+                    }
+                    None => {
+                        instance.fields.remove(self.symbols.name(*key));
+                    }
+                }
             }
             result.instances.push(instance);
         }
@@ -858,9 +902,16 @@ impl ObjectArena {
                 .get_mut(*id as usize)
                 .ok_or("physical override outside table")?;
             for (key, value) in fields {
-                instance
-                    .fields
-                    .insert(self.symbols.name(*key).into(), value.to_json(&self.symbols));
+                match value {
+                    Some(value) => {
+                        instance
+                            .fields
+                            .insert(self.symbols.name(*key).into(), value.to_json(&self.symbols));
+                    }
+                    None => {
+                        instance.fields.remove(self.symbols.name(*key));
+                    }
+                }
             }
         }
         result.state = self.compact_state()?;

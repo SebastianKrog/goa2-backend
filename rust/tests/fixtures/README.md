@@ -679,3 +679,15 @@ other focused tests). The complete 6,592-case / 27,145-operation gameplay replay
 passes in 200.51 seconds; this is not a search-throughput result. Independent
 release-worker checks match all 170 live scenes / 512 operations and all 12 storage
 scenes / 49 mutations. Strict lint/format/whitespace and frozen-source checks pass.
+
+
+Revelation/initiative live corpus: 211 scenes / 598 operations, SHA-256
+`be1972ce5f667f0eefb37fe270f20e0b4354ded3cfc0ecb6ac4e89be3e0382f2`.
+The 41 new real-source scenes cover committed-card reveal, frozen public records,
+two-card retrieval, reversed initiative, live ties, delayed coin flips, pending
+input/override omission and actor scheduling. Parked card bodies remain guarded.
+The source engine/pin, 12-scene storage corpus and 6,592-case canonical gameplay
+corpus remain unchanged. All 214 locked release workspace Rust tests and 804 focused non-NN source tests
+pass. The complete canonical gameplay replay passes (177.59 seconds, not search
+throughput). The release worker independently matches both identity corpora; strict
+lint/format/whitespace and frozen-source checks pass.

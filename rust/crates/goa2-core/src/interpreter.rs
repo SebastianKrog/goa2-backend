@@ -171,6 +171,7 @@ struct Conditions {
 }
 #[derive(Clone, Debug)]
 enum Instruction {
+    ParkedPhase(Symbol),
     MinionProtection {
         spec: crate::protection::ProtectionBinding,
         remove: usize,
@@ -842,7 +843,11 @@ impl NativeSession {
             .iter()
             .enumerate()
         {
-            let id = compile_step(wire, &mut steps, &mut symbols)?;
+            let id = if objects.is_some() {
+                object_execution::BoundObjects::compile_wire(wire, &mut steps, &mut symbols)?
+            } else {
+                compile_step(wire, &mut steps, &mut symbols)?
+            };
             let mut frame = steps[id].initial.clone();
             if let Some(objects) = &mut objects {
                 let object = objects.step(index)?;
@@ -3974,6 +3979,11 @@ impl NativeSession {
                             kept: None,
                         });
                     }
+                }
+                Instruction::ParkedPhase(_) => {
+                    return Err(unsupported(
+                        "parked arena phase step cannot run in the ordinary interpreter",
+                    ));
                 }
                 Instruction::RetrieveUnresolved { hero, prompt } => {
                     let Some(index) = self.world.hero_index(hero) else {

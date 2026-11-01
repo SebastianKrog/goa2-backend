@@ -28,6 +28,123 @@ pub struct TieChoice {
     pub candidates: Vec<Symbol>,
 }
 #[derive(Clone, Debug)]
+pub(crate) enum ActorChoice {
+    Finished,
+    Waiting,
+    Winner(Symbol),
+    Tie(Vec<Symbol>),
+}
+#[derive(Clone, Debug)]
+pub(crate) enum TieResolution {
+    Finished,
+    Choice(TieChoice),
+    Winner {
+        hero: Symbol,
+        flip: bool,
+        prompted: bool,
+    },
+}
+/// Shared ranking primitive; ties retain the input pool's original order.
+pub(crate) fn rank_actors(
+    world: &NativeWorld,
+    unresolved: &[Symbol],
+    reversed: bool,
+) -> Result<ActorChoice> {
+    if unresolved.is_empty() {
+        return Ok(ActorChoice::Finished);
+    }
+    let mut candidates = Vec::new();
+    for hero in unresolved {
+        if let Some(card) = world
+            .hero(*hero)
+            .and_then(|hero| hero.current)
+            .and_then(|id| world.card(id))
+        {
+            let base = if card.facedown {
+                0
+            } else {
+                card.initiative_override
+                    .unwrap_or(world.definitions.cards[card.definition].initiative)
+            };
+            let value = world
+                .computed_stat(*hero, Stat::Initiative, base)
+                .map_err(|_| unsupported("initiative effect/aura closure not compiled"))?;
+            candidates.push((*hero, value));
+        }
+    }
+    let best = if reversed {
+        candidates.iter().map(|(_, value)| *value).min()
+    } else {
+        candidates.iter().map(|(_, value)| *value).max()
+    };
+    let Some(best) = best else {
+        return Ok(ActorChoice::Waiting);
+    };
+    let tied = candidates
+        .into_iter()
+        .filter_map(|(hero, value)| (value == best).then_some(hero))
+        .collect::<Vec<_>>();
+    Ok(if tied.len() == 1 {
+        ActorChoice::Winner(tied[0])
+    } else {
+        ActorChoice::Tie(tied)
+    })
+}
+pub(crate) fn choose_tie(
+    world: &NativeWorld,
+    tied: &[Symbol],
+    favored: Symbol,
+    selection: Option<&Datum>,
+) -> Result<TieResolution> {
+    if tied.is_empty() {
+        return Ok(TieResolution::Finished);
+    }
+    let mut teams: Vec<(Symbol, Vec<Symbol>)> = Vec::new();
+    for hero in tied {
+        if world.hero(*hero).is_some()
+            && let Some(team) = world.entity(*hero).and_then(|entity| entity.team)
+        {
+            if let Some((_, ids)) = teams.iter_mut().find(|(key, _)| *key == team) {
+                ids.push(*hero);
+            } else {
+                teams.push((team, vec![*hero]));
+            }
+        }
+    }
+    if teams.is_empty() {
+        return Err(illegal("no known tied heroes"));
+    }
+    let cross = teams.len() > 1;
+    let index = if cross {
+        teams
+            .iter()
+            .position(|(team, _)| *team == favored)
+            .unwrap_or(0)
+    } else {
+        0
+    };
+    let (team, candidates) = &teams[index];
+    let winner = if candidates.len() == 1 {
+        Some(candidates[0])
+    } else {
+        match selection {
+            Some(Datum::Text(hero)) if candidates.contains(hero) => Some(*hero),
+            _ => None,
+        }
+    };
+    Ok(match winner {
+        Some(hero) => TieResolution::Winner {
+            hero,
+            flip: cross,
+            prompted: candidates.len() > 1,
+        },
+        None => TieResolution::Choice(TieChoice {
+            team: *team,
+            candidates: candidates.clone(),
+        }),
+    })
+}
+#[derive(Clone, Debug)]
 pub struct Planning {
     pub phase: Phase,
     two_card_effects: Vec<Symbol>,
@@ -157,7 +274,7 @@ impl Planning {
             continuation: Vec::new(),
         })
     }
-    fn two_cards(&self, world: &NativeWorld, hero: Symbol) -> bool {
+    pub(crate) fn two_cards(&self, world: &NativeWorld, hero: Symbol) -> bool {
         world.hero(hero).is_some_and(|h| {
             h.level >= 8
                 && h.ultimate.and_then(|id| world.card(id)).is_some_and(|c| {
@@ -331,43 +448,18 @@ impl Planning {
         self.next_actor(world)
     }
     pub(crate) fn next_actor(&mut self, world: &mut NativeWorld) -> Result<bool> {
-        if world.combat.unresolved.is_empty() {
-            return Ok(true);
-        }
-        let mut candidates = Vec::new();
-        for hero in &world.combat.unresolved {
-            if let Some(card) = world
-                .hero(*hero)
-                .and_then(|h| h.current)
-                .and_then(|id| world.card(id))
-            {
-                let base = if card.facedown {
-                    0
-                } else {
-                    card.initiative_override
-                        .unwrap_or(world.definitions.cards[card.definition].initiative)
-                };
-                let init = world
-                    .computed_stat(*hero, Stat::Initiative, base)
-                    .map_err(|_| unsupported("initiative effect/aura closure not compiled"))?;
-                candidates.push((*hero, init));
+        match rank_actors(world, &world.combat.unresolved, false)? {
+            ActorChoice::Finished => Ok(true),
+            ActorChoice::Waiting => Ok(false),
+            ActorChoice::Tie(tied) => {
+                self.continuation.push(Continuation::Tie(tied));
+                Ok(false)
+            }
+            ActorChoice::Winner(hero) => {
+                self.schedule_actor(world, hero, !world.has_board_presence(hero), false);
+                Ok(false)
             }
         }
-        let Some(max) = candidates.iter().map(|(_, i)| *i).max() else {
-            return Ok(false);
-        };
-        let tied = candidates
-            .into_iter()
-            .filter_map(|(h, i)| (i == max).then_some(h))
-            .collect::<Vec<_>>();
-        if tied.len() > 1 {
-            self.continuation.push(Continuation::Tie(tied));
-            return Ok(false);
-        }
-        let hero = tied[0];
-        let presence = world.has_board_presence(hero);
-        self.schedule_actor(world, hero, !presence, false);
-        Ok(false)
     }
     pub(crate) fn take_end_turn(&mut self) -> bool {
         std::mem::take(&mut self.end_turn)
@@ -414,52 +506,14 @@ impl Planning {
         favored: Symbol,
         selection: Option<&Datum>,
     ) -> Result<Option<TieChoice>> {
-        if tied.is_empty() {
-            return Ok(None);
-        }
-        let mut teams: Vec<(Symbol, Vec<Symbol>)> = Vec::new();
-        for id in tied {
-            if world.heroes.iter().any(|h| h.id == *id)
-                && let Some(team) = world.entity(*id).and_then(|e| e.team)
-            {
-                if let Some((_, ids)) = teams.iter_mut().find(|(t, _)| *t == team) {
-                    ids.push(*id);
-                } else {
-                    teams.push((team, vec![*id]));
-                }
+        match choose_tie(world, tied, favored, selection)? {
+            TieResolution::Finished => Ok(None),
+            TieResolution::Choice(choice) => Ok(Some(choice)),
+            TieResolution::Winner { hero, flip, .. } => {
+                self.schedule_actor(world, hero, world.position(hero).is_none(), flip);
+                Ok(None)
             }
         }
-        if teams.is_empty() {
-            return Err(illegal("no known tied heroes"));
-        }
-        let cross = teams.len() > 1;
-        let index = if cross {
-            teams
-                .iter()
-                .position(|(team, _)| *team == favored)
-                .unwrap_or(0)
-        } else {
-            0
-        };
-        let (team, candidates) = &teams[index];
-        let winner = if candidates.len() == 1 {
-            Some(candidates[0])
-        } else {
-            match selection {
-                Some(Datum::Text(id)) if candidates.contains(id) => Some(*id),
-                _ => None,
-            }
-        };
-        let Some(winner) = winner else {
-            return Ok(Some(TieChoice {
-                team: *team,
-                candidates: candidates.clone(),
-            }));
-        };
-        // Preserve the reference tie step's direct-location respawn condition;
-        // the respawn instruction itself owns multi-piece presence handling.
-        self.schedule_actor(world, winner, world.position(winner).is_none(), cross);
-        Ok(None)
     }
     /// Boundary only: reconstruct exact phase records and frozen Python defaults.
     pub fn export(

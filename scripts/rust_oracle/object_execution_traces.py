@@ -175,6 +175,7 @@ def scenes():
     yield from effect_lifecycle_scenes(base)
     yield from scheduled_effect_scenes(base)
     yield from turn_boundary_scenes(base)
+    yield from revelation_scenes(base)
 
 
 def loop_scenes(base):
@@ -1361,6 +1362,314 @@ def turn_boundary_scenes(base):
         yield "turn-boundary-end-phase-" + kind, state, ops
 
 
+def revelation_scenes(base):
+    """Isolated phase primitives using real registered hero/card models."""
+    from combat_effect_traces import effect
+
+    from goa2.domain.models import GamePhase, TeamColor
+    from goa2.domain.models.effect import DurationType, EffectType
+    from goa2.engine.steps import (
+        FindNextActorStep,
+        ResolveCardStep,
+        ResolveTieBreakerStep,
+        RetrieveUnresolvedCardStep,
+    )
+    from goa2.engine.steps.utility import (
+        FlipTieBreakerCoinStep,
+        RecordTargetStep,
+        SetContextFlagStep,
+    )
+
+    def roster(state):
+        return [hero for team in state.teams.values() for hero in team.heroes]
+
+    def prepared(red=None):
+        state = base(red)
+        state.phase = GamePhase.PLANNING
+        state.current_actor_id = None
+        state.resolution_owner_id = None
+        state.execution_stack = []
+        state.execution_context = {
+            "old_pending": state.pending_inputs,
+            "old_second": state.pending_second_cards,
+            "old_done": state.planning_done,
+            "old_unresolved": state.unresolved_hero_ids,
+            "old_revealed": state.public_revealed_cards,
+        }
+        return state
+
+    def commit(state, hero, number=0, second=False):
+        card = hero.hand[number]
+        hero.play_card(card)
+        (state.pending_second_cards if second else state.pending_inputs)[hero.id] = card
+        return card
+
+    for variant in (
+        "basic",
+        "known-card",
+        "unknown-player",
+        "passed-current",
+        "initiative-override",
+        "no-candidates",
+    ):
+        state = prepared()
+        heroes = roster(state)
+        for hero in heroes:
+            card = commit(state, hero)
+            state.execution_context["card_" + hero.id] = card
+        if variant == "known-card":
+            state.record_public_revealed_card(heroes[0].id, heroes[0].current_turn_card.id)
+            state.execution_context["old_revealed"] = state.public_revealed_cards
+            state.execution_context["known"] = state.public_revealed_cards[0]
+        if variant == "unknown-player":
+            state.pending_inputs["not-a-player"] = heroes[0].current_turn_card
+        if variant == "passed-current":
+            state.pending_inputs[heroes[0].id] = None
+            heroes[0].current_turn_card.initiative_override = 19
+            state.execution_context["played"] = heroes[0].played_cards
+        if variant == "initiative-override":
+            heroes[1].current_turn_card.initiative_override = 40
+        if variant == "no-candidates":
+            state.pending_inputs.clear()
+            state.pending_inputs["not-a-player"] = heroes[0].current_turn_card
+        yield "revelation-" + variant, state, [{"kind": "start_revelation"}]
+
+    for variant in ("first", "second", "invalid", "same-object", "trigger-after", "old-history"):
+        state = prepared(["Emmitt"])
+        hero = state.get_hero("hero_emmitt")
+        hero.level = 8
+        first = commit(state, hero)
+        second = commit(state, hero, second=True)
+        if variant == "same-object":
+            second = first
+            state.pending_second_cards[hero.id] = first
+        first.initiative_override = 23
+        for other in roster(state):
+            if other is not hero:
+                commit(state, other)
+        if variant == "trigger-after":
+            state.turn = 2
+            value = effect(
+                state, "reveal-trigger", EffectType.AFTER_CARDS_PLAYED_TRIGGER, source=hero.id
+            )
+            value.duration = DurationType.NEXT_TURN
+            value.created_at_round, value.created_at_turn = state.round, 1
+            step = SetContextFlagStep(
+                step_id="fixture/revelation/hand", key="returned_hand", value=[]
+            )
+            step.value = hero.hand
+            value.finishing_steps = [step]
+            state.active_effects = [value]
+            state.execution_context["trigger"] = value
+        if variant == "old-history":
+            state.record_public_revealed_card(hero.id, first.id)
+            state.execution_context["old_revealed"] = state.public_revealed_cards
+            state.execution_context["known"] = state.public_revealed_cards[0]
+        state.execution_context.update({"first": first, "second": second, "hand": hero.hand})
+        chosen = second.id if variant == "second" else first.id
+        ops = [{"kind": "start_revelation"}, {"kind": "advance_prefix", "steps": 1}]
+        if variant == "invalid":
+            ops += [
+                {"kind": "input", "selection": "not-a-card"},
+                {"kind": "advance_prefix", "steps": 1},
+            ]
+        ops += [{"kind": "input", "selection": chosen}, {"kind": "advance_prefix", "steps": 1}]
+        if variant == "trigger-after":
+            ops += [{"kind": "advance_prefix", "steps": 1} for _ in range(4)]
+        else:
+            ops += [{"kind": "advance_prefix", "steps": 1}]
+        yield "revelation-dual-" + variant, state, ops
+
+    for variant in (
+        "normal",
+        "reversed",
+        "inactive",
+        "stale",
+        "cross-round",
+        "token-passive",
+        "no-card",
+        "unknown",
+        "duplicate-pool",
+    ):
+        state = prepared()
+        state.phase = GamePhase.RESOLUTION
+        for number, hero in enumerate(roster(state)):
+            card = commit(state, hero)
+            card.is_facedown = False
+            card.initiative_override = 5 - number * 3
+        state.pending_inputs = {}
+        state.unresolved_hero_ids = [hero.id for hero in roster(state)]
+        if variant in ("reversed", "inactive", "stale", "cross-round", "token-passive"):
+            state.turn = 2
+            value = effect(
+                state, "reverse", EffectType.REVERSED_INITIATIVE, source=roster(state)[0].id
+            )
+            value.duration = DurationType.NEXT_TURN
+            value.created_at_round, value.created_at_turn = state.round, 1
+            if variant == "inactive":
+                value.is_active = False
+            if variant == "stale":
+                value.created_at_turn = 0
+            if variant == "cross-round":
+                value.created_at_round = state.round + 1
+            if variant == "token-passive":
+                value.token_id = "a-token"
+                value.duration = DurationType.PASSIVE
+            state.active_effects = [value]
+        if variant == "no-card":
+            for hero in roster(state):
+                hero.current_turn_card = None
+        if variant == "unknown":
+            state.unresolved_hero_ids = ["not-a-player"]
+        if variant == "duplicate-pool":
+            state.unresolved_hero_ids = [roster(state)[0].id] * 2
+        state.execution_context["pool"] = state.unresolved_hero_ids
+        state.execution_stack = [FindNextActorStep(step_id="fixture/revelation/find")]
+        yield "revelation-rank-" + variant, state, [{"kind": "advance_prefix", "steps": 1}]
+
+    for variant in (
+        "cross",
+        "same-team",
+        "favored-choice",
+        "wrong-choice",
+        "pending-manual",
+        "append-candidate",
+        "empty",
+        "piece-owner",
+    ):
+        state = prepared(["Arien", "Razzle"] if variant == "piece-owner" else ["Arien", "Hanu"])
+        state.phase = GamePhase.RESOLUTION
+        heroes = roster(state)
+        for hero in heroes:
+            card = commit(state, hero)
+            card.is_facedown = False
+            card.initiative_override = 5
+        state.pending_inputs = {}
+        if variant == "cross":
+            tied = [heroes[0].id, heroes[-1].id]
+        elif variant == "empty":
+            tied = []
+        elif variant == "piece-owner":
+            tied = ["hero_razzle"]
+        else:
+            tied = [heroes[0].id, heroes[1].id]
+        if variant in ("favored-choice", "wrong-choice"):
+            tied.append(heroes[-1].id)
+            state.tie_breaker_team = TeamColor.RED
+        step = ResolveTieBreakerStep(step_id="fixture/revelation/tie", tied_hero_ids=tied)
+        state.unresolved_hero_ids = list(tied)
+        state.execution_stack = [step]
+        state.execution_context.update(
+            {"tie": step, "ties": step.tied_hero_ids, "pool": state.unresolved_hero_ids}
+        )
+        if variant == "pending-manual":
+            step.pending_input = {"selection": heroes[0].id}
+            step.pending_request_id = "fixture/retained-request"
+        if variant == "append-candidate":
+            state.tie_breaker_team = TeamColor.BLUE
+            state.execution_context["target"] = heroes[-1].id
+            state.execution_stack.append(
+                RecordTargetStep(
+                    step_id="fixture/revelation/append", input_key="target", output_list_key="ties"
+                )
+            )
+        ops = [{"kind": "advance_prefix", "steps": 1}]
+        if variant == "append-candidate":
+            ops += [{"kind": "advance_prefix", "steps": 1}]
+        elif variant in ("same-team", "favored-choice", "wrong-choice"):
+            if variant == "wrong-choice":
+                ops += [
+                    {"kind": "input", "selection": heroes[-1].id},
+                    {"kind": "advance_prefix", "steps": 1},
+                ]
+            ops += [
+                {"kind": "input", "selection": heroes[0].id},
+                {"kind": "advance_prefix", "steps": 1},
+            ]
+        yield "revelation-tie-" + variant, state, ops
+
+    for variant in (
+        "first",
+        "second",
+        "dirty-request",
+        "invalid-pending",
+        "no-extra",
+        "missing-hero",
+        "override",
+    ):
+        state = prepared()
+        state.phase = GamePhase.RESOLUTION
+        hero = roster(state)[0]
+        first = commit(state, hero)
+        second = commit(state, hero, second=True)
+        hero.current_turn_card, hero.extra_turn_card = first, second
+        first.is_facedown = second.is_facedown = False
+        first.initiative_override = 30
+        state.pending_inputs = {}
+        state.pending_second_cards = {}
+        step = RetrieveUnresolvedCardStep(step_id="fixture/revelation/retrieve", hero_id=hero.id)
+        if variant == "no-extra":
+            hero.extra_turn_card = None
+        if variant == "missing-hero":
+            step.hero_id = "not-a-player"
+        if variant in ("dirty-request", "override"):
+            step.pending_input = {"selection": first.id}
+            step.pending_request_id = "fixture/dirty-retrieval"
+        if variant == "invalid-pending":
+            step.pending_input = {"selection": "bad"}
+            step.pending_request_id = "fixture/retained-retrieval"
+        state.execution_stack = [step]
+        state.execution_context = {
+            "step": step,
+            "first": first,
+            "second": second,
+            "hand": hero.hand,
+            "played": hero.played_cards,
+        }
+        if variant == "override":
+            state.execution_context["card_copy"] = copy.deepcopy(first)
+        ops = [{"kind": "advance_prefix", "steps": 1}]
+        if variant in ("first", "second", "invalid-pending"):
+            ops += [
+                {"kind": "input", "selection": second.id if variant == "second" else first.id},
+                {"kind": "advance_prefix", "steps": 1},
+            ]
+        yield "revelation-retrieve-" + variant, state, ops
+
+    for variant in ("open", "done", "two"):
+        state = prepared(["Emmitt"])
+        state.phase = GamePhase.RESOLUTION
+        hero = state.get_hero("hero_emmitt")
+        hero.level = 8
+        first = commit(state, hero)
+        if variant == "done":
+            state.planning_done.append(hero.id)
+        if variant == "two":
+            commit(state, hero, second=True)
+        for other in roster(state):
+            if other is not hero:
+                for card in list(other.hand):
+                    other.discard_card(card)
+        state.execution_context["first"] = first
+        ops = [{"kind": "end_turn"}]
+        if variant == "two":
+            ops.append({"kind": "advance_prefix", "steps": 1})
+        yield "revelation-auto-pass-" + variant, state, ops
+
+    state = prepared()
+    state.phase = GamePhase.RESOLUTION
+    state.execution_stack = [FlipTieBreakerCoinStep(step_id="fixture/revelation/flip")]
+    yield "revelation-flip", state, [{"kind": "advance"}]
+    state = prepared()
+    hero = roster(state)[0]
+    state.execution_stack = [
+        ResolveCardStep(
+            step_id="fixture/revelation/skipped-action", hero_id=hero.id, active_if_key="missing"
+        )
+    ]
+    yield "revelation-skipped-parked-action", state, [{"kind": "advance"}]
+
+
 def reference(state, operations):
     from state_codec import materialize
 
@@ -1390,6 +1699,14 @@ def reference(state, operations):
             request = result.input_request
             current = request.model_dump(mode="json") if request else None
             events = [event.model_dump(mode="json") for event in result.events]
+        elif op["kind"] == "start_revelation":
+            from goa2.engine.phases import start_revelation_phase
+
+            start_revelation_phase(state)
+        elif op["kind"] == "next_actor":
+            from goa2.engine.phases import resolve_next_action
+
+            resolve_next_action(state)
         elif op["kind"] == "end_turn":
             from goa2.engine.phases import end_turn
 

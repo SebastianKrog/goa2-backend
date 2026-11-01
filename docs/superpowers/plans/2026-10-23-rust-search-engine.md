@@ -2803,3 +2803,68 @@ those steps mutate. Lift each guard only after full state/request/event/identity
 comparisons, every-boundary restoration and private-worker mutation checks pass.
 The full original engine/search objective remains active; this checkpoint is not
 complete phase closure or a throughput result.
+
+
+## Committed-card revelation and actor selection
+
+The live arena now reveals first/second commits, retains public card identities
+as a tuple of frozen records, and orders two-card retrieval before after-reveal
+triggers and actor selection. Existing knowledge records keep their identity;
+completed planning buffers detach. Retrieval mutates the original physical card
+and hand/slot/discard containers, preserving the source step's finished input.
+Cleared initiative overrides are omitted rather than emitted as null, including
+when an independent copied card retains its old override.
+
+Ordinary and arena execution share initiative ranking and tie decisions. The live
+path handles reversed initiative, mutable candidate lists, team choice, invalid
+input retries, direct-location versus multi-piece respawn scheduling, actor/owner
+headers and the delayed coin flip. Each boundary evaluates its ranking/tie rules
+once. Actual card, confirmation, finalization and respawn bodies remain parked;
+importing them does not compile unrelated gameplay/passive closures, and attempting
+to execute one rejects before changing the step or state.
+
+The live corpus has 211 source scenes / 598 operations, SHA-256
+`be1972ce5f667f0eefb37fe270f20e0b4354ded3cfc0ecb6ac4e89be3e0382f2`.
+All 214 locked release workspace Rust tests and 804 focused non-NN Python
+rules/oracle tests pass. The final CLI replay took 177.59 seconds, a correctness/
+serialization result rather than search throughput. The release worker independently
+matches both identity corpora. Strict Clippy, Rust fmt, Black/Ruff, whitespace and
+frozen-source integrity checks pass. Frozen Python source/pin and
+both older corpora remain unchanged. No live services were restarted.
+
+Public planning commands, remaining action/world/physical-child bindings and full
+turn/round execution are still required, followed by make/unmake, hashing,
+evaluation, iterative team-aware search, hidden/simultaneous planning, parallel
+workers, validated integration/strength gates and 1,000 complete two-game-turn
+simulations/sec. Full transition/search capabilities remain false. Negative
+attacks remain legal; general Python rejection must be documented as an oracle
+bug rather than reproduced in Rust.
+
+The revelation binding replaces only source-replaced containers and keeps in-place
+hand/played/discard mutations on their original nodes. Physical scalar overrides
+now support field deletion; copies snapshot both values and omissions. New public
+knowledge entries are frozen model nodes under an untracked tuple container,
+matching source capture and deepcopy semantics. Source model code is unchanged.
+
+A parked-step cold compiler preserves actual wire fields and input/condition
+state while compiling only a harmless frame shell. It restores the real parked
+family and loop-template metadata immediately; no sanitized marker leaks into
+saved state. This lets actor handoffs/restoration be verified independently of
+unported card bodies without activating their passive/stat/action consumers.
+Unsupported bodies retain explicit runtime guards. Warm execution uses typed
+handles/recipes and never compiles or reconstructs JSON.
+
+The 41 added scenes cover first/second commits, idempotent frozen knowledge,
+unknown/missing players, pass-slot override clearing, two-card retrieval and
+pending-state retention, due trigger order, reverse activation/date/token
+predicates, missing candidates, ties/duplicate pools/invalid inputs, live candidate
+mutation, delayed flips, multi-piece ownership, skipped parked frames and the
+open/done/two-card planning gates reached by auto-pass. New native contracts check
+worker isolation, omission/copy snapshots, frozen alias topology and non-mutating
+parked-action restore. Existing full gameplay coverage stays active.
+
+Next phase work: bind the actual card chooser/body, confirmation, finalization,
+respawn, battle/lane/round cleanup and upgrades/reset; integrate public planning
+commands through authoritative card/request/collection bindings. Preserve all
+identity and phase-order comparisons before lifting the corresponding guards.
+The original complete engine/search and performance objective remains active.

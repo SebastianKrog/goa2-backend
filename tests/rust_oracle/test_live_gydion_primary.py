@@ -117,6 +117,7 @@ def test_dense_and_authoritative_recipe_sets_follow_reviewed_live_dependencies()
         ALL_EFFECTS,
         DENSE_EFFECTS,
         GYDION_EFFECTS,
+        MIN_EFFECTS,
         MISA_EFFECTS,
         WASP_EFFECTS,
     )
@@ -128,5 +129,7 @@ def test_dense_and_authoritative_recipe_sets_follow_reviewed_live_dependencies()
         if any(row["fields"]["type"] in ("cast_spell", "prepare_spellbook") for row in rows)
     }
     assert live == set(GYDION_EFFECTS)
-    assert set(ALL_EFFECTS) == set(DENSE_EFFECTS) | live | set(MISA_EFFECTS) | set(WASP_EFFECTS)
+    assert set(ALL_EFFECTS) == set(DENSE_EFFECTS) | live | set(MISA_EFFECTS) | set(
+        WASP_EFFECTS
+    ) | set(MIN_EFFECTS)
     assert len(DENSE_EFFECTS) == 64

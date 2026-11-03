@@ -201,7 +201,7 @@ fn every_shared_execution_boundary_restores_values_aliases_and_request_generatio
             operations.fetch_add(1, Ordering::Relaxed);
         }
     });
-    assert_eq!(checked, 13766);
+    assert_eq!(checked, 14255);
     assert_eq!(operations.load(Ordering::Relaxed), 74472);
 }
 
@@ -2973,8 +2973,8 @@ fn primary_text_bodies_restore_all_boundaries_and_keep_worker_models_private() {
             assert_eq!(before.object_bindings, after.object_bindings);
         },
     );
-    assert_eq!(count, 711);
-    assert_eq!(operations.load(Ordering::Relaxed), 1911);
+    assert_eq!(count, 781);
+    assert_eq!(operations.load(Ordering::Relaxed), 2051);
 }
 
 #[test]
@@ -3147,8 +3147,8 @@ fn primary_reperformance_restores_every_boundary_and_keeps_outer_scopes_private(
             assert_eq!(before.object_bindings, after.object_bindings);
         },
     );
-    assert_eq!(count, 549);
-    assert_eq!(operations.load(Ordering::Relaxed), 1783);
+    assert_eq!(count, 605);
+    assert_eq!(operations.load(Ordering::Relaxed), 1895);
 }
 
 #[test]
@@ -3198,6 +3198,7 @@ fn copied_card_flows_restore_each_boundary_with_foreign_card_and_scope_aliases()
                 || name.starts_with("object-execution-perform-card-menu-gydion-")
                 || name.starts_with("object-execution-perform-card-menu-misa-")
                 || name.starts_with("object-execution-perform-card-menu-wasp-")
+                || name.starts_with("object-execution-perform-card-menu-min-")
         }),
         |case| {
             let root =
@@ -3225,8 +3226,8 @@ fn copied_card_flows_restore_each_boundary_with_foreign_card_and_scope_aliases()
             assert_eq!(before.object_bindings, after.object_bindings);
         },
     );
-    assert_eq!(count, 181);
-    assert_eq!(operations.load(Ordering::Relaxed), 2216);
+    assert_eq!(count, 199);
+    assert_eq!(operations.load(Ordering::Relaxed), 2448);
 }
 #[test]
 fn mind_grip_restores_every_branch_with_previous_card_and_nested_scope_identity() {
@@ -3505,5 +3506,18 @@ fn wasp_bodies_and_queries_restore_each_boundary_with_private_tokens_filters_and
         ],
         428,
         7971,
+    );
+}
+
+#[test]
+fn min_bodies_items_and_deferred_text_restore_each_boundary_with_private_models() {
+    primary_family_restores_each_boundary(
+        &[
+            "object-execution-min-primary-",
+            "object-execution-min-item-",
+            "object-execution-min-after-",
+        ],
+        363,
+        7873,
     );
 }

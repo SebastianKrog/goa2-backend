@@ -2,9 +2,9 @@
   "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
   "scope": "Ordinary primary-body coverage only; defense/passive/world/search completeness remain separate gates. All 22 spell bodies are tracked separately.",
   "counts": {
-    "reviewed_recipe": 113,
+    "reviewed_recipe": 127,
     "base_noop": 45,
-    "remaining_body": 435,
+    "remaining_body": 421,
     "missing_registry": 3
   },
   "total": 596,
@@ -1160,27 +1160,27 @@
         {
           "card_id": "cobra_stance",
           "effect_id": "cobra_stance",
-          "status": "remaining_body"
+          "status": "reviewed_recipe"
         },
         {
           "card_id": "dragon_stance",
           "effect_id": "dragon_stance",
-          "status": "remaining_body"
+          "status": "reviewed_recipe"
         },
         {
           "card_id": "holy_death_grenade",
           "effect_id": "holy_death_grenade",
-          "status": "remaining_body"
+          "status": "reviewed_recipe"
         },
         {
           "card_id": "minefield",
           "effect_id": "minefield",
-          "status": "remaining_body"
+          "status": "reviewed_recipe"
         },
         {
           "card_id": "perfect_self",
           "effect_id": "perfect_self",
-          "status": "remaining_body"
+          "status": "reviewed_recipe"
         },
         {
           "card_id": "ruse",
@@ -1190,27 +1190,27 @@
         {
           "card_id": "viper_stance",
           "effect_id": "viper_stance",
-          "status": "remaining_body"
+          "status": "reviewed_recipe"
         },
         {
           "card_id": "tiger_stance",
           "effect_id": "tiger_stance",
-          "status": "remaining_body"
+          "status": "reviewed_recipe"
         },
         {
           "card_id": "death_grenade",
           "effect_id": "death_grenade",
-          "status": "remaining_body"
+          "status": "reviewed_recipe"
         },
         {
           "card_id": "cluster_mine",
           "effect_id": "cluster_mine",
-          "status": "remaining_body"
+          "status": "reviewed_recipe"
         },
         {
           "card_id": "inner_strength",
           "effect_id": "inner_strength",
-          "status": "remaining_body"
+          "status": "reviewed_recipe"
         },
         {
           "card_id": "vanish",
@@ -1220,22 +1220,22 @@
         {
           "card_id": "fast_as_lightning",
           "effect_id": "fast_as_lightning",
-          "status": "remaining_body"
+          "status": "reviewed_recipe"
         },
         {
           "card_id": "smoke_bomb",
           "effect_id": "smoke_bomb",
-          "status": "remaining_body"
+          "status": "reviewed_recipe"
         },
         {
           "card_id": "crane_stance",
           "effect_id": "crane_stance",
-          "status": "remaining_body"
+          "status": "reviewed_recipe"
         },
         {
           "card_id": "trip_mine",
           "effect_id": "trip_mine",
-          "status": "remaining_body"
+          "status": "reviewed_recipe"
         },
         {
           "card_id": "poof",

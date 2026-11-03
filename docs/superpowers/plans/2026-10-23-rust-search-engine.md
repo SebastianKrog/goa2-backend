@@ -5514,3 +5514,58 @@ All 84 Python source contracts pass. The final release matches all 572 Wasp
 source cases / 8,455 operations. Strict Clippy, Rustfmt, Black/Ruff and frozen
 source/lock checks pass. See [the validation record](../../../rust/artifacts/wasp-primary-final-validation.json).
 Live services and the preserved Windows checkout remain unchanged.
+
+
+### Min primary bodies, deferred card text and permanent items (2026-11-03)
+
+Fourteen Min primary faces are implemented: three mine cards, Smoke Bomb, five
+stances, Fast as Lightning, two grenades, Inner Strength and Perfect Self.
+Thirteen use pure source-pinned recipes. Perfect Self has explicit conditional
+prototypes; execution chooses from the actual performer's current retired Tier II
+deck cards and binds their ordered IDs. Re-performance rechecks the deck after
+conversion, so its menu disappears when no eligible retired card remains.
+
+ConvertCardToItem reads the live card key and hero operand, chooses the first
+matching physical deck card, increments its item stat and emits ITEM_GAINED.
+It preserves the source's unrestricted repeated conversion behavior. Card state
+assignment clears temporary initiative exactly as Python does, retaining other
+flags and aliases. Shared item dictionaries update every affected native hero
+cache. No card is removed from its existing collections.
+
+ApplyAfterAttackCardText performs its red-card lookup at execution time: played
+cards before discards, using current color so facedown cards are skipped. It
+stops on the first red card even if that card has no registered effect. The native
+ordinary-registry builder uses the selected red card's stats and source binding,
+propagates the actual defender into custom target channels, strips through the
+first attack and queues the remaining roots without replacing the outer action
+context. Generation preflight counts only that returned suffix. Late discards,
+foreign copied performers and an attack-only empty suffix have source coverage.
+
+The source exporter now normalizes step labels throughout finishing continuations
+as well as repeat templates, keeping grenade catalogs deterministic. Complete
+flows expire and detonate grenades through the actual end-turn scheduler,
+including empty-hand defeats and token/effect removal. Inert place_token templates
+can import on the older dense path; reaching one is guarded before popping the
+step. This fixes unrelated dense sessions that otherwise rejected the expanded
+cold catalog. It does not establish dense token execution.
+
+Source parity covers 507 cases / 8,357 operations. A dedicated restore gate
+covers 363 Min cases / 7,873 boundaries, with the expanded generic construction,
+re-performance and copied-menu gates retained. There are 14,255 live cases /
+115,358 operations; the canonical dense corpus remains 6,592 / 27,145.
+
+Reviewed primary coverage is 127 custom bodies + 45 base no-op faces = 172/596.
+Remaining primary faces: 421 registered bodies and three unregistered source IDs.
+Spell bodies remain 22/22. Dynamic Flurry/Cloak rebuilding, other passive/defense
+and filter bodies, world closure, raw exception fidelity, dense bridge retirement,
+make/unmake, hashing/evaluation, iterative team-aware search, hidden/simultaneous
+planning, parallel search, integration/strength and 1,000 complete two-game-turn
+simulations/sec remain required. Engine/search completion remains false.
+
+Validation: all 425 Rust workspace tests pass, including 102 restoration
+integration tests and complete live/canonical CLI replays; one older all-corpus
+exhaustive restoration gate is filtered. All 103 Python source contracts pass.
+Independent release parity matches all 507 Min cases / 8,357 operations. Strict
+Clippy, Rustfmt, Black/Ruff and frozen-source/lock checks pass. See the
+[validation record](../../../rust/artifacts/min-primary-final-validation.json).
+Live services and the preserved Windows checkout remain unchanged.

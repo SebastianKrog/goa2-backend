@@ -16,7 +16,7 @@ def test_misa_catalog_separates_pure_recipes_from_explicit_live_ultimate_shapes(
 
     data = catalog()
     assert data["schema_version"] == 3
-    assert len(data["recipes"]) == 111 and len(data["stateful_recipes"]) == 2
+    assert len(data["recipes"]) == 124 and len(data["stateful_recipes"]) == 3
     assert set(MISA_EFFECTS) - set(data["recipes"]) == set(MISA_STATEFUL_EFFECTS)
     for effect, lengths in (("swoop_in", (4, 6)), ("watch_how_i_soar", (7, 15))):
         body = data["stateful_recipes"][effect]

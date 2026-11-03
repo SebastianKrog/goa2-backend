@@ -15,7 +15,7 @@ def test_all_wasp_primary_bodies_are_pure_source_recipes():
     from primary_templates import WASP_EFFECTS
 
     data = catalog()
-    assert len(data["recipes"]) == 111 and len(data["stateful_recipes"]) == 2
+    assert len(data["recipes"]) == 124 and len(data["stateful_recipes"]) == 3
     assert set(WASP_EFFECTS) <= set(data["recipes"])
     assert len(WASP_EFFECTS) == 14
 

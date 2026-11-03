@@ -2641,3 +2641,32 @@ Validation: 416 Rust workspace tests and 84 Python source contracts pass. One
 older all-corpus exhaustive restoration gate was excluded. Final release parity,
 strict Clippy, Rustfmt, Black/Ruff and frozen-source/lock checks pass.
 [Validation record](../../artifacts/wasp-primary-final-validation.json).
+
+
+### Min primary bodies, permanent items and deferred text (2026-11-03)
+
+Fourteen Min primary bodies join the reviewed closure: 13 pure recipes and
+Perfect Self's explicit retired-card variants. Coverage is 172/596 primary faces
+(124 pure recipes, three stateful builders and 45 base no-op faces). All 22
+spell bodies remain covered separately; Min's dynamic Flurry passive is a
+separate remaining gate.
+
+The Min increment has 507 cases / 8,357 operations: 329 card flows, 23 direct
+item-conversion cases, 11 deferred-text cases and 144 generic construction,
+re-performance and copied menus. The dedicated restoration test covers all
+363 Min flow/primitive cases at each of their 7,873 operation boundaries.
+Scenarios include turn-expiry grenade detonation, smoke/token identity, staged
+mine placement, retired-card menus changing after conversion, foreign performers,
+late discard, first-red ordering, facedown masking, target-channel propagation,
+duplicate physical card IDs, shared item dictionaries and negative attacks.
+
+Current live corpus: 14,255 cases / 115,358 operations; canonical dense corpus:
+6,592 / 27,145. Index SHA-256
+`a604573266b132c2ddf8d1bd8d2217941b3d75735dd9190e1ede241b3e167153`;
+semantic SHA-256 `8fbe84455f71e11ce012a37c5784b70a47085b86ce808a67b0ef3d7da359fd41`.
+
+Validation: 425 Rust workspace tests and 103 Python source contracts pass. One
+older all-corpus exhaustive restoration gate was excluded. Both complete CLI
+corpora and independent release parity pass, as do strict Clippy, Rustfmt,
+Black/Ruff and frozen-source/lock checks.
+[Validation record](../../artifacts/min-primary-final-validation.json).

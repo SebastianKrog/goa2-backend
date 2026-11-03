@@ -5,17 +5,20 @@ This workspace executes the supported rule closure through ordinary full rounds.
 It does not yet support general complete games or select bot actions.
 The live Python backend and lab are unchanged.
 
-Current reviewed primary coverage: **158/596 card faces** (113 custom bodies,
-including two state-dependent Misa builders, and 45 base no-op faces). All **22/22 spell bodies** now execute through native
+Current reviewed primary coverage: **172/596 card faces** (127 custom bodies,
+including three state-dependent Misa/Min builders, and 45 base no-op faces). All **22/22 spell bodies** now execute through native
 casting and copied-card paths, with independent Python parity across 304 scenes /
 6,113 operations. These counts do not establish complete defense, passive,
 world-rule or search support.
 Misa’s 18 primary bodies also pass independent Python parity across 691 scenes /
 8,598 operations; see the [validation record](artifacts/misa-primary-final-validation.json).
 Wasp adds 14 primary bodies and two conditional query steps, verified across
-572 scenes / 8,455 operations. The current workspace passes 416 Rust tests and
-84 Python source contracts, with one older exhaustive restoration gate excluded.
-See the [Wasp validation record](artifacts/wasp-primary-final-validation.json).
+572 scenes / 8,455 operations; see the [Wasp validation record](artifacts/wasp-primary-final-validation.json).
+Min adds 14 primary bodies, permanent item conversion and deferred red-card text,
+verified across 507 scenes / 8,357 operations. The current workspace passes
+425 Rust tests and 103 Python source contracts, with one older all-corpus
+exhaustive restoration gate excluded. Both full CLI corpora pass.
+See the [Min validation record](artifacts/min-primary-final-validation.json).
 
 ## Build and test in WSL
 

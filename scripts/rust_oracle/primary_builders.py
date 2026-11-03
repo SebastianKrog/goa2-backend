@@ -111,6 +111,7 @@ def catalog():
         "defense": freeze_steps([LogMessageStep(message="template-primary-defense-log")]),
         "skill": freeze_steps([LogMessageStep(message="template-primary-skill-log")]),
     }
+    from min_builders import stateful_recipes as min_stateful_recipes
     from misa_builders import stateful_recipes
 
     source = {
@@ -119,7 +120,7 @@ def catalog():
         "methods": methods,
         "spell_effects": sorted(CardEffectRegistry._spell_effects),
         "recipes": recipes,
-        "stateful_recipes": stateful_recipes(state),
+        "stateful_recipes": {**stateful_recipes(state), **min_stateful_recipes(state)},
         "ranged_steps": ranged_steps,
         "radius_fallbacks": radius_fallbacks,
         "fallback": fallback,

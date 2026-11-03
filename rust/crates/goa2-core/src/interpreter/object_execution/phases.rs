@@ -377,8 +377,10 @@ pub(super) enum Field {
     KeyA,
     KeyB,
     Operation,
+    Items,
+    ItemState,
 }
-const NAMES: [&str; 374] = [
+const NAMES: [&str; 376] = [
     "phase",
     "turn",
     "turn_discard_log",
@@ -753,6 +755,8 @@ const NAMES: [&str; 374] = [
     "key_a",
     "key_b",
     "operation",
+    "items",
+    "ITEM",
 ];
 #[derive(Clone, Debug)]
 pub(super) struct PhaseBindings {

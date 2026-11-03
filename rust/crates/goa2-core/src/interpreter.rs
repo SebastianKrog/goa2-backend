@@ -243,6 +243,8 @@ enum Instruction {
     LiveDistanceCheck,
     LiveUnitTypeCheck,
     LiveBooleanCombine,
+    LiveConvertCardItem,
+    LiveAfterAttackText,
     LiveMinionRespawn,
     LiveCardCount,
     LiveRoundDefeat,
@@ -755,6 +757,11 @@ pub enum NativeEvent {
         unit: Symbol,
         from: Option<Hex>,
         to: Hex,
+    },
+    ItemGained {
+        actor: Symbol,
+        stat: Stat,
+        card: Symbol,
     },
     CardRetrieved {
         hero: Symbol,
@@ -1877,10 +1884,17 @@ impl NativeSession {
                     | Instruction::LiveDistanceCheck
                     | Instruction::LiveUnitTypeCheck
                     | Instruction::LiveBooleanCombine
+                    | Instruction::LiveConvertCardItem
+                    | Instruction::LiveAfterAttackText
                     | Instruction::LiveMinionRespawn
             ) {
                 return Err(unsupported(
                     "card and round queries require authoritative object bindings",
+                ));
+            }
+            if matches!(compiled.instruction, Instruction::LiveTokenPlace) {
+                return Err(unsupported(
+                    "token placement requires authoritative object bindings",
                 ));
             }
             let mut frame = self.stack.pop().unwrap();
@@ -4223,6 +4237,8 @@ impl NativeSession {
                 | Instruction::LiveDistanceCheck
                 | Instruction::LiveUnitTypeCheck
                 | Instruction::LiveBooleanCombine
+                | Instruction::LiveConvertCardItem
+                | Instruction::LiveAfterAttackText
                 | Instruction::LiveMinionRespawn
                 | Instruction::LiveCardCount
                 | Instruction::LiveRoundDefeat
@@ -6038,6 +6054,9 @@ impl NativeSession {
                 }
                 json!({"event_type":"CARD_RETRIEVED","actor_id":self.symbols.name(*hero),"target_id":null,"from_hex":null,"to_hex":null,"metadata":metadata})
             }
+            NativeEvent::ItemGained { actor, stat, card } => {
+                json!({"event_type":"ITEM_GAINED","actor_id":self.symbols.name(*actor),"target_id":null,"from_hex":null,"to_hex":null,"metadata":{"stat_type":stat.name(),"amount":1,"source_card_id":self.symbols.name(*card)}})
+            }
             NativeEvent::TieBreakerFlipped { blue } => {
                 json!({"event_type":"TIE_BREAKER_FLIPPED","actor_id":null,"target_id":null,"from_hex":null,"to_hex":null,
                 "metadata":{"tie_breaker_team":if *blue {"BLUE"}else{"RED"},"coin_face":if *blue {"BLUE"}else{"ORANGE"}}})
@@ -6585,6 +6604,9 @@ fn compile_step(
         "check_distance" => Instruction::LiveDistanceCheck,
         "check_unit_type" => Instruction::LiveUnitTypeCheck,
         "combine_boolean_context" => Instruction::LiveBooleanCombine,
+        "convert_card_to_item" => Instruction::LiveConvertCardItem,
+        "apply_after_attack_card_text" => Instruction::LiveAfterAttackText,
+        "place_token" => Instruction::LiveTokenPlace,
         "respawn_minion_at_hex" => Instruction::LiveMinionRespawn,
         "count_cards" => Instruction::LiveCardCount,
         "check_hero_defeated_this_round" => Instruction::LiveRoundDefeat,
@@ -7588,6 +7610,35 @@ mod tests {
                         assert!(origin.is_none(), "{kind} {target} {output}: {state}");
                         assert!(kind == "count" || result.request.is_some());
                     }
+                }
+            }
+        }
+    }
+    #[test]
+    fn inert_min_card_templates_import_but_reached_dense_cards_guard_before_pop() {
+        for kind in [
+            "convert_card_to_item",
+            "apply_after_attack_card_text",
+            "place_token",
+        ] {
+            for active in [false, true] {
+                let mut envelope = source("action-execution-Min-HOLD");
+                envelope.state["execution_stack"] = json!([{"type":kind,"step_id":"dense-min-card","active_if_key":"enabled","card_key":"target_card","hero_id":"hero_min"}]);
+                envelope.state["execution_context"] = json!({"enabled":active});
+                let mut worker = NativeSession::compile(envelope).unwrap();
+                let before = worker.semantic_state().unwrap();
+                if active {
+                    assert!(
+                        worker
+                            .advance_prefix(1)
+                            .unwrap_err()
+                            .to_string()
+                            .contains("authoritative object bindings")
+                    );
+                    assert_eq!(worker.semantic_state().unwrap(), before);
+                } else {
+                    worker.advance_prefix(1).unwrap();
+                    assert!(worker.stack.is_empty());
                 }
             }
         }

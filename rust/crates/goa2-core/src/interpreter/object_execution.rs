@@ -19,6 +19,9 @@ mod forced_discard;
 mod gydion_tests;
 mod hex_selection;
 mod markers;
+mod min_cards;
+#[cfg(test)]
+mod min_tests;
 #[cfg(test)]
 mod mind_grip_tests;
 mod mines;
@@ -265,6 +268,8 @@ impl BoundObjects {
                 | "check_distance"
                 | "check_unit_type"
                 | "combine_boolean_context"
+                | "convert_card_to_item"
+                | "apply_after_attack_card_text"
                 | "respawn_minion_at_hex"
                 | "force_discard_or_defeat"
                 | "choose_rune"
@@ -366,6 +371,8 @@ impl BoundObjects {
                         | "check_distance"
                         | "check_unit_type"
                         | "combine_boolean_context"
+                        | "convert_card_to_item"
+                        | "apply_after_attack_card_text"
                         | "respawn_minion_at_hex"
                         | "force_discard_or_defeat"
                         | "choose_rune"
@@ -556,6 +563,10 @@ impl BoundObjects {
                 _ => None,
             } {
                 steps[index].instruction = Instruction::LiveSpell(op);
+            } else if wire["type"] == "convert_card_to_item" {
+                steps[index].instruction = Instruction::LiveConvertCardItem;
+            } else if wire["type"] == "apply_after_attack_card_text" {
+                steps[index].instruction = Instruction::LiveAfterAttackText;
             } else if wire["type"] == "check_unit_type" {
                 steps[index].instruction = Instruction::LiveUnitTypeCheck;
             } else if wire["type"] == "combine_boolean_context" {
@@ -1526,6 +1537,24 @@ impl NativeSession {
             } else {
                 None
             };
+            let convert_item = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveConvertCardItem
+                ) {
+                self.preflight_convert_item_bound(objects, top_object.unwrap())?
+            } else {
+                None
+            };
+            let after_attack = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveAfterAttackText
+                ) {
+                self.preflight_after_attack_bound(objects, top_object.unwrap())?
+            } else {
+                None
+            };
             let retrieve = if !skipped
                 && matches!(
                     self.steps[top_instruction].instruction,
@@ -1994,6 +2023,12 @@ impl NativeSession {
                 Instruction::LiveTokenRemove => result
                     .events
                     .extend(self.token_remove_bound(objects, token_remove)?),
+                Instruction::LiveConvertCardItem => result
+                    .events
+                    .extend(self.convert_item_bound(objects, convert_item)?),
+                Instruction::LiveAfterAttackText => {
+                    self.after_attack_bound(objects, after_attack)?
+                }
                 Instruction::LiveRetrieve => result
                     .events
                     .extend(self.retrieve_card_bound(objects, retrieve)?),

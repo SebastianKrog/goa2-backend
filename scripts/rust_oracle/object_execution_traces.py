@@ -371,6 +371,19 @@ def scenes():
 
     yield from wasp_primary_scenes()
     yield from wasp_query_scenes()
+    from live_min_primary_traces import (
+        after_scenes as min_after_scenes,
+    )
+    from live_min_primary_traces import (
+        item_scenes as min_item_scenes,
+    )
+    from live_min_primary_traces import (
+        scenes as min_primary_scenes,
+    )
+
+    yield from min_primary_scenes()
+    yield from min_item_scenes()
+    yield from min_after_scenes()
 
 
 def live_choice_operations(state, mode="first", stop_types=("offer_passive",)):

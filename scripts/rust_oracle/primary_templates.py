@@ -125,6 +125,19 @@ EFFECTS = {
     "kinetic_repulse": "Wasp",
     "kinetic_blast": "Wasp",
     "static_barrier": "Wasp",
+    "trip_mine": "Min",
+    "cluster_mine": "Min",
+    "minefield": "Min",
+    "smoke_bomb": "Min",
+    "crane_stance": "Min",
+    "tiger_stance": "Min",
+    "dragon_stance": "Min",
+    "viper_stance": "Min",
+    "cobra_stance": "Min",
+    "fast_as_lightning": "Min",
+    "death_grenade": "Min",
+    "holy_death_grenade": "Min",
+    "inner_strength": "Min",
     "devoted_followers": "Xargatha",
     "fresh_converts": "Xargatha",
 }
@@ -189,7 +202,24 @@ WASP_EFFECTS = (
     "kinetic_blast",
     "static_barrier",
 )
-ALL_EFFECTS = {**EFFECTS, **MISA_STATEFUL_EFFECTS}
+MIN_STATEFUL_EFFECTS = {"perfect_self": "Min"}
+MIN_EFFECTS = (
+    "trip_mine",
+    "cluster_mine",
+    "minefield",
+    "smoke_bomb",
+    "crane_stance",
+    "tiger_stance",
+    "dragon_stance",
+    "viper_stance",
+    "cobra_stance",
+    "fast_as_lightning",
+    "death_grenade",
+    "holy_death_grenade",
+    "inner_strength",
+    "perfect_self",
+)
+ALL_EFFECTS = {**EFFECTS, **MISA_STATEFUL_EFFECTS, **MIN_STATEFUL_EFFECTS}
 DENSE_EFFECT_IDS = (
     "bullrush",
     "furious_charge",
@@ -284,9 +314,15 @@ def build_catalog():
         wires = [step.model_dump(mode="json") for step in steps]
 
         def labels(wire):
-            wire["step_id"] = "native-step-primary-template"
-            for child in wire.get("steps_template", []):
-                labels(child)
+            if isinstance(wire, dict):
+                for key, value in wire.items():
+                    if key == "step_id":
+                        wire[key] = "native-step-primary-template"
+                    else:
+                        labels(value)
+            elif isinstance(wire, list):
+                for value in wire:
+                    labels(value)
 
         for wire in wires:
             labels(wire)

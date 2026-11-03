@@ -11,13 +11,27 @@ pub(super) struct PrimaryRules {
     pub(super) spell_bodies: Arc<super::spell_bodies::SpellBodies>,
     spells: HashSet<Symbol>,
     recipes: HashMap<Symbol, Vec<Recipe>>,
-    misa_variants: HashMap<Symbol, [Vec<Recipe>; 2]>,
+    variants: HashMap<Symbol, StatefulPrimary>,
     ranged: HashMap<Symbol, Vec<usize>>,
     fallback: HashMap<&'static str, Vec<Recipe>>,
     empty: Symbol,
     card: Symbol,
     defense_log: Symbol,
     skill_log: Symbol,
+}
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum PrimaryMode {
+    Ordinary,
+    Copied,
+    AfterAttack,
+}
+#[derive(Clone, Debug)]
+enum StatefulPrimary {
+    MisaUltimate([Vec<Recipe>; 2]),
+    MinRetired {
+        variants: [Vec<Recipe>; 2],
+        operand: Symbol,
+    },
 }
 fn catalog() -> Result<&'static Value> {
     static DATA: OnceLock<std::result::Result<Value, String>> = OnceLock::new();
@@ -86,14 +100,11 @@ impl PrimaryRules {
                     .collect::<Result<Vec<_>>>()?,
             );
         }
-        let misa_variants = data["stateful_recipes"]
+        let variants = data["stateful_recipes"]
             .as_object()
             .ok_or_else(|| unsupported("stateful primary recipes missing"))?
             .iter()
             .map(|(effect, body)| {
-                if body["predicate"] != "misa_has_ultimate" {
-                    return Err(unsupported("unknown stateful primary predicate"));
-                }
                 let mut rows = |name: &str| {
                     body["variants"][name]
                         .as_array()
@@ -102,8 +113,26 @@ impl PrimaryRules {
                         .map(|row| Recipe::compile(row, steps, symbols))
                         .collect::<Result<Vec<_>>>()
                 };
-                let variants = [rows("without_ultimate")?, rows("with_ultimate")?];
-                Ok((symbols.intern(effect), variants))
+                let kind = match body["predicate"].as_str() {
+                    Some("misa_has_ultimate") => StatefulPrimary::MisaUltimate([
+                        rows("without_ultimate")?,
+                        rows("with_ultimate")?,
+                    ]),
+                    Some("min_has_retired_tier_two") => {
+                        let variants = [
+                            rows("without_retired_tier_two")?,
+                            rows("with_retired_tier_two")?,
+                        ];
+                        let operand = symbols.intern(
+                            body["retired_card_operand"]
+                                .as_str()
+                                .ok_or_else(|| unsupported("retired-card operand missing"))?,
+                        );
+                        StatefulPrimary::MinRetired { variants, operand }
+                    }
+                    _ => return Err(unsupported("unknown stateful primary predicate")),
+                };
+                Ok((symbols.intern(effect), kind))
             })
             .collect::<Result<HashMap<_, _>>>()?;
         let mut ranged = HashMap::new();
@@ -146,7 +175,7 @@ impl PrimaryRules {
             spell_bodies: Arc::new(super::spell_bodies::SpellBodies::compile(steps, symbols)?),
             spells,
             recipes,
-            misa_variants,
+            variants,
             ranged,
             fallback,
             empty: symbols.intern("CardEffect.build_steps"),
@@ -203,7 +232,7 @@ impl NativeSession {
         card: crate::cards::CardId,
         computed: Option<CardStats>,
     ) -> Result<PrimaryPlan> {
-        self.prepare_primary_body_kind_bound(objects, hero, card, computed, false)
+        self.prepare_primary_body_kind_bound(objects, hero, card, computed, PrimaryMode::Ordinary)
     }
     pub(super) fn prepare_copied_body_bound(
         &mut self,
@@ -212,7 +241,22 @@ impl NativeSession {
         card: crate::cards::CardId,
     ) -> Result<PrimaryPlan> {
         let stats = self.world.card_stats(hero, card).map_err(unsupported)?;
-        self.prepare_primary_body_kind_bound(objects, hero, card, Some(stats), true)
+        self.prepare_primary_body_kind_bound(objects, hero, card, Some(stats), PrimaryMode::Copied)
+    }
+    pub(super) fn prepare_deferred_primary_bound(
+        &mut self,
+        objects: &BoundObjects,
+        hero: Symbol,
+        card: crate::cards::CardId,
+    ) -> Result<PrimaryPlan> {
+        let stats = self.world.card_stats(hero, card).map_err(unsupported)?;
+        self.prepare_primary_body_kind_bound(
+            objects,
+            hero,
+            card,
+            Some(stats),
+            PrimaryMode::AfterAttack,
+        )
     }
     fn prepare_primary_body_kind_bound(
         &mut self,
@@ -220,8 +264,9 @@ impl NativeSession {
         hero: Symbol,
         card: crate::cards::CardId,
         computed: Option<CardStats>,
-        copied: bool,
+        mode: PrimaryMode,
     ) -> Result<PrimaryPlan> {
+        let copied = mode == PrimaryMode::Copied;
         let mut plan = PrimaryPlan::default();
         let instance = self
             .world
@@ -235,7 +280,9 @@ impl NativeSession {
             return Ok(plan);
         }
         let rules = objects.scheduler.as_ref().unwrap().primary_bodies.clone();
-        let spell = definition.spell && rules.spells.contains(&definition.effect);
+        let spell = mode != PrimaryMode::AfterAttack
+            && definition.spell
+            && rules.spells.contains(&definition.effect);
         let registered = if spell {
             None
         } else {
@@ -247,6 +294,7 @@ impl NativeSession {
             radius: None,
         };
         let mut logs = None;
+        let mut retired_binding = None;
         plan.recipes = if spell {
             stats = if let Some(stats) = computed {
                 stats
@@ -262,8 +310,31 @@ impl NativeSession {
             };
             if *method == rules.empty {
                 Vec::new()
-            } else if let Some(variants) = rules.misa_variants.get(&definition.effect) {
-                variants[usize::from(self.misa_has_ultimate_bound(objects, owner)?)].clone()
+            } else if let Some(kind) = rules.variants.get(&definition.effect) {
+                match kind {
+                    StatefulPrimary::MisaUltimate(variants) => {
+                        variants[usize::from(self.misa_has_ultimate_bound(objects, owner)?)].clone()
+                    }
+                    StatefulPrimary::MinRetired { variants, operand } => {
+                        let ids = self
+                            .world
+                            .hero(owner)
+                            .unwrap()
+                            .deck
+                            .iter()
+                            .filter_map(|id| {
+                                let card = self.world.card(*id).unwrap();
+                                let definition = &self.world.definitions.cards[card.definition];
+                                (card.lifecycle == crate::world::CardLifecycle::Retired
+                                    && self.symbols.name(definition.tier) == "II")
+                                    .then_some(definition.printed_id)
+                            })
+                            .collect::<Vec<_>>();
+                        let variant = usize::from(!ids.is_empty());
+                        retired_binding = Some((*operand, ids));
+                        variants[variant].clone()
+                    }
+                }
             } else {
                 rules
                     .recipes
@@ -356,6 +427,7 @@ impl NativeSession {
             stats: &CardStats,
             log: Option<(Symbol, Symbol)>,
             operands: &crate::primary::PrimaryOperands,
+            retired: Option<(Symbol, &[Symbol])>,
         ) {
             match value {
                 Datum::Text(v) if *v == rules.card => *v = card,
@@ -371,13 +443,20 @@ impl NativeSession {
                     }
                 }
                 Datum::List(values) => {
-                    for value in values {
-                        bind(value, rules, card, stats, log, operands);
+                    if let Some((marker, ids)) = retired
+                        && values.len() == 1
+                        && matches!(values[0], Datum::Text(value) if value == marker)
+                    {
+                        *values = ids.iter().copied().map(Datum::Text).collect();
+                    } else {
+                        for value in values {
+                            bind(value, rules, card, stats, log, operands, retired);
+                        }
                     }
                 }
                 Datum::Object(fields) => {
                     for (_, value) in fields {
-                        bind(value, rules, card, stats, log, operands);
+                        bind(value, rules, card, stats, log, operands, retired);
                     }
                 }
                 _ => {}
@@ -391,6 +470,9 @@ impl NativeSession {
                 &stats,
                 log,
                 &self.primary_operands,
+                retired_binding
+                    .as_ref()
+                    .map(|(marker, ids)| (*marker, ids.as_slice())),
             );
             if registered.is_some()
                 && rules
@@ -417,7 +499,7 @@ impl NativeSession {
             .flat_map(|recipe| &recipe.objects)
             .filter(|(_, kind)| *kind == ObjectKind::Step)
             .count();
-        if count != 0 {
+        if mode != PrimaryMode::AfterAttack && count != 0 {
             self.phase_generation_check(
                 0,
                 u64::try_from(count)

@@ -6,6 +6,8 @@ format is private offline tooling; no backend API or persistence format changes.
 
 from __future__ import annotations
 
+from fixture_cache import read_text, write_text
+
 from oracle import ORACLE_REVISION, digest, verify_sources
 
 REFERENCE_KEY = "$goa2_instance"
@@ -272,11 +274,11 @@ def main():
     if args.mode == "export":
         corpus = state_corpus()
         args.corpus.parent.mkdir(parents=True, exist_ok=True)
-        args.corpus.write_text(json.dumps(corpus, separators=(",", ":")) + "\n")
+        write_text(args.corpus, json.dumps(corpus, separators=(",", ":")) + "\n")
         print(json.dumps({"cases": len(corpus["cases"]), "corpus_sha256": corpus["corpus_sha256"]}))
         return
     verify_sources()
-    corpus = json.loads(args.corpus.read_text())
+    corpus = json.loads(read_text(args.corpus))
     identity = corpus.pop("corpus_sha256")
     if digest(corpus) != identity:
         raise ValueError("state corpus identity mismatch")

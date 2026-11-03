@@ -5,7 +5,7 @@ from __future__ import annotations
 from state_codec import export_state
 
 
-def cases(advance, answer):
+def cases(advance, answer, *, live_sink=None):
     import copy
 
     from model_traces import setup
@@ -98,6 +98,8 @@ def cases(advance, answer):
             assert (
                 work.execution_context.get("turn_done") or work.phase == GamePhase.GAME_OVER
             ), name
+        if live_sink is not None:
+            live_sink(name, copy.deepcopy(state), copy.deepcopy(operations))
         expected = reference_trace(state, operations)
         result.append(
             {

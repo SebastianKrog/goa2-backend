@@ -7,6 +7,8 @@ an explicit native runtime port.
 
 from __future__ import annotations
 
+from fixture_cache import write_text
+
 import json
 
 from oracle import ROOT, digest, verify_sources
@@ -190,9 +192,7 @@ def catalog():
 
 def export():
     payload = catalog()
-    (ROOT / "rust/tests/fixtures/primary-builders.json").write_text(
-        json.dumps(payload, indent=2) + "\n"
-    )
+    write_text(ROOT / "rust/tests/fixtures/primary-builders.json", json.dumps(payload, indent=2) + "\n")
     print(
         {
             "effects": len(payload["recipes"]),

@@ -6,6 +6,8 @@ The Rust worker is a persistent subprocess, including when launched through WSL.
 
 from __future__ import annotations
 
+from fixture_cache import read_bytes, read_text, write_text
+
 import argparse
 import hashlib
 import io
@@ -66,7 +68,7 @@ def source_manifest():
 
 
 def verify_sources():
-    manifest = json.loads(MANIFEST.read_text())
+    manifest = json.loads(read_text(MANIFEST))
     if manifest["oracle_revision"] != ORACLE_REVISION or manifest["source_sha256"] != digest(
         {"files": manifest["files"], "runtime": manifest["runtime"]}
     ):
@@ -74,7 +76,7 @@ def verify_sources():
     if manifest["runtime"] != reference_runtime():
         raise ValueError("oracle runtime drift: use the frozen Python/Pydantic/jsonpatch versions")
     for name, expected in manifest["files"].items():
-        actual = hashlib.sha256((ROOT / name).read_bytes().replace(b"\r\n", b"\n")).hexdigest()
+        actual = hashlib.sha256(read_bytes(ROOT / name).replace(b"\r\n", b"\n")).hexdigest()
         if actual != expected:
             raise ValueError(f"oracle source drift: {name}; explicitly re-pin before exporting")
     # New Python modules can change registries/import discovery as well.
@@ -237,7 +239,7 @@ class Worker:
 
 def verify_corpus(path, command):
     manifest = verify_sources()
-    corpus = json.loads(path.read_text())
+    corpus = json.loads(read_text(path))
     identity = corpus.pop("corpus_sha256")
     if digest(corpus) != identity or corpus["oracle_revision"] != ORACLE_REVISION:
         raise ValueError("corpus identity mismatch")
@@ -264,14 +266,14 @@ def verify_corpus(path, command):
                         }
                         failure_path = ROOT / "rust/artifacts/movement-mismatch.json"
                         failure_path.parent.mkdir(parents=True, exist_ok=True)
-                        failure_path.write_text(json.dumps(failure, indent=2))
+                        write_text(failure_path, json.dumps(failure, indent=2))
                         raise AssertionError(f"native mismatch saved to {failure_path}")
                 raise AssertionError("native result shape mismatch")
             stateful = worker.request("movement", queries=case["queries"], stateful=True)["results"]
             if stateful != case["stateful_expected"]:
                 failure_path = ROOT / "rust/artifacts/stateful-movement-mismatch.json"
                 failure_path.parent.mkdir(parents=True, exist_ok=True)
-                failure_path.write_text(json.dumps({"case": case, "actual": stateful}, indent=2))
+                write_text(failure_path, json.dumps({"case": case, "actual": stateful}, indent=2))
                 raise AssertionError(f"stateful movement mismatch saved to {failure_path}")
             checked += sum(len(result) for result in actual)
     finally:
@@ -296,13 +298,13 @@ def main():
     verify.add_argument("worker", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     if args.mode == "pin":
-        MANIFEST.write_text(json.dumps(source_manifest(), indent=2) + "\n")
+        write_text(MANIFEST, json.dumps(source_manifest(), indent=2) + "\n")
         verify_sources()
         print(f"Pinned {ORACLE_REVISION}")
     elif args.mode == "export-movement":
         corpus = movement_corpus()
         args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(canonical(corpus) + "\n")
+        write_text(args.output, canonical(corpus) + "\n")
         print(json.dumps({"cases": len(corpus["cases"]), "corpus_sha256": corpus["corpus_sha256"]}))
     else:
         command = args.worker

@@ -6,6 +6,8 @@ reserved hero/card/stat operands; arbitrary Python effects are never inferred.
 
 from __future__ import annotations
 
+from fixture_cache import write_text
+
 import json
 
 from oracle import ROOT, digest, verify_sources
@@ -384,9 +386,7 @@ def build_catalog():
 def export():
     payload = build_catalog()
     recipes = payload["recipes"]
-    (ROOT / "rust/tests/fixtures/primary-effects.json").write_text(
-        json.dumps(payload, indent=2) + "\n"
-    )
+    write_text(ROOT / "rust/tests/fixtures/primary-effects.json", json.dumps(payload, indent=2) + "\n")
     print(
         {
             "effects": len(recipes),

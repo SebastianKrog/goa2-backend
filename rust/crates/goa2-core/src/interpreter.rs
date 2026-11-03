@@ -203,6 +203,8 @@ enum Instruction {
         remove: bool,
     },
     LiveMove,
+    LiveTokenMove,
+    LiveDrag,
     LiveMineChoice,
     LiveTriggerMines,
     LiveForceDiscard,
@@ -732,6 +734,13 @@ pub enum NativeEvent {
         from: Hex,
         to: Hex,
         kind: Symbol,
+    },
+    TokenWalked {
+        actor: Option<Symbol>,
+        token: Symbol,
+        from: Hex,
+        to: Hex,
+        range: i64,
     },
     TokenMoved {
         actor: Option<Symbol>,
@@ -1370,8 +1379,8 @@ impl NativeSession {
         } else {
             None
         };
-        let turn_rules =
-            has_flow.then(|| Arc::new(crate::turn::TurnRules::compile(&world, &mut symbols)));
+        let turn_rules = (has_flow || objects.is_some())
+            .then(|| Arc::new(crate::turn::TurnRules::compile(&world, &mut symbols)));
         let has_battle = steps
             .iter()
             .any(|s| matches!(s.instruction, Instruction::Battle(_)));
@@ -2513,7 +2522,9 @@ impl NativeSession {
                                 continue;
                             }
                             let multi = self.world.entity(h.id).is_some_and(|e| e.multi_piece);
-                            let candidates = rules.respawn_candidates(&self.world, hero);
+                            let candidates = rules
+                                .respawn_candidates(&self.world, hero)
+                                .map_err(unsupported)?;
                             if candidates.is_empty() {
                                 continue;
                             }
@@ -4215,6 +4226,8 @@ impl NativeSession {
                 | Instruction::LiveDefenseBody { .. }
                 | Instruction::LiveMarker { .. }
                 | Instruction::LiveMove
+                | Instruction::LiveTokenMove
+                | Instruction::LiveDrag
                 | Instruction::LiveMineChoice
                 | Instruction::LiveTriggerMines
                 | Instruction::LivePassive
@@ -5988,6 +6001,15 @@ impl NativeSession {
             } => {
                 json!({"event_type":"TOKEN_MOVED","actor_id":actor.map(|id|self.symbols.name(id)),"target_id":self.symbols.name(*token),"from_hex":from,"to_hex":to,"metadata":{"token_type":self.symbols.name(*kind),"replaced":true}})
             }
+            NativeEvent::TokenWalked {
+                actor,
+                token,
+                from,
+                to,
+                range,
+            } => {
+                json!({"event_type":"TOKEN_MOVED","actor_id":actor.map(|id|self.symbols.name(id)),"target_id":self.symbols.name(*token),"from_hex":from,"to_hex":to,"metadata":{"range":range}})
+            }
             NativeEvent::TokenMoved {
                 actor,
                 token,
@@ -7720,14 +7742,14 @@ mod tests {
             std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures"));
         let index = INDEX.get_or_init(|| {
             serde_json::from_reader(std::io::BufReader::new(
-                std::fs::File::open(base.join("stack-traces.json")).unwrap(),
+                crate::fixture_cache::open(base.join("stack-traces.json")).unwrap(),
             ))
             .unwrap()
         });
         assert_eq!(index.schema_version, 2);
         let entry = index.cases.iter().find(|case| case.name == name).unwrap();
         let input: Input = serde_json::from_reader(std::io::BufReader::new(
-            std::fs::File::open(base.join(&entry.path)).unwrap(),
+            crate::fixture_cache::open(base.join(&entry.path)).unwrap(),
         ))
         .unwrap();
         input.envelope
@@ -9312,7 +9334,7 @@ mod tests {
         let base =
             std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures"));
         let index: Value = serde_json::from_reader(std::io::BufReader::new(
-            std::fs::File::open(base.join("stack-traces.json")).unwrap(),
+            crate::fixture_cache::open(base.join("stack-traces.json")).unwrap(),
         ))
         .unwrap();
         let names = index["cases"]
@@ -9435,7 +9457,7 @@ mod tests {
         let base =
             std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures"));
         let index: Value = serde_json::from_reader(std::io::BufReader::new(
-            std::fs::File::open(base.join("stack-traces.json")).unwrap(),
+            crate::fixture_cache::open(base.join("stack-traces.json")).unwrap(),
         ))
         .unwrap();
         let names = index["cases"]
@@ -10159,7 +10181,7 @@ mod tests {
         let base =
             std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures"));
         let index: Value = serde_json::from_reader(std::io::BufReader::new(
-            std::fs::File::open(base.join("stack-traces.json")).unwrap(),
+            crate::fixture_cache::open(base.join("stack-traces.json")).unwrap(),
         ))
         .unwrap();
         let names = index["cases"]
@@ -10580,7 +10602,7 @@ mod tests {
         let base =
             std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures"));
         let index: Value = serde_json::from_reader(std::io::BufReader::new(
-            std::fs::File::open(base.join("stack-traces.json")).unwrap(),
+            crate::fixture_cache::open(base.join("stack-traces.json")).unwrap(),
         ))
         .unwrap();
         let names = index["cases"]
@@ -10701,7 +10723,7 @@ mod tests {
         let base =
             std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures"));
         let index: Value = serde_json::from_reader(std::io::BufReader::new(
-            std::fs::File::open(base.join("stack-traces.json")).unwrap(),
+            crate::fixture_cache::open(base.join("stack-traces.json")).unwrap(),
         ))
         .unwrap();
         let names = index["cases"]

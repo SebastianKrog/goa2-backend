@@ -147,7 +147,8 @@ impl PrimaryOperands {
                 self.origin(origin, v);
                 self.optional_symbol(source_card, v);
             }
-            HexFilter::AdjacentContext(_)
+            HexFilter::CoMover { .. }
+            | HexFilter::AdjacentContext(_)
             | HexFilter::Between { .. }
             | HexFilter::SpawnTeam(_)
             | HexFilter::BattleZone

@@ -1,4 +1,6 @@
 //! Mine paths are sets; explicit trigger/event/path ordering is still exact.
+#[path = "../../../test-support/fixture_cache.rs"]
+mod fixture_cache;
 use goa2_core::{
     data::Symbols,
     diagnostics::{mine_path_batch, normalize_mine_choice_record},
@@ -11,7 +13,7 @@ fn corpus() -> &'static Value {
     DATA.get_or_init(|| {
         let p = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../tests/fixtures/mine-paths.json");
-        serde_json::from_slice(&std::fs::read(p).unwrap()).unwrap()
+        serde_json::from_reader(std::io::BufReader::new(fixture_cache::open(p).unwrap())).unwrap()
     })
 }
 #[test]

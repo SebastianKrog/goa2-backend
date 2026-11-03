@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from fixture_cache import write_text
+
 import json
 from unittest.mock import patch
 
@@ -216,7 +218,7 @@ def catalog():
 if __name__ == "__main__":
     data = catalog()
     path = ROOT / "rust/tests/fixtures/defense-builders.json"
-    path.write_text(json.dumps(data, indent=2) + "\n")
+    write_text(path, json.dumps(data, indent=2) + "\n")
     print(
         {
             "effects": len(data["methods"]),

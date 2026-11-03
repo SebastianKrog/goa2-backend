@@ -82,6 +82,10 @@ enum Operation {
         envelope: StateEnvelope,
         operations: Vec<Value>,
     },
+    StackTraceStream {
+        envelope: StateEnvelope,
+        operations: Vec<Value>,
+    },
     StackTrace {
         envelope: StateEnvelope,
         operations: Vec<Value>,
@@ -110,7 +114,7 @@ fn execute(
     }
     match request.operation {
         Operation::Capabilities => Ok(
-            json!({"plain_fast_travel":true,"unit_selection_traces":true,"acting_piece_traces":true,"action_recipes":true,"fast_travel_zones":true,"planning_phase_traces":true,"card_models":true,"scalar_stats":true,"native_step_traces":true,"state_codec":true,"plain_board_movement":true,"stateful_plain_movement":true,"game_transitions":false,"search":false,"rules_versions":[]}),
+            json!({"plain_fast_travel":true,"unit_selection_traces":true,"acting_piece_traces":true,"action_recipes":true,"fast_travel_zones":true,"planning_phase_traces":true,"card_models":true,"scalar_stats":true,"native_step_traces":true,"streamed_step_traces":true,"state_codec":true,"plain_board_movement":true,"stateful_plain_movement":true,"game_transitions":false,"search":false,"rules_versions":[]}),
         ),
         Operation::AggregateTrace {
             envelope,
@@ -164,6 +168,7 @@ fn execute(
             envelope,
             operations,
         } => goa2_core::diagnostics::card_trace(envelope, operations),
+        Operation::StackTraceStream { .. } => Err("streamed trace requires an output sink".into()),
         Operation::StackTrace {
             envelope,
             operations,
@@ -200,6 +205,16 @@ fn replay_trace(
     envelope: StateEnvelope,
     operations: Vec<Value>,
     mut record_ready: impl FnMut(Value),
+) -> Result<(), String> {
+    replay_trace_checked(envelope, operations, |record| {
+        record_ready(record);
+        Ok(())
+    })
+}
+fn replay_trace_checked(
+    envelope: StateEnvelope,
+    operations: Vec<Value>,
+    mut record_ready: impl FnMut(Value) -> Result<(), String>,
 ) -> Result<(), String> {
     let mut session = NativeSession::compile(envelope).map_err(|e| e.to_string())?;
     for operation in operations {
@@ -365,9 +380,34 @@ fn replay_trace(
             record["object_bindings"] =
                 serde_json::to_value(envelope.object_bindings).map_err(|e| e.to_string())?;
         }
-        record_ready(record);
+        record_ready(record)?;
     }
     Ok(())
+}
+fn write_packet(out: &mut impl Write, value: &Value) -> io::Result<()> {
+    serde_json::to_writer(&mut *out, value)?;
+    writeln!(out)?;
+    out.flush()
+}
+fn stack_trace_stream(
+    id: Value,
+    envelope: StateEnvelope,
+    operations: Vec<Value>,
+    out: &mut impl Write,
+) -> io::Result<()> {
+    let mut count = 0;
+    let result = replay_trace_checked(envelope, operations, |record| {
+        write_packet(out,&json!({"schema_version":1,"id":id,"ok":true,"result":{"sequence":count,"record":record}})).map_err(|e|e.to_string())?;
+        count += 1;
+        Ok(())
+    });
+    let response = match result {
+        Ok(()) => {
+            json!({"schema_version":1,"id":id,"ok":true,"result":{"complete":true,"records":count}})
+        }
+        Err(error) => json!({"schema_version":1,"id":id,"ok":false,"error":error,"records":count}),
+    };
+    write_packet(out, &response)
 }
 fn main() -> io::Result<()> {
     let mut board = None;
@@ -375,6 +415,18 @@ fn main() -> io::Result<()> {
     for line in io::stdin().lock().lines() {
         let line = line?;
         let response = match serde_json::from_str::<Request>(&line) {
+            Ok(Request {
+                schema_version: 1,
+                id,
+                operation:
+                    Operation::StackTraceStream {
+                        envelope,
+                        operations,
+                    },
+            }) => {
+                stack_trace_stream(id, envelope, operations, &mut out)?;
+                continue;
+            }
             Ok(request) => {
                 let id = request.id.clone();
                 match execute(request, &mut board) {
@@ -396,6 +448,94 @@ fn main() -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn stream_case() -> (StateEnvelope, Vec<Value>) {
+        let base =
+            std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures"));
+        let index: Value = serde_json::from_reader(std::io::BufReader::new(
+            crate::fixture_cache::open(base.join("object-execution.json")).unwrap(),
+        ))
+        .unwrap();
+        let entry = index["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["name"] == "object-execution-shared-pending-step")
+            .unwrap();
+        let mut case: Value = serde_json::from_reader(std::io::BufReader::new(
+            crate::fixture_cache::open(base.join(entry["path"].as_str().unwrap())).unwrap(),
+        ))
+        .unwrap();
+        (
+            serde_json::from_value(case["envelope"].take()).unwrap(),
+            serde_json::from_value(case["operations"].take()).unwrap(),
+        )
+    }
+    #[test]
+    fn streamed_packets_preserve_collected_records_order_identity_and_completion_count() {
+        let (envelope, operations) = stream_case();
+        let collected = stack_trace(envelope.clone(), operations.clone()).unwrap();
+        let mut bytes = Vec::new();
+        stack_trace_stream(json!("stream-test"), envelope, operations, &mut bytes).unwrap();
+        let rows = bytes
+            .split(|b| *b == b'\n')
+            .filter(|r| !r.is_empty())
+            .map(|r| serde_json::from_slice::<Value>(r).unwrap())
+            .collect::<Vec<_>>();
+        let expected = collected["records"].as_array().unwrap();
+        assert_eq!(rows.len(), expected.len() + 1);
+        for (i, (packet, record)) in rows.iter().zip(expected).enumerate() {
+            assert_eq!(packet["id"], "stream-test");
+            assert_eq!(packet["schema_version"], 1);
+            assert_eq!(packet["result"]["sequence"], i);
+            assert_eq!(packet["result"]["record"], *record);
+        }
+        assert_eq!(
+            rows.last().unwrap()["result"],
+            json!({"complete":true,"records":expected.len()})
+        );
+    }
+    #[test]
+    fn stream_failure_reports_the_successful_prefix_and_one_terminal_error() {
+        let (envelope, _) = stream_case();
+        let mut bytes = Vec::new();
+        stack_trace_stream(
+            json!(7),
+            envelope,
+            vec![
+                json!({"kind":"advance_prefix","steps":0}),
+                json!({"kind":"unknown"}),
+            ],
+            &mut bytes,
+        )
+        .unwrap();
+        let rows = bytes
+            .split(|b| *b == b'\n')
+            .filter(|r| !r.is_empty())
+            .map(|r| serde_json::from_slice::<Value>(r).unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0]["result"]["sequence"], 0);
+        assert_eq!(rows[1]["ok"], false);
+        assert_eq!(rows[1]["records"], 1);
+    }
+    #[test]
+    fn failed_stream_consumer_stops_replay_before_following_operations() {
+        let (envelope, _) = stream_case();
+        let mut calls = 0;
+        let result = replay_trace_checked(
+            envelope,
+            vec![
+                json!({"kind":"advance_prefix","steps":0}),
+                json!({"kind":"unknown"}),
+            ],
+            |_| {
+                calls += 1;
+                Err("disconnected".into())
+            },
+        );
+        assert_eq!(calls, 1);
+        assert_eq!(result.unwrap_err(), "disconnected");
+    }
     #[test]
     fn protocol_rejects_unknown_fields_and_preserves_prior_board_on_error() {
         assert!(
@@ -463,6 +603,62 @@ mod trace_tests {
             }
         }
     }
+    fn normalize_record(
+        record: &mut Value,
+        ids: &mut HashMap<String, String>,
+        steps: &mut HashMap<String, String>,
+    ) {
+        if !record["request"].is_null() {
+            normalize_id(&mut record["request"]["id"], ids);
+        }
+        let generated = record
+            .as_object_mut()
+            .unwrap()
+            .remove("generated_step_objects")
+            .map(|value| {
+                serde_json::from_value::<Vec<(usize, usize)>>(value)
+                    .unwrap()
+                    .into_iter()
+                    .collect::<HashMap<usize, usize>>()
+            });
+        // Borrow disjoint fields rather than clone every identity/path row.
+        let (mut semantic, mut bindings) = (None, None);
+        for (key, value) in record.as_object_mut().unwrap() {
+            match key.as_str() {
+                "semantic_state" => semantic = Some(value),
+                "object_bindings" => bindings = Some(value),
+                _ => {}
+            }
+        }
+        let semantic = semantic.unwrap();
+        if let Some(bindings) = bindings.and_then(|value| value.as_array()) {
+            for (index, binding) in bindings.iter().enumerate() {
+                if binding["kind"] != "step" {
+                    continue;
+                }
+                for path in binding["paths"].as_array().unwrap() {
+                    let mut step = &mut *semantic;
+                    for part in path.as_array().unwrap() {
+                        step = if let Some(key) = part.as_str() {
+                            &mut step[key]
+                        } else {
+                            &mut step[part.as_u64().unwrap() as usize]
+                        };
+                    }
+                    normalize_step_fields(
+                        step,
+                        ids,
+                        steps,
+                        generated.as_ref().map(|ids| ids.get(&index).copied()),
+                    );
+                }
+            }
+        } else {
+            for step in semantic["execution_stack"].as_array_mut().unwrap() {
+                normalize_step(step, ids, steps);
+            }
+        }
+    }
     #[derive(Deserialize)]
     struct TraceCase {
         name: String,
@@ -490,56 +686,7 @@ mod trace_tests {
                     &unordered_mine_keys,
                 );
             }
-            if !record["request"].is_null() {
-                normalize_id(&mut record["request"]["id"], &mut ids);
-            }
-            let generated = record
-                .as_object_mut()
-                .unwrap()
-                .remove("generated_step_objects")
-                .map(|value| {
-                    serde_json::from_value::<Vec<(usize, usize)>>(value)
-                        .unwrap()
-                        .into_iter()
-                        .collect::<HashMap<usize, usize>>()
-                });
-            // Borrow disjoint fields rather than clone every identity/path row.
-            let (mut semantic, mut bindings) = (None, None);
-            for (key, value) in record.as_object_mut().unwrap() {
-                match key.as_str() {
-                    "semantic_state" => semantic = Some(value),
-                    "object_bindings" => bindings = Some(value),
-                    _ => {}
-                }
-            }
-            let semantic = semantic.unwrap();
-            if let Some(bindings) = bindings.and_then(|value| value.as_array()) {
-                for (index, binding) in bindings.iter().enumerate() {
-                    if binding["kind"] != "step" {
-                        continue;
-                    }
-                    for path in binding["paths"].as_array().unwrap() {
-                        let mut step = &mut *semantic;
-                        for part in path.as_array().unwrap() {
-                            step = if let Some(key) = part.as_str() {
-                                &mut step[key]
-                            } else {
-                                &mut step[part.as_u64().unwrap() as usize]
-                            };
-                        }
-                        normalize_step_fields(
-                            step,
-                            &mut ids,
-                            &mut steps,
-                            generated.as_ref().map(|ids| ids.get(&index).copied()),
-                        );
-                    }
-                }
-            } else {
-                for step in semantic["execution_stack"].as_array_mut().unwrap() {
-                    normalize_step(step, &mut ids, &mut steps);
-                }
-            }
+            normalize_record(&mut record, &mut ids, &mut steps);
             let want = expected
                 .get(checked)
                 .unwrap_or_else(|| panic!("{name}: unexpected operation {checked}"));
@@ -556,9 +703,205 @@ mod trace_tests {
             "{name}: missing operation snapshots"
         );
     }
+    #[derive(Deserialize)]
+    #[serde(tag = "op", rename_all = "snake_case", deny_unknown_fields)]
+    enum SnapshotEdit {
+        Set {
+            path: Vec<goa2_core::codec::ObjectPathPart>,
+            value: Value,
+        },
+        Delete {
+            path: Vec<goa2_core::codec::ObjectPathPart>,
+        },
+        Splice {
+            path: Vec<goa2_core::codec::ObjectPathPart>,
+            index: usize,
+            delete: usize,
+            values: Vec<Value>,
+        },
+    }
+    fn snapshot_target<'a>(
+        mut target: &'a mut Value,
+        path: &[goa2_core::codec::ObjectPathPart],
+    ) -> Result<&'a mut Value, String> {
+        use goa2_core::codec::ObjectPathPart;
+        for part in path {
+            target = match part {
+                ObjectPathPart::Key(key) => target.as_object_mut().and_then(|m| m.get_mut(key)),
+                ObjectPathPart::Index(i) => target.as_array_mut().and_then(|a| a.get_mut(*i)),
+            }
+            .ok_or("snapshot parent missing")?;
+        }
+        Ok(target)
+    }
+    fn apply_snapshot_edits(record: &mut Value, edits: Vec<SnapshotEdit>) -> Result<(), String> {
+        use goa2_core::codec::ObjectPathPart;
+        for edit in edits {
+            if let SnapshotEdit::Splice {
+                path,
+                index,
+                delete,
+                values,
+            } = edit
+            {
+                let target = snapshot_target(record, &path)?
+                    .as_array_mut()
+                    .ok_or("snapshot splice target is not an array")?;
+                let end = index
+                    .checked_add(delete)
+                    .filter(|end| *end <= target.len())
+                    .ok_or("snapshot splice range outside array")?;
+                target.splice(index..end, values);
+                continue;
+            }
+            let (path, value) = match edit {
+                SnapshotEdit::Set { path, value } => (path, Some(value)),
+                SnapshotEdit::Delete { path } => (path, None),
+                SnapshotEdit::Splice { .. } => unreachable!(),
+            };
+            let Some((last, parents)) = path.split_last() else {
+                *record = value.ok_or("cannot delete snapshot root")?;
+                continue;
+            };
+            let target = snapshot_target(record, parents)?;
+            match (last, value) {
+                (ObjectPathPart::Key(key), Some(value)) => {
+                    target
+                        .as_object_mut()
+                        .ok_or("snapshot target is not a dictionary")?
+                        .insert(key.clone(), value);
+                }
+                (ObjectPathPart::Key(key), None) => {
+                    target
+                        .as_object_mut()
+                        .ok_or("snapshot delete target is not a dictionary")?
+                        .remove(key)
+                        .ok_or("snapshot delete key missing")?;
+                }
+                (ObjectPathPart::Index(i), Some(value)) => {
+                    *target
+                        .as_array_mut()
+                        .and_then(|a| a.get_mut(*i))
+                        .ok_or("snapshot index outside array")? = value;
+                }
+                (ObjectPathPart::Index(_), None) => {
+                    return Err("snapshot array deletion is not supported".into());
+                }
+            }
+        }
+        Ok(())
+    }
+    #[test]
+    fn snapshot_edits_preserve_null_values_nested_arrays_and_literal_keys() {
+        let mut record = json!({"a/b~":[{"old":1},2]});
+        let edits = serde_json::from_value(json!([
+            {"op":"set","path":["a/b~",0,"new"],"value":null},
+            {"op":"delete","path":["a/b~",0,"old"]},
+            {"op":"set","path":["a/b~",1],"value":[3,4]}
+        ]))
+        .unwrap();
+        apply_snapshot_edits(&mut record, edits).unwrap();
+        assert_eq!(record, json!({"a/b~":[{"new":null},[3,4]]}));
+        let splice = serde_json::from_value(
+            json!([{"op":"splice","path":["a/b~"],"index":1,"delete":1,"values":[3,4,5]}]),
+        )
+        .unwrap();
+        apply_snapshot_edits(&mut record, splice).unwrap();
+        assert_eq!(record, json!({"a/b~":[{"new":null},3,4,5]}));
+        let invalid = serde_json::from_value(
+            json!([{"op":"splice","path":["a/b~"],"index":9,"delete":0,"values":[]}]),
+        )
+        .unwrap();
+        assert!(apply_snapshot_edits(&mut record, invalid).is_err());
+
+        let invalid =
+            serde_json::from_value(json!([{"op":"set","path":["missing",0],"value":3}])).unwrap();
+        assert!(apply_snapshot_edits(&mut record, invalid).is_err());
+    }
+    #[test]
+    fn complete_games_match_python_at_every_operation_using_lossless_snapshot_deltas() {
+        #[derive(Deserialize)]
+        struct Entry {
+            name: String,
+            path: String,
+        }
+        #[derive(Deserialize)]
+        struct Index {
+            schema_version: u32,
+            contract: String,
+            cases: Vec<Entry>,
+        }
+        #[derive(Deserialize)]
+        struct Chunk {
+            path: String,
+            records: usize,
+            sha256: String,
+        }
+        #[derive(Deserialize)]
+        struct Case {
+            name: String,
+            envelope: StateEnvelope,
+            operations: Vec<Value>,
+            expected_delta_chunks: Vec<Chunk>,
+        }
+        let base =
+            std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures"));
+        let index: Index = serde_json::from_reader(std::io::BufReader::new(
+            crate::fixture_cache::open(base.join("complete-games.json")).unwrap(),
+        ))
+        .unwrap();
+        assert_eq!(index.schema_version, 2);
+        assert_eq!(index.contract, "complete-games-snapshot-deltas-v3");
+        assert_eq!(index.cases.len(), 2);
+        fixture_parallel::for_each_case(index.cases.into_iter(), |entry| {
+            let case: Case = serde_json::from_reader(std::io::BufReader::new(
+                crate::fixture_cache::open(base.join(entry.path)).unwrap(),
+            ))
+            .unwrap();
+            assert_eq!(case.name, entry.name);
+            assert_eq!(
+                case.operations.len(),
+                case.expected_delta_chunks
+                    .iter()
+                    .map(|c| c.records)
+                    .sum::<usize>()
+            );
+            let mut expected = Value::Null;
+            let mut ids = HashMap::new();
+            let mut steps = HashMap::new();
+            let mut count = 0;
+            let mut chunks = case.expected_delta_chunks.into_iter();
+            let mut deltas = std::collections::VecDeque::new();
+            replay_trace(case.envelope, case.operations, |mut record| {
+                if deltas.is_empty() {
+                    let chunk = chunks.next().expect("missing snapshot delta chunk");
+                    assert_eq!(chunk.sha256.len(), 64);
+                    assert!(chunk.path.ends_with(&format!("/{}.json", chunk.sha256)));
+                    let rows: Vec<Vec<SnapshotEdit>> =
+                        serde_json::from_reader(std::io::BufReader::new(
+                            crate::fixture_cache::open(base.join(chunk.path)).unwrap(),
+                        ))
+                        .unwrap();
+                    assert_eq!(rows.len(), chunk.records);
+                    deltas = rows.into();
+                }
+                apply_snapshot_edits(&mut expected, deltas.pop_front().unwrap()).unwrap();
+                normalize_record(&mut record, &mut ids, &mut steps);
+                assert!(
+                    record == expected,
+                    "{} operation {count} differs from Python",
+                    case.name
+                );
+                count += 1;
+            })
+            .unwrap_or_else(|error| panic!("{}: {error}", case.name));
+            assert!(deltas.is_empty() && chunks.next().is_none());
+            assert_eq!(expected["semantic_state"]["phase"], "GAME_OVER");
+        });
+    }
     #[test]
     fn live_shared_steps_and_context_match_python_values_requests_and_identity() {
-        verify_index("object-execution.json", Some(14793));
+        verify_index("object-execution.json", Some(15531));
     }
     #[test]
     fn every_native_transition_matches_python_full_state_request_and_event_order() {
@@ -578,7 +921,7 @@ mod trace_tests {
         let base =
             std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures"));
         let index: Index = serde_json::from_reader(std::io::BufReader::new(
-            std::fs::File::open(base.join(filename)).unwrap(),
+            crate::fixture_cache::open(base.join(filename)).unwrap(),
         ))
         .unwrap();
         assert_eq!(index.schema_version, 2);
@@ -589,7 +932,7 @@ mod trace_tests {
         let total = index.cases.len();
         let checked = fixture_parallel::for_each_case(index.cases.into_iter(), |entry| {
             let case: TraceCase = serde_json::from_reader(std::io::BufReader::new(
-                std::fs::File::open(base.join(entry.path)).unwrap(),
+                crate::fixture_cache::open(base.join(entry.path)).unwrap(),
             ))
             .unwrap();
             assert_eq!(case.name, entry.name);
@@ -598,3 +941,7 @@ mod trace_tests {
         assert_eq!(checked, total, "every oracle case must run");
     }
 }
+
+#[cfg(test)]
+#[path = "../../../test-support/fixture_cache.rs"]
+mod fixture_cache;

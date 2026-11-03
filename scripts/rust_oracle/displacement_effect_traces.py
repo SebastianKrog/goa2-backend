@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from fixture_cache import read_text, write_text
+
 import copy
 import json
 
@@ -446,9 +448,7 @@ def export_validation(path=None):
     m = verify_sources()
     data = {"schema_version": 1, "source_sha256": m["source_sha256"], "cases": validation_cases()}
     data["corpus_sha256"] = digest(data)
-    (path or ROOT / "rust/tests/fixtures/displacement-validation.json").write_text(
-        json.dumps(data, separators=(",", ":")) + "\n"
-    )
+    write_text(path or ROOT / "rust/tests/fixtures/displacement-validation.json", json.dumps(data, separators=(",", ":")) + "\n")
     return data
 
 
@@ -456,7 +456,7 @@ def verify_validation(path, command):
     from oracle import Worker
 
     manifest = verify_sources()
-    data = json.loads(path.read_text())
+    data = json.loads(read_text(path))
     identity = data.pop("corpus_sha256")
     if (
         data["schema_version"] != 1

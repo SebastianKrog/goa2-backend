@@ -6,6 +6,8 @@ execution is a separate coverage gate; no neural-network modules are imported.
 
 from __future__ import annotations
 
+from fixture_cache import read_text, write_text
+
 import argparse
 import json
 from pathlib import Path
@@ -305,7 +307,7 @@ def tie_cases():
 
 
 def verify(path, command):
-    data = json.loads(path.read_text())
+    data = json.loads(read_text(path))
     identity = data.pop("corpus_sha256")
     if digest(data) != identity or data["source_sha256"] != verify_sources()["source_sha256"]:
         raise ValueError("phase corpus identity mismatch")
@@ -322,7 +324,7 @@ def verify(path, command):
             if actual != case["expected"]:
                 failure = ROOT / "rust/artifacts/planning-mismatch.json"
                 failure.parent.mkdir(parents=True, exist_ok=True)
-                failure.write_text(json.dumps({"case": case, "actual": actual}, indent=2))
+                write_text(failure, json.dumps({"case": case, "actual": actual}, indent=2))
                 raise AssertionError(f"{case['name']}: saved {failure}")
         for case in data["ties"]:
             actual = worker.request(
@@ -336,7 +338,7 @@ def verify(path, command):
             if actual != case["expected"]:
                 failure = ROOT / "rust/artifacts/tie-mismatch.json"
                 failure.parent.mkdir(parents=True, exist_ok=True)
-                failure.write_text(json.dumps({"case": case, "actual": actual}, indent=2))
+                write_text(failure, json.dumps({"case": case, "actual": actual}, indent=2))
                 raise AssertionError(f"{case['name']}: saved {failure}")
     finally:
         worker.close()
@@ -357,7 +359,7 @@ def main():
     args = parser.parse_args()
     if args.mode == "export":
         data = corpus()
-        args.corpus.write_text(json.dumps(data, separators=(",", ":")) + "\n")
+        write_text(args.corpus, json.dumps(data, separators=(",", ":")) + "\n")
         print(
             json.dumps(
                 {

@@ -9,3 +9,6 @@ publish.workspace = true
 goa2-core = { path = "../goa2-core" }
 serde.workspace = true
 serde_json.workspace = true
+
+[dev-dependencies]
+flate2 = "1"

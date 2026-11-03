@@ -1,4 +1,6 @@
 //! Live source identity, restore, worker isolation and execution boundaries.
+#[path = "../../../test-support/fixture_cache.rs"]
+mod fixture_cache;
 use goa2_core::{
     codec::StateEnvelope,
     data::Symbols,
@@ -16,7 +18,7 @@ fn cases() -> impl Iterator<Item = Value> {
 fn cases_matching(predicate: impl Fn(&str) -> bool) -> impl Iterator<Item = Value> {
     let base = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures"));
     let index: Value = serde_json::from_reader(std::io::BufReader::new(
-        std::fs::File::open(base.join("object-execution.json")).unwrap(),
+        fixture_cache::open(base.join("object-execution.json")).unwrap(),
     ))
     .unwrap();
     // Keep only the small index in memory; full state/identity traces can be
@@ -29,7 +31,7 @@ fn cases_matching(predicate: impl Fn(&str) -> bool) -> impl Iterator<Item = Valu
         .filter(move |entry| predicate(entry["name"].as_str().unwrap()))
         .map(move |entry| {
             serde_json::from_reader(std::io::BufReader::new(
-                std::fs::File::open(base.join(entry["path"].as_str().unwrap())).unwrap(),
+                fixture_cache::open(base.join(entry["path"].as_str().unwrap())).unwrap(),
             ))
             .unwrap()
         })
@@ -37,7 +39,7 @@ fn cases_matching(predicate: impl Fn(&str) -> bool) -> impl Iterator<Item = Valu
 fn case(name: &str) -> Value {
     let base = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures"));
     let index: Value = serde_json::from_reader(std::io::BufReader::new(
-        std::fs::File::open(base.join("object-execution.json")).unwrap(),
+        fixture_cache::open(base.join("object-execution.json")).unwrap(),
     ))
     .unwrap();
     let entry = index["cases"]
@@ -47,7 +49,7 @@ fn case(name: &str) -> Value {
         .find(|entry| entry["name"] == name)
         .unwrap();
     serde_json::from_reader(std::io::BufReader::new(
-        std::fs::File::open(base.join(entry["path"].as_str().unwrap())).unwrap(),
+        fixture_cache::open(base.join(entry["path"].as_str().unwrap())).unwrap(),
     ))
     .unwrap()
 }
@@ -3535,4 +3537,29 @@ fn live_battles_restore_each_boundary_with_private_maps_spawns_effects_and_pendi
 #[test]
 fn live_cleanup_restores_each_boundary_with_private_cards_lists_effects_and_level_up_snapshots() {
     primary_family_restores_each_boundary(&["object-execution-cleanup-live-"], 95, 192);
+}
+
+#[test]
+fn live_upgrades_and_round_reset_restore_every_boundary_with_private_cards_items_and_maps() {
+    primary_family_restores_each_boundary(&["object-execution-upgrade-live-"], 107, 653);
+}
+
+#[test]
+fn live_hero_respawn_restores_each_boundary_with_private_tokens_effects_and_hex_aliases() {
+    primary_family_restores_each_boundary(&["object-execution-hero-respawn-live-"], 123, 417);
+}
+
+#[test]
+fn complete_turn_and_round_phase_flows_restore_each_boundary_with_private_maps_and_cards() {
+    primary_family_restores_each_boundary(&["object-execution-phase-closure-live-"], 191, 1819);
+}
+
+#[test]
+fn current_card_status_filters_restore_each_boundary_with_private_card_aliases() {
+    primary_family_restores_each_boundary(&["object-execution-card-status-filter-"], 37, 222);
+}
+
+#[test]
+fn coordinated_unit_and_token_movement_restores_every_boundary_with_private_hex_aliases() {
+    primary_family_restores_each_boundary(&["object-execution-co-movement-"], 280, 1020);
 }

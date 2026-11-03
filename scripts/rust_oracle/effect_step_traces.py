@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from fixture_cache import write_text
+
 import json
 
 from oracle import ROOT, digest, verify_sources
@@ -261,7 +263,5 @@ def cases(advance, answer):
 
 if __name__ == "__main__":
     data = defaults()
-    (ROOT / "rust/tests/fixtures/effect-defaults.json").write_text(
-        json.dumps(data, indent=2) + "\n"
-    )
+    write_text(ROOT / "rust/tests/fixtures/effect-defaults.json", json.dumps(data, indent=2) + "\n")
     print(data["catalog_sha256"])

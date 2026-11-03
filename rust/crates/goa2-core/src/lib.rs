@@ -75,3 +75,7 @@ pub mod equality;
 mod pre_action;
 
 pub mod spells;
+
+#[cfg(test)]
+#[path = "../../../test-support/fixture_cache.rs"]
+mod fixture_cache;

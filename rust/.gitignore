@@ -1,0 +1,24 @@
+/target/
+/artifacts/
+
+# Generated full-corpus payloads are compressed local caches.
+/tests/fixtures/**/*.json
+/tests/fixtures/*.json
+/tests/fixtures/**/*.gz
+/tests/fixtures/*.gz
+!/tests/fixtures/action-builders.json
+!/tests/fixtures/complete-games.json
+!/tests/fixtures/defense-builders.json
+!/tests/fixtures/effect-defaults.json
+!/tests/fixtures/effect-errors.json
+!/tests/fixtures/instruction-templates.json
+!/tests/fixtures/mine-reference-errors.json
+!/tests/fixtures/movement.json
+!/tests/fixtures/object-arena.json
+!/tests/fixtures/object-execution.json
+!/tests/fixtures/primary-builders.json
+!/tests/fixtures/primary-effects.json
+!/tests/fixtures/spell-builders.json
+!/tests/fixtures/stack-traces.json
+!/tests/fixtures/states.json
+!/tests/fixtures/cache-identities.json

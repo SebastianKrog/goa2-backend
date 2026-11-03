@@ -41,6 +41,8 @@ pub enum UnitFilter {
     },
     HasTeam,
     PreviousSlotCard,
+    UnresolvedCard,
+    ResolvedCard,
     Terrain(bool),
     BatchRemoval(Box<crate::batch::RemovalSearch>),
     Or(Vec<UnitFilter>),
@@ -343,6 +345,17 @@ impl UnitFilter {
             }
             Self::Terrain(wanted) => *wanted,
             Self::HasTeam => entity.is_some_and(|e| e.has_team && e.team.is_some()),
+            Self::UnresolvedCard => world.hero(id).is_some_and(|hero| {
+                hero.current
+                    .and_then(|card| world.card(card))
+                    .is_some_and(|card| card.lifecycle == crate::world::CardLifecycle::Unresolved)
+            }),
+            Self::ResolvedCard => world.hero(id).is_some_and(|hero| {
+                hero.current
+                    .and_then(|card| world.card(card))
+                    .is_some_and(|card| card.lifecycle == crate::world::CardLifecycle::Resolved)
+                    || hero.card_in_turn_slot(world.combat.turn).is_some()
+            }),
             Self::PreviousSlotCard => world.hero(id).is_some_and(|hero| {
                 world
                     .combat
@@ -603,7 +616,10 @@ pub fn compile_unit_filter(raw: &Value, symbols: &mut Symbols) -> Result<UnitFil
             keys: keys("exclude_keys", symbols)?,
         },
         "terrain_filter" => UnitFilter::Terrain(raw["is_terrain"].as_bool().unwrap_or(true)),
+        "co_mover_valid_hex_filter" => UnitFilter::Spatial(HexFilter::Reject),
         "has_previous_slot_card_filter" => UnitFilter::PreviousSlotCard,
+        "has_unresolved_card_filter" => UnitFilter::UnresolvedCard,
+        "has_resolved_card_filter" => UnitFilter::ResolvedCard,
         "played_card_filter" => {
             let action = raw
                 .get("action_type")

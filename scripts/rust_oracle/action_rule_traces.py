@@ -6,6 +6,8 @@ its restriction must never become a general negative-value legality test.
 
 from __future__ import annotations
 
+from fixture_cache import read_text, write_text
+
 import argparse
 import copy
 import json
@@ -510,14 +512,14 @@ def export(path):
         "menus": menus,
     }
     data["corpus_sha256"] = digest(data)
-    path.write_text(json.dumps(data, separators=(",", ":")) + "\n")
+    write_text(path, json.dumps(data, separators=(",", ":")) + "\n")
     return data
 
 
 def verify(path, command):
     from action_traces import normalize
 
-    data = json.loads(path.read_text())
+    data = json.loads(read_text(path))
     identity = data.pop("corpus_sha256")
     if (
         data["schema_version"] != 1
@@ -544,8 +546,7 @@ def verify(path, command):
                 if normalize(got) != want:
                     failure = ROOT / "rust/artifacts/action-validation-mismatch.json"
                     failure.parent.mkdir(parents=True, exist_ok=True)
-                    failure.write_text(
-                        json.dumps(
+                    write_text(failure, json.dumps(
                             {
                                 "case": case["name"],
                                 "operation": case["operations"][i],
@@ -553,8 +554,7 @@ def verify(path, command):
                                 "want": want,
                             },
                             indent=2,
-                        )
-                    )
+                        ))
                     raise AssertionError(f"{case['name']} menu operation {i}: saved {failure}")
     finally:
         worker.close()

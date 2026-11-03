@@ -7,6 +7,8 @@ ordinary Python mutations provide expected values and identity topology.
 
 from __future__ import annotations
 
+from fixture_cache import write_text
+
 import argparse
 import copy
 import json
@@ -284,7 +286,7 @@ def verify(path, command):
             )["records"]
             if got != case["expected"]:
                 dest = ROOT / "rust/artifacts/object-arena-mismatch.json"
-                dest.write_text(json.dumps({"case": case, "actual": got}, indent=2))
+                write_text(dest, json.dumps({"case": case, "actual": got}, indent=2))
                 raise AssertionError(f"object arena mismatch in {case['name']}: {dest}")
             count += len(got)
     finally:

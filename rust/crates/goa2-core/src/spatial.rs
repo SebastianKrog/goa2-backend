@@ -6,6 +6,7 @@ use crate::{
     world::{EntityKind, NativeWorld},
 };
 use serde_json::Value;
+mod co_movement;
 
 #[derive(Clone, Debug, Default)]
 pub struct Origin {
@@ -24,6 +25,11 @@ pub enum AdjacencyTag {
 #[derive(Clone, Debug)]
 pub enum HexFilter {
     Reject,
+    CoMover {
+        anchor: Symbol,
+        partner: Symbol,
+        through: bool,
+    },
     AdjacentContext(Symbol),
     Between {
         from: Symbol,
@@ -225,6 +231,17 @@ impl HexFilter {
     ) -> Result<(), String> {
         match self {
             Self::Reject => accepted.fill(false),
+            Self::CoMover {
+                anchor,
+                partner,
+                through,
+            } => {
+                for (hex, yes) in candidates.iter().zip(accepted.iter_mut()) {
+                    if *yes {
+                        *yes = co_movement::accepts(context, *hex, *anchor, *partner, *through)?;
+                    }
+                }
+            }
             Self::AdjacentContext(key) => {
                 let target = match context.registers.get(*key) {
                     Some(Datum::Text(id)) if !context.symbols.name(*id).is_empty() => {
@@ -703,6 +720,19 @@ pub fn compile_filter(raw: &Value, symbols: &mut Symbols) -> Result<HexFilter, S
         })
     };
     match raw["type"].as_str().ok_or("filter type missing")? {
+        "co_mover_valid_hex_filter" => Ok(HexFilter::CoMover {
+            anchor: symbols.intern(
+                raw["anchor_key"]
+                    .as_str()
+                    .ok_or("co-mover anchor key missing")?,
+            ),
+            partner: symbols.intern(
+                raw["partner_key"]
+                    .as_str()
+                    .ok_or("co-mover partner key missing")?,
+            ),
+            through: raw["ignore_path_obstacles"].as_bool().unwrap_or(false),
+        }),
         "adjacency_to_context_filter" => Ok(HexFilter::AdjacentContext(
             symbols.intern(
                 raw["target_key"]
@@ -740,7 +770,9 @@ pub fn compile_filter(raw: &Value, symbols: &mut Symbols) -> Result<HexFilter, S
         "terrain_filter" => Ok(HexFilter::Terrain(
             raw["is_terrain"].as_bool().unwrap_or(true),
         )),
-        "has_previous_slot_card_filter" => Ok(HexFilter::Reject),
+        "has_previous_slot_card_filter"
+        | "has_unresolved_card_filter"
+        | "has_resolved_card_filter" => Ok(HexFilter::Reject),
         "exclude_identity_filter" => Ok(HexFilter::Exclude(
             raw["exclude_keys"]
                 .as_array()

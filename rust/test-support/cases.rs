@@ -1,8 +1,10 @@
 // Stream one case from a monolithic frozen JSON fixture at a time.
+#[path = "fixture_cache.rs"]
+mod fixture_cache;
 use serde::Deserialize;
 use serde::de::{self, DeserializeSeed, IgnoredAny, MapAccess, SeqAccess, Visitor};
 use serde_json::Value;
-use std::{collections::HashMap, fmt, fs::File, io::BufReader, path::Path};
+use std::{collections::HashMap, fmt, io::BufReader, path::Path};
 
 struct Case<'a> {
     names: Option<&'a [&'a str]>,
@@ -121,7 +123,7 @@ pub fn visit_array(path: &Path, field: &str, verify: impl FnMut(Value)) -> usize
 }
 fn visit(path: &Path, field: &str, names: Option<&[&str]>, mut verify: impl FnMut(Value)) -> usize {
     let mut deserializer =
-        serde_json::Deserializer::from_reader(BufReader::new(File::open(path).unwrap()));
+        serde_json::Deserializer::from_reader(BufReader::new(fixture_cache::open(path).unwrap()));
     let checked = Corpus {
         field,
         verify: &mut verify,

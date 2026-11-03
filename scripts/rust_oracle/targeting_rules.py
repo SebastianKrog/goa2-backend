@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from fixture_cache import read_text, write_text
+
 import argparse
 import json
 from pathlib import Path
@@ -384,7 +386,7 @@ def corpus():
 
 
 def verify(path, command):
-    data = json.loads(path.read_text())
+    data = json.loads(read_text(path))
     identity = data.pop("corpus_sha256")
     assert digest(data) == identity
     assert data["source_sha256"] == verify_sources()["source_sha256"]
@@ -397,7 +399,7 @@ def verify(path, command):
             )["results"]
             if actual != case["expected"]:
                 fail = ROOT / "rust/artifacts/targeting-mismatch.json"
-                fail.write_text(json.dumps({"case": case, "actual": actual}, indent=2))
+                write_text(fail, json.dumps({"case": case, "actual": actual}, indent=2))
                 raise AssertionError((case["name"], fail))
             count += len(actual)
     finally:
@@ -418,7 +420,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if args.mode == "export":
         data = corpus()
-        args.corpus.write_text(json.dumps(data, separators=(",", ":")) + "\n")
+        write_text(args.corpus, json.dumps(data, separators=(",", ":")) + "\n")
         print(
             json.dumps(
                 {

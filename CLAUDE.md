@@ -376,3 +376,26 @@ def test_flow(empty_state):
     assert req["type"] == "SELECT_UNIT"
     # Provide input and continue...
 ```
+
+
+## Bot development storage
+
+The bot checkout plus its Git data, fixture caches, dependencies and WSL Rust
+builds has a **12 GiB planning budget**, with cleanup considered around **10 GiB**.
+This is guidance, not an enforced cap. Review with
+`python scripts/development_footprint.py` about weekly during active development,
+after major corpus generation/build work, and before committing large artifacts.
+Consider obsolete build profiles, cached export snapshots and old diagnostics
+first. Increase the budget deliberately if current development needs justify it;
+never delete source, uncommitted work, or unique fixture coverage to meet it.
+
+Commit fixture generators/scenarios, pinned oracle/runtime identities, small
+bootstrap examples, runtime recipe catalogs and corpus indexes/hashes. Do not
+commit the full generated JSON payloads or their compressed cache files. The
+allowlist in `scripts/rust_oracle/fixture_cache.py` and `rust/.gitignore` records
+the retained bootstrap/catalog/index files. New generated payloads belong in the
+ignored cache. Store pre-generated cases as deterministic `.json.gz` files;
+Python and Rust tests decompress one case at a time in memory. A temporary file
+is acceptable for tools requiring a path; remove it after use. Do not retain an
+extracted full corpus or load the full corpus into memory. Preserve and verify
+semantic hashes, dictionary order, and complete test coverage across migration.

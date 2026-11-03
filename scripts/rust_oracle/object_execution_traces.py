@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from fixture_cache import write_text
+
 import argparse
 import copy
 import json
@@ -24,8 +26,9 @@ class ObjectTraceNormalizer(TraceNormalizer):
             if binding["kind"] == "step"
         }
 
-    def record(self, record, live_steps=None):
-        record = copy.deepcopy(record)
+    def record(self, record, live_steps=None, *, inplace=False):
+        if not inplace:
+            record = copy.deepcopy(record)
         generated_rows = record.pop("generated_step_objects", None)
         generated_objects = dict(generated_rows) if generated_rows is not None else None
         if generated_objects is not None and (
@@ -83,6 +86,12 @@ class ObjectTraceNormalizer(TraceNormalizer):
 
 
 def scenes():
+    from co_movement_traces import scenes as co_movement_scenes
+
+    yield from co_movement_scenes()
+    from card_status_filter_traces import scenes as card_status_scenes
+
+    yield from card_status_scenes()
     from combat_effect_traces import effect
     from model_traces import setup
 
@@ -393,6 +402,18 @@ def scenes():
     from live_cleanup_traces import scenes as live_cleanup_scenes
 
     yield from live_cleanup_scenes()
+
+    from live_upgrade_traces import scenes as live_upgrade_scenes
+
+    yield from live_upgrade_scenes()
+
+    from live_hero_respawn_traces import scenes as live_hero_respawn_scenes
+
+    yield from live_hero_respawn_scenes()
+
+    from live_phase_closure_traces import scenes as live_phase_closure_scenes
+
+    yield from live_phase_closure_scenes()
 
 
 def live_choice_operations(state, mode="first", stop_types=("offer_passive",), *, max_steps=80):
@@ -3682,13 +3703,17 @@ def piece_planning_scenes(base):
 
 
 def reference(state, operations, unordered_keys=()):
+    """Collected compatibility adapter; long games consume iter_reference directly."""
+    return list(iter_reference(state, operations, unordered_keys))
+
+
+def iter_reference(state, operations, unordered_keys=(), *, inplace_records=False):
     from state_codec import export_state_with_instances, materialize
 
     from goa2.domain.input import InputResponse
     from goa2.engine.handler import process_stack, submit_input
 
     request = None
-    records = []
     normalizer = ObjectTraceNormalizer(unordered_keys)
     initial_envelope, original_objects = export_state_with_shared_objects(state)
     normalizer.bind_originals(initial_envelope["object_bindings"], original_objects)
@@ -3792,21 +3817,19 @@ def reference(state, operations, unordered_keys=()):
             except ValueError:
                 error = "invalid_input"
         envelope, live_objects = export_state_with_shared_objects(state)
-        records.append(
-            normalizer.record(
-                {
-                    "semantic_state": materialize(envelope),
-                    "object_bindings": envelope["object_bindings"],
-                    "context_keys": list(state.execution_context),
-                    "instance_bindings": instance_bindings(envelope["state"]),
-                    "request": current,
-                    "events": events,
-                    "error": error,
-                },
-                live_objects,
-            )
+        yield normalizer.record(
+            {
+                "semantic_state": materialize(envelope),
+                "object_bindings": envelope["object_bindings"],
+                "context_keys": list(state.execution_context),
+                "instance_bindings": instance_bindings(envelope["state"]),
+                "request": current,
+                "events": events,
+                "error": error,
+            },
+            live_objects,
+            inplace=inplace_records,
         )
-    return records
 
 
 def _export_scene_case(item):
@@ -3891,7 +3914,7 @@ def verify(path, command):
             if actual != case["expected"]:
                 dest = ROOT / "rust/artifacts/object-execution-mismatch.json"
                 dest.parent.mkdir(parents=True, exist_ok=True)
-                dest.write_text(json.dumps({"case": case, "actual": actual}, indent=2))
+                write_text(dest, json.dumps({"case": case, "actual": actual}, indent=2))
                 raise AssertionError(f"object execution mismatch in {case['name']}: {dest}")
             count += len(actual)
     finally:

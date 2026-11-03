@@ -12,6 +12,7 @@ mod battles;
 mod card_actions;
 mod card_selection;
 mod cleanup;
+mod co_movement;
 mod combat_resolution;
 mod coordinates;
 mod defeat;
@@ -21,6 +22,7 @@ mod effect_creation;
 mod forced_discard;
 #[cfg(test)]
 mod gydion_tests;
+mod hero_respawn;
 mod hex_selection;
 mod markers;
 mod min_cards;
@@ -40,6 +42,8 @@ mod passive_bodies;
 mod passives;
 mod perform_card;
 mod perform_primary;
+#[cfg(test)]
+mod phase_closure_tests;
 mod phases;
 mod placement;
 mod planning_commands;
@@ -68,6 +72,7 @@ mod tokens;
 mod travel;
 mod turrets;
 mod unit_selection;
+mod upgrades;
 #[cfg(test)]
 mod utility_tests;
 #[cfg(test)]
@@ -313,6 +318,8 @@ impl BoundObjects {
                 | "resolve_pre_action_movement"
                 | "resolve_pre_action_discard"
                 | "move_unit"
+                | "move_token"
+                | "co_directional_drag"
                 | "place_unit"
                 | "swap_units"
                 | "create_effect"
@@ -342,8 +349,9 @@ impl BoundObjects {
                 step["type"].as_str(),
                 Some(
                     "resolve_card"
-                        | "respawn_hero"
                         | "move_unit"
+                        | "move_token"
+                        | "co_directional_drag"
                         | "place_unit"
                         | "swap_units"
                         | "create_effect"
@@ -519,6 +527,10 @@ impl BoundObjects {
                 steps[index].instruction = Instruction::LiveTriggerMines;
             } else if wire["type"] == "move_sequence" {
                 steps[index].instruction = Instruction::LiveMoveSequence;
+            } else if wire["type"] == "co_directional_drag" {
+                steps[index].instruction = Instruction::LiveDrag;
+            } else if wire["type"] == "move_token" {
+                steps[index].instruction = Instruction::LiveTokenMove;
             } else if wire["type"] == "move_unit" {
                 steps[index].instruction = Instruction::LiveMove;
             } else if matches!(
@@ -706,6 +718,7 @@ impl BoundObjects {
                 "attack_select",
                 "pre_action_select",
                 "move_unit",
+                "move_token",
                 "set_actor",
                 "reaction",
                 "pre_movement",
@@ -1375,6 +1388,22 @@ impl NativeSession {
             } else {
                 None
             };
+            let co_movement = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveDrag | Instruction::LiveTokenMove
+                ) {
+                Some(self.preflight_co_movement_bound(
+                    objects,
+                    top_object.ok_or_else(|| unsupported("co-movement step missing"))?,
+                    matches!(
+                        self.steps[top_instruction].instruction,
+                        Instruction::LiveDrag
+                    ),
+                )?)
+            } else {
+                None
+            };
             let coordinates = if !skipped
                 && let Instruction::LiveCoordinates(op) = self.steps[top_instruction].instruction
             {
@@ -1596,6 +1625,33 @@ impl NativeSession {
                     Instruction::Flow(crate::turn::FlowStep::Cleanup)
                 ) {
                 Some(self.preflight_cleanup_bound(objects, top_object.unwrap())?)
+            } else {
+                None
+            };
+            let hero_respawn = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::Flow(crate::turn::FlowStep::Respawn(_))
+                ) {
+                Some(self.preflight_hero_respawn_bound(objects, top_object.unwrap())?)
+            } else {
+                None
+            };
+            let round_plan = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::Flow(
+                        crate::turn::FlowStep::Upgrades | crate::turn::FlowStep::Reset
+                    )
+                ) {
+                Some(self.preflight_round_transition_bound(
+                    objects,
+                    top_object.unwrap(),
+                    matches!(
+                        self.steps[top_instruction].instruction,
+                        Instruction::Flow(crate::turn::FlowStep::Reset)
+                    ),
+                )?)
             } else {
                 None
             };
@@ -2284,6 +2340,14 @@ impl NativeSession {
                         repeat.ok_or_else(|| unsupported("live repeat plan missing"))?,
                     )?;
                 }
+                Instruction::LiveDrag | Instruction::LiveTokenMove => {
+                    if let Some(event) = self.co_movement_bound(
+                        objects,
+                        co_movement.ok_or_else(|| unsupported("co-movement plan missing"))?,
+                    )? {
+                        result.events.push(event);
+                    }
+                }
                 Instruction::LiveCoordinates(_) => {
                     self.coordinates_bound(
                         objects,
@@ -2361,11 +2425,27 @@ impl NativeSession {
                         battle_plan.ok_or_else(|| unsupported("arena battle plan missing"))?,
                     )?;
                 }
+                Instruction::Flow(crate::turn::FlowStep::Respawn(_)) => {
+                    let (next, events) = self.hero_respawn_bound(
+                        objects,
+                        hero_respawn.ok_or_else(|| unsupported("hero respawn plan missing"))?,
+                    );
+                    request = next;
+                    result.events.extend(events);
+                }
                 Instruction::Flow(crate::turn::FlowStep::Cleanup) => {
                     result.events.extend(self.cleanup_bound(
                         objects,
                         cleanup_plan.ok_or_else(|| unsupported("cleanup transaction missing"))?,
                     ));
+                }
+                Instruction::Flow(
+                    crate::turn::FlowStep::Upgrades | crate::turn::FlowStep::Reset,
+                ) => {
+                    request = self.round_transition_bound(
+                        objects,
+                        round_plan.ok_or_else(|| unsupported("round transition plan missing"))?,
+                    );
                 }
                 Instruction::Flow(crate::turn::FlowStep::Advance) => {
                     let ids = objects.phases.effect_ids(&objects.arena, id)?;
@@ -2845,6 +2925,17 @@ impl NativeSession {
         objects.push_scope(action, card, owner)
     }
     pub(super) fn submit_objects(&mut self, request: RequestToken, selection: Datum) -> Result<()> {
+        if let Some(frame) = self.stack.last()
+            && matches!(
+                self.steps[frame.instruction].instruction,
+                Instruction::Flow(crate::turn::FlowStep::Upgrades)
+            )
+            && let Some(objects) = self.objects.as_ref()
+            && let Some(id) = frame.object
+            && objects.token(id)? == Some(request)
+        {
+            self.validate_upgrade_submission_bound(&selection)?;
+        }
         let frame = self
             .stack
             .last_mut()
@@ -2881,7 +2972,7 @@ impl NativeSession {
 fn fixture_case(name: &str) -> Value {
     let base = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures"));
     let index: Value = serde_json::from_reader(std::io::BufReader::new(
-        std::fs::File::open(base.join("object-execution.json")).unwrap(),
+        crate::fixture_cache::open(base.join("object-execution.json")).unwrap(),
     ))
     .unwrap();
     let entry = index["cases"]
@@ -2891,7 +2982,7 @@ fn fixture_case(name: &str) -> Value {
         .find(|case| case["name"] == name)
         .unwrap();
     serde_json::from_reader(std::io::BufReader::new(
-        std::fs::File::open(base.join(entry["path"].as_str().unwrap())).unwrap(),
+        crate::fixture_cache::open(base.join(entry["path"].as_str().unwrap())).unwrap(),
     ))
     .unwrap()
 }

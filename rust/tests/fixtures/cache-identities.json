@@ -1,0 +1,50 @@
+{
+  "actions.json": {
+    "raw_sha256": "e56d1401b1528c8cb231ad042a98e97c5d1520bda1bd1b4da7020d37bf4ebf0d",
+    "raw_bytes": 8309968
+  },
+  "terrain-validation.json": {
+    "raw_sha256": "78de54b483a84ff5aacc669c1085e8ffbe2d5383240cd63221ed6cb5acb2986b",
+    "raw_bytes": 23580467
+  },
+  "action-validation.json": {
+    "raw_sha256": "17fe7a73de239d19ea32e9108e9ea2fd2be7254da7905162acabd4acd2a2caba",
+    "raw_bytes": 75451379
+  },
+  "models.json": {
+    "raw_sha256": "be80a1b1900a8aeb30fd01fb1d0223b5fa46aeacd43c63138b8608fa5d260e5e",
+    "raw_bytes": 11885659
+  },
+  "hex-filters.json": {
+    "raw_sha256": "5c7419ef60244962a13d2bb219ab61eb82b4c550e46f7e9b06d2e170d2572ce6",
+    "raw_bytes": 48725448
+  },
+  "effects.json": {
+    "raw_sha256": "71cac5a0cb1dff0cd0d180f7dc5320e463285abc678e047b8608876bc793048d",
+    "raw_bytes": 103016652
+  },
+  "mine-paths.json": {
+    "raw_sha256": "d2032e0fc76f8e96255d596529f8ebb28ab26c0c29d2c9a36cfa30a2d37d772f",
+    "raw_bytes": 2579972
+  },
+  "effect-stats.json": {
+    "raw_sha256": "fd2390280ac5f9b2010cb35905aaab31ba9da1e5af1ad33cadb828a386dad8a2",
+    "raw_bytes": 10928662
+  },
+  "targeting.json": {
+    "raw_sha256": "10dd13c877fdfb51201732f53a3e0bf9b0c1833b5fdfd35d83be761dcdc18010",
+    "raw_bytes": 10381759
+  },
+  "card-equality.json": {
+    "raw_sha256": "f5805a07c262e5c6c32b3f3c13a72c903892ca6f041a532dc602235bb1aec56e",
+    "raw_bytes": 9602982
+  },
+  "displacement-validation.json": {
+    "raw_sha256": "0169ea6b7ca1eca59362894e86685da892002719450587e87bdc4664148e40c5",
+    "raw_bytes": 27700641
+  },
+  "planning.json": {
+    "raw_sha256": "800d68731c339c711ac9c1139dbecf541c8f3128a7a2bce409eef86274d8c634",
+    "raw_bytes": 17428045
+  }
+}

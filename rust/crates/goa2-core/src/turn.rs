@@ -107,9 +107,13 @@ impl TurnRules {
                 .collect(),
         }
     }
-    pub fn respawn_candidates(&self, world: &NativeWorld, hero: Symbol) -> Vec<Hex> {
+    pub fn respawn_candidates(
+        &self,
+        world: &NativeWorld,
+        hero: Symbol,
+    ) -> Result<Vec<Hex>, String> {
         let Some(team) = world.entity(hero).and_then(|h| h.team) else {
-            return vec![];
+            return Ok(vec![]);
         };
         let spawns = world
             .definitions
@@ -118,13 +122,14 @@ impl TurnRules {
             .iter()
             .filter_map(|(t, h)| (*t == team).then_some(*h))
             .collect::<Vec<_>>();
-        let valid = spawns
-            .iter()
-            .copied()
-            .filter(|hex| !world.obstacle(*hex) || Self::token(world, *hex).is_some())
-            .collect::<Vec<_>>();
+        let mut valid = Vec::new();
+        for hex in &spawns {
+            if !world.obstacle_for_actor(*hex, Some(hero))? || Self::token(world, *hex).is_some() {
+                valid.push(*hex);
+            }
+        }
         if !valid.is_empty() {
-            return valid;
+            return Ok(valid);
         }
         for origin in spawns {
             if let Some(zone) = world
@@ -134,11 +139,11 @@ impl TurnRules {
             {
                 let candidates = crate::minion_return::nearest(world, origin, &zone.hexes, false).0;
                 if !candidates.is_empty() {
-                    return candidates;
+                    return Ok(candidates);
                 }
             }
         }
-        vec![]
+        Ok(vec![])
     }
     pub fn token(world: &NativeWorld, hex: Hex) -> Option<Symbol> {
         (!world.terrain(hex))

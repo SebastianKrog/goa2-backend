@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from fixture_cache import read_text, write_text
+
 import json
 
 from oracle import ROOT, digest, verify_sources
@@ -379,7 +381,7 @@ def export(path=None):
     data = {"schema_version": 1, "source_sha256": manifest["source_sha256"], "cases": cases()}
     data["corpus_sha256"] = digest(data)
     target = path or ROOT / "rust/tests/fixtures/effect-stats.json"
-    target.write_text(json.dumps(data, separators=(",", ":")) + "\n")
+    write_text(target, json.dumps(data, separators=(",", ":")) + "\n")
     return data
 
 
@@ -387,7 +389,7 @@ def verify(path, command):
     from oracle import Worker
 
     manifest = verify_sources()
-    data = json.loads(path.read_text())
+    data = json.loads(read_text(path))
     identity = data.pop("corpus_sha256")
     if (
         data["schema_version"] != 1

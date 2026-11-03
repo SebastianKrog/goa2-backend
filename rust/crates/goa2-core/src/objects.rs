@@ -1359,9 +1359,10 @@ mod equality_metadata_tests {
     fn physical_deepcopy_preserves_private_equality_metadata() {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../tests/fixtures/card-equality.json");
-        let data: Value =
-            serde_json::from_reader(std::io::BufReader::new(std::fs::File::open(path).unwrap()))
-                .unwrap();
+        let data: Value = serde_json::from_reader(std::io::BufReader::new(
+            crate::fixture_cache::open(path).unwrap(),
+        ))
+        .unwrap();
         let case = &data["cases"][0];
         let source: StateEnvelope = serde_json::from_value(case["envelope"].clone()).unwrap();
         let original = case["queries"][0]["a"].as_u64().unwrap() as u32;

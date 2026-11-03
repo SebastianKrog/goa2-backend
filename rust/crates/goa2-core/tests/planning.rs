@@ -1,4 +1,6 @@
 //! Planning oracle compares actual phase functions before stack execution.
+#[path = "../../../test-support/fixture_cache.rs"]
+mod fixture_cache;
 use goa2_core::{
     codec::StateEnvelope,
     data::Symbols,
@@ -8,7 +10,10 @@ use goa2_core::{
 use serde_json::{Value, json};
 use std::collections::HashMap;
 fn corpus() -> Value {
-    serde_json::from_str(include_str!("../../../tests/fixtures/planning.json")).unwrap()
+    serde_json::from_str(&fixture_cache::text(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/planning.json"),
+    ))
+    .unwrap()
 }
 fn normalize(records: &mut Value) {
     let mut ids = HashMap::new();

@@ -5,7 +5,7 @@ from __future__ import annotations
 from state_codec import export_state
 
 
-def cases(advance, answer, *, effect_factory=None, cleanup_only=False):
+def cases(advance, answer, *, effect_factory=None, cleanup_only=False, live_sink=None):
     import copy
 
     from model_traces import setup
@@ -142,6 +142,8 @@ def cases(advance, answer, *, effect_factory=None, cleanup_only=False):
                 and work.round == state.round + 1
             ), name
             assert work.execution_context.get("round_done"), name
+        if live_sink is not None:
+            live_sink(name, copy.deepcopy(state), copy.deepcopy(operations))
         expected = reference_trace(state, operations)
         result.append(
             {

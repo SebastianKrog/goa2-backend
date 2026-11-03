@@ -183,7 +183,10 @@ impl NativeSession {
                 max: self.spatial_int_bound(objects, object, Field::MaxCards)?,
                 visible: self.spatial_bool_bound(objects, object, Field::ExcludeFacedown)?,
             },
+            "co_mover_valid_hex_filter" => UnitFilter::Spatial(crate::spatial::HexFilter::Reject),
             "has_previous_slot_card_filter" => UnitFilter::PreviousSlotCard,
+            "has_unresolved_card_filter" => UnitFilter::UnresolvedCard,
+            "has_resolved_card_filter" => UnitFilter::ResolvedCard,
             "played_card_filter" => {
                 let action = self
                     .passive_optional_text_bound(objects, object, Field::ActionType)?

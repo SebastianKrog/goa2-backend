@@ -2779,3 +2779,232 @@ were not rerun for this increment.
 [Validation record](../../artifacts/arena-cleanup-final-validation.json).
 Live corpus SHA-256 `ca313f63072c7b2b5b72ce7fa65dc806e3ad9eabd56bb36e1ce98156cfe9be7a`;
 semantic SHA-256 `7a09d90d00100ba88888f4b9cff4962bfa0639a2245147bb23070c00ee78af20`.
+
+
+### Authoritative arena upgrade choices and round reset (2026-11-03)
+
+ResolveUpgrades now reads live physical collections and pending counts. Single
+choices and ordered all-remaining batches use the same native tier eligibility
+rules as dense execution. Invalid submitted batches reject before token/input or
+world edits; invalid imported pending choices clear and reissue like the source.
+A falsey empty pending-input dictionary remains attached. Chosen cards append to
+the existing hand, previous cards retire, paired cards become items, and all
+lifecycle assignments clear initiative overrides while retaining other flags.
+Sparse item increments preserve dictionary identity and refresh every hero cache
+when an item map is shared. Pending counts decrement/delete in place. Completion
+clears the existing reveal map and schedules the real RoundReset continuation.
+
+RoundReset increments round, resets turn, replaces the position snapshot with a
+shallow dictionary copy, enters planning, and clears the defeated list in place.
+Snapshot Hex objects stay shared. Both consumers stage against private mutable
+session/arena clones and share immutable programs. Generation failure cannot leak
+partial card, item, pending/reveal or stack writes. This is not make/unmake and
+establishes no search-throughput result. Source partial-error fidelity remains
+separate unfinished work.
+
+The new differential corpus contains 107 cases / 653 operations across Arien,
+Min, Gydion, Takahide, Ursafar, Misa and Wasp; both upgrade sides; one/three/six
+single or batch choices; invalid input; physical flags; shared item maps; imported
+pending inputs; reset aliases; and complete multihero cleanup-to-planning flow.
+Nine explicit Python contracts cover ordering/identity and tier validation. Six
+native regressions cover generation guards, issued-token reuse, invalid-submit
+atomicity, independent worker clones, shared caches and reset without generation.
+The dedicated restoration gate checks every new operation boundary; the cleanup
+restoration gate also exercises the updated upgrade continuation behavior.
+
+The live corpus is 14,900 cases / 118,301 operations; canonical dense coverage
+remains 6,592 / 27,145. Primary-face/spell coverage remains 172/596 and 22/22.
+Remaining card/passive/defense/filter bodies, general phase/game closure, raw
+exception fidelity, dense bridge retirement, make/unmake, hashing/evaluation,
+team-aware iterative minimax/alpha-beta, hidden/simultaneous planning, parallel
+search, strength/integration and 1,000 complete two-game-turn simulations/sec
+remain required. Frozen Python and live services are unchanged. Engine/search
+completion remains false.
+
+Validation: all 291 core tests, the new upgrade/reset restoration gate (107 cases /
+653 operations), the affected cleanup restoration gate (95 / 192), and all three
+full CLI replay tests pass. Independent release parity passes all 107 cases.
+All 36 affected source contracts and 28 existing Python upgrade-rule tests pass.
+Strict Clippy, Rustfmt, Black/Ruff, whitespace and frozen-source/lock checks pass.
+Other existing integration suites and the older exhaustive all-corpus restoration
+gate were not rerun for this increment.
+[Validation record](../../artifacts/arena-upgrades-final-validation.json).
+Live corpus SHA-256 `58760a3b5acac23466ba868a14d63a75d6f87c0d2c3ed2ddc46b654521ce429f`;
+semantic SHA-256 `482dc08a9adb3bffbf71ac97d86258f7996e919e2c25f2cb2a7f3c0bef61adef`.
+
+
+### Authoritative hero respawn (2026-11-03)
+
+RespawnHero now reaches the live arena consumer rather than importing as a parked
+phase step. It reads the current hero_id operand, returns immediately for unknown
+or present heroes, and handles PASS before spawn discovery. Pending input and
+request/step aliases remain intact on completion. Nonempty dict selections are
+validated/coerced through the existing Hex parser; malformed/illegal dicts reopen
+the hex prompt. An empty dict, immutable Hex model or unrelated scalar reopens the
+initial respawn prompt, matching source isinstance/truthiness behavior.
+
+Marked hero spawn points use actor-aware obstacle checks, with the source token
+exception. The shared dense candidate helper now also uses those checks. If all
+marked points are blocked, fallback BFS intentionally uses generic obstacles,
+can pass through blocked spaces and returns nearest candidates in the first
+usable spawn zone; it may offer a space denied by an actor-specific effect.
+Static barriers do not affect an offboard actor with no position.
+
+A selected dict creates a fresh immutable Hex instead of reusing a spawn or
+selection object. Placement keeps location/tile maps and shared snapshots intact.
+A spawn token is removed first, replacing its linked-effect list as the source
+does and emitting exactly one respawn TokenRemoved event; direct placement emits
+no extra unit-placement event. A token on terrain is not cleared. Multipiece
+heroes place their first supplied piece in stable numeric supply order, even
+when misc-entity registration order is reversed. The owner hero stays unplaced.
+
+Request-capacity failure is checked before pop or world writes. A private mutable
+session/arena staging clone keeps token/effect/placement changes isolated, shares
+immutable programs, and does not establish make/unmake or performance. Raw
+partial-error fidelity remains unfinished.
+
+Coverage: 123 source cases / 417 operations, including both teams across all six
+supplied maps; first/last/PASS choices; no-spawn/no-space cases; terrain/token/
+effect interactions; fallback and duplicate spawns; live hero operands; partial
+multipiece presence and supply order; numeric/extra-key coordinate coercion;
+malformed/empty/model pending selections; and retained pending, step, tile, Hex,
+effect-list, location and snapshot aliases. Ten source contracts and six native
+regressions specify ordering, guard atomicity, request reuse and root/worker
+isolation. The dedicated restore gate covers every operation boundary.
+
+The live corpus is 15,023 cases / 118,718 operations; canonical dense coverage
+stays 6,592 / 27,145. Primary/spell coverage remains 172/596 and 22/22. Next audit:
+ResolveCard and remaining ParkedPhase mappings, complete ordinary rounds and game
+termination. Remaining card/passive/defense/filter bodies, raw exception fidelity,
+dense bridge retirement, make/unmake, hashing/evaluation, team-aware iterative
+minimax/alpha-beta, hidden/simultaneous planning, parallel search, strength and
+integration, and 1,000 complete two-game-turn simulations/sec remain required.
+Engine/search completion remains false. Frozen Python and live services are
+unchanged.
+
+Validation: all 297 core tests, the 123-case / 417-operation hero-respawn
+restoration gate, and all three full CLI replay tests pass. Independent release
+parity matches every new case. All 61 affected Python source-contract and existing
+hero/piece/round-rule tests pass. Strict Clippy, Rustfmt, Black/Ruff, whitespace,
+frozen-source and lock checks pass. Other existing integration suites and the
+older exhaustive all-corpus restoration gate were not rerun for this increment.
+[Validation record](../../artifacts/hero-respawn-final-validation.json).
+Live corpus SHA-256 `7e2054129c6e309e96e8220a9a541239a9fd0766747187936b081c677da8437e`;
+semantic SHA-256 `437956329fb22f3040a10b667e304dcda24ccfa294c2794d200c39fd2f1821a0`.
+
+
+### Phase-closure audit and bounded complete-game verification (2026-11-03)
+
+The runtime audit corrected an outdated TODO: ResolveCard already imports as
+LiveCardAction and uses ActionBindings. The remaining dense ResolveCard rejection
+is a pre-pop invariant guard, not evidence of a missing live consumer. A native
+regression compiles every supported source-pinned instruction prototype and rejects
+any parked/dense-card residue. This does not claim support for every unreviewed
+source GameStep or card body.
+
+Existing real-handler turn/round scenarios now expose a read-only capture hook.
+The new live family expands their full advances to one-step boundaries and retains
+stack, current-card, card-container, item, pending/reveal, effect, position and
+snapshot aliases. Coverage is 191 scenarios / 1,819 operations through planning,
+revelation/actor handoff, action menus and dispatch, respawn, confirm/finalize,
+battles, cleanup, upgrades and round reset, including all supplied-map turn flows.
+The existing action adapter and primitives already match these complete flows.
+
+Whole-game verification originally exposed a test-harness memory problem: full
+snapshot collection grew past 5 GB in one source worker. Source iter_reference and
+the CLI stack_trace_stream command now expose one operation record at a time.
+The native engine stays in one session for the entire game, including round and
+planning boundaries. Transport packets carry request identity and monotonically
+ordered sequence numbers, followed by one completion/count packet or terminal
+error. A fallible sink stops replay on output failure. Collected replay behavior
+is retained as a compatibility wrapper; no server/frontend contract changed.
+
+Golden data uses lossless set/delete/splice snapshot deltas in immutable chunks
+of at most 64 records. The Rust fixture verifier lazily loads each chunk, rebuilds
+the complete expected snapshot, and compares state, request, events and identity
+at every operation. Chunk boundaries do not reset the native game. Offline v2->v3
+array compaction verifies the SHA-256 of every reconstructed complete record stream;
+no field, intermediate operation or failing choice is discarded. Source replay and
+fresh native JSON can explicitly normalize in place, avoiding redundant frame
+copies while retaining the default non-mutating API.
+
+The deterministic test policy prefers available attacks and movement toward combat,
+with varied remaining legal choices and upgrades. Both complete games start from
+ordinary GameSetup rosters (Arien/Brogan vs Tigerclaw/Sabina) on Forgotten Island
+and Magma and Ice. Generation fixes PYTHONHASHSEED=0 for stable source option order.
+This policy creates rule coverage; it is not the Rust search implementation or a
+strength benchmark. Complete-game fixtures remain a separate compact corpus;
+the main live corpus is 15,214 cases / 120,537 operations and canonical dense
+coverage remains 6,592 / 27,145.
+
+Primary/spell coverage remains 172/596 and 22/22. The next implementation expansion
+should port genuinely missing bodies (Hanu is an important default-roster gap),
+including any required co-movement, initiative, journey-return/control primitives
+and filters. General card/passive/defense/filter closure, raw exception fidelity,
+dense bridge retirement, make/unmake, hashing/evaluation, team-aware iterative
+minimax/alpha-beta, hidden/simultaneous planning, parallel search, integration/
+strength and 1,000 complete two-game-turn simulations/sec remain required.
+Engine/search completion remains false. Frozen Python and live services are
+unchanged; work remains uncommitted.
+
+Final validation: 298 core tests, the new 191-case / 1,819-operation restoration
+gate, seven regular CLI tests plus the separate compact full-game replay gate,
+and 98 affected Python tests pass. The nine streaming contracts pass again after
+final decoder/resource cleanup. Independent release parity passes all 191 phase
+scenarios and both complete games. The games match every state, request, event
+and identity record through game over: 5,410 operations to round 14 on Forgotten
+Island and 1,649 operations to round 5 on Magma and Ice. Full regular replay also
+passes the 15,214-case / 120,537-operation live corpus and unchanged 6,592-case /
+27,145-operation canonical corpus. Strict Clippy, Rustfmt, Black/Ruff, whitespace
+and frozen-source/lock checks pass. Other existing integration suites and the
+older exhaustive all-corpus restoration gate were not rerun.
+
+The completed source verifier peaked at 214,708 KiB (about 210 MiB). Lossless
+array compaction reduced the same 7,059-record golden delta payload from
+705,282,827 to 21,448,692 bytes, preserving both complete-record stream hashes.
+An explicitly offline cleanup reclaimed 707,497,011 bytes from only this turn's
+exact superseded files after replacement and release verification. Current
+fixtures, historical baseline cases, active caches, frozen Python and live services
+remain intact. These are verification/storage improvements, not search throughput
+measurements. The one-time v2 converter is retained only as an ignored audit
+artifact; maintained tools generate/read the current v3 compact format.
+
+Work remains uncommitted. Primary/spell coverage remains 172/596 and 22/22;
+engine/search completion remains false.
+[Validation record](../../artifacts/phase-closure-and-stream-final-validation.json).
+Main corpus SHA-256 `00a95d0083e43e976f959558678f37554abccf773a78cefd96bc71b2ab7307b0`;
+complete-game corpus SHA-256 `52ac6e55f4bf9b8facae59a84b9b60e168599875a70a984c5bf68758ea6bf399`.
+
+
+### Current-card status filters
+
+`card_status_filter_traces.py` freezes 37 scenarios / 222 live operations for
+`HasUnresolvedCardFilter` and `HasResolvedCardFilter`. These check every card
+lifecycle with both face orientations, missing current cards, current-turn slot
+boundaries, and rejection of hex candidates. A filled current-turn slot counts
+as resolved independently of the stored card lifecycle. Facedown status does not
+change either predicate. Native selectors and queries read the same physical
+card instances; the restoration gate retains current-card aliases.
+
+These shared primitives support Hanu and Emmitt; they do not add their remaining
+card bodies to the reviewed primary-face count.
+
+The maintained live corpus now contains 15,251 cases / 120,759 operations
+(index SHA-256 `d490d18bb53222b93d2194d08a87e3fa3328308f620737cd722d7beaeff4faff`).
+The separate complete-game corpus and canonical dense corpus are unchanged.
+
+Validation: 298 core unit tests, the 37-case / 222-operation restore gate,
+10 affected Python tests, new-family parity in iterate and release builds, and
+strict Clippy / Rustfmt / Black / Ruff passed. The complete live-corpus replay
+and full workspace integrations were not rerun for this predicate addition.
+
+
+## Local compressed cache
+
+Large generated payloads are local `.json.gz` cache files, excluded from Git.
+Corpus indexes retain logical `.json` paths and exact semantic hashes. Use
+`fixture_cache.read_bytes/read_text` (Python) or the shared native test fixture
+reader; both read a committed small JSON file or decompress a cached payload.
+Indexed corpora continue to stream one case at a time. Do not extract or retain
+a second full corpus. Temporary path-based tooling must clean up its output.
+See `rust/README.md` for migration, regeneration and the 12 GiB development budget.

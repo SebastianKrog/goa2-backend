@@ -964,8 +964,11 @@ mod tests {
     }
     #[test]
     fn lifecycle_workers_share_definitions_but_keep_card_records_and_collections_private() {
-        let corpus: Value =
-            serde_json::from_str(include_str!("../../../tests/fixtures/models.json")).unwrap();
+        let corpus: Value = serde_json::from_str(&crate::fixture_cache::text(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../tests/fixtures/models.json"),
+        ))
+        .unwrap();
         let source: StateEnvelope =
             serde_json::from_value(corpus["cards"][0]["envelope"].clone()).unwrap();
         let mut symbols = Symbols::default();

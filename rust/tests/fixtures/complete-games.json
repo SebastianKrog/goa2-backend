@@ -1,0 +1,22 @@
+{
+  "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+  "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+  "contract": "complete-games-snapshot-deltas-v3",
+  "schema_version": 2,
+  "policy": "progress-v1",
+  "python_hash_seed": "0",
+  "semantic_sha256": "dd6f264636d52261b5b184df2e0b597033fe367883a6f5176b1a2cb134e85e93",
+  "cases": [
+    {
+      "name": "complete-game-live-forgotten_island-progress-11",
+      "path": "complete-games/120af52aeeffc45ddacf5ae616716b267aef0863820aba7a24a3fb0d8314c2a8.json",
+      "case_sha256": "120af52aeeffc45ddacf5ae616716b267aef0863820aba7a24a3fb0d8314c2a8"
+    },
+    {
+      "name": "complete-game-live-magma_and_ice-progress-19",
+      "path": "complete-games/90d301f57801a874e1a2e12be6e9831af892ea649612c15d12ca3ba516880cfd.json",
+      "case_sha256": "90d301f57801a874e1a2e12be6e9831af892ea649612c15d12ca3ba516880cfd"
+    }
+  ],
+  "corpus_sha256": "52ac6e55f4bf9b8facae59a84b9b60e168599875a70a984c5bf68758ea6bf399"
+}

@@ -1,4 +1,6 @@
 //! Source object semantics, not yet dense gameplay/frame binding coverage.
+#[path = "../../../test-support/fixture_cache.rs"]
+mod fixture_cache;
 use goa2_core::{
     codec::{ObjectKind, StateEnvelope},
     objects::{ObjectArena, aggregate_trace},
@@ -11,7 +13,7 @@ fn cases() -> impl Iterator<Item = Value> {
 fn cases_matching(predicate: impl Fn(&str) -> bool) -> impl Iterator<Item = Value> {
     let base = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures"));
     let index: Value = serde_json::from_reader(std::io::BufReader::new(
-        std::fs::File::open(base.join("object-arena.json")).unwrap(),
+        fixture_cache::open(base.join("object-arena.json")).unwrap(),
     ))
     .unwrap();
     assert_eq!(index["schema_version"], 2);
@@ -23,7 +25,7 @@ fn cases_matching(predicate: impl Fn(&str) -> bool) -> impl Iterator<Item = Valu
         .filter(move |entry| predicate(entry["name"].as_str().unwrap()))
         .map(move |entry| {
             serde_json::from_reader(std::io::BufReader::new(
-                std::fs::File::open(base.join(entry["path"].as_str().unwrap())).unwrap(),
+                fixture_cache::open(base.join(entry["path"].as_str().unwrap())).unwrap(),
             ))
             .unwrap()
         })

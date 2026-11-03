@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from fixture_cache import cached, read_text, write_text
+
 import argparse
 import json
 from pathlib import Path
@@ -281,7 +283,7 @@ def corpus():
 
 
 def verify(path, command):
-    data = json.loads(path.read_text())
+    data = json.loads(read_text(path))
     identity = data.pop("corpus_sha256")
     if digest(data) != identity or data["source_sha256"] != verify_sources()["source_sha256"]:
         raise ValueError("effect corpus identity mismatch")
@@ -293,7 +295,7 @@ def verify(path, command):
             )["records"]
             if actual != case["expected"]:
                 target = ROOT / "rust/artifacts/effect-lifecycle-mismatch.json"
-                target.write_text(json.dumps({"case": case, "actual": actual}, indent=2))
+                write_text(target, json.dumps({"case": case, "actual": actual}, indent=2))
                 raise AssertionError(f"{case['name']}: saved {target}")
     finally:
         worker.close()
@@ -314,8 +316,11 @@ def main():
         data = corpus()
         temporary = args.corpus.with_suffix(args.corpus.suffix + ".tmp")
         temporary.unlink(missing_ok=True)
-        temporary.write_text(json.dumps(data, separators=(",", ":")) + "\n")
-        temporary.replace(args.corpus)
+        if cached(args.corpus):
+            write_text(args.corpus, json.dumps(data, separators=(",", ":")) + "\n")
+        else:
+            write_text(temporary, json.dumps(data, separators=(",", ":")) + "\n")
+            temporary.replace(args.corpus)
         print({"cases": len(data["cases"]), "corpus_sha256": data["corpus_sha256"]})
     else:
         command = args.worker[1:] if args.worker[:1] == ["--"] else args.worker

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from fixture_cache import read_text, write_text
+
 import argparse
 import copy
 import json
@@ -459,7 +461,7 @@ def export(path):
     m = verify_sources()
     data = {"schema_version": 1, "source_sha256": m["source_sha256"], "cases": filter_cases()}
     data["corpus_sha256"] = digest(data)
-    path.write_text(json.dumps(data, separators=(",", ":")) + "\n")
+    write_text(path, json.dumps(data, separators=(",", ":")) + "\n")
     return data
 
 
@@ -478,7 +480,7 @@ def export_transitions(path):
 
 
 def verify(path, command):
-    data = json.loads(path.read_text())
+    data = json.loads(read_text(path))
     identity = data.pop("corpus_sha256")
     if (
         data["schema_version"] != 1

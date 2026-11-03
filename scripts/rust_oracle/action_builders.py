@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from fixture_cache import write_text
+
 import json
 
 from oracle import ROOT, digest, verify_sources
@@ -118,7 +120,5 @@ def catalog():
 
 if __name__ == "__main__":
     payload = catalog()
-    (ROOT / "rust/tests/fixtures/action-builders.json").write_text(
-        json.dumps(payload, indent=2) + "\n"
-    )
+    write_text(ROOT / "rust/tests/fixtures/action-builders.json", json.dumps(payload, indent=2) + "\n")
     print({"recipes": len(payload["recipes"]), "catalog_sha256": payload["catalog_sha256"]})

@@ -7,6 +7,8 @@ not infer a Python builder's purity from a successful call.
 
 from __future__ import annotations
 
+from fixture_cache import write_text
+
 import json
 
 from oracle import ROOT, digest, verify_sources
@@ -101,7 +103,7 @@ def catalog():
 
 def export():
     data = catalog()
-    (ROOT / "rust/tests/fixtures/spell-builders.json").write_text(json.dumps(data, indent=2) + "\n")
+    write_text(ROOT / "rust/tests/fixtures/spell-builders.json", json.dumps(data, indent=2) + "\n")
     print(
         dict(
             effects=len(data["effects"]),

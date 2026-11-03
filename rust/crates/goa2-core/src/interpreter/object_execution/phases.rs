@@ -238,6 +238,11 @@ pub(super) enum Field {
     RemainingRemovals,
     BatchFreed,
     AnchorKey,
+    PartnerKey,
+    AnchorDestinationKey,
+    PartnerDestinationKey,
+    AnchorIsToken,
+    IgnorePathObstacles,
     OccupiedHexKeys,
     OptInPrompt,
     PlacedFlagKey,
@@ -380,7 +385,7 @@ pub(super) enum Field {
     Items,
     ItemState,
 }
-const NAMES: [&str; 376] = [
+const NAMES: [&str; 381] = [
     "phase",
     "turn",
     "turn_discard_log",
@@ -616,6 +621,11 @@ const NAMES: [&str; 376] = [
     "remaining_removals",
     "_batch_freed_hexes",
     "anchor_key",
+    "partner_key",
+    "anchor_dest_key",
+    "partner_dest_key",
+    "anchor_is_token",
+    "ignore_path_obstacles",
     "occupied_hex_keys",
     "opt_in_prompt",
     "placed_flag_key",
@@ -995,16 +1005,15 @@ impl NativeSession {
         match instruction {
             Instruction::Battle(_) => Ok(()),
             Instruction::Flow(FlowStep::Cleanup) => Ok(()),
-            Instruction::Flow(FlowStep::Upgrades | FlowStep::Reset) => {
-                Err(unsupported("arena upgrade/reset consumer not yet bound"))
-            }
+            Instruction::Flow(FlowStep::Upgrades | FlowStep::Reset) => Ok(()),
             Instruction::ParkedPhase(family) => Err(unsupported(format!(
                 "arena {} consumer not yet bound",
                 self.symbols.name(*family)
             ))),
-            Instruction::ResolveCard { .. } | Instruction::Flow(FlowStep::Respawn(_)) => Err(
-                unsupported("arena card-resolution/respawn consumers not yet bound"),
-            ),
+            Instruction::Flow(FlowStep::Respawn(_)) => Ok(()),
+            Instruction::ResolveCard { .. } => Err(unsupported(
+                "dense card-resolution instruction reached the authoritative arena",
+            )),
             Instruction::RetrieveUnresolved { .. } => Ok(()),
             Instruction::Flow(FlowStep::Next) => {
                 if matches!(actor_choice, Some(crate::planning::ActorChoice::Finished)) {

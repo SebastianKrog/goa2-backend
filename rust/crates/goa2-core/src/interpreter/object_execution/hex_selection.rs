@@ -80,6 +80,11 @@ impl NativeSession {
         }
         let kind = self.passive_text_bound(objects, object, Field::FilterType)?;
         Ok(match self.symbols.name(kind) {
+            "co_mover_valid_hex_filter" => HexFilter::CoMover {
+                anchor: self.passive_text_bound(objects, object, Field::AnchorKey)?,
+                partner: self.passive_text_bound(objects, object, Field::PartnerKey)?,
+                through: self.spatial_bool_bound(objects, object, Field::IgnorePathObstacles)?,
+            },
             "adjacency_to_context_filter" => HexFilter::AdjacentContext(self.passive_text_bound(
                 objects,
                 object,
@@ -109,7 +114,9 @@ impl NativeSession {
             "terrain_filter" => {
                 HexFilter::Terrain(self.spatial_bool_bound(objects, object, Field::IsTerrain)?)
             }
-            "has_previous_slot_card_filter" => HexFilter::Reject,
+            "has_previous_slot_card_filter"
+            | "has_unresolved_card_filter"
+            | "has_resolved_card_filter" => HexFilter::Reject,
             "exclude_identity_filter" => HexFilter::Exclude(self.unit_filter_texts_bound(
                 objects,
                 object,
@@ -385,6 +392,12 @@ impl NativeSession {
         keys: &mut Vec<Symbol>,
     ) {
         match filter {
+            HexFilter::CoMover {
+                anchor, partner, ..
+            } => {
+                keys.push(*anchor);
+                keys.push(*partner);
+            }
             HexFilter::AdjacentContext(key) => keys.push(*key),
             HexFilter::Between { from, to } => {
                 keys.push(*from);

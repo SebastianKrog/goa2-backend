@@ -1,5 +1,7 @@
 """Freeze Python's wire defaults for native-generated continuation frames."""
 
+from fixture_cache import write_text
+
 import json
 import sys
 
@@ -26,6 +28,7 @@ from goa2.engine.steps import (
     CheckPassiveAbilitiesStep,
     ChooseActingPieceStep,
     ChooseMinionRemovalStep,
+    CoDirectionalDragStep,
     ConfirmResolutionStep,
     DefeatUnitStep,
     DiscardCardStep,
@@ -47,6 +50,7 @@ from goa2.engine.steps import (
     MinePathChoiceStep,
     MinionBattleStep,
     MoveSequenceStep,
+    MoveTokenStep,
     MoveUnitStep,
     OfferPassiveStep,
     OfferRockUltimateStep,
@@ -308,6 +312,10 @@ def export():
         "context": SetContextFlagStep(step_id="template", key="template", value=None),
         "select_hex": SelectStep(step_id="template", target_type=TargetType.HEX, prompt=""),
         "move_unit": MoveUnitStep(step_id="template"),
+        "move_token": MoveTokenStep(step_id="template", token_key="template"),
+        "co_drag": CoDirectionalDragStep(
+            step_id="template", anchor_key="template", partner_key="template"
+        ),
         "mine_path_choice": MinePathChoiceStep(step_id="template"),
         "trigger_mine": TriggerMineStep(step_id="template"),
         "place_unit": PlaceUnitStep(step_id="template"),
@@ -449,9 +457,7 @@ def export():
         },
         "templates": {key: value.model_dump(mode="json") for key, value in values.items()},
     }
-    (ROOT / "rust/tests/fixtures/instruction-templates.json").write_text(
-        json.dumps(payload, indent=2) + "\n"
-    )
+    write_text(ROOT / "rust/tests/fixtures/instruction-templates.json", json.dumps(payload, indent=2) + "\n")
     print("Exported frozen continuation templates")
 
 

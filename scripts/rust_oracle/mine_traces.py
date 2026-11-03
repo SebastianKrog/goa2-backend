@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from fixture_cache import read_text, write_text
+
 import argparse
 import copy
 import json
@@ -533,12 +535,12 @@ def export_errors(path):
         "native_policy": "mine path identity is an unordered set with stable native order; explicit trigger/event order is preserved; literal-destination loss remains a documented source compatibility defect",
     }
     data["corpus_sha256"] = digest(data)
-    path.write_text(json.dumps(data, indent=2) + "\n")
+    write_text(path, json.dumps(data, indent=2) + "\n")
     return data
 
 
 def verify_errors(path):
-    data = json.loads(path.read_text())
+    data = json.loads(read_text(path))
     identity = data.pop("corpus_sha256")
     assert digest(data) == identity and data["source_sha256"] == verify_sources()["source_sha256"]
     assert data["errors"] == reference_defects()
@@ -554,7 +556,7 @@ def export(path):
         "cases": path_cases(),
     }
     data["corpus_sha256"] = digest(data)
-    path.write_text(json.dumps(data, separators=(",", ":")) + "\n")
+    write_text(path, json.dumps(data, separators=(",", ":")) + "\n")
     return data
 
 
@@ -573,7 +575,7 @@ def export_transitions(path):
 
 
 def verify(path, command):
-    data = json.loads(path.read_text())
+    data = json.loads(read_text(path))
     identity = data.pop("corpus_sha256")
     if (
         data["schema_version"] != 1

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from fixture_cache import read_text, write_text
+
 import argparse
 import json
 from pathlib import Path
@@ -126,13 +128,13 @@ def export(path):
     }
     data["corpus_sha256"] = digest(data)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2) + "\n")
+    write_text(path, json.dumps(data, indent=2) + "\n")
     return data
 
 
 def verify(path, command):
     manifest = verify_sources()
-    data = json.loads(path.read_text())
+    data = json.loads(read_text(path))
     identity = data.pop("corpus_sha256")
     if (
         digest(data) != identity

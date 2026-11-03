@@ -5104,6 +5104,35 @@
       "success_output_key": null,
       "mine_path_prechosen": false
     },
+    "move_token": {
+      "type": "move_token",
+      "step_id": "template",
+      "pending_input": null,
+      "pending_request_id": null,
+      "is_mandatory": true,
+      "active_if_key": null,
+      "skip_if_key": null,
+      "token_key": "template",
+      "destination_key": "target_hex",
+      "range_val": 1,
+      "pass_through_obstacles": false,
+      "force_straight_line": false
+    },
+    "co_drag": {
+      "type": "co_directional_drag",
+      "step_id": "template",
+      "pending_input": null,
+      "pending_request_id": null,
+      "is_mandatory": true,
+      "active_if_key": null,
+      "skip_if_key": null,
+      "anchor_key": "template",
+      "partner_key": "template",
+      "anchor_dest_key": "anchor_dest",
+      "partner_dest_key": "co_drag_partner_dest",
+      "ignore_path_obstacles": false,
+      "anchor_is_token": true
+    },
     "mine_path_choice": {
       "type": "mine_path_choice",
       "step_id": "template",

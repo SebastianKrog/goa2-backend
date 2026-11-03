@@ -10,6 +10,14 @@ import os
 import sys
 from pathlib import Path
 
+from fixture_cache import (
+    cached,
+    install_verified_case,
+    read_bytes,
+    read_text,
+    write_bytes,
+    write_text,
+)
 from oracle import ROOT, Worker, canonical, digest, verify_sources
 from state_codec import export_state
 
@@ -27,7 +35,7 @@ class TraceNormalizer:
         if value is None:
             return None
         if value not in self.requests:
-            self.requests[value] = f"request/{len(self.requests)+1}"
+            self.requests[value] = f"request/{len(self.requests) + 1}"
         return self.requests[value]
 
     def bind_steps(self, steps):
@@ -35,7 +43,7 @@ class TraceNormalizer:
             if not step.step_id.startswith("fixture/"):
                 key = id(step)
                 if key not in self.python_steps:
-                    self.python_steps[key] = f"dynamic-step/{len(self.python_steps)+1}"
+                    self.python_steps[key] = f"dynamic-step/{len(self.python_steps) + 1}"
                     self.retained_steps.append(step)
             for child in getattr(step, "steps_template", []):
                 bind(child)
@@ -49,7 +57,7 @@ class TraceNormalizer:
         elif str(step.get("step_id", "")).startswith("native-step-"):
             value = step["step_id"]
             if value not in self.steps:
-                self.steps[value] = f"dynamic-step/{len(self.steps)+1}"
+                self.steps[value] = f"dynamic-step/{len(self.steps) + 1}"
             step["step_id"] = self.steps[value]
         # These fixture instructions have only steps_template as nested frames.
         # No arbitrary metadata keys or entity IDs are stripped or rewritten.
@@ -302,7 +310,7 @@ def corpus():
     )
     for value in (None, False, 0, [], {}, "", True):
         add(
-            f"condition-{json.dumps(value,separators=(',',':'))}",
+            f"condition-{json.dumps(value, separators=(',', ':'))}",
             [
                 SetContextFlagStep(key="active_ran", active_if_key="condition"),
                 SetContextFlagStep(key="skip_ran", skip_if_key="condition"),
@@ -1111,8 +1119,7 @@ def write_corpus_stream(path, metadata, cases):
         target = path.parent / relative
         temporary = target.with_suffix(".json.tmp")
         temporary.unlink(missing_ok=True)
-        temporary.write_bytes(encoded + b"\n")
-        temporary.replace(target)
+        write_bytes(target, encoded + b"\n")
         entries.append({"name": case["name"], "path": relative, "case_sha256": identity})
     hasher.update(b"]}")
     metadata["schema_version"] = 2
@@ -1136,8 +1143,11 @@ def write_corpus(path, source):
         target = path.parent / relative
         temporary = target.with_suffix(".json.tmp")
         temporary.unlink(missing_ok=True)
-        temporary.write_text(json.dumps(case, separators=(",", ":")) + "\n")
-        temporary.replace(target)
+        if cached(target):
+            write_text(target, json.dumps(case, separators=(",", ":")) + "\n")
+        else:
+            write_text(temporary, json.dumps(case, separators=(",", ":")) + "\n")
+            temporary.replace(target)
         entries.append({"name": case["name"], "path": relative, "case_sha256": identity})
     source["schema_version"] = 2
     source["semantic_sha256"] = semantic_identity
@@ -1149,7 +1159,7 @@ def _install_index(path, source):
     identity = digest(source)
     result = {**source, "corpus_sha256": identity}
     temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_text(json.dumps(result, indent=2) + "\n")
+    write_text(temporary, json.dumps(result, indent=2) + "\n")
     temporary.replace(path)
     # Readers retain an index snapshot while streaming its cases. Publishing a
     # new index must not remove any immutable case those readers still need.
@@ -1158,7 +1168,7 @@ def _install_index(path, source):
 
 
 def read_index(path):
-    source = json.loads(path.read_text())
+    source = json.loads(read_text(path))
     identity = source.pop("corpus_sha256")
     if source.get("schema_version") != 2 or digest(source) != identity:
         raise ValueError("trace index identity mismatch")
@@ -1180,7 +1190,7 @@ def _case_file(path, entry):
 
 def _read_case_encoded(path, entry):
     identity = entry["case_sha256"]
-    case = json.loads(_case_file(path, entry).read_text())
+    case = json.loads(read_text(_case_file(path, entry)))
     encoded = canonical(case).encode()
     if hashlib.sha256(encoded).hexdigest() != identity or case["name"] != entry["name"]:
         raise ValueError("trace case content identity mismatch")
@@ -1193,7 +1203,7 @@ def _verified_case_encoding(path, entry):
     The SHA is the same canonical-case identity used by full readers. Check the
     exact leading name as well; alternate formatting/order uses the full parser.
     """
-    encoded = _case_file(path, entry).read_bytes().removesuffix(b"\n")
+    encoded = read_bytes(_case_file(path, entry)).removesuffix(b"\n")
     prefix = ('{"name":' + canonical(entry["name"]) + ",").encode()
     if encoded.startswith(prefix) and hashlib.sha256(encoded).hexdigest() == entry["case_sha256"]:
         return encoded
@@ -1242,7 +1252,11 @@ def merge_corpora(path, additions_path):
             hasher.update(b",")
         hasher.update(encoded)
         relative = f"{path.stem}/{entry['case_sha256']}.json"
-        if source_path != path:
+        if source_path != path and cached(path.parent / relative):
+            install_verified_case(
+                source_path.parent / entry["path"], path.parent / relative, encoded
+            )
+        elif source_path != path:
             target = path.parent / relative
             temporary = target.with_suffix(".json.tmp")
             # A failed prior replacement may have left a hard-linked temporary.
@@ -1254,7 +1268,7 @@ def merge_corpora(path, additions_path):
             try:
                 os.link(source_path.parent / entry["path"], temporary)
             except OSError:
-                temporary.write_bytes(encoded + b"\n")
+                write_bytes(temporary, encoded + b"\n")
             temporary.replace(target)
         entries.append(
             {"name": entry["name"], "path": relative, "case_sha256": entry["case_sha256"]}
@@ -1291,7 +1305,7 @@ def verify(path, command):
             if actual != case["expected"]:
                 failure = ROOT / "rust/artifacts/stack-trace-mismatch.json"
                 failure.parent.mkdir(parents=True, exist_ok=True)
-                failure.write_text(json.dumps({"case": case, "actual": actual}, indent=2))
+                write_text(failure, json.dumps({"case": case, "actual": actual}, indent=2))
                 raise AssertionError(f"trace mismatch in {case['name']}: {failure}")
             count += len(actual)
     finally:

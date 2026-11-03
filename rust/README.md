@@ -1,8 +1,9 @@
 # Native search engine
 
 Work in progress, following [the implementation plan](../docs/superpowers/plans/2026-10-23-rust-search-engine.md).
-This workspace executes the supported rule closure through ordinary full rounds.
-It does not yet support general complete games or select bot actions.
+Two complete-game traces now match Python for Arien/Brogan versus Tigerclaw/Sabina
+on Forgotten Island and Magma and Ice. General roster support and bot action
+selection remain unfinished.
 The live Python backend and lab are unchanged.
 
 Current reviewed primary coverage: **172/596 card faces** (127 custom bodies,
@@ -29,16 +30,68 @@ The authoritative arena now executes lane checks/pushes, minion battle,
 casualty choices and spawn displacement through typed ordered mutations.
 Coverage includes 267 source cases / 1,446 operations across all supplied maps,
 preserving mapping aliases, spawn Hex identity and pending-input behavior.
-Upgrades/reset and general game/search closure remain unfinished.
+General game/search closure remains unfinished.
 See the [arena battle validation record](artifacts/arena-battle-final-validation.json).
 Round cleanup now stages an identity-preserving arena transaction: duration and
 card expiry, retrieval, markers, token persistence, mandatory leveling and both
 ultimate unlock hooks. Coverage includes 95 cases / 192 operations and a new
-round's commit/uncommit. Level-up snapshots restore; upgrade/reset execution is
-still guarded before pop. Transaction and search performance gates remain open.
+round's commit/uncommit. Transaction and search performance gates remain open.
 All 285 core tests, the cleanup restoration gate and three full CLI replay tests pass;
 27 affected Python source contracts and independent release parity also pass.
 See the [cleanup validation record](artifacts/arena-cleanup-final-validation.json).
+
+Upgrade choices and round reset now execute in the authoritative arena. Ordered
+single/all-remaining batches are validated before mutation; physical hand/deck,
+item, pending/reveal and defeated-hero containers retain source identity. Round
+reset replaces only the shallow position snapshot. Differential coverage includes
+107 cases / 653 operations across seven heroes, both upgrade sides, intermediate
+tiers, invalid submissions, imported pending inputs and a complete multihero round.
+Mutable session/arena staging is still a correctness implementation, with no
+make/unmake or throughput claim. General rules, raw exception fidelity and search
+completion remain open.
+Validation passes 291 core tests, both affected restoration gates, three full CLI
+replay tests, 36 source contracts and 28 existing upgrade-rule tests. Full replay
+covers 14,900 live cases / 118,301 operations and the unchanged canonical corpus.
+See the [upgrade/reset validation record](artifacts/arena-upgrades-final-validation.json).
+
+Hero respawn now executes through live operands and retained arena maps. It
+preserves PASS-before-spawn ordering, token unlinking, fresh selected Hex identity,
+actor-specific marked-spawn obstacles, source fallback BFS and multipiece supply
+order. Differential coverage includes 123 cases / 417 operations, both teams on
+all six supplied maps, imported pending values and shared snapshots. Dense and
+live candidate paths share the actor-aware obstacle fix. Card menus and action dispatch already have a live adapter. The audit below
+verifies their phase integration; unported card bodies and general roster/game
+coverage remain open.
+All 297 core tests, the respawn restoration gate and three full CLI replays pass,
+along with 61 affected Python tests and independent release parity. Full replay
+covers 15,023 live cases / 118,718 operations and the unchanged canonical corpus.
+See the [hero respawn validation record](artifacts/hero-respawn-final-validation.json).
+
+The phase audit confirms that every supported source-pinned instruction prototype
+reaches its live adapter; ResolveCard was already implemented. Its dense-only
+rejection is now labelled as an invariant rather than an unported feature.
+A new corpus covers 191 real-handler turn/round flows / 1,819 atomic operations,
+including action choice, respawn, confirmation, finalization, upgrades and reset.
+
+Whole-game diagnostics now stream source/native snapshots and retain lossless
+64-operation delta chunks. The native session stays alive across the entire game;
+only golden-data loading is chunked. Sparse array splices avoid repeating unchanged
+binding rows. The existing collected replay API and non-mutating normalization
+remain available; explicit fresh-record ownership can avoid redundant frame copies.
+No neural runtime or server is involved.
+Two complete games pass all 7,059 operation comparisons through game over, with
+an independent release replay. The source verifier peaked at about 210 MiB;
+lossless compaction reduced its golden deltas from 673 MiB to 20.5 MiB. All 298
+core tests, the 191-flow restoration gate, eight CLI tests and 98 affected Python
+tests pass. See the [validation record](artifacts/phase-closure-and-stream-final-validation.json).
+
+To regenerate full-game goldens using the pinned oracle environment:
+
+```sh
+PYTHONHASHSEED=0 PYTHONPATH=scripts/rust_oracle:src \
+  "$HOME/.cache/goa2-rust/oracle-venv/bin/python" -m streamed_games \
+  --worker "$HOME/.cache/goa2-rust/target/release/goa2-search-cli"
+```
 
 ## Build and test in WSL
 
@@ -163,7 +216,7 @@ To regenerate fixtures from the *unchanged* frozen source, using the same PowerS
 & $oraclePython "$engineRoot/scripts/rust_oracle/action_traces.py" export
 ```
 
-`cargo test` consumes the committed fixtures directly. Worker verification also
+`cargo test` consumes the small committed fixtures and the local compressed full-corpus cache. Worker verification also
 checks the persistent JSON-lines protocol and corpus/source fingerprints.
 Movement disagreements are saved under ignored `rust/artifacts/` for diagnosis.
 
@@ -4278,3 +4331,38 @@ matrix update. Full replay covers 12,539 live scenes / 90,556 operations and the
 Strict lint, formatting and frozen-source checks pass. See the [implementation
 plan](../docs/superpowers/plans/2026-10-23-rust-search-engine.md) and
 [validation record](artifacts/gydion-primary-final-validation.json) for details.
+
+
+## Development footprint and fixture storage
+
+Use `python scripts/development_footprint.py` from the repository root to review
+the bot checkout (including Git and fixtures) plus `$HOME/.cache/goa2-rust`.
+The planning budget is 12 GiB; consider cleanup around 10 GiB. Review weekly during
+active development and after major exports/builds. The report never deletes,
+blocks generation or enforces a cap. Raise the budget deliberately if needed.
+
+Full generated fixture payloads are ignored local `.json.gz` caches. Generators,
+scenario definitions, oracle/runtime pins, expected corpus indexes/hashes and
+small bootstrap/runtime catalogs remain committed. Logical `.json` paths in
+indexes are unchanged; Python and native test readers transparently decompress
+individual cases, with no permanent extraction or whole-corpus RAM cache.
+Gzip is used per case instead of one giant ZIP so exporters can atomically
+publish/merge cases and tests can access cases independently. Missing full-cache
+files fail explicitly; tests never silently substitute a reduced corpus.
+
+For a fresh checkout, the small movement/state fixtures allow:
+`sh rust/cargo-wsl.sh test --locked --test oracle`.
+Full native tests require regenerating/restoring the compressed full corpus.
+Use the exporter commands above with the pinned oracle and runtime. Exports now
+write compressed payloads directly. Existing corpora can be migrated offline:
+
+```sh
+python scripts/rust_oracle/fixture_cache.py compress --untrack
+```
+
+Migration streams and verifies every gzip against its original bytes before
+removing extracted files, preserves hard-link sharing, and removes only cached
+payloads from the current Git index. It never rewrites published Git history.
+Run it with no corpus generators/readers active. Keep runtime catalogs as normal
+JSON because the engine embeds them at compile time. The exact retained files
+are listed in `fixture_cache.COMMITTED` and `rust/.gitignore`.

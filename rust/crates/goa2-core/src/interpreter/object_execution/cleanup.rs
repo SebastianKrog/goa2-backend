@@ -12,10 +12,10 @@ pub(super) struct CleanupPlan {
     events: Vec<NativeEvent>,
 }
 impl NativeSession {
-    fn cleanup_key(&self, name: &str) -> Symbol {
+    pub(super) fn cleanup_key(&self, name: &str) -> Symbol {
         self.symbols.lookup(name).unwrap()
     }
-    fn cleanup_prepare_keys(&mut self, objects: &mut BoundObjects) {
+    pub(super) fn cleanup_prepare_keys(&mut self, objects: &mut BoundObjects) {
         for name in [
             "round",
             "pending_upgrades",
@@ -25,6 +25,9 @@ impl NativeSession {
             "LEVEL_UP",
             "DECK",
             "HAND",
+            "RETIRED",
+            "ITEM",
+            "items",
             "enraged_active_override",
             "persists_end_of_round",
         ] {
@@ -34,7 +37,7 @@ impl NativeSession {
         }
         objects.arena.symbols = self.symbols.clone();
     }
-    fn cleanup_list(
+    pub(super) fn cleanup_list(
         &self,
         objects: &BoundObjects,
         model: ObjectId,
@@ -58,7 +61,7 @@ impl NativeSession {
             })
             .collect()
     }
-    fn cleanup_equal(
+    pub(super) fn cleanup_equal(
         &self,
         objects: &BoundObjects,
         list: ObjectId,
@@ -739,23 +742,21 @@ mod tests {
         assert_eq!(root.export_envelope().unwrap().state, before.state);
     }
     #[test]
-    fn cleanup_upgrade_boundary_is_restorable_and_unsupported_advance_does_not_pop() {
+    fn cleanup_upgrade_boundary_restores_the_same_upgrade_prompt() {
         let mut worker = object_session("object-execution-cleanup-live-level-gold-3");
         worker.advance_prefix(1).unwrap();
-        let before = worker.export_envelope().unwrap();
-        let mut restored = NativeSession::compile(before.clone()).unwrap();
-        for branch in [&mut worker, &mut restored] {
-            assert!(
-                branch
-                    .advance_prefix(1)
-                    .unwrap_err()
-                    .to_string()
-                    .contains("upgrade/reset")
-            );
-            let after = branch.export_envelope().unwrap();
-            assert_eq!(before.state, after.state);
-            assert_eq!(before.object_bindings, after.object_bindings);
-        }
+        let mut restored = NativeSession::compile(worker.export_envelope().unwrap()).unwrap();
+        let a = worker.advance_prefix(1).unwrap().request.unwrap();
+        let b = restored.advance_prefix(1).unwrap().request.unwrap();
+        assert_eq!(worker.request_json(&a), restored.request_json(&b));
+        assert_eq!(
+            worker.export_envelope().unwrap().state,
+            restored.export_envelope().unwrap().state
+        );
+        assert_eq!(
+            worker.export_envelope().unwrap().object_bindings,
+            restored.export_envelope().unwrap().object_bindings
+        );
     }
     #[test]
     fn cleanup_uses_the_live_physical_token_persistence_override() {

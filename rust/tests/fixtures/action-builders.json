@@ -1,0 +1,569 @@
+{
+  "schema_version": 1,
+  "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+  "recipes": {
+    "restore_context": [
+      {
+        "fields": {
+          "type": "restore_action_context",
+          "step_id": "template",
+          "pending_input": null,
+          "pending_request_id": null,
+          "is_mandatory": true,
+          "active_if_key": null,
+          "skip_if_key": null,
+          "other_hero_action": false
+        },
+        "objects": [
+          {
+            "kind": "step",
+            "paths": [
+              []
+            ]
+          }
+        ]
+      }
+    ],
+    "piece": [
+      {
+        "fields": {
+          "type": "choose_acting_piece",
+          "step_id": "template",
+          "pending_input": null,
+          "pending_request_id": null,
+          "is_mandatory": true,
+          "active_if_key": null,
+          "skip_if_key": null,
+          "hero_id": "template-passive-owner"
+        },
+        "objects": [
+          {
+            "kind": "step",
+            "paths": [
+              []
+            ]
+          }
+        ]
+      }
+    ],
+    "passive": [
+      {
+        "fields": {
+          "type": "check_passive_abilities",
+          "step_id": "template",
+          "pending_input": null,
+          "pending_request_id": null,
+          "is_mandatory": true,
+          "active_if_key": null,
+          "skip_if_key": null,
+          "trigger": "template-action-value",
+          "hero_id": null
+        },
+        "objects": [
+          {
+            "kind": "step",
+            "paths": [
+              []
+            ]
+          }
+        ]
+      }
+    ],
+    "pre_move": [
+      {
+        "fields": {
+          "type": "resolve_pre_action_movement",
+          "step_id": "template",
+          "pending_input": null,
+          "pending_request_id": null,
+          "is_mandatory": true,
+          "active_if_key": null,
+          "skip_if_key": null,
+          "hero_id": "template-passive-owner",
+          "hero_key": null
+        },
+        "objects": [
+          {
+            "kind": "step",
+            "paths": [
+              []
+            ]
+          }
+        ]
+      }
+    ],
+    "pre_discard": [
+      {
+        "fields": {
+          "type": "resolve_pre_action_discard",
+          "step_id": "template",
+          "pending_input": null,
+          "pending_request_id": null,
+          "is_mandatory": true,
+          "active_if_key": null,
+          "skip_if_key": null,
+          "hero_id": "template-passive-owner",
+          "hero_key": null,
+          "abort_on_defeat": true,
+          "processed_effect_ids": []
+        },
+        "objects": [
+          {
+            "kind": "step",
+            "paths": [
+              []
+            ]
+          },
+          {
+            "kind": "list",
+            "paths": [
+              [
+                "processed_effect_ids"
+              ]
+            ]
+          }
+        ]
+      }
+    ],
+    "text": [
+      {
+        "fields": {
+          "type": "resolve_card_text",
+          "step_id": "template",
+          "pending_input": null,
+          "pending_request_id": null,
+          "is_mandatory": true,
+          "active_if_key": null,
+          "skip_if_key": null,
+          "card_id": "template-action-card",
+          "hero_id": "template-passive-owner"
+        },
+        "objects": [
+          {
+            "kind": "step",
+            "paths": [
+              []
+            ]
+          }
+        ]
+      }
+    ],
+    "movement": [
+      {
+        "fields": {
+          "type": "move_sequence",
+          "step_id": "template",
+          "pending_input": null,
+          "pending_request_id": null,
+          "is_mandatory": true,
+          "active_if_key": null,
+          "skip_if_key": null,
+          "unit_id": "template-passive-owner",
+          "range_val": 62003,
+          "range_stat_type": "MOVEMENT",
+          "destination_key": "target_hex",
+          "pass_through_obstacles": false,
+          "force_straight_line": false,
+          "force_full_distance": false
+        },
+        "objects": [
+          {
+            "kind": "step",
+            "paths": [
+              []
+            ]
+          }
+        ]
+      }
+    ],
+    "travel": [
+      {
+        "fields": {
+          "type": "fast_travel_sequence",
+          "step_id": "template",
+          "pending_input": null,
+          "pending_request_id": null,
+          "is_mandatory": true,
+          "active_if_key": null,
+          "skip_if_key": null,
+          "unit_id": "template-passive-owner",
+          "destination_key": "target_hex",
+          "require_zone_change": false,
+          "source_card_id": "template-action-card"
+        },
+        "objects": [
+          {
+            "kind": "step",
+            "paths": [
+              []
+            ]
+          }
+        ]
+      }
+    ],
+    "travel_unit": [
+      {
+        "fields": {
+          "type": "fast_travel_unit",
+          "step_id": "template",
+          "pending_input": null,
+          "pending_request_id": null,
+          "is_mandatory": false,
+          "active_if_key": null,
+          "skip_if_key": null,
+          "unit_id": "template-passive-owner",
+          "destination_key": "target_hex",
+          "target_hex_arg": null,
+          "require_zone_change": false,
+          "source_card_id": "template-action-card"
+        },
+        "objects": [
+          {
+            "kind": "step",
+            "paths": [
+              []
+            ]
+          }
+        ]
+      }
+    ],
+    "travel_select": [
+      {
+        "fields": {
+          "type": "select_step",
+          "step_id": "template",
+          "pending_input": null,
+          "pending_request_id": null,
+          "is_mandatory": false,
+          "active_if_key": null,
+          "skip_if_key": null,
+          "target_type": "HEX",
+          "prompt": "Select Fast Travel Destination",
+          "output_key": "selection",
+          "decision_purpose": null,
+          "filters": [
+            {
+              "type": "fast_travel_destination_filter",
+              "unit_id": "template-passive-owner",
+              "require_zone_change": false,
+              "source_card_id": "template-action-card"
+            }
+          ],
+          "auto_select_if_one": false,
+          "context_hero_id": null,
+          "context_hero_id_key": null,
+          "card_container": "HAND",
+          "card_containers": null,
+          "restrict_played_to_shields": false,
+          "include_facedown": false,
+          "number_options": [],
+          "number_labels": {},
+          "skip_immunity_filter": false,
+          "skip_self_filter": false,
+          "override_player_id": null,
+          "override_player_id_key": null,
+          "card_action_types": null,
+          "card_colors": null,
+          "card_color_key": null,
+          "card_tier_key": null,
+          "card_is_basic": null,
+          "card_is_active": null,
+          "card_has_item": null,
+          "allowed_card_ids": null,
+          "exclude_card_id_keys": null,
+          "card_states": null,
+          "exclude_card_states": null,
+          "selected_card_color_key": null,
+          "selected_card_tier_key": null
+        },
+        "objects": [
+          {
+            "kind": "step",
+            "paths": [
+              []
+            ]
+          },
+          {
+            "kind": "list",
+            "paths": [
+              [
+                "filters"
+              ]
+            ]
+          },
+          {
+            "kind": "model",
+            "paths": [
+              [
+                "filters",
+                0
+              ]
+            ]
+          },
+          {
+            "kind": "list",
+            "paths": [
+              [
+                "number_options"
+              ]
+            ]
+          },
+          {
+            "kind": "dict",
+            "paths": [
+              [
+                "number_labels"
+              ]
+            ]
+          }
+        ]
+      }
+    ],
+    "attack": [
+      {
+        "fields": {
+          "type": "attack_sequence",
+          "step_id": "template",
+          "pending_input": null,
+          "pending_request_id": null,
+          "is_mandatory": true,
+          "active_if_key": null,
+          "skip_if_key": null,
+          "damage": 62003,
+          "range_val": 62007,
+          "is_ranged": false,
+          "target_id_key": null,
+          "target_output_key": null,
+          "target_filters": [],
+          "damage_bonus_key": null,
+          "range_bonus_key": null,
+          "damage_stat_type": "ATTACK",
+          "range_stat_type": "RANGE",
+          "defense_uses_initiative": false
+        },
+        "objects": [
+          {
+            "kind": "step",
+            "paths": [
+              []
+            ]
+          },
+          {
+            "kind": "list",
+            "paths": [
+              [
+                "target_filters"
+              ]
+            ]
+          }
+        ]
+      }
+    ],
+    "log": [
+      {
+        "fields": {
+          "type": "log_message",
+          "step_id": "template",
+          "pending_input": null,
+          "pending_request_id": null,
+          "is_mandatory": true,
+          "active_if_key": null,
+          "skip_if_key": null,
+          "message": "template-action-log"
+        },
+        "objects": [
+          {
+            "kind": "step",
+            "paths": [
+              []
+            ]
+          }
+        ]
+      }
+    ],
+    "context": [
+      {
+        "fields": {
+          "type": "set_context_flag",
+          "step_id": "template",
+          "pending_input": null,
+          "pending_request_id": null,
+          "is_mandatory": true,
+          "active_if_key": null,
+          "skip_if_key": null,
+          "key": "template-action-key",
+          "value": "template-action-value"
+        },
+        "objects": [
+          {
+            "kind": "step",
+            "paths": [
+              []
+            ]
+          }
+        ]
+      }
+    ],
+    "clear": [
+      {
+        "fields": {
+          "type": "multi_select",
+          "step_id": "template",
+          "pending_input": null,
+          "pending_request_id": null,
+          "is_mandatory": true,
+          "active_if_key": null,
+          "skip_if_key": null,
+          "target_type": "UNIT_OR_TOKEN",
+          "prompt": "Select tokens to clear.",
+          "output_key": "clear_targets",
+          "max_selections": 6,
+          "min_selections": 0,
+          "filters": [
+            {
+              "type": "unit_type_filter",
+              "unit_type": "TOKEN"
+            },
+            {
+              "type": "range_filter",
+              "max_range": 1,
+              "min_range": 0,
+              "origin_id": null,
+              "origin_key": null,
+              "origin_hex_key": null,
+              "max_range_key": null,
+              "min_range_key": null,
+              "distance_mode": "topology"
+            },
+            {
+              "type": "immunity_filter"
+            }
+          ],
+          "skip_immunity_filter": false,
+          "skip_self_filter": false,
+          "selections": []
+        },
+        "objects": [
+          {
+            "kind": "step",
+            "paths": [
+              []
+            ]
+          },
+          {
+            "kind": "list",
+            "paths": [
+              [
+                "filters"
+              ]
+            ]
+          },
+          {
+            "kind": "model",
+            "paths": [
+              [
+                "filters",
+                0
+              ]
+            ]
+          },
+          {
+            "kind": "model",
+            "paths": [
+              [
+                "filters",
+                1
+              ]
+            ]
+          },
+          {
+            "kind": "model",
+            "paths": [
+              [
+                "filters",
+                2
+              ]
+            ]
+          },
+          {
+            "kind": "list",
+            "paths": [
+              [
+                "selections"
+              ]
+            ]
+          }
+        ]
+      },
+      {
+        "fields": {
+          "type": "for_each",
+          "step_id": "template",
+          "pending_input": null,
+          "pending_request_id": null,
+          "is_mandatory": true,
+          "active_if_key": null,
+          "skip_if_key": null,
+          "list_key": "clear_targets",
+          "item_key": "target_id",
+          "steps_template": [
+            {
+              "type": "remove_token",
+              "step_id": "template",
+              "pending_input": null,
+              "pending_request_id": null,
+              "is_mandatory": true,
+              "active_if_key": null,
+              "skip_if_key": null,
+              "token_id": null,
+              "token_key": "target_id"
+            }
+          ],
+          "current_index": 0
+        },
+        "objects": [
+          {
+            "kind": "step",
+            "paths": [
+              []
+            ]
+          },
+          {
+            "kind": "list",
+            "paths": [
+              [
+                "steps_template"
+              ]
+            ]
+          },
+          {
+            "kind": "step",
+            "paths": [
+              [
+                "steps_template",
+                0
+              ]
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "exclusion_filter": {
+    "type": "exclude_identity_filter",
+    "exclude_self": false,
+    "exclude_keys": [
+      "template-action-key"
+    ]
+  },
+  "operands": {
+    "owner": "template-passive-owner",
+    "card": "template-action-card",
+    "value": 62003,
+    "range": 62007,
+    "key": "template-action-key",
+    "data": "template-action-value",
+    "log": "template-action-log"
+  },
+  "catalog_sha256": "4f740420af5a513216ece02f492560bef8b9eb49e0a1e63c91ecd7fb171f9238"
+}

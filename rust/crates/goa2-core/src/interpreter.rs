@@ -169,9 +169,88 @@ struct Conditions {
     skip: Option<Symbol>,
     mandatory: bool,
 }
+#[derive(Clone, Copy, Debug)]
+enum CoordinateOp {
+    Record,
+    Compute,
+    Adjacency,
+}
 #[derive(Clone, Debug)]
 enum Instruction {
     ParkedPhase(Symbol),
+    LiveReturnMinions,
+    LivePlace,
+    LiveSwap,
+    LiveCreateEffect,
+    LiveResource,
+    LivePrimaryText,
+    LiveCoordinates(CoordinateOp),
+    LivePush,
+    LiveTravel {
+        sequence: bool,
+    },
+    LivePerformPrimary,
+    LivePerformCard,
+    LiveCardAction,
+    LiveChoosePiece,
+    LiveRepeat {
+        templates: Vec<usize>,
+    },
+    LiveDefenseBody {
+        on_block: bool,
+    },
+    LiveMarker {
+        remove: bool,
+    },
+    LiveMove,
+    LiveMineChoice,
+    LiveTriggerMines,
+    LiveForceDiscard,
+    LiveDiscardOrDefeat,
+    LiveDiscard,
+    LiveRetrieve,
+    LiveTokenPlace,
+    LiveTokenRemove,
+    LiveTokenBatch,
+    LiveRockUltimate,
+    LiveTurret {
+        remove: bool,
+    },
+    LiveTokenPath {
+        trail: bool,
+    },
+    LivePassive,
+    LiveOfferPassive,
+    LiveMarkPassive,
+    LiveRuneChoice,
+    LiveHexSelect,
+    LiveUnitSelect,
+    LiveMultiSelect,
+    LiveDefeat,
+    LiveCombatResolve,
+    LiveAttackSequence,
+    LiveReaction,
+    LivePreMovement,
+    LivePreDiscard,
+    LiveAdjacentSnapshot,
+    LiveTargetDefeated,
+    LiveRemoveUnit,
+    LiveGameOver,
+    LiveProtection,
+    LiveContextCondition,
+    LiveSpell(crate::spells::SpellOp),
+    LiveCheckUnitFilters,
+    LiveDistanceCheck,
+    LiveUnitTypeCheck,
+    LiveBooleanCombine,
+    LiveMinionRespawn,
+    LiveCardCount,
+    LiveRoundDefeat,
+    LiveQuery {
+        collect: bool,
+    },
+    LiveMoveSequence,
+    LiveCardSelect,
     MinionProtection {
         spec: crate::protection::ProtectionBinding,
         remove: usize,
@@ -494,6 +573,7 @@ enum Instruction {
 }
 #[derive(Clone, Debug)]
 struct CompiledStep {
+    primary_template: bool,
     conditions: Conditions,
     instruction: Instruction,
     wire: Value,
@@ -506,6 +586,13 @@ enum Team {
 }
 #[derive(Clone, Debug)]
 pub enum RequestChoices {
+    SpellCards {
+        values: Vec<crate::cards::CardId>,
+        cast: bool,
+        removed: usize,
+        max: i64,
+    },
+    Minions(Vec<(Symbol, crate::world::MinionKind)>),
     Protection(Vec<crate::cards::CardId>),
     Mines(Vec<crate::mines::MinePath>),
     Numbers {
@@ -521,6 +608,7 @@ pub enum RequestChoices {
         done: i64,
         max: i64,
     },
+    Runes(Vec<Symbol>),
     Passive {
         card: Symbol,
         name: Symbol,
@@ -545,6 +633,12 @@ pub enum RequestChoices {
         values: Vec<Symbol>,
         count: usize,
         max: i64,
+    },
+    PrimaryReplacement {
+        actor: Symbol,
+        card: Symbol,
+        primary: crate::world::ActionKind,
+        replacement: crate::world::ActionKind,
     },
     Action(ActionMenu),
     Defense(DefenseMenu),
@@ -577,6 +671,25 @@ pub enum NativeEvent {
         blast: bool,
     },
     EffectCreated(crate::effect_steps::EffectCreated),
+    GoldEffect {
+        actor: Option<Symbol>,
+        target: Option<Symbol>,
+        owner: Symbol,
+        amount: Datum,
+        lost: bool,
+    },
+    Spell(crate::spells::SpellEvent),
+    CoinsStolen {
+        actor: Symbol,
+        victim: Symbol,
+        amount: Datum,
+    },
+    LifeRestored {
+        hero: Symbol,
+        team: Symbol,
+        change: i64,
+        remaining: i64,
+    },
     Round(crate::round::RoundEvent),
     TurnEnded(Symbol),
     RespawnCleared {
@@ -592,6 +705,31 @@ pub enum NativeEvent {
         to: Hex,
         distance: usize,
         collision: bool,
+    },
+    BoardEntityPlaced {
+        actor: Option<Symbol>,
+        entity: Symbol,
+        from: Option<Hex>,
+        to: Hex,
+        obstacle: bool,
+    },
+    BoardEntityRemoved {
+        actor: Option<Symbol>,
+        entity: Symbol,
+        from: Hex,
+    },
+    TokenPlaced {
+        actor: Option<Symbol>,
+        token: Symbol,
+        to: Hex,
+        kind: Symbol,
+    },
+    TokenReplaced {
+        actor: Option<Symbol>,
+        token: Symbol,
+        from: Hex,
+        to: Hex,
+        kind: Symbol,
     },
     TokenMoved {
         actor: Option<Symbol>,
@@ -675,6 +813,7 @@ pub struct NativeSession {
     steps: Arc<Vec<CompiledStep>>,
     symbols: Arc<Symbols>,
     context: Registers,
+    count_observer: crate::data::FilterObservation,
     objects: Option<object_execution::BoundObjects>,
     world: NativeWorld,
     combat_rules: CombatRules,
@@ -689,6 +828,7 @@ pub struct NativeSession {
     passive_rules: Arc<crate::passives::PassiveRules>,
     passive_offer: Option<usize>,
     protection_program: Option<usize>,
+    primary_blast_guard: bool,
     passive_bodies: Arc<Vec<PassiveBody>>,
     stack: Vec<Frame>,
     planning: crate::planning::Planning,
@@ -821,7 +961,7 @@ impl NativeSession {
         let marker_rules = MarkerRules::compile(&mut symbols);
         let attack_rules = AttackRules::compile(&mut symbols);
         let action_rules = ActionRules::compile(&mut symbols);
-        let primary_operands = PrimaryOperands::compile(&mut symbols);
+        let primary_operands = PrimaryOperands::compile(&mut symbols).map_err(unsupported)?;
         let reaction_rules = Arc::new(ReactionRules::compile(&mut symbols).map_err(unsupported)?);
         let mut context_items = Vec::new();
         for (key, value) in raw["execution_context"]
@@ -1051,9 +1191,9 @@ impl NativeSession {
         } else {
             None
         };
-        let may_create_effects = steps
-            .iter()
-            .any(|step| matches!(step.instruction, Instruction::CreateEffect(_)));
+        let may_create_effects = steps.iter().any(|step| {
+            !step.primary_template && matches!(step.instruction, Instruction::CreateEffect(_))
+        });
         let may_deploy = steps
             .iter()
             .any(|s| matches!(s.instruction, Instruction::Place { .. }))
@@ -1155,6 +1295,7 @@ impl NativeSession {
                 }
             })
             .collect::<Vec<_>>();
+        let primary_blast_guard = mine_links.iter().any(|(_, _, possible)| *possible);
         for (index, key, possible) in mine_links {
             if !possible {
                 continue;
@@ -1248,8 +1389,7 @@ impl NativeSession {
             if matches!(
                 step.instruction,
                 Instruction::FastTravel { .. } | Instruction::TravelSequence { .. }
-            ) || matches!(&step.instruction,Instruction::Hex {filters,..} if filters.iter().any(|f|matches!(f,HexFilter::FastTravel {..})))
-            {
+            ) {
                 world.ensure_fast_travel_closure().map_err(unsupported)?;
             }
             if let Instruction::ChoosePiece { hero, .. } = step.instruction
@@ -1338,6 +1478,7 @@ impl NativeSession {
             steps: Arc::new(steps),
             symbols,
             context,
+            count_observer: crate::data::FilterObservation::default(),
             objects,
             world,
             combat_rules,
@@ -1352,6 +1493,7 @@ impl NativeSession {
             passive_rules,
             passive_offer,
             protection_program,
+            primary_blast_guard,
             passive_bodies: Arc::new(passive_bodies),
             stack,
             planning,
@@ -1372,13 +1514,23 @@ impl NativeSession {
             coordinates,
         })
     }
+    fn cleanup_count_origin(&mut self) {
+        if self.count_observer.observed()
+            && let Some(key) = self.symbols.lookup("_cmf_origin_hex")
+            && matches!(self.context.get(key), Some(Datum::Null))
+        {
+            self.context.remove(key);
+        }
+        self.count_observer.clear();
+    }
     fn multi_choices(
-        &self,
+        &mut self,
         tokens: bool,
         filters: &[UnitFilter],
         frame: &Frame,
     ) -> Result<Vec<Symbol>> {
         let context = SpatialContext {
+            count_observer: Some(&self.count_observer),
             world: &self.world,
             registers: &self.context,
             symbols: &self.symbols,
@@ -1388,7 +1540,7 @@ impl NativeSession {
             range_override: None,
             through_override: None,
         };
-        Ok(self
+        let choices = self
             .world
             .select_units(
                 if tokens {
@@ -1403,7 +1555,9 @@ impl NativeSession {
             .map_err(unsupported)?
             .into_iter()
             .filter(|id| !frame.multi.contains(id))
-            .collect())
+            .collect();
+        self.cleanup_count_origin();
+        Ok(choices)
     }
     fn normalized_owner(&self, actor: Symbol) -> Symbol {
         self.world.hero(actor).map_or(actor, |hero| hero.id)
@@ -1666,8 +1820,9 @@ impl NativeSession {
                 return Ok(result);
             }
             budget.check(result.steps)?;
+            self.count_observer.clear();
             result.steps += 1;
-            let mut frame = self.stack.pop().unwrap();
+            let frame = self.stack.last().unwrap();
             let compiled = &self.steps[frame.instruction];
             let conditions = &compiled.conditions;
             if frame
@@ -1685,8 +1840,50 @@ impl NativeSession {
                         .is_some_and(|v| !matches!(v, Datum::Null))
                 })
             {
+                self.stack.pop();
                 continue;
             }
+            // A catalog body is not reachable merely because it was compiled.
+            // Keep the unsupported dense mine/effect combination guarded when
+            // an actual primary effect frame reaches execution, before popping.
+            if self.primary_blast_guard
+                && compiled.primary_template
+                && matches!(compiled.instruction, Instruction::CreateEffect(_))
+            {
+                return Err(unsupported(
+                    "blast mine dynamically-created effect closure not compiled",
+                ));
+            }
+            if matches!(compiled.instruction, Instruction::LivePerformCard) {
+                return Err(unsupported(
+                    "copied-card action requires authoritative object bindings",
+                ));
+            }
+            if matches!(compiled.instruction, Instruction::LiveSpell(_)) {
+                return Err(unsupported(
+                    "spell lifecycle requires authoritative object bindings",
+                ));
+            }
+            if matches!(compiled.instruction, Instruction::LiveResource) {
+                return Err(unsupported(
+                    "resource step requires authoritative object bindings",
+                ));
+            }
+            if matches!(
+                compiled.instruction,
+                Instruction::LiveCardCount
+                    | Instruction::LiveRoundDefeat
+                    | Instruction::LiveCheckUnitFilters
+                    | Instruction::LiveDistanceCheck
+                    | Instruction::LiveUnitTypeCheck
+                    | Instruction::LiveBooleanCombine
+                    | Instruction::LiveMinionRespawn
+            ) {
+                return Err(unsupported(
+                    "card and round queries require authoritative object bindings",
+                ));
+            }
+            let mut frame = self.stack.pop().unwrap();
             // Instructions are immutable and shared by cloned sessions. A clone
             // here contains only this small primitive payload, never a game state.
             let mut instruction = compiled.instruction.clone();
@@ -2177,9 +2374,18 @@ impl NativeSession {
                         }
                         FlowStep::Finalize(hero) => {
                             if let Some(index) = self.world.hero_index(hero) {
+                                let printed = self.world.heroes[index]
+                                    .current
+                                    .and_then(|id| self.world.card(id))
+                                    .map(|card| {
+                                        self.world.definitions.cards[card.definition].printed_id
+                                    });
                                 self.world
                                     .resolve_current_card(hero, Some(self.world.combat.turn))
                                     .map_err(card_error)?;
+                                if let Some(printed) = printed {
+                                    self.world.effects.activate_card(printed, true);
+                                }
                                 let cards = self.world.heroes[index]
                                     .played
                                     .iter()
@@ -2221,9 +2427,20 @@ impl NativeSession {
                             }) {
                                 continue;
                             }
-                            frame.pending = None;
-                            if selected == Some(Datum::Text(rules.confirm)) {
-                                continue;
+                            if let Some(pending) = frame
+                                .pending
+                                .as_ref()
+                                .filter(|value| value.truthy(&self.symbols))
+                            {
+                                if !matches!(pending, Datum::Object(_)) {
+                                    return Err(unsupported(
+                                        "confirmation input must be a mapping",
+                                    ));
+                                }
+                                frame.pending = None;
+                                if selected == Some(Datum::Text(rules.confirm)) {
+                                    continue;
+                                }
                             }
                             request = Some(NativeRequest {
                                 controlled: None,
@@ -2831,7 +3048,7 @@ impl NativeSession {
                         .lookup("current_card_id")
                         .ok_or_else(|| unsupported("current card register missing"))?;
                     self.context.set(key, Datum::Text(d.printed_id));
-                    if c.facedown {
+                    if c.facedown || d.effect_absent {
                         continue;
                     }
                     let mut values = PrimaryValues {
@@ -3665,21 +3882,9 @@ impl NativeSession {
                     else {
                         continue;
                     };
-                    let provider = self.world.effects.instances.iter().find(|effect| {
-                        effect.definition.behavior.kind == crate::effect_rules::Kind::PreMovement
-                            && effect.source == hero
-                            && effect.active
-                            && self.world.effect_active(effect)
-                    });
-                    let Some(provider) = provider else {
+                    let Some(range) = self.world.pre_action_movement_range(hero) else {
                         continue;
                     };
-                    let range = provider
-                        .definition
-                        .behavior
-                        .maximum
-                        .filter(|n| *n != 0)
-                        .unwrap_or(1);
                     let range = i32::try_from(range)
                         .map_err(|_| unsupported("pre-action movement range outside i32"))?;
                     for id in children.into_iter().rev() {
@@ -3719,19 +3924,13 @@ impl NativeSession {
                         continue;
                     }
                     let has_hand = !owner.hand.is_empty();
-                    let board_actor = self.world.resolved_actor(hero);
                     let mut next = None;
                     for effect in &self.world.effects.instances {
                         if effect.definition.behavior.kind != crate::effect_rules::Kind::PreDiscard
                             || frame.pre_processed.contains(&effect.id)
-                            || !self.world.effect_active(effect)
                             || !self
                                 .world
-                                .effect_in_scope(effect, board_actor, false)
-                                .map_err(unsupported)?
-                            || self
-                                .world
-                                .effect_ignored(effect, board_actor)
+                                .pre_action_discard_applies(effect, hero)
                                 .map_err(unsupported)?
                         {
                             continue;
@@ -3980,7 +4179,66 @@ impl NativeSession {
                         });
                     }
                 }
-                Instruction::ParkedPhase(_) => {
+                Instruction::ParkedPhase(_)
+                | Instruction::LiveReturnMinions
+                | Instruction::LivePlace
+                | Instruction::LiveSwap
+                | Instruction::LiveRepeat { .. }
+                | Instruction::LiveTravel { .. }
+                | Instruction::LivePerformPrimary
+                | Instruction::LivePerformCard
+                | Instruction::LiveCardAction
+                | Instruction::LiveChoosePiece
+                | Instruction::LivePush
+                | Instruction::LiveCoordinates(_)
+                | Instruction::LivePrimaryText
+                | Instruction::LiveResource
+                | Instruction::LiveCreateEffect
+                | Instruction::LiveDefenseBody { .. }
+                | Instruction::LiveMarker { .. }
+                | Instruction::LiveMove
+                | Instruction::LiveMineChoice
+                | Instruction::LiveTriggerMines
+                | Instruction::LivePassive
+                | Instruction::LiveOfferPassive
+                | Instruction::LiveMoveSequence
+                | Instruction::LiveHexSelect
+                | Instruction::LiveUnitSelect
+                | Instruction::LiveMultiSelect
+                | Instruction::LiveDefeat
+                | Instruction::LivePreMovement
+                | Instruction::LivePreDiscard
+                | Instruction::LiveReaction
+                | Instruction::LiveAttackSequence
+                | Instruction::LiveCombatResolve
+                | Instruction::LiveAdjacentSnapshot
+                | Instruction::LiveTargetDefeated
+                | Instruction::LiveRemoveUnit
+                | Instruction::LiveGameOver
+                | Instruction::LiveProtection
+                | Instruction::LiveQuery { .. }
+                | Instruction::LiveContextCondition
+                | Instruction::LiveSpell(_)
+                | Instruction::LiveCheckUnitFilters
+                | Instruction::LiveDistanceCheck
+                | Instruction::LiveUnitTypeCheck
+                | Instruction::LiveBooleanCombine
+                | Instruction::LiveMinionRespawn
+                | Instruction::LiveCardCount
+                | Instruction::LiveRoundDefeat
+                | Instruction::LiveRuneChoice
+                | Instruction::LiveMarkPassive
+                | Instruction::LiveDiscard
+                | Instruction::LiveRetrieve
+                | Instruction::LiveTokenPlace
+                | Instruction::LiveTokenPath { .. }
+                | Instruction::LiveTurret { .. }
+                | Instruction::LiveRockUltimate
+                | Instruction::LiveTokenBatch
+                | Instruction::LiveTokenRemove
+                | Instruction::LiveForceDiscard
+                | Instruction::LiveDiscardOrDefeat
+                | Instruction::LiveCardSelect => {
                     return Err(unsupported(
                         "parked arena phase step cannot run in the ordinary interpreter",
                     ));
@@ -4169,6 +4427,7 @@ impl NativeSession {
                         self.planning.actor
                     };
                     let spatial = SpatialContext {
+                        count_observer: Some(&self.count_observer),
                         world: &self.world,
                         registers: &self.context,
                         symbols: &self.symbols,
@@ -4191,6 +4450,7 @@ impl NativeSession {
                             &spatial,
                         )
                         .map_err(unsupported)?;
+                    self.cleanup_count_origin();
                     if choices.is_empty() {
                         if mandatory {
                             self.abort_action();
@@ -4298,6 +4558,7 @@ impl NativeSession {
                     let candidates = self.world.tile_hexes();
                     let mut accepted = vec![true; candidates.len()];
                     let context = SpatialContext {
+                        count_observer: Some(&self.count_observer),
                         world: &self.world,
                         registers: &self.context,
                         symbols: &self.symbols,
@@ -4317,6 +4578,7 @@ impl NativeSession {
                         .zip(accepted)
                         .filter_map(|(hex, accepted)| accepted.then_some(*hex))
                         .collect::<Vec<_>>();
+                    self.cleanup_count_origin();
                     if choices.is_empty() {
                         if mandatory {
                             if self
@@ -4844,6 +5106,7 @@ impl NativeSession {
                     output,
                 } => {
                     let spatial = SpatialContext {
+                        count_observer: Some(&self.count_observer),
                         world: &self.world,
                         registers: &self.context,
                         symbols: &self.symbols,
@@ -4854,6 +5117,7 @@ impl NativeSession {
                         through_override: None,
                     };
                     let value = spec.evaluate(&spatial, collect).map_err(unsupported)?;
+                    self.cleanup_count_origin();
                     self.context.set(output, value);
                 }
                 Instruction::ContextCondition {
@@ -5047,21 +5311,39 @@ impl NativeSession {
         Ok(())
     }
     pub fn commit_card(&mut self, hero: Symbol, card: crate::cards::CardId) -> Result<()> {
+        if self.objects.is_some() {
+            return self.with_live_objects(|session, objects| {
+                session.commit_card_bound(objects, hero, card)
+            });
+        }
         self.ensure_planning_effect_closure()?;
         let result = self.planning.commit(&mut self.world, hero, card);
         self.finish_planning_command(result)
     }
     pub fn uncommit_card(&mut self, hero: Symbol) -> Result<()> {
+        if self.objects.is_some() {
+            return self
+                .with_live_objects(|session, objects| session.uncommit_card_bound(objects, hero));
+        }
         self.ensure_planning_effect_closure()?;
         let result = self.planning.uncommit(&mut self.world, hero);
         self.finish_planning_command(result)
     }
     pub fn pass_planning(&mut self, hero: Symbol) -> Result<()> {
+        if self.objects.is_some() {
+            return self
+                .with_live_objects(|session, objects| session.pass_planning_bound(objects, hero));
+        }
         self.ensure_planning_effect_closure()?;
         let result = self.planning.pass(&mut self.world, hero);
         self.finish_planning_command(result)
     }
     pub fn finish_planning(&mut self, hero: Symbol) -> Result<()> {
+        if self.objects.is_some() {
+            return self.with_live_objects(|session, objects| {
+                session.finish_planning_bound(objects, hero)
+            });
+        }
         self.ensure_planning_effect_closure()?;
         let result = self.planning.finish(&mut self.world, hero);
         self.finish_planning_command(result)
@@ -5135,6 +5417,18 @@ impl NativeSession {
             RequestToken::Imported(id)
         }
     }
+    /// Trace-only model identities; never part of rule state or persisted IDs.
+    pub fn generated_step_objects(
+        &self,
+        bindings: &[crate::codec::ObjectBinding],
+    ) -> Result<Vec<(usize, usize)>> {
+        self.objects
+            .as_ref()
+            .ok_or_else(|| unsupported("trace object arena missing"))?
+            .arena
+            .generated_step_objects(bindings)
+            .map_err(unsupported)
+    }
     /// Compact outer boundary preserves physical instance aliases on restore.
     pub fn export_envelope(&self) -> Result<StateEnvelope> {
         let mut source = if let Some(objects) = &self.objects {
@@ -5175,7 +5469,7 @@ impl NativeSession {
                         let mut wire = self.steps[frame.instruction].wire.clone();
                         if let Some(values) = frame.effect.as_ref().and_then(|e| e.primary.as_ref())
                         {
-                            values.patch_wire(&mut wire, &self.symbols);
+                            values.patch_wire(&mut wire, &self.symbols, &self.primary_operands);
                             if matches!(&self.steps[frame.instruction].instruction,Instruction::Attack{spec,..} if spec.card_ranged){wire["is_ranged"]=json!(values.ranged);}
                         }
                         if let Some(cont)=&frame.continuation {patch_continuation(&mut wire,cont,&self.symbols);}
@@ -5455,14 +5749,56 @@ impl NativeSession {
     }
     fn request_json_base(&self, request: &NativeRequest) -> Value {
         let owner = request.controlled.unwrap_or(request.owner);
+        if let RequestChoices::Minions(values) = &request.choices {
+            return json!({"id":self.request_token(request.id),"request_type":"SELECT_OPTION","player_id":self.symbols.name(owner),"prompt":self.symbols.name(request.prompt),"options":values.iter().map(|(id,kind)|json!({"id":self.symbols.name(*id),"text":format!("{} Minion",match kind {crate::world::MinionKind::Melee=>"MELEE",crate::world::MinionKind::Ranged=>"RANGED",crate::world::MinionKind::Heavy=>"HEAVY"}),"metadata":{}})).collect::<Vec<_>>(),"can_skip":false,"can_rollback":false,"context":{},"decision_context":null});
+        }
+        if let RequestChoices::SpellCards {
+            values,
+            cast,
+            removed,
+            max,
+        } = &request.choices
+        {
+            return json!({"id":self.request_token(request.id),"request_type":"SELECT_CARD","player_id":self.symbols.name(owner),
+                "prompt":if *cast {"Choose a prepared spell to cast".to_owned()}else{format!("Find Familiar: remove up to three other prepared spells ({removed}/{max})")},
+                "options":values.iter().map(|id|{let d=&self.world.definitions.cards[self.world.card(*id).unwrap().definition];json!({"id":self.symbols.name(d.printed_id),"text":self.symbols.name(d.name),"metadata":{}})}).collect::<Vec<_>>(),
+                "can_skip":!*cast,"can_rollback":false,"context":{},"decision_context":if *cast {json!({"purpose":"cast_spell","actor_id":self.symbols.name(owner),"source_card_id":null,"choice_facts":{}})}else{Value::Null}});
+        }
         if let RequestChoices::Protection(cards) = &request.choices {
             return json!({"id":self.request_token(request.id),"request_type":"SELECT_CARD","player_id":self.symbols.name(owner),
                 "prompt":format!("Discard a card to protect {}?",self.symbols.name(request.prompt)),
                 "options":cards.iter().map(|id| {let d=&self.world.definitions.cards[self.world.card(*id).unwrap().definition]; json!({"id":self.symbols.name(d.printed_id),"text":self.symbols.name(d.name),"metadata":{"card_id":self.symbols.name(d.printed_id),"color":d.color.map(|id| self.symbols.name(id))}})}).collect::<Vec<_>>(),
                 "can_skip":true,"can_rollback":false,"context":{},"decision_context":{"purpose":"discard","actor_id":self.symbols.name(owner),"source_card_id":null,"choice_facts":{}}});
         }
+        if let RequestChoices::Runes(values) = &request.choices {
+            return json!({"id":self.request_token(request.id),"request_type":"SELECT_OPTION","player_id":self.symbols.name(owner),"prompt":self.symbols.name(request.prompt),"options":values.iter().map(|id| {let name=self.symbols.name(*id);let label=match name {"axe"=>"Axe","bird"=>"Bird","anvil"=>"Anvil","horn"=>"Horn",_=>name};json!({"id":name,"text":label,"metadata":{}})}).collect::<Vec<_>>(),"can_skip":false,"can_rollback":false,"context":{},"decision_context":{"purpose":"rune_selection","actor_id":self.symbols.name(owner),"source_card_id":null,"choice_facts":{}}});
+        }
         if let RequestChoices::Mines(options) = &request.choices {
             return json!({"id":self.request_token(request.id),"request_type":"SELECT_OPTION","player_id":self.symbols.name(owner),"prompt":"Choose which mines to move through","options":options.iter().enumerate().map(|(i,path)|json!({"id":i.to_string(),"text":format!("Path through {} mine(s)",path.mines.len()),"metadata":{"metadata":{"mine_count":path.mines.len(),"mine_hexes":path.mines.iter().filter_map(|id|self.world.position(*id)).collect::<Vec<_>>(),"path":path.path}}})).collect::<Vec<_>>(),"can_skip":false,"can_rollback":false,"context":{},"decision_context":null});
+        }
+        if let RequestChoices::PrimaryReplacement {
+            actor,
+            card,
+            primary,
+            replacement,
+        } = &request.choices
+        {
+            let mut facts = serde_json::Map::new();
+            let options = [
+                (*primary, "Primary", "primary"),
+                (*replacement, "Replacement", "replacement"),
+            ]
+            .into_iter()
+            .map(|(kind, label, role)| {
+                let name = kind.name();
+                facts.insert(
+                    name.into(),
+                    json!({"action_role":role,"defense_stat":null,"defense_kind":null}),
+                );
+                json!({"id":name,"text":format!("{label}: {name}"),"metadata":{"type":name}})
+            })
+            .collect::<Vec<_>>();
+            return json!({"id":self.request_token(request.id),"request_type":"CHOOSE_ACTION","player_id":self.symbols.name(owner),"prompt":self.symbols.name(request.prompt),"options":options,"can_skip":false,"can_rollback":false,"context":{},"decision_context":{"purpose":"action","actor_id":self.symbols.name(*actor),"source_card_id":self.symbols.name(*card),"choice_facts":facts}});
         }
         if let RequestChoices::Action(menu) = &request.choices {
             return menu.to_json(self.request_token(request.id), &self.symbols);
@@ -5507,7 +5843,7 @@ impl NativeSession {
                 "options":[],"can_skip":false,"can_rollback":false,"context":{"players":players,"supports_batch":true,"supports_preview":true},"decision_context":null});
         }
         let (kind,options)=match &request.choices {
-            RequestChoices::Protection(_) | RequestChoices::Mines(_) | RequestChoices::Defense(_) | RequestChoices::Action(_)|RequestChoices::Actors{..}|RequestChoices::Respawn{..}|RequestChoices::Upgrades(_)=>unreachable!(),
+            RequestChoices::Minions(_) | RequestChoices::SpellCards { .. } | RequestChoices::PrimaryReplacement { .. } | RequestChoices::Runes(_) | RequestChoices::Protection(_) | RequestChoices::Mines(_) | RequestChoices::Defense(_) | RequestChoices::Action(_)|RequestChoices::Actors{..}|RequestChoices::Respawn{..}|RequestChoices::Upgrades(_)=>unreachable!(),
             RequestChoices::ConfirmAction=>("CHOOSE_ACTION",vec![json!({"id":"CONFIRM","text":"Confirm","metadata":{}})]),
             RequestChoices::Multiple{values,..}=>("SELECT_UNIT",values.iter().map(|id|json!({"id":self.symbols.name(*id),"text":self.symbols.name(*id),"metadata":{}})).collect()),
             RequestChoices::Units {tokens,values}=>(if *tokens {"SELECT_UNIT_OR_TOKEN"}else{"SELECT_UNIT"},values.iter().map(|(id,label)|{
@@ -5599,6 +5935,39 @@ impl NativeSession {
             } => {
                 json!({"event_type":"TOKEN_REMOVED","actor_id":actor.map(|id|self.symbols.name(id)),"target_id":self.symbols.name(*token),"from_hex":from,"to_hex":null,"metadata":{"effects_removed":effects_removed}})
             }
+            NativeEvent::BoardEntityPlaced {
+                actor,
+                entity,
+                from,
+                to,
+                obstacle,
+            } => {
+                json!({"event_type":"BOARD_ENTITY_PLACED","actor_id":actor.map(|id|self.symbols.name(id)),"target_id":self.symbols.name(*entity),"from_hex":from,"to_hex":to,"metadata":{"entity_kind":"turret","is_obstacle":obstacle}})
+            }
+            NativeEvent::BoardEntityRemoved {
+                actor,
+                entity,
+                from,
+            } => {
+                json!({"event_type":"BOARD_ENTITY_REMOVED","actor_id":actor.map(|id|self.symbols.name(id)),"target_id":self.symbols.name(*entity),"from_hex":from,"to_hex":null,"metadata":{"entity_kind":"turret"}})
+            }
+            NativeEvent::TokenPlaced {
+                actor,
+                token,
+                to,
+                kind,
+            } => {
+                json!({"event_type":"TOKEN_PLACED","actor_id":actor.map(|id|self.symbols.name(id)),"target_id":self.symbols.name(*token),"from_hex":null,"to_hex":to,"metadata":{"token_type":self.symbols.name(*kind)}})
+            }
+            NativeEvent::TokenReplaced {
+                actor,
+                token,
+                from,
+                to,
+                kind,
+            } => {
+                json!({"event_type":"TOKEN_MOVED","actor_id":actor.map(|id|self.symbols.name(id)),"target_id":self.symbols.name(*token),"from_hex":from,"to_hex":to,"metadata":{"token_type":self.symbols.name(*kind),"replaced":true}})
+            }
             NativeEvent::TokenMoved {
                 actor,
                 token,
@@ -5620,6 +5989,36 @@ impl NativeSession {
                 collision,
             } => {
                 json!({"event_type":if *token{"TOKEN_PUSHED"}else{"UNIT_PUSHED"},"actor_id":actor.map(|id|self.symbols.name(id)),"target_id":self.symbols.name(*target),"from_hex":from,"to_hex":to,"metadata":{"distance":distance,"collision":collision}})
+            }
+            NativeEvent::GoldEffect {
+                actor,
+                target,
+                owner,
+                amount,
+                lost,
+            } => {
+                let mut metadata =
+                    json!({"amount":amount.to_json(&self.symbols),"reason":"effect"});
+                if *lost {
+                    metadata["owner_id"] = json!(self.symbols.name(*owner));
+                }
+                json!({"event_type":if *lost {"GOLD_LOST"} else {"GOLD_GAINED"},"actor_id":actor.map(|id|self.symbols.name(id)),"target_id":target.map(|id|self.symbols.name(id)),"from_hex":null,"to_hex":null,"metadata":metadata})
+            }
+            NativeEvent::Spell(event) => event.to_json(&self.symbols),
+            NativeEvent::CoinsStolen {
+                actor,
+                victim,
+                amount,
+            } => {
+                json!({"event_type":"GOLD_GAINED","actor_id":self.symbols.name(*actor),"target_id":self.symbols.name(*victim),"from_hex":null,"to_hex":null,"metadata":{"amount":amount.to_json(&self.symbols),"reason":"steal"}})
+            }
+            NativeEvent::LifeRestored {
+                hero,
+                team,
+                change,
+                remaining,
+            } => {
+                json!({"event_type":"LIFE_COUNTER_CHANGED","actor_id":self.symbols.name(*hero),"target_id":null,"from_hex":null,"to_hex":null,"metadata":{"team":self.symbols.name(*team),"change":change,"remaining":remaining,"reason":"life_counter_restored"}})
             }
             NativeEvent::Marker(event) => event.to_json(&self.symbols),
             NativeEvent::Combat(event) => event.to_json(&self.symbols),
@@ -5741,29 +6140,7 @@ fn compile_movement_sequence(
     let select = compile_step(&selection, steps, symbols)?;
     if let Instruction::Hex { filters, .. } = &mut steps[select].instruction {
         for filter in filters {
-            match filter {
-                HexFilter::Obstacle { exclude, .. } => {
-                    *exclude = Origin {
-                        frame: true,
-                        ..Default::default()
-                    }
-                }
-                HexFilter::Movement { origin, .. }
-                | HexFilter::Straight { origin, .. }
-                | HexFilter::ClearLine { origin, .. } => {
-                    *origin = Origin {
-                        frame: true,
-                        ..Default::default()
-                    }
-                }
-                HexFilter::FastTravel { .. }
-                | HexFilter::Spawn { .. }
-                | HexFilter::AdjacentSpawn { .. }
-                | HexFilter::AdjacentTags(_) => {}
-                HexFilter::Range { frame_range, .. } => {
-                    *frame_range = true;
-                }
-            }
+            filter.bind_frame();
         }
     }
     let mut movement = templates["templates"]["move_unit"].clone();
@@ -5846,7 +6223,11 @@ fn compile_primary_program(
             .iter()
             .enumerate()
             .map(|(index, wire)| {
+                let first = steps.len();
                 let id = compile_step(wire, steps, symbols)?;
+                for step in &mut steps[first..] {
+                    step.primary_template = true;
+                }
                 if source["ranged_steps"][name]
                     .as_array()
                     .is_some_and(|v| v.contains(&json!(index)))
@@ -5890,7 +6271,7 @@ fn bind_primary(
     v: &PrimaryValues,
     slots: &PrimaryOperands,
 ) -> Result<()> {
-    let number = |n: i64| PrimaryOperands::number(n, v).map_err(unsupported);
+    let number = |n: i64| slots.number(n, v).map_err(unsupported);
     match instruction {
         Instruction::Attack { spec, .. } => {
             if spec.card_ranged {
@@ -5945,7 +6326,7 @@ fn bind_primary(
 fn bind_primary_datum(value: &mut Datum, v: &PrimaryValues, slots: &PrimaryOperands) -> Result<()> {
     match value {
         Datum::Text(id) => *id = slots.symbol(*id, v),
-        Datum::Int(n) => *n = PrimaryOperands::number(*n, v).map_err(unsupported)?,
+        Datum::Int(n) => *n = slots.number(*n, v).map_err(unsupported)?,
         Datum::List(values) => {
             for value in values {
                 bind_primary_datum(value, v, slots)?;
@@ -6196,6 +6577,21 @@ fn compile_step(
         .as_str()
         .ok_or_else(|| unsupported("step lacks type"))?
     {
+        "cast_spell" => Instruction::LiveSpell(crate::spells::SpellOp::Cast),
+        "wish_sequence" => Instruction::LiveSpell(crate::spells::SpellOp::Wish),
+        "prepare_spellbook" => Instruction::LiveSpell(crate::spells::SpellOp::Prepare),
+        "remove_prepared_spells" => Instruction::LiveSpell(crate::spells::SpellOp::Remove),
+        "check_unit_filters" => Instruction::LiveCheckUnitFilters,
+        "check_distance" => Instruction::LiveDistanceCheck,
+        "check_unit_type" => Instruction::LiveUnitTypeCheck,
+        "combine_boolean_context" => Instruction::LiveBooleanCombine,
+        "respawn_minion_at_hex" => Instruction::LiveMinionRespawn,
+        "count_cards" => Instruction::LiveCardCount,
+        "check_hero_defeated_this_round" => Instruction::LiveRoundDefeat,
+        "gain_coins" | "lose_coins" | "restore_spent_life_counter" | "steal_coins" => {
+            Instruction::LiveResource
+        }
+        "perform_card_action" => Instruction::LivePerformCard,
         "find_next_actor" => Instruction::Flow(crate::turn::FlowStep::Next),
         "finalize_hero_turn" => Instruction::Flow(crate::turn::FlowStep::Finalize(
             required_symbol(raw, "hero_id", symbols)?,
@@ -6988,6 +7384,7 @@ fn compile_step(
             .unwrap_or_default(),
     };
     steps.push(CompiledStep {
+        primary_template: false,
         conditions,
         instruction,
         wire: raw.clone(),
@@ -7164,6 +7561,90 @@ fn bind_passive_owner(value: &mut Value, owner: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn dense_candidate_count_cleans_null_before_selector_or_query_output() {
+        for kind in ["select_step", "multi_select", "count"] {
+            for target in ["UNIT", "HEX"] {
+                if kind == "multi_select" && target == "HEX" {
+                    continue;
+                }
+                for output in ["result", "_cmf_origin_hex"] {
+                    let mut envelope = source("action-execution-Min-HOLD");
+                    envelope.state["execution_stack"] = json!([{
+                        "type":kind, "target_type":target, "step_id":"dense-count-cleanup",
+                        "prompt":"Choose counted candidate", "output_key":output,
+                        "min_selections":1, "max_selections":2,
+                        "filters":[{"type":"count_match_filter", "min_count":0, "sub_filters":[]}]
+                    }]);
+                    envelope.state["execution_context"] = json!({"_cmf_origin_hex":null});
+                    let mut worker = NativeSession::compile(envelope).unwrap();
+                    assert!(worker.objects.is_none());
+                    let result = worker.advance_prefix(1).unwrap();
+                    let state = worker.semantic_state().unwrap();
+                    let origin = state["execution_context"].get("_cmf_origin_hex");
+                    if kind == "count" && output == "_cmf_origin_hex" {
+                        assert!(origin.unwrap().as_i64().unwrap() > 0);
+                    } else {
+                        assert!(origin.is_none(), "{kind} {target} {output}: {state}");
+                        assert!(kind == "count" || result.request.is_some());
+                    }
+                }
+            }
+        }
+    }
+    #[test]
+    fn inert_wasp_query_templates_import_but_reached_dense_queries_guard_before_pop() {
+        for kind in ["check_unit_type", "combine_boolean_context"] {
+            for active in [false, true] {
+                let mut envelope = source("action-execution-Min-HOLD");
+                envelope.state["execution_stack"] = json!([{
+                    "type":kind, "step_id":"dense-wasp-query", "active_if_key":"enabled",
+                    "unit_key":"subject", "expected_type":"HERO", "key_a":"left", "key_b":"right",
+                    "operation":"AND", "output_key":"query_result"
+                }]);
+                envelope.state["execution_context"] =
+                    json!({"enabled":active,"subject":"hero_min"});
+                let mut worker = NativeSession::compile(envelope).unwrap();
+                let before = worker.semantic_state().unwrap();
+                if active {
+                    assert!(
+                        worker
+                            .advance_prefix(1)
+                            .unwrap_err()
+                            .to_string()
+                            .contains("authoritative object bindings")
+                    );
+                    assert_eq!(worker.semantic_state().unwrap(), before);
+                } else {
+                    worker.advance_prefix(1).unwrap();
+                    assert!(worker.stack.is_empty());
+                }
+            }
+        }
+    }
+    #[test]
+    fn inert_distance_templates_import_but_reached_dense_distance_is_guarded_before_pop() {
+        for active in [false, true] {
+            let mut envelope = source("action-execution-Min-HOLD");
+            envelope.state["execution_stack"] = json!([{
+                "type":"check_distance", "step_id":"dense-distance", "active_if_key":"enabled",
+                "unit_a_id":"hero_min", "unit_b_id":"hero_hanu", "operator":"==", "threshold":1,
+                "output_key":"distance_result"
+            }]);
+            envelope.state["execution_context"] = json!({"enabled":active});
+            let mut worker = NativeSession::compile(envelope).unwrap();
+            let before = worker.semantic_state().unwrap();
+            if active {
+                assert!(
+                    matches!(worker.advance(&ExecutionBudget::default()),Err(EngineError::Unsupported(message)) if message.contains("authoritative object bindings"))
+                );
+                assert_eq!(worker.semantic_state().unwrap(), before);
+            } else {
+                worker.advance(&ExecutionBudget::default()).unwrap();
+                assert!(worker.stack.is_empty());
+            }
+        }
+    }
     fn source(name: &str) -> StateEnvelope {
         #[derive(serde::Deserialize)]
         struct Entry {
@@ -7286,7 +7767,7 @@ mod tests {
             if definition.fields["id"] == "noble_blade" {
                 definition
                     .fields
-                    .insert("effect_id".into(), json!("spell_break"));
+                    .insert("effect_id".into(), json!("angry_roar"));
             }
         }
         let mut unported = NativeSession::compile(envelope).unwrap();
@@ -7310,6 +7791,211 @@ mod tests {
         assert!(
             matches!(unported.advance(&ExecutionBudget::default()),Err(EngineError::Unsupported(message)) if message.contains("primary card effect"))
         );
+    }
+
+    #[test]
+    fn unexecuted_primary_effect_catalog_does_not_block_min_actions() {
+        let mut worker = NativeSession::compile(source("action-execution-Min-HOLD")).unwrap();
+        let request = worker
+            .advance(&ExecutionBudget::default())
+            .unwrap()
+            .request
+            .unwrap();
+        let hold = worker.import_selection(&json!("HOLD")).unwrap();
+        worker.submit(request.id, hold).unwrap();
+        worker.advance(&ExecutionBudget::default()).unwrap();
+    }
+    #[test]
+    fn reached_primary_effect_keeps_the_unsafe_blast_mine_combination_guarded_before_pop() {
+        let root = NativeSession::compile(source("action-execution-Min-HOLD")).unwrap();
+        assert!(root.primary_blast_guard);
+        let indices = root
+            .steps
+            .iter()
+            .enumerate()
+            .filter_map(|(index, step)| {
+                (step.primary_template && matches!(step.instruction, Instruction::CreateEffect(_)))
+                    .then_some(index)
+            })
+            .collect::<Vec<_>>();
+        assert!(!indices.is_empty());
+        for index in indices {
+            let mut worker = root.clone();
+            if let Some(key) = worker.steps[index].conditions.active {
+                worker.context.set(key, Datum::Bool(true));
+            }
+            if let Some(key) = worker.steps[index].conditions.skip {
+                worker.context.set(key, Datum::Null);
+            }
+            worker.stack = vec![worker.steps[index].initial.clone()];
+            let before = worker.semantic_state().unwrap();
+            assert!(
+                matches!(worker.advance(&ExecutionBudget::default()),Err(EngineError::Unsupported(message)) if message.contains("blast mine dynamically-created effect closure not compiled"))
+            );
+            assert_eq!(worker.semantic_state().unwrap(), before);
+            assert_eq!(worker.stack.len(), 1);
+        }
+    }
+
+    #[test]
+    fn inert_copied_primary_templates_import_but_reached_dense_copy_is_guarded_before_pop() {
+        let root = NativeSession::compile(source("action-execution-Min-HOLD")).unwrap();
+        let index = root
+            .steps
+            .iter()
+            .position(|step| {
+                step.primary_template && matches!(step.instruction, Instruction::LivePerformCard)
+            })
+            .unwrap();
+        for enabled in [false, true] {
+            let mut worker = root.clone();
+            let key = worker.steps[index].conditions.active.unwrap();
+            worker.context.set(key, Datum::Bool(enabled));
+            worker.stack = vec![worker.steps[index].initial.clone()];
+            let before = worker.semantic_state().unwrap();
+            if enabled {
+                assert!(
+                    matches!(worker.advance(&ExecutionBudget::default()), Err(EngineError::Unsupported(message)) if message.contains("copied-card action requires authoritative object bindings"))
+                );
+                assert_eq!(worker.semantic_state().unwrap(), before);
+                assert_eq!(worker.stack.len(), 1);
+            } else {
+                worker.advance(&ExecutionBudget::default()).unwrap();
+                assert!(worker.stack.is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn inert_resource_templates_import_but_reached_dense_theft_stays_guarded_before_pop() {
+        let root = NativeSession::compile(source("action-execution-Min-HOLD")).unwrap();
+        let index = root
+            .steps
+            .iter()
+            .position(|step| {
+                step.primary_template && matches!(step.instruction, Instruction::LiveResource)
+            })
+            .unwrap();
+        for enabled in [false, true] {
+            let mut worker = root.clone();
+            let key = worker.steps[index].conditions.active.unwrap();
+            worker.context.set(key, Datum::Bool(enabled));
+            worker.stack = vec![worker.steps[index].initial.clone()];
+            let before = worker.semantic_state().unwrap();
+            if enabled {
+                assert!(
+                    matches!(worker.advance(&ExecutionBudget::default()),Err(EngineError::Unsupported(message)) if message.contains("resource step requires authoritative object bindings"))
+                );
+                assert_eq!(worker.semantic_state().unwrap(), before);
+                assert_eq!(worker.stack.len(), 1);
+            } else {
+                worker.advance(&ExecutionBudget::default()).unwrap();
+                assert!(worker.stack.is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn inert_card_and_round_queries_import_but_reached_dense_queries_are_guarded_before_pop() {
+        let root = NativeSession::compile(source("action-execution-Min-HOLD")).unwrap();
+        let indices: Vec<_> = root
+            .steps
+            .iter()
+            .enumerate()
+            .filter_map(|(i, step)| {
+                (step.primary_template
+                    && matches!(
+                        step.instruction,
+                        Instruction::LiveCardCount | Instruction::LiveRoundDefeat
+                    ))
+                .then_some(i)
+            })
+            .collect();
+        assert!(indices.len() >= 3);
+        for index in indices {
+            for enabled in [false, true] {
+                let mut worker = root.clone();
+                let key = Arc::make_mut(&mut worker.symbols).intern("query_enabled");
+                Arc::make_mut(&mut worker.steps)[index].conditions.active = Some(key);
+                Arc::make_mut(&mut worker.steps)[index].conditions.skip = None;
+                worker.context.set(key, Datum::Bool(enabled));
+                worker.stack = vec![worker.steps[index].initial.clone()];
+                let before = worker.semantic_state().unwrap();
+                if enabled {
+                    assert!(
+                        matches!(worker.advance(&ExecutionBudget::default()), Err(EngineError::Unsupported(message)) if message.contains("card and round queries require authoritative object bindings"))
+                    );
+                    assert_eq!(worker.semantic_state().unwrap(), before);
+                    assert_eq!(worker.stack.len(), 1);
+                } else {
+                    worker.advance(&ExecutionBudget::default()).unwrap();
+                    assert!(worker.stack.is_empty());
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn inert_spell_lifecycle_templates_import_but_reached_dense_operations_are_guarded_before_pop()
+    {
+        for name in [
+            "cast_spell",
+            "wish_sequence",
+            "prepare_spellbook",
+            "remove_prepared_spells",
+        ] {
+            for enabled in [false, true] {
+                let mut envelope = source("action-execution-Min-HOLD");
+                let mut wire = combat_template(name).unwrap();
+                wire["active_if_key"] = json!("spell_enabled");
+                envelope.state["execution_stack"] = json!([wire]);
+                envelope.state["execution_context"]["spell_enabled"] = json!(enabled);
+                let mut worker = NativeSession::compile(envelope).unwrap();
+                let before = worker.semantic_state().unwrap();
+                if enabled {
+                    assert!(
+                        matches!(worker.advance(&ExecutionBudget::default()),Err(EngineError::Unsupported(message)) if message.contains("spell lifecycle requires authoritative object bindings"))
+                    );
+                    assert_eq!(worker.semantic_state().unwrap(), before);
+                    assert_eq!(worker.stack.len(), 1);
+                } else {
+                    worker.advance(&ExecutionBudget::default()).unwrap();
+                    assert!(worker.stack.is_empty());
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn inert_spell_rule_primitives_import_but_reached_dense_queries_and_respawns_are_guarded_before_pop()
+     {
+        let data: Value =
+            serde_json::from_str(include_str!("../../../tests/fixtures/spell-builders.json"))
+                .unwrap();
+        for wire in [
+            &data["recipes"]["disintegrate"][1]["fields"],
+            &data["recipes"]["create_undead"][0]["fields"],
+        ] {
+            for enabled in [false, true] {
+                let mut envelope = source("action-execution-Min-HOLD");
+                let mut wire = wire.clone();
+                wire["active_if_key"] = json!("spell_rule_enabled");
+                envelope.state["execution_stack"] = json!([wire]);
+                envelope.state["execution_context"]["spell_rule_enabled"] = json!(enabled);
+                let mut worker = NativeSession::compile(envelope).unwrap();
+                let before = worker.semantic_state().unwrap();
+                if enabled {
+                    assert!(
+                        matches!(worker.advance(&ExecutionBudget::default()),Err(EngineError::Unsupported(message)) if message.contains("authoritative object bindings"))
+                    );
+                    assert_eq!(worker.semantic_state().unwrap(), before);
+                    assert_eq!(worker.stack.len(), 1);
+                } else {
+                    worker.advance(&ExecutionBudget::default()).unwrap();
+                    assert!(worker.stack.is_empty());
+                }
+            }
+        }
     }
 
     #[test]
@@ -8570,9 +9256,10 @@ mod tests {
     fn effect_reaction_and_illusion_traces_restore_every_instruction() {
         let base =
             std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures"));
-        let index: Value =
-            serde_json::from_reader(std::fs::File::open(base.join("stack-traces.json")).unwrap())
-                .unwrap();
+        let index: Value = serde_json::from_reader(std::io::BufReader::new(
+            std::fs::File::open(base.join("stack-traces.json")).unwrap(),
+        ))
+        .unwrap();
         let names = index["cases"]
             .as_array()
             .unwrap()
@@ -8692,9 +9379,10 @@ mod tests {
     fn effect_targeting_pre_actions_and_projectiles_restore_every_instruction() {
         let base =
             std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures"));
-        let index: Value =
-            serde_json::from_reader(std::fs::File::open(base.join("stack-traces.json")).unwrap())
-                .unwrap();
+        let index: Value = serde_json::from_reader(std::io::BufReader::new(
+            std::fs::File::open(base.join("stack-traces.json")).unwrap(),
+        ))
+        .unwrap();
         let names = index["cases"]
             .as_array()
             .unwrap()
@@ -9014,7 +9702,7 @@ mod tests {
         assert_eq!(restored.request_json(&again), wire);
     }
     #[test]
-    fn unported_effect_fast_travel_filter_rejects_before_any_resolution() {
+    fn effect_fast_travel_filter_compiles_and_keeps_stack_order() {
         let mut envelope = source("movement-sequence-base-plain-normal");
         let filter =
             crate::templates::instructions().unwrap()["templates"]["travel_filter"].clone();
@@ -9022,9 +9710,13 @@ mod tests {
             {"type":"select_step","target_type":"HEX","prompt":"Unported travel","output_key":"choice","filters":[filter],"step_id":"fixture/unsafe-effect-travel"},
             {"type":"set_context_flag","key":"before","value":true,"step_id":"fixture/unsafe-before"}
         ]);
-        assert!(
-            matches!(NativeSession::compile(envelope),Err(EngineError::Unsupported(message)) if message.contains("Fast Travel action/topology effect closure"))
+        let mut session = NativeSession::compile(envelope).unwrap();
+        session.advance_prefix(1).unwrap();
+        assert_eq!(
+            session.semantic_state().unwrap()["execution_context"]["before"],
+            true
         );
+        session.advance_prefix(1).unwrap();
     }
     #[test]
     fn effect_aware_movement_restores_at_every_instruction() {
@@ -9411,9 +10103,10 @@ mod tests {
     fn effect_aware_cleanup_upgrades_and_reset_restore_every_instruction() {
         let base =
             std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures"));
-        let index: Value =
-            serde_json::from_reader(std::fs::File::open(base.join("stack-traces.json")).unwrap())
-                .unwrap();
+        let index: Value = serde_json::from_reader(std::io::BufReader::new(
+            std::fs::File::open(base.join("stack-traces.json")).unwrap(),
+        ))
+        .unwrap();
         let names = index["cases"]
             .as_array()
             .unwrap()
@@ -9831,9 +10524,10 @@ mod tests {
     fn effect_aware_battles_restore_every_instruction() {
         let base =
             std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures"));
-        let index: Value =
-            serde_json::from_reader(std::fs::File::open(base.join("stack-traces.json")).unwrap())
-                .unwrap();
+        let index: Value = serde_json::from_reader(std::io::BufReader::new(
+            std::fs::File::open(base.join("stack-traces.json")).unwrap(),
+        ))
+        .unwrap();
         let names = index["cases"]
             .as_array()
             .unwrap()
@@ -9951,9 +10645,10 @@ mod tests {
     fn effect_aware_minion_returns_restore_every_instruction() {
         let base =
             std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures"));
-        let index: Value =
-            serde_json::from_reader(std::fs::File::open(base.join("stack-traces.json")).unwrap())
-                .unwrap();
+        let index: Value = serde_json::from_reader(std::io::BufReader::new(
+            std::fs::File::open(base.join("stack-traces.json")).unwrap(),
+        ))
+        .unwrap();
         let names = index["cases"]
             .as_array()
             .unwrap()

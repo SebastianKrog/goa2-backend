@@ -5,7 +5,7 @@ from __future__ import annotations
 from state_codec import export_state
 
 
-def cases(advance, answer, active_projectiles=False):
+def cases(advance, answer, active_projectiles=False, emit=None):
     from model_traces import setup
     from stack_traces import reference_trace
 
@@ -57,6 +57,9 @@ def cases(advance, answer, active_projectiles=False):
         for i, step in enumerate(steps):
             step.step_id = f"fixture/card-select/{name}/{i}"
         push_steps(state, steps)
+        if emit is not None:
+            emit(name, state, ops)
+            return
         result.append(
             {
                 "name": f"card-select-{name}",

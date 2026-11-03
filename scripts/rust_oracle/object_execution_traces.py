@@ -7,12 +7,16 @@ import copy
 import json
 from pathlib import Path
 
-from oracle import ROOT, Worker, digest, verify_sources
+from oracle import ROOT, Worker, verify_sources
 from shared_objects import export_state_with_shared_objects, instance_bindings
-from stack_traces import TraceNormalizer, read_case, read_index, write_corpus
+from stack_traces import TraceNormalizer, read_case, read_index, write_corpus_stream
 
 
 class ObjectTraceNormalizer(TraceNormalizer):
+    def __init__(self, unordered_keys=()):
+        super().__init__()
+        self.unordered_keys = tuple(unordered_keys)
+
     def bind_originals(self, bindings, objects):
         self.original_step_ids = {
             obj.step_id
@@ -22,6 +26,19 @@ class ObjectTraceNormalizer(TraceNormalizer):
 
     def record(self, record, live_steps=None):
         record = copy.deepcopy(record)
+        generated_rows = record.pop("generated_step_objects", None)
+        generated_objects = dict(generated_rows) if generated_rows is not None else None
+        if generated_objects is not None and (
+            len(generated_objects) != len(generated_rows)
+            or len(set(generated_objects.values())) != len(generated_objects)
+            or any(
+                index < 0
+                or index >= len(record["object_bindings"])
+                or record["object_bindings"][index]["kind"] != "step"
+                for index in generated_objects
+            )
+        ):
+            raise ValueError("invalid native generated-object identity metadata")
         if record["request"] is not None:
             record["request"]["id"] = self.request_id(record["request"]["id"])
         # Only typed step bindings carry request IDs. Do not rewrite matching
@@ -44,14 +61,24 @@ class ObjectTraceNormalizer(TraceNormalizer):
                     value = value[part]
                 if generated is not None:
                     value["step_id"] = generated
-                elif live_steps is None and str(value.get("step_id", "")).startswith(
-                    "native-step-"
+                elif live_steps is None and (
+                    index in generated_objects
+                    if generated_objects is not None
+                    else str(value.get("step_id", "")).startswith("native-step-")
                 ):
-                    step_id = value["step_id"]
+                    step_id = (
+                        generated_objects[index]
+                        if generated_objects is not None
+                        else value["step_id"]
+                    )
                     if step_id not in self.steps:
                         self.steps[step_id] = f"dynamic-step/{len(self.steps)+1}"
                     value["step_id"] = self.steps[step_id]
                 value["pending_request_id"] = self.request_id(value["pending_request_id"])
+        if self.unordered_keys:
+            from mine_traces import normalize_choice_record
+
+            normalize_choice_record(record, self.unordered_keys)
         return record
 
 
@@ -63,7 +90,11 @@ def scenes():
     from goa2.domain.models import GamePhase, TargetType
     from goa2.domain.models.effect import EffectType
     from goa2.engine.steps import SelectStep
-    from goa2.engine.steps.utility import AddContextValueStep, RecordTargetStep, SetContextFlagStep
+    from goa2.engine.steps.utility import (
+        AddContextValueStep,
+        RecordTargetStep,
+        SetContextFlagStep,
+    )
 
     def base(red=None):
         state = setup(red=red)
@@ -154,14 +185,20 @@ def scenes():
     )
     state.execution_stack = [setter, record]
     state.execution_context = {"target": 2, "history": setter.value}
-    yield "live-set-payload", state, [{"kind": "advance_prefix", "steps": 1}, {"kind": "advance"}]
+    yield "live-set-payload", state, [
+        {"kind": "advance_prefix", "steps": 1},
+        {"kind": "advance"},
+    ]
     state = base()
     record = RecordTargetStep(
         step_id="fixture/objects/new-record", input_key="target", output_list_key="history"
     )
     state.execution_stack = [record, record]
     state.execution_context = {"target": {"nested": [1]}}
-    yield "new-shared-list", state, [{"kind": "advance_prefix", "steps": 1}, {"kind": "advance"}]
+    yield "new-shared-list", state, [
+        {"kind": "advance_prefix", "steps": 1},
+        {"kind": "advance"},
+    ]
     for value in (True, 1.5, "not a number", [4]):
         state = base()
         state.execution_stack = [
@@ -176,6 +213,1252 @@ def scenes():
     yield from scheduled_effect_scenes(base)
     yield from turn_boundary_scenes(base)
     yield from revelation_scenes(base)
+    yield from planning_command_scenes(base)
+    yield from card_planning_scenes(base)
+    yield from confirmation_scenes(base)
+    yield from finalization_scenes(base)
+    yield from piece_planning_scenes(base)
+    yield from minion_return_scenes(base)
+    yield from placement_scenes(base)
+    yield from movement_scenes(base)
+    yield from live_mine_scenes(base)
+    yield from forced_discard_scenes(base)
+    yield from card_selection_scenes(base)
+    yield from discard_scenes(base)
+    from live_passive_traces import scenes as passive_scenes
+
+    yield from passive_scenes()
+    from live_passive_body_traces import scenes as passive_body_scenes
+
+    yield from passive_body_scenes()
+    from live_rune_traces import scenes as rune_scenes
+
+    yield from rune_scenes()
+    from live_spatial_traces import scenes as spatial_scenes
+
+    yield from spatial_scenes()
+    from live_unit_traces import scenes as unit_scenes
+
+    yield from unit_scenes()
+    from live_query_traces import scenes as query_scenes
+
+    yield from query_scenes()
+    from live_retrieval_traces import scenes as retrieval_scenes
+
+    yield from retrieval_scenes()
+    from live_token_traces import scenes as token_scenes
+
+    yield from token_scenes()
+    from live_token_path_traces import scenes as token_path_scenes
+
+    yield from token_path_scenes()
+    from live_token_batch_traces import scenes as token_batch_scenes
+
+    yield from token_batch_scenes()
+    from live_rock_ultimate_traces import scenes as rock_ultimate_scenes
+
+    yield from rock_ultimate_scenes()
+    from live_turret_traces import scenes as turret_scenes
+
+    yield from turret_scenes()
+    from live_multi_selection_traces import scenes as multi_selection_scenes
+
+    yield from multi_selection_scenes()
+    from live_defeat_traces import scenes as defeat_scenes
+
+    yield from defeat_scenes()
+    from live_combat_resolution_traces import scenes as combat_resolution_scenes
+
+    yield from combat_resolution_scenes()
+
+    from live_attack_sequence_traces import scenes as attack_sequence_scenes
+
+    yield from attack_sequence_scenes()
+
+    from live_reaction_traces import scenes as reaction_scenes
+
+    yield from reaction_scenes()
+
+    from live_pre_action_traces import scenes as pre_action_scenes
+
+    yield from pre_action_scenes()
+    from live_swap_traces import scenes as swap_scenes
+
+    yield from swap_scenes()
+    from live_marker_traces import scenes as marker_scenes
+
+    yield from marker_scenes()
+    from live_effect_creation_traces import scenes as effect_creation_scenes
+
+    yield from effect_creation_scenes()
+    from live_defense_body_traces import scenes as defense_body_scenes
+
+    yield from defense_body_scenes()
+    from live_resource_traces import scenes as resource_scenes
+
+    yield from resource_scenes()
+    from live_primary_body_traces import scenes as primary_body_scenes
+
+    yield from primary_body_scenes()
+    from live_utility_traces import scenes as utility_scenes
+
+    yield from utility_scenes()
+    from live_push_traces import scenes as push_scenes
+
+    yield from push_scenes()
+    from live_card_action_traces import scenes as card_action_scenes
+
+    yield from card_action_scenes()
+    from live_travel_traces import scenes as travel_scenes
+
+    yield from travel_scenes()
+    from live_perform_primary_traces import scenes as perform_primary_scenes
+
+    yield from perform_primary_scenes()
+    from live_arien_primary_traces import scenes as arien_primary_scenes
+
+    yield from arien_primary_scenes()
+    from live_perform_card_traces import scenes as perform_card_scenes
+
+    yield from perform_card_scenes()
+    from live_mind_grip_traces import scenes as mind_grip_scenes
+
+    yield from mind_grip_scenes()
+    from live_tigerclaw_primary_traces import scenes as tigerclaw_primary_scenes
+
+    yield from tigerclaw_primary_scenes()
+    from live_brogan_primary_traces import (
+        protection_scenes as brogan_protection_scenes,
+    )
+    from live_brogan_primary_traces import (
+        query_scenes as brogan_query_scenes,
+    )
+    from live_brogan_primary_traces import (
+        scenes as brogan_primary_scenes,
+    )
+
+    yield from brogan_primary_scenes()
+    yield from brogan_query_scenes()
+    yield from brogan_protection_scenes()
+    from live_spellbook_traces import scenes as spellbook_scenes
+
+    yield from spellbook_scenes()
+    from live_spell_body_traces import (
+        extra_scenes as spell_body_extra_scenes,
+    )
+    from live_spell_body_traces import (
+        scenes as spell_body_scenes,
+    )
+    from live_spell_primitive_traces import scenes as spell_primitive_scenes
+
+    yield from spell_body_scenes()
+    yield from spell_body_extra_scenes()
+    yield from spell_primitive_scenes()
+    from live_gydion_primary_traces import scenes as gydion_primary_scenes
+
+    yield from gydion_primary_scenes()
+    from live_misa_geometry_traces import scenes as misa_geometry_scenes
+    from live_misa_primary_traces import scenes as misa_primary_scenes
+
+    yield from misa_primary_scenes()
+    yield from misa_geometry_scenes()
+    from live_wasp_primary_traces import (
+        query_scenes as wasp_query_scenes,
+    )
+    from live_wasp_primary_traces import (
+        scenes as wasp_primary_scenes,
+    )
+
+    yield from wasp_primary_scenes()
+    yield from wasp_query_scenes()
+
+
+def live_choice_operations(state, mode="first", stop_types=("offer_passive",)):
+    """Drive real one-step boundaries up to the next unbound consumer."""
+    from goa2.domain.input import InputResponse, selection_value
+    from goa2.engine.handler import process_stack, submit_input
+
+    probe = copy.deepcopy(state)
+    result = []
+    bad = False
+    for _ in range(80):
+        if not probe.execution_stack or probe.execution_stack[-1].type.value in stop_types:
+            return result
+        remaining = 1
+
+        def boundary(_state, _step):
+            nonlocal remaining
+            if not remaining:
+                return True
+            remaining -= 1
+            return False
+
+        output = process_stack(probe, stop_before_step=boundary)
+        result.append({"kind": "advance_prefix", "steps": 1})
+        if output.input_request:
+            request = output.input_request
+            if mode in ("invalid", "numeric") and not bad:
+                selection = "invalid" if mode == "invalid" else 0
+                bad = True
+            else:
+                option = request.options[-1] if mode == "last" else request.options[0]
+                selection = (
+                    option.id
+                    if request.prompt == "Choose which mines to move through"
+                    else selection_value(option)
+                )
+            submit_input(probe, InputResponse(request_id=request.id, selection=selection))
+            result.append({"kind": "input", "selection": selection})
+    raise AssertionError("live choice scene did not reach its boundary")
+
+
+def discard_scenes(base):
+    """Primitive boundaries use registered cards and the actual source discard."""
+    from combat_effect_traces import effect
+
+    from goa2.domain.models import CardContainerType, CardState
+    from goa2.domain.models.effect import EffectType
+    from goa2.engine.steps.cards import DiscardCardStep
+    from goa2.engine.steps.utility import SetContextFlagStep
+
+    variants = (
+        "hand",
+        "played",
+        "current",
+        "fallback-played",
+        "fallback-hand",
+        "deck-fallback",
+        "missing-hero",
+        "no-hero",
+        "no-card",
+        "missing-card",
+        "context",
+        "literal-wins",
+        "equal-current",
+        "revision-current",
+        "metadata-current",
+        "metadata-order-current",
+        "equal-earlier-played",
+        "shared-hand-discard",
+        "cross-hero-hand",
+        "shared-discard",
+        "effects",
+        "effects-global-first",
+        "log-existing",
+        "log-shared",
+        "skipped",
+    )
+    for variant in variants:
+        state = base()
+        hero = state.get_hero("hero_arien")
+        other = state.get_hero("hero_hanu")
+        card = hero.hand[0]
+        card.is_active = True
+        step = DiscardCardStep(
+            step_id="fixture/discard/" + variant, hero_id=str(hero.id), card_id=card.id
+        )
+        if variant in {
+            "played",
+            "fallback-played",
+            "equal-current",
+            "revision-current",
+            "metadata-current",
+            "metadata-order-current",
+            "equal-earlier-played",
+        }:
+            hero.hand.remove(card)
+            card.state = CardState.RESOLVED
+            card.is_facedown = False
+            hero.played_cards = [card]
+            if variant != "fallback-played":
+                step.source = CardContainerType.PLAYED
+        if variant == "current":
+            hero.hand.remove(card)
+            card.state = CardState.UNRESOLVED
+            card.initiative_override = 15
+            hero.current_turn_card = card
+            step.source = CardContainerType.PLAYED
+        if variant == "fallback-hand":
+            step.source = CardContainerType.PLAYED
+        if variant == "deck-fallback":
+            step.source = CardContainerType.DECK
+        if variant == "missing-hero":
+            step.hero_id = "hero_missing"
+        if variant == "no-hero":
+            step.hero_id = None
+        if variant == "no-card":
+            step.card_id = None
+        if variant == "missing-card":
+            step.card_id = "card_missing"
+        if variant == "context":
+            step.hero_id = step.card_id = None
+            step.hero_key, step.card_key = "who", "which"
+            state.execution_context.update(who=str(hero.id), which=card.id)
+        if variant == "literal-wins":
+            step.hero_key, step.card_key = "who", "which"
+            state.execution_context.update(who="hero_missing", which="card_missing")
+        if variant in {
+            "equal-current",
+            "revision-current",
+            "metadata-current",
+            "metadata-order-current",
+        }:
+            clone = card.model_copy(deep=True)
+            hero.current_turn_card = clone
+            if variant == "revision-current":
+                clone._definition_revision += 1
+            if variant == "metadata-current":
+                clone.metadata = {"different": True}
+            if variant == "metadata-order-current":
+                card.metadata = {"a": 1, "b": [2]}
+                clone.metadata = {"b": [2.0], "a": True}
+            state.execution_context["current_alias"] = clone
+        if variant == "equal-earlier-played":
+            clone = card.model_copy(deep=True)
+            hero.played_cards = [None, clone, card]
+            state.execution_context["later_alias"] = card
+        if variant == "shared-hand-discard":
+            hero.discard_pile = hero.hand
+        if variant == "cross-hero-hand":
+            other.hand = hero.hand
+        if variant == "shared-discard":
+            other.discard_pile = hero.discard_pile
+        if variant in {"effects", "effects-global-first"}:
+            unrelated = hero.hand[1]
+            rows = [
+                effect(state, "same-id", EffectType.DELAYED_TRIGGER, source_card_id=c.id)
+                for c in (card, unrelated, card)
+            ]
+            for row in rows:
+                row.finishing_steps = [
+                    SetContextFlagStep(
+                        step_id="fixture/discard/not-run", key="finishing_ran", value=True
+                    )
+                ]
+            state.active_effects = rows
+            if variant == "effects-global-first":
+                clone = card.model_copy(deep=True)
+                hero.current_turn_card = clone
+                state.execution_context["global_first_alias"] = clone
+        if variant in {"log-existing", "log-shared"}:
+            state.record_public_revealed_card(hero.id, card.id)
+            state.turn_discard_log[hero.id] = [card.id]
+            state.execution_context["log_alias"] = state.turn_discard_log[hero.id]
+            if variant == "log-shared":
+                state.turn_discard_log[other.id] = state.turn_discard_log[hero.id]
+        if variant == "skipped":
+            step.skip_if_key = "skip"
+            state.execution_context["skip"] = True
+        state.execution_context.update(
+            card_alias=card,
+            hand_alias=hero.hand,
+            played_alias=hero.played_cards,
+            discard_alias=hero.discard_pile,
+            old_effects=state.active_effects,
+            step_alias=step,
+        )
+        state.execution_stack = [step]
+        yield "discard-" + variant, state, [{"kind": "advance_prefix", "steps": 1}]
+
+
+def card_selection_scenes(base):
+    """Reuse the complete registered-roster selector matrix with live aliases."""
+    from card_selection_traces import cases
+
+    collected = []
+
+    def capture(name, state, operations):
+        if not all(
+            step.type.value == "set_context_flag"
+            or (step.type.value == "select_step" and step.target_type.value == "CARD")
+            for step in state.execution_stack
+        ):
+            return
+        step = next(step for step in state.execution_stack if step.type.value == "select_step")
+        state.execution_context["selector"] = step
+        state.execution_context["pending_alias"] = step.pending_input
+        state.execution_context["locations_alias"] = state.entity_locations
+        collected.append(("card-selector-" + name, state, operations))
+
+    def answer(selection, token="current"):
+        return {"kind": "input", "request_id": token, "selection": selection}
+
+    cases({"kind": "advance"}, answer, emit=capture)
+    yield from collected
+
+
+def forced_discard_scenes(base):
+    """Source forced-discard expansion, before its card consumer executes."""
+    from discard_effect_traces import state_for
+
+    from goa2.engine.handler import push_steps
+    from goa2.engine.steps import ForceDiscardStep, SetContextFlagStep
+
+    variants = [
+        "plain",
+        "current",
+        "current-facedown",
+        "facedown",
+        "duplicate",
+        "missing-card",
+        "inactive",
+        "old-active",
+        "wrong-source",
+        "empty-card",
+        "off-scope",
+        "multiple",
+        "linked-expiry",
+        "empty-hand",
+        "no-basic",
+        "basic",
+        "non-basic",
+        "immune",
+        "friendly-immunity",
+        "no-immunity-source",
+        "irrelevant-provider",
+        "key",
+        "empty-literal",
+        "no-victim",
+        "unknown-victim",
+        "repeated",
+        "skipped",
+        "dirty-pending",
+    ]
+    for variant in variants:
+        state, hero, _shield = state_for(variant)
+        # Original fixture steps need stable IDs: Python's default id(object())
+        # can collide with a later generated step and defeat ID normalization.
+        original_finishers = {}
+        for active in state.active_effects:
+            for finisher in active.finishing_steps:
+                identity = id(finisher)
+                if identity not in original_finishers:
+                    original_finishers[identity] = (
+                        f"fixture/live-discard/finishing/{len(original_finishers)}"
+                    )
+                finisher.step_id = original_finishers[identity]
+        options = {"victim_id": "hero_mrak", "immunity_source_id": "hero_min"}
+        if variant in ("basic", "no-basic"):
+            options["card_is_basic"] = True
+        if variant == "non-basic":
+            options["card_is_basic"] = False
+        if variant == "friendly-immunity":
+            options["immunity_source_id"] = "hero_arien"
+        if variant == "no-immunity-source":
+            options["immunity_source_id"] = None
+        if variant in ("key", "empty-literal", "no-victim"):
+            options.update(
+                victim_id="" if variant == "empty-literal" else None, victim_key="victim"
+            )
+            if variant == "no-victim":
+                state.execution_context.pop("victim", None)
+        if variant == "unknown-victim":
+            options["victim_id"] = "unknown"
+        step = ForceDiscardStep(**options, step_id="fixture/live-discard/main")
+        if variant == "skipped":
+            step.active_if_key = "absent"
+        if variant == "dirty-pending":
+            step.pending_input = {"selection": "ignored"}
+            step.pending_request_id = "ignored-discard-request"
+        state.execution_context.update(
+            discard_step=step,
+            hand_alias=hero.hand,
+            played_alias=hero.played_cards,
+            effects=state.active_effects,
+        )
+        state.execution_stack = []
+        push_steps(
+            state,
+            [
+                step,
+                SetContextFlagStep(key="after", value=True, step_id="fixture/live-discard/after"),
+            ],
+        )
+        if variant == "repeated":
+            state.execution_stack = [step, step]
+        yield "forced-discard-" + variant, state, live_choice_operations(state)
+
+
+def live_mine_scenes(base):
+    """Real mine choice/requeue/removal; blast discard is a staged consumer."""
+    from mine_traces import states
+
+    from goa2.engine.handler import push_steps
+    from goa2.engine.steps import (
+        MinePathChoiceStep,
+        MoveUnitStep,
+        SetContextFlagStep,
+        TriggerMineStep,
+    )
+
+    for variant, original, h, _pieces, _mines in states():
+        for mode in ("first", "last", "invalid", "numeric"):
+            state = copy.deepcopy(original)
+            step = MinePathChoiceStep(
+                unit_id="hero_arien", range_val=4, step_id="fixture/live-mines/choice"
+            )
+            state.execution_context = {
+                "target_hex": h(1, 0),
+                "triggered_mine_ids": ["stale"],
+                "choice_step": step,
+            }
+            state.execution_stack = []
+            push_steps(
+                state,
+                [
+                    step,
+                    SetContextFlagStep(key="after", value=True, step_id="fixture/live-mines/after"),
+                ],
+            )
+            yield "mines-choice-" + variant + "-" + mode, state, live_choice_operations(state, mode)
+
+    for variant in (
+        "unit-key",
+        "no-target",
+        "offboard",
+        "custom-output",
+        "pending-valid",
+        "pending-invalid",
+        "pending-empty",
+        "pending-false",
+        "skipped",
+        "no-unit",
+    ):
+        _, state, h, _pieces, _mines = next(row for row in states() if row[0] == "one-dud")
+        step = MinePathChoiceStep(
+            unit_id="hero_arien", range_val=3, step_id="fixture/live-mines/alias"
+        )
+        state.execution_context = {
+            "target_hex": h(0, 0),
+            "triggered_mine_ids": ["stale"],
+            "choice_step": step,
+        }
+        if variant == "unit-key":
+            step.unit_id, step.unit_key = None, "unit"
+            state.execution_context["unit"] = "hero_arien"
+        if variant == "no-target":
+            state.execution_context.pop("target_hex")
+        if variant == "offboard":
+            state.remove_entity("hero_arien")
+        if variant == "custom-output":
+            step.output_key = "chosen"
+        if variant in ("pending-valid", "pending-invalid"):
+            step.pending_input = {
+                "selection": "1" if variant == "pending-valid" else 0,
+                "retained": True,
+            }
+        if variant == "pending-empty":
+            step.pending_input = {}
+        if variant == "pending-false":
+            step.pending_input = False
+        if variant == "skipped":
+            step.active_if_key = "absent"
+        if variant == "no-unit":
+            step.unit_id, state.current_actor_id = None, None
+        state.execution_context["pending_alias"] = step.pending_input
+        state.execution_stack = []
+        push_steps(state, [step])
+        yield "mines-choice-alias-" + variant, state, live_choice_operations(state)
+
+    from mine_movement_traces import setup
+
+    for blast in (False, True):
+        for corridor in (False, True):
+            for mode in ("first", "last", "invalid", "numeric"):
+                state, h, _ = setup(blast, corridor)
+                step = MoveUnitStep(
+                    unit_id="hero_arien",
+                    range_val=3,
+                    success_output_key="success",
+                    step_id="fixture/live-mines/move",
+                )
+                state.execution_context = {
+                    "target_hex": h(0, 0),
+                    "success": "old",
+                    "move_step": step,
+                    "locations": state.entity_locations,
+                    "effects": state.active_effects,
+                }
+                state.execution_stack = []
+                push_steps(
+                    state,
+                    [
+                        step,
+                        SetContextFlagStep(
+                            key="after", value=True, step_id="fixture/live-mines/after"
+                        ),
+                    ],
+                )
+                yield f"mines-movement-{'blast' if blast else 'dud'}-{'corridor' if corridor else 'choice'}-{mode}", state, live_choice_operations(
+                    state, mode
+                )
+
+    for variant in (
+        "ordered",
+        "duplicates",
+        "missing",
+        "empty-literal",
+        "context",
+        "custom",
+        "snapshot-alias",
+        "literal-alias",
+        "offboard",
+        "linked-effects",
+        "mutate-old-effects",
+    ):
+        _, state, h, _pieces, _mines = next(row for row in states() if row[0] == "mixed")
+        queue = ["mine_b", "mine_a", "missing", "mine_c"]
+        step = TriggerMineStep(
+            mine_ids=queue, victim_id="hero_arien", step_id="fixture/live-mines/trigger"
+        )
+        if variant == "duplicates":
+            step.mine_ids = ["mine_a", "mine_a", "mine_b", "mine_b"]
+        if variant == "missing":
+            step.mine_ids = ["missing"]
+        if variant == "empty-literal":
+            step.mine_ids = []
+        if variant == "context":
+            step.mine_ids = None
+        if variant == "custom":
+            step.mine_ids_key, step.victim_key, step.victim_id, step.mine_ids = (
+                "queued",
+                "victim",
+                None,
+                None,
+            )
+        if variant == "snapshot-alias":
+            state.last_turn_positions = state.entity_locations
+        if variant == "offboard":
+            state.remove_entity("mine_b")
+        if variant in ("linked-effects", "mutate-old-effects"):
+            from goa2.domain.models.effect import (
+                ActiveEffect,
+                DurationType,
+                EffectScope,
+                EffectType,
+                Shape,
+            )
+
+            step.mine_ids = ["mine_a"]
+            for name, source, token, origin in [
+                ("duplicate", "hero_min", "mine_a", None),
+                ("source", "mine_a", None, None),
+                ("origin", "hero_min", None, "mine_a"),
+                ("duplicate", "hero_min", None, None),
+            ]:
+                state.active_effects.append(
+                    ActiveEffect(
+                        id=name,
+                        source_id=source,
+                        token_id=token,
+                        effect_type=EffectType.MOVEMENT_ZONE,
+                        max_value=1,
+                        scope=EffectScope(
+                            shape=Shape.POINT if origin else Shape.GLOBAL, origin_id=origin
+                        ),
+                        duration=DurationType.PASSIVE,
+                        created_at_turn=state.turn,
+                        created_at_round=state.round,
+                    )
+                )
+        state.execution_context = {
+            "triggered_mine_ids": ["mine_a"],
+            "mine_victim_id": "hero_arien",
+            "queued": ["mine_c"],
+            "victim": "hero_arien",
+            "trigger_step": step,
+            "queue_alias": step.mine_ids,
+            "effects": state.active_effects,
+            "locations": state.entity_locations,
+            "old_hex": state.get_position("mine_a"),
+            "tile": state.board.get_tile(h(-1, 0)),
+        }
+        state.execution_stack = []
+        steps = [step]
+        if variant == "mutate-old-effects":
+            from goa2.engine.steps.utility import RecordTargetStep
+
+            state.execution_context["detached_value"] = {"detached": True}
+            steps.append(
+                RecordTargetStep(
+                    input_key="detached_value",
+                    output_list_key="effects",
+                    step_id="fixture/live-mines/detached",
+                )
+            )
+        push_steps(state, steps)
+        yield "mines-trigger-" + variant, state, live_choice_operations(state)
+
+
+def movement_scenes(base):
+    """Live walking against actual displacement effects and output lifecycles."""
+    from displacement_effect_traces import states
+
+    from goa2.engine.handler import push_steps
+    from goa2.engine.steps import MoveUnitStep, SetContextFlagStep
+
+    for variant, state, h, pieces, heavy in states():
+        step = MoveUnitStep(
+            unit_id="hero_brogan",
+            target_hex_arg=h(2, -1),
+            range_val=3,
+            success_output_key="moved",
+            crossed_obstacles_output_key="crossed",
+            is_mandatory=variant == "mandatory",
+            step_id="fixture/live-walk/main",
+        )
+        state.execution_context["moved"] = "stale"
+        state.execution_context["crossed"] = ["stale"]
+        if variant == "same-place":
+            step.target_hex_arg = h(1, 0)
+        if variant == "keys":
+            step.unit_id, step.unit_key, step.target_hex_arg = None, "unit", None
+            state.execution_context.update(unit="hero_brogan", target_hex=h(2, -1).model_dump())
+        if variant == "context-skip":
+            step.target_hex_arg = None
+            state.execution_context.pop("target_hex", None)
+        if variant == "gate-off":
+            step.active_if_key = "absent"
+        if variant.startswith("target-"):
+            step.unit_id = {
+                "target-token": "restriction-token",
+                "target-token-empty-actor": "restriction-token",
+                "target-piece": pieces[0],
+                "target-heavy": str(heavy.id),
+                "target-owner": "hero_razzle",
+                "target-unknown": "unknown",
+            }[variant]
+        state.execution_context["walk_step"] = step
+        state.execution_context["locations"] = state.entity_locations
+        state.execution_context["snapshot"] = state.last_turn_positions
+        state.execution_stack = []
+        push_steps(
+            state,
+            [
+                step,
+                SetContextFlagStep(key="after", value=True, step_id="fixture/live-walk/after"),
+            ],
+        )
+        yield "walking-effect-" + variant, state, [
+            {"kind": "advance_prefix", "steps": 1},
+            {"kind": "advance"},
+        ]
+
+    for variant in (
+        "success-active",
+        "success-skip",
+        "success-false",
+        "negative-range",
+        "straight",
+        "through",
+        "dict",
+        "same-place",
+        "same-place-negative",
+        "snapshot-alias",
+        "prechosen-empty",
+    ):
+        state = base()
+        start = state.get_position("hero_arien")
+        target = next(
+            hex
+            for hex in start.neighbors()
+            if state.board.get_tile(hex)
+            and not state.board.get_tile(hex).occupant_id
+            and not state.board.get_tile(hex).is_obstacle
+        )
+        step = MoveUnitStep(
+            unit_id="hero_arien",
+            target_hex_arg=target,
+            range_val=1,
+            success_output_key="moved",
+            crossed_obstacles_output_key="crossed",
+            step_id="fixture/live-walk/main",
+        )
+        state.execution_context.update(moved=True, crossed=["old"])
+        if variant == "success-active":
+            step.active_if_key = "moved"
+        if variant == "success-skip":
+            step.skip_if_key = "moved"
+        if variant == "success-false":
+            state.execution_context["moved"] = False
+        if variant in ("negative-range", "same-place-negative"):
+            step.range_val = -1
+        if variant == "straight":
+            step.force_straight_line = True
+        if variant == "through":
+            step.pass_through_obstacles = True
+        if variant == "dict":
+            step.target_hex_arg = None
+            state.execution_context["target_hex"] = target.model_dump()
+        if variant.startswith("same-place"):
+            step.target_hex_arg = start
+        if variant == "snapshot-alias":
+            state.last_turn_positions = state.entity_locations
+        if variant == "prechosen-empty":
+            step.mine_path_prechosen = True
+            state.execution_context["triggered_mine_ids"] = []
+        state.execution_context.update(
+            walk_step=step,
+            locations=state.entity_locations,
+            old_hex=start,
+            old_tile=state.board.get_tile(start),
+            target_tile=state.board.get_tile(step.target_hex_arg or target),
+        )
+        state.execution_stack = []
+        push_steps(state, [step])
+        yield "walking-alias-" + variant, state, [{"kind": "advance"}]
+
+    for name, state, operations in minion_return_scenes(base):
+        if name == "minion-return-walk":
+            yield "walking-minion-return-complete", state, [*operations, {"kind": "advance"}]
+
+
+def placement_scenes(base):
+    """Real placement rules plus retained location, tile and target identities."""
+    from displacement_effect_traces import states
+
+    from goa2.engine.handler import push_steps
+    from goa2.engine.steps import PlaceUnitStep, SetActorStep, SetContextFlagStep
+
+    def retain(state, step, target):
+        state.execution_context["placement_step"] = step
+        state.execution_context["locations"] = state.entity_locations
+        old = state.get_position(step.unit_id) if step.unit_id else None
+        if old is not None:
+            state.execution_context["old_hex"] = old
+            state.execution_context["old_tile"] = state.board.get_tile(old)
+        state.execution_context["target_tile"] = state.board.get_tile(target)
+
+    for variant, state, h, pieces, heavy in states():
+        step = PlaceUnitStep(
+            unit_id="hero_brogan",
+            target_hex_arg=h(2, -1),
+            is_mandatory=variant == "mandatory",
+            step_id="fixture/live-placement/main",
+        )
+        if variant == "same-place":
+            step.target_hex_arg = h(1, 0)
+        if variant == "keys":
+            step.unit_id, step.unit_key, step.target_hex_arg = None, "unit", None
+            state.execution_context = {
+                "unit": "hero_brogan",
+                "target_hex": h(2, -1).model_dump(),
+            }
+        if variant == "context-skip":
+            step.target_hex_arg = None
+            state.execution_context = {"target_hex": "SKIP"}
+        if variant == "gate-off":
+            step.active_if_key = "absent"
+        if variant.startswith("target-"):
+            step.unit_id = {
+                "target-token": "restriction-token",
+                "target-token-empty-actor": "restriction-token",
+                "target-piece": pieces[0],
+                "target-heavy": str(heavy.id),
+                "target-owner": "hero_razzle",
+                "target-unknown": "unknown",
+            }[variant]
+        retain(state, step, h(2, -1))
+        steps = [
+            step,
+            SetContextFlagStep(key="after", value=True, step_id="fixture/live-placement/after"),
+        ]
+        if variant in ("live-origin", "live-piece-origin"):
+            steps = [
+                PlaceUnitStep(
+                    unit_id="hero_arien" if variant == "live-origin" else pieces[0],
+                    target_hex_arg=h(-3, 0),
+                    step_id="fixture/live-placement/origin",
+                ),
+                SetActorStep(actor_id="hero_brogan", step_id="fixture/live-placement/actor"),
+                *steps,
+            ]
+        state.execution_stack = []
+        push_steps(state, steps)
+        yield "placement-effect-" + variant, state, [
+            {"kind": "advance_prefix", "steps": 1},
+            {"kind": "advance"},
+        ]
+
+    variants = [
+        "dict-target",
+        "immutable-context",
+        "board-hex",
+        "snapshot-alias",
+        "occupied",
+        "occupied-mandatory",
+        "self-mandatory",
+        "no-unit",
+        "fallback-unit",
+        "empty-unit-key",
+        "empty-key-value",
+        "offboard-unit",
+        "off-map",
+        "off-map-collision",
+        "terrain",
+        "dirty-pending",
+        "pending-false",
+        "repeated",
+        "argument-priority",
+        "empty-destination-key",
+        "skipped-malformed",
+        "live-destination",
+        "old-snapshot",
+        "foreign-abort",
+        "same-abort",
+        "dict-coercion",
+        "dict-extra-alias",
+        "false-target",
+        "empty-target",
+    ]
+    for variant in variants:
+        _, state, h, _, _ = next(states())
+        state.active_effects = []
+        target = h(2, -1)
+        step = PlaceUnitStep(
+            unit_id="hero_brogan",
+            target_hex_arg=target,
+            is_mandatory=False,
+            step_id="fixture/live-placement/" + variant,
+        )
+        state.execution_context = {"kept": [True]}
+        before = []
+        after = [
+            SetContextFlagStep(key="after", value=True, step_id="fixture/live-placement/after")
+        ]
+        if variant in (
+            "dict-target",
+            "immutable-context",
+            "empty-destination-key",
+            "live-destination",
+        ):
+            step.target_hex_arg = None
+            state.execution_context["target_hex"] = (
+                target if variant == "immutable-context" else target.model_dump()
+            )
+        if variant == "board-hex":
+            step.target_hex_arg = state.board.get_tile(target).hex
+        if variant == "snapshot-alias":
+            state.last_turn_positions = state.entity_locations
+            state.execution_context["snapshot"] = state.last_turn_positions
+        if variant in ("occupied", "occupied-mandatory"):
+            step.target_hex_arg = h(0, 0)
+            step.is_mandatory = variant.endswith("mandatory")
+        if variant == "self-mandatory":
+            step.target_hex_arg = state.get_position("hero_brogan")
+            step.is_mandatory = True
+        if variant == "no-unit":
+            step.unit_id = None
+            state.current_actor_id = None
+        if variant == "fallback-unit":
+            step.unit_id = None
+        if variant in ("empty-unit-key", "empty-key-value"):
+            step.unit_id = "" if variant == "empty-unit-key" else None
+            step.unit_key = "unit"
+            state.execution_context["unit"] = "hero_brogan" if variant == "empty-unit-key" else ""
+        if variant == "offboard-unit":
+            state.remove_entity("hero_brogan")
+        if variant in ("off-map", "off-map-collision"):
+            target = h(99, -99)
+            state.board.map_id = ""
+            step.target_hex_arg = target
+            if variant == "off-map-collision":
+                before = [
+                    PlaceUnitStep(
+                        unit_id="hero_arien",
+                        target_hex_arg=target,
+                        is_mandatory=False,
+                        step_id="fixture/live-placement/virtual-first",
+                    )
+                ]
+        if variant == "terrain":
+            state.board.get_tile(target).is_terrain = True
+        if variant == "dirty-pending":
+            step.pending_input = {"selection": "ignored", "kept": [1]}
+            step.pending_request_id = "fixture-existing-request"
+            state.execution_context["pending"] = step.pending_input
+        if variant == "pending-false":
+            step.pending_input = False
+        if variant == "repeated":
+            before = [step]
+        if variant == "argument-priority":
+            state.execution_context["target_hex"] = h(0, -1)
+        if variant == "empty-destination-key":
+            step.destination_key = ""
+            state.execution_context[""] = state.execution_context.pop("target_hex")
+        if variant == "skipped-malformed":
+            step.active_if_key = "missing"
+            step.target_hex_arg = None
+            state.execution_context["target_hex"] = ["unused"]
+        if variant == "live-destination":
+            state.execution_context["target_hex"] = h(0, 0)
+            before = [
+                SetContextFlagStep(
+                    key="target_hex",
+                    value=target,
+                    step_id="fixture/live-placement/live-destination",
+                )
+            ]
+        if variant == "old-snapshot":
+            state.last_turn_positions = {"retained": state.get_position("hero_brogan")}
+            state.execution_context["snapshot"] = state.last_turn_positions
+        if variant in ("foreign-abort", "same-abort"):
+            from goa2.engine.steps.phases import RestoreActionContextStep
+
+            step.target_hex_arg = state.get_position("hero_brogan")
+            step.is_mandatory = True
+            after.insert(
+                0,
+                RestoreActionContextStep(
+                    other_hero_action=variant == "foreign-abort",
+                    step_id="fixture/live-placement/restore",
+                ),
+            )
+        if variant in ("dict-coercion", "dict-extra-alias", "false-target", "empty-target"):
+            step.target_hex_arg = None
+            state.execution_context["target_hex"] = (
+                {"q": "2", "r": -1.0, "s": "-1", "ignored": [42]}
+                if variant == "dict-coercion"
+                else (
+                    {"q": 2, "r": -1, "s": -1, "ignored": state.entity_locations}
+                    if variant == "dict-extra-alias"
+                    else False if variant == "false-target" else {}
+                )
+            )
+        retain(state, step, target)
+        state.execution_stack = []
+        push_steps(state, [*before, step, *after])
+        yield "placement-alias-" + variant, state, [
+            {"kind": "advance_prefix", "steps": 1},
+            {"kind": "advance"},
+        ]
+
+    from goa2.bootstrap import register_all_effects
+    from goa2.domain.models import GamePhase
+    from goa2.engine.setup import GameSetup
+
+    register_all_effects()
+    for map_path in sorted((ROOT / "src/goa2/data/maps").glob("*.json")):
+        state = GameSetup.create_game(
+            str(map_path), ["Arien", "Hanu"], ["Brogan", "Tigerclaw"], seed=29
+        )
+        state.phase = GamePhase.RESOLUTION
+        state.current_actor_id = "hero_brogan"
+        target = next(
+            tile.hex
+            for tile in state.board.tiles.values()
+            if not tile.is_occupied and not tile.is_terrain
+        )
+        step = PlaceUnitStep(
+            unit_id="hero_brogan",
+            target_hex_arg=target,
+            is_mandatory=False,
+            step_id="fixture/live-placement/map/" + map_path.stem,
+        )
+        state.execution_context = {}
+        retain(state, step, target)
+        state.execution_stack = []
+        push_steps(
+            state,
+            [
+                step,
+                SetContextFlagStep(
+                    key="after", value=True, step_id="fixture/live-placement/map-after"
+                ),
+            ],
+        )
+        yield "placement-map-" + map_path.stem, state, [
+            {"kind": "advance_prefix", "steps": 1},
+            {"kind": "advance"},
+        ]
+
+    for name, state, operations in minion_return_scenes(base):
+        if name in (
+            "minion-return-fallback",
+            "minion-return-cap-zero",
+            "minion-return-cap-one",
+        ):
+            yield "placement-" + name, state, [
+                *operations,
+                {"kind": "advance_prefix", "steps": 1},
+            ]
+
+
+def minion_return_scenes(base):
+    """Raw automatic phase controller; relocation bodies are separate consumers."""
+    from goa2.domain.board import Board, Zone
+    from goa2.domain.hex import Hex
+    from goa2.domain.input import selection_value
+    from goa2.domain.models import TeamColor
+    from goa2.domain.tile import Tile
+    from goa2.engine.steps import ReturnMinionToZoneStep, SetContextFlagStep
+
+    def h(q, r=0):
+        return Hex(q=q, r=r, s=-q - r)
+
+    variants = [
+        "walk",
+        "choice",
+        "choice-last",
+        "invalid-retry",
+        "pending-valid",
+        "pending-invalid",
+        "pending-false",
+        "pending-empty",
+        "pending-missing",
+        "fallback",
+        "detour",
+        "no-space",
+        "disconnected",
+        "inside",
+        "offboard",
+        "missing-zone",
+        "missing-lane",
+        "no-team",
+        "processed",
+        "two-teams",
+        "blue-first",
+        "two-red",
+        "processed-duplicates",
+        "no-actor",
+        "shared-list",
+        "repeated-empty",
+        "skipped",
+        "cap-zero",
+        "cap-one",
+        "cap-two",
+        "cap-actions-only",
+    ]
+    for variant in variants:
+        state = base()
+        for uid in list(state.entity_locations):
+            state.remove_entity(uid)
+        points = [h(q, r) for q in range(-3, 4) for r in range(-3, 4) if abs(q + r) <= 3]
+        state.board = Board(
+            map_id="live-return-fixture",
+            tiles={point: Tile(hex=point) for point in points},
+            zones={"battle": Zone(id="battle", hexes={h(0), h(0, 1), h(0, -1)})},
+        )
+        state.battle_zones = {"lane_1": "battle"}
+        state.tie_breaker_team = TeamColor.RED
+        red = state.teams[TeamColor.RED].minions[0]
+        blue = state.teams[TeamColor.BLUE].minions[0]
+        state.place_entity(red.id, h(2))
+        state.execution_context = {"kept": [True]}
+        processed = []
+        if variant in ("walk", "fallback", "detour", "no-space"):
+            state.board.zones["battle"].hexes = {h(0)}
+        if variant == "detour":
+            state.board.tiles[h(1)].is_terrain = True
+        if variant in ("fallback", "no-space"):
+            for point in h(2).neighbors():
+                if point in state.board.tiles:
+                    state.board.tiles[point].is_terrain = True
+        if variant == "no-space":
+            state.board.tiles[h(0)].is_terrain = True
+        if variant == "disconnected":
+            state.board.tiles = {point: Tile(hex=point) for point in [h(0), h(2)]}
+        if variant == "inside":
+            state.move_unit(red.id, h(0))
+        if variant in ("offboard", "repeated-empty"):
+            state.remove_entity(red.id)
+        if variant == "missing-zone":
+            state.board.zones = {}
+        if variant == "missing-lane":
+            red.lane_id = "missing"
+        if variant == "no-team":
+            red.team = None
+        if variant == "processed":
+            processed = [str(red.id)]
+        if variant == "processed-duplicates":
+            processed = ["unknown", "unknown"]
+        if variant in ("two-teams", "blue-first", "shared-list"):
+            state.place_entity(blue.id, h(-2))
+        if variant == "blue-first":
+            state.tie_breaker_team = TeamColor.BLUE
+        if variant == "two-red":
+            state.place_entity(state.teams[TeamColor.RED].minions[1].id, h(-2))
+        if variant == "no-actor":
+            state.current_actor_id = None
+        if variant == "shared-list":
+            # Force an automatic choice while retaining the original processed
+            # list through context and an unrelated stored step operand.
+            state.board.zones["battle"].hexes = {h(0)}
+        if variant.startswith("cap-"):
+            state.board.zones["battle"].hexes = {h(0)}
+            from combat_effect_traces import effect
+
+            from goa2.domain.models.effect import EffectType
+
+            state.active_effects = [
+                effect(
+                    state,
+                    "live-return-cap",
+                    EffectType.MOVEMENT_ZONE,
+                    source="hero_arien",
+                    max_value={
+                        "cap-zero": 0,
+                        "cap-one": 1,
+                        "cap-two": 2,
+                        "cap-actions-only": 0,
+                    }[variant],
+                    limit_actions_only=variant == "cap-actions-only",
+                )
+            ]
+        step = ReturnMinionToZoneStep(
+            step_id="fixture/live-return/" + variant, processed_minion_ids=processed
+        )
+        state.execution_stack = [step]
+        state.execution_context["return_step"] = step
+        state.execution_context["processed"] = step.processed_minion_ids
+        operations = [{"kind": "advance_prefix", "steps": 1}]
+        if variant in (
+            "choice",
+            "choice-last",
+            "invalid-retry",
+            "pending-valid",
+            "pending-invalid",
+        ):
+            request = step.resolve(state, state.execution_context).input_request
+            assert request is not None
+            choice = selection_value(request.options[-1 if variant == "choice-last" else 0])
+            if variant == "pending-valid":
+                step.pending_input = {"selection": choice, "retained": True}
+                state.execution_context["pending_alias"] = step.pending_input
+            elif variant == "pending-invalid":
+                step.pending_input = {"selection": "SKIP", "retained": True}
+                state.execution_context["pending_alias"] = step.pending_input
+            else:
+                if variant == "invalid-retry":
+                    operations += [
+                        {"kind": "input", "selection": {"q": 0, "r": 0, "s": 1}},
+                        {"kind": "advance_prefix", "steps": 1},
+                    ]
+                operations += [
+                    {"kind": "input", "selection": choice},
+                    {"kind": "advance_prefix", "steps": 1},
+                ]
+        if variant == "pending-false":
+            step.pending_input = False
+        if variant == "pending-empty":
+            step.pending_input = {}
+            state.execution_context["pending_alias"] = step.pending_input
+        if variant == "pending-missing":
+            step.pending_input = {"other": True}
+        if variant == "shared-list":
+            retained = SetContextFlagStep(
+                step_id="fixture/live-return/retained",
+                key="retained",
+                value=step.processed_minion_ids,
+            )
+            state.execution_context["retained_step"] = retained
+        if variant == "repeated-empty":
+            state.execution_stack = [step, step]
+            operations += [{"kind": "advance"}]
+        if variant == "skipped":
+            step.active_if_key = "absent"
+            step.pending_input = ["malformed-but-skipped"]
+        yield "minion-return-" + variant, state, operations
 
 
 def loop_scenes(base):
@@ -456,7 +1739,14 @@ def scope_scenes(base):
             {"kind": "advance"},
         ]
 
-    for variant in ("missing", "present-null", "empty-stack", "all-fields", "physical", "model"):
+    for variant in (
+        "missing",
+        "present-null",
+        "empty-stack",
+        "all-fields",
+        "physical",
+        "model",
+    ):
         state = base()
         state.execution_context = {"unrelated": "before"}
         if variant == "present-null":
@@ -564,7 +1854,9 @@ def scope_scenes(base):
                 restore(other),
                 select(True),
                 SetActorStep(
-                    step_id="fixture/scope/actor", actor_id="hero_hanu", save_key="previous_actor"
+                    step_id="fixture/scope/actor",
+                    actor_id="hero_hanu",
+                    save_key="previous_actor",
                 ),
             ]
         ops = [{"kind": "advance_prefix", "steps": 1}] if variant == "other-boundary" else []
@@ -634,7 +1926,10 @@ def scope_scenes(base):
             values["save_key"] = "candidate"
         if variant == "unknown":
             values["actor_id"] = "hero_missing"
-        state.execution_stack = [select(), SetActorStep(step_id="fixture/scope/actor", **values)]
+        state.execution_stack = [
+            select(),
+            SetActorStep(step_id="fixture/scope/actor", **values),
+        ]
         yield "scope-actor-" + variant, state, [
             {"kind": "advance"},
             {"kind": "input", "selection": 1},
@@ -923,7 +2218,11 @@ def effect_lifecycle_scenes(base):
     # Source constructor deep-copies templates; keep the live original payload.
     loop.steps_template[0].value = card
     state.execution_stack = [loop]
-    state.execution_context = {"items": [1, 2], "card": card, "old_effects": state.active_effects}
+    state.execution_context = {
+        "items": [1, 2],
+        "card": card,
+        "old_effects": state.active_effects,
+    }
     yield "effects-physical-copy-snapshot", state, [
         {"kind": "advance_prefix", "steps": 1},
         {"kind": "remove_effects", "ids": ["first"]},
@@ -939,7 +2238,9 @@ def effect_lifecycle_scenes(base):
     state.execution_context = {"old_effects": state.active_effects, "extra": value}
     state.execution_stack = [
         RecordTargetStep(
-            step_id="fixture/lifecycle/old-list", input_key="extra", output_list_key="old_effects"
+            step_id="fixture/lifecycle/old-list",
+            input_key="extra",
+            output_list_key="old_effects",
         )
     ]
     yield "effects-detached-list", state, [
@@ -966,7 +2267,10 @@ def effect_lifecycle_scenes(base):
         marker = FinishedExpiringEffectStep(step_id="fixture/lifecycle/marker")
         if variant == "skipped-marker":
             marker.active_if_key = "never"
-        state.execution_context = {"current_card_id": "outer", "old_effects": state.active_effects}
+        state.execution_context = {
+            "current_card_id": "outer",
+            "old_effects": state.active_effects,
+        }
         if variant in ("scope", "other-hero"):
             push_action_context(
                 state.execution_context,
@@ -1187,7 +2491,11 @@ def turn_boundary_scenes(base):
     from goa2.domain.models import GamePhase, TargetType
     from goa2.domain.models.effect import DurationType, EffectType
     from goa2.engine.steps import AdvanceTurnStep, EndPhaseStep, SelectStep
-    from goa2.engine.steps.utility import AddContextValueStep, RecordTargetStep, SetContextFlagStep
+    from goa2.engine.steps.utility import (
+        AddContextValueStep,
+        RecordTargetStep,
+        SetContextFlagStep,
+    )
 
     def flag(key):
         return SetContextFlagStep(step_id="fixture/turn-boundary/" + key, key=key, value=True)
@@ -1270,7 +2578,11 @@ def turn_boundary_scenes(base):
     ):
         state = prepare()
         add_effect(state, kind)
-        ops = [{"kind": "end_turn"}, {"kind": "advance_prefix", "steps": 1}, {"kind": "advance"}]
+        ops = [
+            {"kind": "end_turn"},
+            {"kind": "advance_prefix", "steps": 1},
+            {"kind": "advance"},
+        ]
         if kind == "pending-input":
             ops += [{"kind": "input", "selection": 2}, {"kind": "advance"}]
         yield "turn-boundary-" + kind, state, ops
@@ -1328,7 +2640,10 @@ def turn_boundary_scenes(base):
             state.execution_context["current"] = hero.current_turn_card
         if kind == "all-trigger":
             value = effect(
-                state, "after-auto-pass", EffectType.AFTER_CARDS_PLAYED_TRIGGER, source="hero_arien"
+                state,
+                "after-auto-pass",
+                EffectType.AFTER_CARDS_PLAYED_TRIGGER,
+                source="hero_arien",
             )
             value.duration = DurationType.NEXT_TURN
             value.created_at_round, value.created_at_turn = state.round, 1
@@ -1434,7 +2749,14 @@ def revelation_scenes(base):
             state.pending_inputs["not-a-player"] = heroes[0].current_turn_card
         yield "revelation-" + variant, state, [{"kind": "start_revelation"}]
 
-    for variant in ("first", "second", "invalid", "same-object", "trigger-after", "old-history"):
+    for variant in (
+        "first",
+        "second",
+        "invalid",
+        "same-object",
+        "trigger-after",
+        "old-history",
+    ):
         state = prepared(["Emmitt"])
         hero = state.get_hero("hero_emmitt")
         hero.level = 8
@@ -1570,7 +2892,9 @@ def revelation_scenes(base):
             state.execution_context["target"] = heroes[-1].id
             state.execution_stack.append(
                 RecordTargetStep(
-                    step_id="fixture/revelation/append", input_key="target", output_list_key="ties"
+                    step_id="fixture/revelation/append",
+                    input_key="target",
+                    output_list_key="ties",
                 )
             )
         ops = [{"kind": "advance_prefix", "steps": 1}]
@@ -1664,23 +2988,693 @@ def revelation_scenes(base):
     hero = roster(state)[0]
     state.execution_stack = [
         ResolveCardStep(
-            step_id="fixture/revelation/skipped-action", hero_id=hero.id, active_if_key="missing"
+            step_id="fixture/revelation/skipped-action",
+            hero_id=hero.id,
+            active_if_key="missing",
         )
     ]
     yield "revelation-skipped-parked-action", state, [{"kind": "advance"}]
 
 
-def reference(state, operations):
-    from state_codec import materialize
+def planning_command_scenes(base):
+    """Public planning commands, including retained collection identities."""
+    from goa2.domain.models import GamePhase
+
+    for variant in (
+        "pass",
+        "pass-requests",
+        "pass-nonempty",
+        "pass-unknown",
+        "pass-duplicate",
+        "pass-wrong-phase",
+        "finish",
+        "finish-missing",
+        "finish-unknown-pending",
+        "finish-wrong-phase",
+        "finish-last",
+        "finish-dual-last",
+        "pass-last",
+    ):
+        state = base(["Emmitt"] if variant == "finish-dual-last" else None)
+        state.phase = GamePhase.PLANNING
+        state.current_actor_id = None
+        state.resolution_owner_id = None
+        heroes = [hero for team in state.teams.values() for hero in team.heroes]
+        hero = heroes[0]
+        state.execution_context = {
+            "pending": state.pending_inputs,
+            "done": state.planning_done,
+            "requests": state.starting_position_requests,
+            "hand": hero.hand,
+        }
+        kind = "pass" if variant.startswith("pass") else "finish"
+        target = str(hero.id)
+        if kind == "pass" and variant != "pass-nonempty":
+            for card in list(hero.hand):
+                hero.discard_card(card)
+        if variant == "pass-requests":
+            state.starting_position_requests.update(
+                {
+                    "outgoing": {"from": str(hero.id), "to": str(heroes[1].id)},
+                    "incoming": {"from": str(heroes[1].id), "to": str(hero.id)},
+                    "keep": {"from": str(heroes[1].id), "to": str(heroes[2].id)},
+                }
+            )
+            state.execution_context["kept_request"] = state.starting_position_requests["keep"]
+        if variant == "pass-duplicate":
+            state.pending_inputs[hero.id] = None
+        if variant in ("pass-unknown", "finish-unknown-pending"):
+            target = "not-a-player"
+        if variant in ("pass-wrong-phase", "finish-wrong-phase"):
+            state.phase = GamePhase.RESOLUTION
+        if kind == "finish" and variant not in ("finish-missing", "finish-wrong-phase"):
+            if variant == "finish-unknown-pending":
+                state.pending_inputs[target] = None
+            else:
+                card = hero.hand[0]
+                hero.play_card(card)
+                state.pending_inputs[hero.id] = card
+                if variant == "finish-dual-last":
+                    hero.level = 8
+        if variant in ("finish-last", "finish-dual-last", "pass-last"):
+            for other in heroes[1:]:
+                card = other.hand[0]
+                other.play_card(card)
+                state.pending_inputs[other.id] = card
+        operations = [{"kind": kind, "hero": target}]
+        if variant in ("pass", "finish", "finish-unknown-pending"):
+            operations.append({"kind": kind, "hero": target})
+        yield "planning-command-" + variant, state, operations
+
+
+def card_planning_scenes(base):
+    """Commit/take-back phase APIs with registered cards and live aliases."""
+    from state_codec import export_state_with_instances
+
+    from goa2.domain.models import GamePhase
+
+    variants = (
+        "cycle",
+        "wrong-phase",
+        "unknown",
+        "foreign",
+        "duplicate",
+        "passed",
+        "missing",
+        "requests",
+        "override-copy",
+        "shared-deck",
+        "shared-hero-hand",
+        "last",
+        "dual-cycle",
+        "dual-done",
+        "dual-low-level",
+        "dual-first-last",
+        "dual-second-last",
+        "dual-last-card",
+        "dual-requests",
+        "duplicate-done",
+        "spell-foreign",
+        "uncommit-twice",
+        "aliased-buffers",
+    )
+    for variant in variants:
+        red = (
+            ["Emmitt"]
+            if variant.startswith("dual")
+            else (["Gydion"] if variant.startswith("spell") else None)
+        )
+        state = base(red)
+        state.phase = GamePhase.PLANNING
+        state.current_actor_id = None
+        state.resolution_owner_id = None
+        state.execution_stack = []
+        heroes = [hero for team in state.teams.values() for hero in team.heroes]
+        hero = heroes[0]
+        if variant.startswith("dual"):
+            hero.level = 7 if variant == "dual-low-level" else 8
+        first, second, third = hero.hand[:3]
+        state.execution_context = {
+            "hand": hero.hand,
+            "pending": state.pending_inputs,
+            "second": state.pending_second_cards,
+            "done": state.planning_done,
+            "requests": state.starting_position_requests,
+            "first": first,
+            "second_card": second,
+        }
+
+        # Store actual cards until all context/model references have been added;
+        # physical table positions depend on the complete initial object graph.
+        def op(kind, card=None, target=None, hero_id=str(hero.id)):
+            value = {"kind": kind, "hero": hero_id if target is None else target}
+            if card is not None:
+                value["card"] = card
+            return value
+
+        operations = [op("commit", first), op("uncommit"), op("commit", second)]
+        if variant == "wrong-phase":
+            state.phase = GamePhase.RESOLUTION
+            operations = [op("commit", first), op("uncommit")]
+        elif variant == "unknown":
+            operations = [
+                op("commit", first, "not-a-player"),
+                op("uncommit", target="not-a-player"),
+            ]
+        elif variant == "foreign":
+            operations = [op("commit", heroes[1].hand[0])]
+        elif variant == "duplicate":
+            operations = [op("commit", first), op("commit", second), op("uncommit")]
+        elif variant == "passed":
+            state.pending_inputs[hero.id] = None
+            operations = [op("commit", first), op("uncommit")]
+        elif variant == "missing":
+            operations = [op("uncommit")]
+        elif variant in ("requests", "dual-requests"):
+            if variant == "dual-requests":
+                hero.play_card(first)
+                state.pending_inputs[hero.id] = first
+                operations = [op("commit", second), op("uncommit"), op("uncommit")]
+            state.starting_position_requests.update(
+                {
+                    "outgoing": {"from": str(hero.id), "to": str(heroes[1].id)},
+                    "incoming": {"from": str(heroes[1].id), "to": str(hero.id)},
+                    "keep": {"from": str(heroes[1].id), "to": str(heroes[-1].id)},
+                }
+            )
+            state.execution_context["kept_request"] = state.starting_position_requests["keep"]
+        elif variant == "override-copy":
+            first.initiative_override = 19
+            state.execution_context["copy"] = copy.deepcopy(first)
+            operations = [op("commit", first), op("uncommit")]
+        elif variant == "shared-deck":
+            hero.deck = hero.hand
+            operations = [op("commit", first), op("uncommit")]
+        elif variant == "shared-hero-hand":
+            heroes[1].hand = hero.hand
+            operations = [
+                op("commit", first),
+                op("uncommit"),
+                op("commit", first, str(heroes[1].id)),
+            ]
+        elif variant in ("last", "dual-first-last", "dual-second-last", "dual-last-card"):
+            for other in heroes[1:]:
+                card = other.hand[0]
+                other.play_card(card)
+                state.pending_inputs[other.id] = card
+            if variant == "dual-last-card":
+                for card in list(hero.hand)[1:]:
+                    hero.discard_card(card)
+            operations = [op("commit", first)]
+            if variant == "dual-first-last":
+                operations.append(op("finish"))
+            elif variant == "dual-second-last":
+                operations.extend([op("commit", second), {"kind": "advance"}])
+            elif variant == "last":
+                operations.append(op("uncommit"))
+        elif variant == "dual-cycle":
+            operations = [
+                op("commit", first),
+                op("commit", second),
+                op("commit", third),
+                op("uncommit"),
+                op("uncommit"),
+            ]
+        elif variant in ("dual-done", "dual-low-level"):
+            operations = [op("commit", first)]
+            if variant == "dual-done":
+                operations.append(op("finish"))
+            operations.extend([op("commit", second), op("uncommit")])
+        elif variant == "duplicate-done":
+            hero.play_card(first)
+            state.pending_inputs[hero.id] = first
+            state.planning_done.extend([str(hero.id), str(hero.id)])
+            operations = [op("uncommit")]
+        elif variant == "spell-foreign":
+            operations = [op("commit", hero.spells[0])]
+        elif variant == "uncommit-twice":
+            operations = [op("commit", first), op("uncommit"), op("uncommit")]
+        elif variant == "aliased-buffers":
+            state.pending_second_cards = state.pending_inputs
+            state.execution_context["second"] = state.pending_second_cards
+            operations = [op("commit", first), op("uncommit")]
+        _, physical = export_state_with_instances(state)
+        for operation in operations:
+            if "card" in operation:
+                operation["card"] = next(
+                    index for index, value in enumerate(physical) if value is operation["card"]
+                )
+        yield "card-planning-" + variant, state, operations
+
+
+def confirmation_scenes(base):
+    """Live confirmation, controller ownership and real abort boundaries."""
+    from goa2.domain.models import GamePhase, TargetType
+    from goa2.domain.models.effect import (
+        ActiveEffect,
+        DurationType,
+        EffectScope,
+        EffectType,
+        Shape,
+    )
+    from goa2.engine.steps import (
+        ConfirmResolutionStep,
+        FinalizeHeroTurnStep,
+        ForEachStep,
+        SelectStep,
+    )
+    from goa2.engine.steps.utility import SetContextFlagStep
+
+    def prepared(red=None, owner="hero_arien"):
+        state = base(red)
+        state.phase = GamePhase.RESOLUTION
+        state.current_actor_id = "hero_razzle" if red else "hero_arien"
+        state.resolution_owner_id = state.current_actor_id
+        step = ConfirmResolutionStep(step_id="fixture/confirmation/step", hero_id=owner)
+        state.execution_stack = [step]
+        state.execution_context = {"confirmation": step, "same_step": step}
+        return state, step
+
+    def answer():
+        return [
+            {"kind": "advance"},
+            {"kind": "input", "selection": "CONFIRM"},
+            {"kind": "advance"},
+        ]
+
+    for variant in (
+        "basic",
+        "retry",
+        "stale",
+        "retained-valid",
+        "retained-invalid",
+        "empty-mapping",
+        "empty-list",
+        "unknown-owner",
+        "piece-owner",
+        "skipped",
+    ):
+        state, step = prepared(
+            ["Razzle"] if variant == "piece-owner" else None,
+            (
+                "hero_razzle_piece_1"
+                if variant == "piece-owner"
+                else ("not-a-player" if variant == "unknown-owner" else "hero_arien")
+            ),
+        )
+        operations = answer()
+        if variant == "retry":
+            operations = [{"kind": "advance"}]
+            for selection in ("NO", False, [], {"wrong": 1}, "CONFIRM"):
+                operations.extend([{"kind": "input", "selection": selection}, {"kind": "advance"}])
+        elif variant == "stale":
+            operations.insert(
+                1, {"kind": "input", "selection": "CONFIRM", "request_id": "stale-confirm"}
+            )
+        elif variant.startswith("retained"):
+            step.pending_input = {"selection": "CONFIRM" if variant == "retained-valid" else "NO"}
+            step.pending_request_id = "fixture/confirmation/retained-request"
+            state.execution_context["old_pending"] = step.pending_input
+            if variant == "retained-valid":
+                operations = [{"kind": "advance"}]
+        elif variant in ("empty-mapping", "empty-list"):
+            step.pending_input = {} if variant == "empty-mapping" else []
+            state.execution_context["old_pending"] = step.pending_input
+        elif variant == "skipped":
+            step.active_if_key = "not-set"
+            step.pending_input = {"selection": "NO"}
+            operations = [{"kind": "advance"}]
+        yield "confirmation-" + variant, state, operations
+
+    for flag in ("rollback_frozen", "rollback_reanchor_pending"):
+        for index, value in enumerate((True, 0, {}, {"yes": 1}, [], [1])):
+            state, step = prepared()
+            step.pending_input = {"selection": "NO"}
+            step.pending_request_id = "fixture/confirmation/frozen-request"
+            state.execution_context["old_pending"] = step.pending_input
+            state.execution_context[flag] = value
+            yield "confirmation-" + flag + "-" + str(index), state, (
+                [{"kind": "advance"}] if value else answer()
+            )
+
+    for variant in ("controlled", "inactive", "foreign-owner", "foreign-prompt"):
+        state, step = prepared(owner="hero_brogan" if variant == "foreign-prompt" else "hero_arien")
+        hero = state.get_hero("hero_arien")
+        hero.current_turn_card = hero.hand[1]
+        state.active_effects = [
+            ActiveEffect(
+                id="confirmation-control",
+                source_id="hero_hanu",
+                effect_type=EffectType.CONTROL_NEXT_ACTION,
+                scope=EffectScope(shape=Shape.GLOBAL, origin_id="hero_arien"),
+                duration=DurationType.PASSIVE,
+                is_active=variant != "inactive",
+                created_at_round=state.round,
+                created_at_turn=state.turn,
+                controlled_card_id=hero.current_turn_card.id,
+            )
+        ]
+        if variant == "foreign-owner":
+            state.resolution_owner_id = "hero_hanu"
+        yield "confirmation-" + variant, state, answer()
+
+    for variant in ("confirm", "finalize", "frozen-confirm", "scope-confirm"):
+        state, step = prepared()
+        boundary = (
+            step
+            if variant != "finalize"
+            else FinalizeHeroTurnStep(step_id="fixture/confirmation/finalize", hero_id="hero_arien")
+        )
+        if variant == "frozen-confirm":
+            state.execution_context["rollback_frozen"] = True
+        steps = [
+            boundary,
+            SetContextFlagStep(
+                step_id="fixture/confirmation/skipped-after-abort",
+                key="should_not_run",
+                value=True,
+            ),
+            SelectStep(
+                step_id="fixture/confirmation/fail",
+                target_type=TargetType.NUMBER,
+                number_options=[],
+                prompt="No legal selection",
+            ),
+        ]
+        state.execution_stack = steps
+        state.execution_context["boundary"] = boundary
+        if variant == "scope-confirm":
+            from goa2.domain.models import ActionType
+            from goa2.engine.steps.phases import push_action_context
+
+            state.execution_context["current_card_id"] = "outer"
+            push_action_context(
+                state.execution_context,
+                action_type=ActionType.SKILL,
+                card_id="inner",
+                card_owner_id="hero_arien",
+            )
+        operations = (
+            [{"kind": "advance_prefix", "steps": 1}]
+            if variant == "finalize"
+            else ([{"kind": "advance"}] if variant == "frozen-confirm" else answer())
+        )
+        yield "confirmation-abort-" + variant, state, operations
+
+    state, step = prepared()
+    state.execution_context["items"] = [1, 2]
+    state.execution_stack = [
+        ForEachStep(
+            step_id="fixture/confirmation/loop",
+            list_key="items",
+            item_key="item",
+            steps_template=[step],
+        )
+    ]
+    yield "confirmation-loop", state, [
+        *answer(),
+        {"kind": "input", "selection": "CONFIRM"},
+        {"kind": "advance"},
+    ]
+
+    state, step = prepared()
+    state.execution_stack = [step, step]
+    yield "confirmation-repeated-step", state, [
+        *answer(),
+        {"kind": "input", "selection": "CONFIRM"},
+        {"kind": "advance"},
+    ]
+
+
+def finalization_scenes(base):
+    """Exact hero-turn completion before staged minion/lane consumers."""
+    from combat_effect_traces import effect
+
+    from goa2.domain.models import CardState, GamePhase
+    from goa2.domain.models.effect import EffectType
+    from goa2.engine.steps import FinalizeHeroTurnStep
+    from goa2.engine.steps.utility import SetContextFlagStep
+
+    variants = (
+        "basic",
+        "no-current",
+        "existing-slot",
+        "turn-four",
+        "overwrite",
+        "positive-uses",
+        "nonpositive-uses",
+        "effects",
+        "duplicate-effect-ids",
+        "shared-effect",
+        "own-own",
+        "own-foreign",
+        "foreign-own",
+        "foreign-foreign",
+        "empty-reveals",
+        "missing-owner",
+        "unknown-hero",
+        "piece-id",
+        "piece-effects",
+        "shared-played",
+        "duplicate-print",
+        "override",
+        "facedown",
+        "high-resolved-count",
+        "extra-card",
+        "retained-context",
+        "repeated",
+        "skipped",
+    )
+    for variant in variants:
+        piece_variant = variant in ("piece-id", "piece-effects")
+        state = base(
+            ["Razzle"] if piece_variant else (["Emmitt"] if variant == "extra-card" else None)
+        )
+        state.phase = GamePhase.RESOLUTION
+        heroes = [hero for team in state.teams.values() for hero in team.heroes]
+        hero = heroes[0]
+        state.current_actor_id = str(hero.id)
+        state.resolution_owner_id = str(hero.id)
+        state.acting_piece_id = "hero_razzle_piece_1" if piece_variant else None
+        target = (
+            "not-a-player"
+            if variant == "unknown-hero"
+            else ("hero_razzle_piece_1" if piece_variant else str(hero.id))
+        )
+        card, previous = hero.hand[:2]
+        if variant in ("overwrite", "positive-uses", "nonpositive-uses", "existing-slot"):
+            state.turn = 2
+            hero.play_card(previous)
+            previous.is_facedown = False
+            hero.resolve_current_card(
+                turn_number=2 if variant in ("overwrite", "existing-slot") else 1
+            )
+        if variant not in ("no-current", "existing-slot"):
+            hero.play_card(card)
+            card.is_facedown = variant == "facedown"
+        if variant == "no-current":
+            state.turn = 3
+        if variant == "turn-four":
+            state.turn = 4
+        if variant == "positive-uses":
+            card.passive_uses_this_turn = 3
+            previous.passive_uses_this_turn = 2
+            hero.ultimate_card.passive_uses_this_turn = 4
+            hero.hand[0].passive_uses_this_turn = 5
+        if variant == "nonpositive-uses":
+            card.passive_uses_this_turn = -2
+            previous.passive_uses_this_turn = 0
+            hero.ultimate_card.passive_uses_this_turn = -1
+        if variant == "high-resolved-count":
+            hero.resolved_turn_count = 4
+        if variant == "override":
+            card.initiative_override = 19
+        if variant == "extra-card":
+            hero.level = 8
+            hero.play_card(previous)
+            hero.current_turn_card = card
+            hero.extra_turn_card = previous
+            previous.passive_uses_this_turn = 5
+        if variant == "shared-played":
+            heroes[1].played_cards = hero.played_cards
+        if variant == "duplicate-print":
+            duplicate = copy.deepcopy(card)
+            duplicate.state = CardState.HAND
+            duplicate.is_facedown = False
+            hero.hand.append(duplicate)
+        if variant in ("effects", "duplicate-effect-ids", "shared-effect", "piece-effects"):
+            for index in range(4):
+                item = effect(
+                    state,
+                    (
+                        "finalize-effect"
+                        if variant == "duplicate-effect-ids"
+                        else "finalize-effect-" + str(index)
+                    ),
+                    EffectType.DELAYED_TRIGGER,
+                    source=str(hero.id) if index % 2 == 0 else str(heroes[1].id),
+                    source_card_id=card.id if index < 2 else previous.id,
+                )
+                item.is_active = False
+                item.passive_uses_this_turn = index + 2
+                state.active_effects.append(item)
+            if variant == "shared-effect":
+                state.active_effects.append(state.active_effects[0])
+        if variant in ("own-own", "own-foreign", "foreign-own", "foreign-foreign"):
+            guess, reveal = variant.split("-")
+            state.card_guess = {
+                "guesser_id": str(hero.id) if guess == "own" else str(heroes[1].id),
+                "note": "keep original mapping",
+            }
+            state.card_reveal = {
+                "revealer_id": str(hero.id) if reveal == "own" else str(heroes[1].id),
+                "note": "keep original mapping",
+            }
+        if variant == "empty-reveals":
+            state.card_guess = {}
+            state.card_reveal = {}
+        if variant == "missing-owner":
+            state.card_guess = {"note": "no owner"}
+            state.card_reveal = {"note": "no owner"}
+        if variant in (
+            "own-own",
+            "own-foreign",
+            "foreign-own",
+            "foreign-foreign",
+            "empty-reveals",
+            "missing-owner",
+        ):
+            keeper = SetContextFlagStep(
+                step_id="fixture/finalization/reveal-keeper", key="old_reveals", value=None
+            )
+            keeper.value = [state.card_guess, state.card_reveal]
+            item = effect(
+                state,
+                "finalize-reveal-keeper",
+                EffectType.DELAYED_TRIGGER,
+                source=str(heroes[1].id),
+            )
+            item.finishing_steps = [keeper]
+            state.active_effects.append(item)
+        if variant == "piece-effects":
+            state.card_guess = {"guesser_id": str(hero.id)}
+            state.card_reveal = {"revealer_id": target}
+        step = FinalizeHeroTurnStep(step_id="fixture/finalization/step", hero_id=target)
+        state.execution_stack = [step]
+        state.execution_context = {
+            "finalizer": step,
+            "played": hero.played_cards,
+            "card": card,
+            "previous": previous,
+            "old_guess": state.card_guess,
+            "old_reveal": state.card_reveal,
+        }
+        operations = [{"kind": "advance_prefix", "steps": 1}]
+        if variant == "retained-context":
+            keeper = SetContextFlagStep(
+                step_id="fixture/finalization/context-keeper", key="later", value=None
+            )
+            keeper.value = state.execution_context
+            item = effect(
+                state,
+                "finalize-context-keeper",
+                EffectType.DELAYED_TRIGGER,
+                source=str(hero.id),
+            )
+            item.finishing_steps = [keeper]
+            state.active_effects.append(item)
+        if variant == "repeated":
+            item = effect(state, "finalize-repeat", EffectType.DELAYED_TRIGGER, source=str(hero.id))
+            item.finishing_steps = [step]
+            state.active_effects.append(item)
+            step.pending_input = {"selection": "retained data"}
+            step.pending_request_id = "fixture/finalization/retained-request"
+            operations.extend(
+                [
+                    {"kind": "queue_steps", "path": ["active_effects", 0, "finishing_steps"]},
+                    {"kind": "advance_prefix", "steps": 1},
+                ]
+            )
+        if variant == "skipped":
+            step.active_if_key = "not-set"
+        yield "finalization-" + variant, state, operations
+
+
+def piece_planning_scenes(base):
+    """get_hero resolves piece IDs, while phase buffers use raw caller keys."""
+    from state_codec import export_state_with_instances
+
+    from goa2.domain.models import GamePhase
+
+    for variant in ("cycle", "pass", "last", "buffers"):
+        state = base(["Razzle"])
+        state.phase = GamePhase.PLANNING
+        state.current_actor_id = None
+        state.resolution_owner_id = None
+        heroes = [hero for team in state.teams.values() for hero in team.heroes]
+        hero = heroes[0]
+        piece = "hero_razzle_piece_1"
+        card = hero.hand[0]
+        state.execution_context = {
+            "hand": hero.hand,
+            "pending": state.pending_inputs,
+            "done": state.planning_done,
+            "card": card,
+        }
+        if variant == "pass":
+            for item in list(hero.hand):
+                hero.discard_card(item)
+            operations = [
+                {"kind": "pass", "hero": piece},
+                {"kind": "finish", "hero": piece},
+                {"kind": "uncommit", "hero": piece},
+            ]
+        elif variant == "last":
+            for other in heroes[1:]:
+                other_card = other.hand[0]
+                other.play_card(other_card)
+                state.pending_inputs[other.id] = other_card
+            operations = [{"kind": "commit", "hero": piece, "card": card}]
+        elif variant == "buffers":
+            operations = [
+                {"kind": "commit", "hero": piece, "card": card},
+                {"kind": "finish", "hero": str(hero.id)},
+                {"kind": "finish", "hero": piece},
+                {"kind": "uncommit", "hero": str(hero.id)},
+                {"kind": "uncommit", "hero": piece},
+            ]
+        else:
+            operations = [
+                {"kind": "commit", "hero": piece, "card": card},
+                {"kind": "uncommit", "hero": piece},
+                {"kind": "commit", "hero": str(hero.id), "card": card},
+                {"kind": "uncommit", "hero": piece},
+            ]
+        _, physical = export_state_with_instances(state)
+        for operation in operations:
+            if "card" in operation:
+                operation["card"] = next(
+                    index for index, value in enumerate(physical) if value is operation["card"]
+                )
+        yield "piece-planning-" + variant, state, operations
+
+
+def reference(state, operations, unordered_keys=()):
+    from state_codec import export_state_with_instances, materialize
 
     from goa2.domain.input import InputResponse
     from goa2.engine.handler import process_stack, submit_input
 
     request = None
     records = []
-    normalizer = ObjectTraceNormalizer()
+    normalizer = ObjectTraceNormalizer(unordered_keys)
     initial_envelope, original_objects = export_state_with_shared_objects(state)
     normalizer.bind_originals(initial_envelope["object_bindings"], original_objects)
+    physical = (
+        export_state_with_instances(state)[1]
+        if any(op["kind"] == "commit" for op in operations)
+        else ()
+    )
     for op in operations:
         current, events, error = None, [], None
         if op["kind"] in ("advance", "advance_prefix"):
@@ -1699,6 +3693,23 @@ def reference(state, operations):
             request = result.input_request
             current = request.model_dump(mode="json") if request else None
             events = [event.model_dump(mode="json") for event in result.events]
+        elif op["kind"] in ("commit", "uncommit", "pass", "finish"):
+            from goa2.engine.phases import (
+                commit_card,
+                finish_planning,
+                pass_turn,
+                uncommit_card,
+            )
+
+            try:
+                if op["kind"] == "commit":
+                    commit_card(state, op["hero"], physical[op["card"]])
+                else:
+                    {"uncommit": uncommit_card, "pass": pass_turn, "finish": finish_planning}[
+                        op["kind"]
+                    ](state, op["hero"])
+            except ValueError:
+                error = "invalid_planning_action"
         elif op["kind"] == "start_revelation":
             from goa2.engine.phases import start_revelation_phase
 
@@ -1776,27 +3787,68 @@ def reference(state, operations):
     return records
 
 
-def export(path):
-    manifest = verify_sources()
-    cases = []
-    for name, state, operations in scenes():
-        envelope, _ = export_state_with_shared_objects(state)
-        cases.append(
-            {
-                "name": "object-execution-" + name,
-                "envelope": envelope,
-                "operations": operations,
-                "expected": reference(state, operations),
-            }
-        )
-    data = {
-        "schema_version": 1,
-        "oracle_revision": manifest["oracle_revision"],
-        "source_sha256": manifest["source_sha256"],
-        "cases": cases,
+def _export_scene_case(item):
+    name, state, operations = item
+    envelope, _ = export_state_with_shared_objects(state)
+    keys = ("triggered_mine_ids", "chosen") if name.startswith("mines-choice-") else ()
+    case = {
+        "name": "object-execution-" + name,
+        "envelope": envelope,
+        "operations": operations,
+        "expected": reference(state, operations, keys),
     }
-    data["corpus_sha256"] = digest(data)
-    return write_corpus(path, data)
+    if keys:
+        case["unordered_mine_keys"] = list(keys)
+    return case
+
+
+def _export_cases(items, workers):
+    if workers < 1:
+        raise ValueError("source export workers must be positive")
+    if workers == 1:
+        yield from map(_export_scene_case, items)
+        return
+    import multiprocessing
+    import os
+    from collections import deque
+    from concurrent.futures import ProcessPoolExecutor
+
+    cpus = len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else os.cpu_count() or 1
+    count = min(workers, cpus, 4)
+    method = "fork" if "fork" in multiprocessing.get_all_start_methods() else "spawn"
+    iterator = iter(items)
+    with ProcessPoolExecutor(
+        max_workers=count, mp_context=multiprocessing.get_context(method)
+    ) as pool:
+        pending = deque()
+        for _ in range(count * 2):
+            item = next(iterator, None)
+            if item is None:
+                break
+            pending.append(pool.submit(_export_scene_case, item))
+        while pending:
+            yield pending.popleft().result()
+            item = next(iterator, None)
+            if item is not None:
+                pending.append(pool.submit(_export_scene_case, item))
+
+
+def export(path, *, workers=1):
+    """Stream ordered goldens; optional workers cap CPU and in-flight snapshots.
+
+    A caller using process workers must use the normal __main__ guard on spawn
+    platforms. The default serial path supports every existing source fixture.
+    """
+    manifest = verify_sources()
+    return write_corpus_stream(
+        path,
+        {
+            "schema_version": 1,
+            "oracle_revision": manifest["oracle_revision"],
+            "source_sha256": manifest["source_sha256"],
+        },
+        _export_cases(scenes(), workers),
+    )
 
 
 def verify(path, command):
@@ -1812,7 +3864,7 @@ def verify(path, command):
             raw = worker.request(
                 "stack_trace", envelope=case["envelope"], operations=case["operations"]
             )["records"]
-            normalizer = ObjectTraceNormalizer()
+            normalizer = ObjectTraceNormalizer(case.get("unordered_mine_keys", ()))
             actual = [normalizer.record(record) for record in raw]
             if actual != case["expected"]:
                 dest = ROOT / "rust/artifacts/object-execution-mismatch.json"

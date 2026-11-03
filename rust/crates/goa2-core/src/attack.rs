@@ -2,7 +2,7 @@
 //! typed in the native interpreter; this module never generates JSON steps.
 use crate::{
     cards::CardId,
-    data::{Datum, Registers, Symbol, Symbols},
+    data::{Datum, RegisterRead, Registers, Symbol, Symbols},
     stats::Stat,
     world::NativeWorld,
 };
@@ -30,6 +30,12 @@ pub struct AttackBinding {
 pub struct AttackExpansion {
     pub binding: AttackBinding,
     pub select: bool,
+}
+#[derive(Clone, Copy, Debug)]
+pub struct AttackValues {
+    pub damage: i64,
+    pub range: i64,
+    pub basic: bool,
 }
 #[derive(Clone, Debug)]
 pub struct AttackRules {
@@ -66,17 +72,8 @@ impl AttackRules {
         spec: &AttackSpec,
         followup: Option<Symbol>,
     ) -> Result<Option<AttackExpansion>, String> {
-        let target = followup.or(spec.target);
-        let (key, select) = if let Some(key) =
-            target.filter(|key| ctx.get(*key).is_some_and(|v| v.truthy(symbols)))
-        {
-            (key, false)
-        } else if let Some(output) = spec.output.filter(|_| followup.is_none()) {
-            (output, true)
-        } else if target.is_some() {
+        let Some((key, select)) = self.target(ctx, symbols, spec, followup) else {
             return Ok(None);
-        } else {
-            (self.default_target, true)
         };
         let mark = match ctx.get(self.log) {
             None => 0,
@@ -95,6 +92,50 @@ impl AttackRules {
             marks.push((key, value));
         }
         ctx.set(self.marks, Datum::Object(marks));
+        let AttackValues {
+            damage,
+            range,
+            basic,
+        } = self.values(world, ctx, symbols, actor, spec)?;
+        ctx.set(self.ranged, Datum::Bool(spec.ranged));
+        ctx.set(self.attacker, actor.map_or(Datum::Null, Datum::Text));
+        ctx.set(self.damage, Datum::Int(damage));
+        ctx.set(self.initiative, Datum::Bool(spec.initiative));
+        ctx.set(self.basic, Datum::Bool(basic));
+        Ok(Some(AttackExpansion {
+            binding: AttackBinding { key, damage, range },
+            select,
+        }))
+    }
+    pub fn target(
+        &self,
+        ctx: &dyn RegisterRead,
+        symbols: &Symbols,
+        spec: &AttackSpec,
+        followup: Option<Symbol>,
+    ) -> Option<(Symbol, bool)> {
+        let target = followup.or(spec.target);
+        let (key, select) = if let Some(key) =
+            target.filter(|key| ctx.get(*key).is_some_and(|v| v.truthy(symbols)))
+        {
+            (key, false)
+        } else if let Some(output) = spec.output.filter(|_| followup.is_none()) {
+            (output, true)
+        } else if target.is_some() {
+            return None;
+        } else {
+            (self.default_target, true)
+        };
+        Some((key, select))
+    }
+    pub fn values(
+        &self,
+        world: &NativeWorld,
+        ctx: &dyn RegisterRead,
+        symbols: &Symbols,
+        actor: Option<Symbol>,
+        spec: &AttackSpec,
+    ) -> Result<AttackValues, String> {
         let mut damage = spec.damage;
         let mut range = spec.range;
         if let Some(actor) = actor {
@@ -127,15 +168,11 @@ impl AttackRules {
         } else {
             false
         };
-        ctx.set(self.ranged, Datum::Bool(spec.ranged));
-        ctx.set(self.attacker, actor.map_or(Datum::Null, Datum::Text));
-        ctx.set(self.damage, Datum::Int(damage));
-        ctx.set(self.initiative, Datum::Bool(spec.initiative));
-        ctx.set(self.basic, Datum::Bool(basic));
-        Ok(Some(AttackExpansion {
-            binding: AttackBinding { key, damage, range },
-            select,
-        }))
+        Ok(AttackValues {
+            damage,
+            range,
+            basic,
+        })
     }
     pub fn defeated(
         &self,

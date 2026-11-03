@@ -1,0 +1,58 @@
+{
+  "feature": "native PerformCardActionStep",
+  "ordinary_menus": 596,
+  "new_source_cases": 723,
+  "new_source_operations": 8284,
+  "bounded_restore_cases": 127,
+  "bounded_restore_operations": 1526,
+  "native_guards_and_piece_binding_tests": 5,
+  "source_and_corpus_integrity_tests": 27,
+  "workspace_passed": 358,
+  "workspace_filtered": 1,
+  "not_rerun": "older all-corpus restore gate",
+  "release_parity": {
+    "cases": 723,
+    "operations": 8284,
+    "corpus_sha256": "3481311016beaf42980f0446c54a4c6c97ed178f0eaf5a76697470c7da6db036",
+    "workers": 4,
+    "state_request_event_and_identity_parity": true,
+    "seconds": 63.69
+  },
+  "live_corpus_cases": 10964,
+  "live_corpus_operations": 64681,
+  "live_index_sha256": "2bfcf750870868ff692eea107345135623635cc8bfb168ee67f39f2bcbc40688",
+  "live_semantic_sha256": "8d356a4fce4ce78b1df31efa57106cdaf592f5c2611ef18668f83df24e4bf23e",
+  "merge_append": {
+    "new_cases": 723,
+    "cases": 10964,
+    "corpus_sha256": "2bfcf750870868ff692eea107345135623635cc8bfb168ee67f39f2bcbc40688",
+    "semantic_sha256": "8d356a4fce4ce78b1df31efa57106cdaf592f5c2611ef18668f83df24e4bf23e",
+    "subset_merge_seconds": 6.64,
+    "full_merge_seconds": 69.08
+  },
+  "merge_encoding_benchmark": {
+    "cases": 20,
+    "parsed": {
+      "seconds": 1.4388,
+      "bytes": 37263898,
+      "peak_python_bytes": 20577723
+    },
+    "verified_bytes": {
+      "seconds": 0.1919,
+      "bytes": 37263898,
+      "peak_python_bytes": 4569713
+    },
+    "identical_case_hashes": true,
+    "scope": "corpus merge encoding, not engine search throughput"
+  },
+  "clippy_strict": true,
+  "rustfmt": true,
+  "black_ruff": true,
+  "frozen_src_and_lock_unchanged": true,
+  "custom_primary_bodies": 45,
+  "base_noop_faces": 45,
+  "ordinary_bodies_remaining": 506,
+  "complete_spell_bodies": 0,
+  "engine_complete": false,
+  "search_complete": false
+}

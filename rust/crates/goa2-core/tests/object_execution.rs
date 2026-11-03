@@ -7,38 +7,48 @@ use goa2_core::{
 };
 use serde_json::{Value, json};
 use std::{sync::atomic::AtomicBool, time::Instant};
+#[path = "../../../test-support/parallel.rs"]
+mod fixture_parallel;
 
-fn cases() -> Vec<Value> {
+fn cases() -> impl Iterator<Item = Value> {
+    cases_matching(|_| true)
+}
+fn cases_matching(predicate: impl Fn(&str) -> bool) -> impl Iterator<Item = Value> {
     let base = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures"));
-    let index: Value =
-        serde_json::from_reader(std::fs::File::open(base.join("object-execution.json")).unwrap())
-            .unwrap();
+    let index: Value = serde_json::from_reader(std::io::BufReader::new(
+        std::fs::File::open(base.join("object-execution.json")).unwrap(),
+    ))
+    .unwrap();
+    // Keep only the small index in memory; full state/identity traces can be
+    // large, and each test needs just one source case at a time.
     index["cases"]
         .as_array()
         .unwrap()
-        .iter()
-        .map(|entry| {
-            serde_json::from_reader(
+        .clone()
+        .into_iter()
+        .filter(move |entry| predicate(entry["name"].as_str().unwrap()))
+        .map(move |entry| {
+            serde_json::from_reader(std::io::BufReader::new(
                 std::fs::File::open(base.join(entry["path"].as_str().unwrap())).unwrap(),
-            )
+            ))
             .unwrap()
         })
-        .collect()
 }
 fn case(name: &str) -> Value {
     let base = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures"));
-    let index: Value =
-        serde_json::from_reader(std::fs::File::open(base.join("object-execution.json")).unwrap())
-            .unwrap();
+    let index: Value = serde_json::from_reader(std::io::BufReader::new(
+        std::fs::File::open(base.join("object-execution.json")).unwrap(),
+    ))
+    .unwrap();
     let entry = index["cases"]
         .as_array()
         .unwrap()
         .iter()
         .find(|entry| entry["name"] == name)
         .unwrap();
-    serde_json::from_reader(
+    serde_json::from_reader(std::io::BufReader::new(
         std::fs::File::open(base.join(entry["path"].as_str().unwrap())).unwrap(),
-    )
+    ))
     .unwrap()
 }
 fn source(name: &str) -> StateEnvelope {
@@ -65,6 +75,28 @@ fn apply(session: &mut NativeSession, operation: &Value) -> Value {
                 .iter()
                 .map(|event| session.event_json(event))
                 .collect();
+        }
+        "commit" | "uncommit" | "pass" | "finish" => {
+            let goa2_core::data::Datum::Text(hero) =
+                session.import_selection(&operation["hero"]).unwrap()
+            else {
+                panic!("planning hero must be text");
+            };
+            let result = match operation["kind"].as_str().unwrap() {
+                "commit" => session.commit_card(
+                    hero,
+                    goa2_core::cards::CardId(operation["card"].as_u64().unwrap() as u32),
+                ),
+                "uncommit" => session.uncommit_card(hero),
+                "pass" => session.pass_planning(hero),
+                "finish" => session.finish_planning(hero),
+                _ => unreachable!(),
+            };
+            match result {
+                Ok(()) => {}
+                Err(EngineError::InvalidInput(_)) => error = json!("invalid_planning_action"),
+                Err(error) => panic!("{error}"),
+            }
         }
         "start_revelation" => {
             session.start_revelation().unwrap();
@@ -138,8 +170,9 @@ fn apply(session: &mut NativeSession, operation: &Value) -> Value {
 
 #[test]
 fn every_shared_execution_boundary_restores_values_aliases_and_request_generations() {
-    let mut operations = 0;
-    for case in cases() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let operations = AtomicUsize::new(0);
+    let checked = fixture_parallel::for_each_case(cases(), |case| {
         let mut session =
             NativeSession::compile(serde_json::from_value(case["envelope"].clone()).unwrap())
                 .unwrap();
@@ -153,6 +186,10 @@ fn every_shared_execution_boundary_restores_values_aliases_and_request_generatio
             });
             assert_eq!(restored.export_envelope().unwrap().state, envelope.state);
             assert_eq!(
+                restored.export_envelope().unwrap().board_keys,
+                envelope.board_keys
+            );
+            assert_eq!(
                 restored.export_envelope().unwrap().object_bindings,
                 envelope.object_bindings
             );
@@ -161,10 +198,11 @@ fn every_shared_execution_boundary_restores_values_aliases_and_request_generatio
                 "{}: {op}",
                 case["name"]
             );
-            operations += 1;
+            operations.fetch_add(1, Ordering::Relaxed);
         }
-    }
-    assert_eq!(operations, 598);
+    });
+    assert_eq!(checked, 13766);
+    assert_eq!(operations.load(Ordering::Relaxed), 74472);
 }
 
 #[test]
@@ -241,7 +279,7 @@ fn cancelled_expired_and_zero_prefix_leave_live_object_state_untouched() {
 }
 
 #[test]
-fn shared_world_and_phase_mutations_still_require_dense_bindings() {
+fn legacy_dense_import_and_setup_phase_remain_guarded_for_shared_worlds() {
     let source = source("object-execution-context-list");
     assert!(
         NativeWorld::compile(&source, &mut Symbols::default())
@@ -255,14 +293,6 @@ fn shared_world_and_phase_mutations_still_require_dense_bindings() {
             .unwrap_err()
             .to_string()
             .contains("phase flow")
-    );
-    let mut movement = source;
-    movement.state["execution_stack"][3]["type"] = json!("move_unit");
-    assert!(
-        NativeSession::compile(movement)
-            .unwrap_err()
-            .to_string()
-            .contains("instruction family")
     );
 }
 
@@ -477,20 +507,13 @@ fn mandatory_abort_preserves_other_hero_boundary_before_restoring_outer_scope() 
 
 #[test]
 fn ordinary_and_arena_actor_and_owner_rules_match_the_same_source_boundaries() {
-    for case in cases().into_iter().filter(|case| {
-        case["name"]
-            .as_str()
-            .unwrap()
-            .starts_with("object-execution-scope-owner-")
-            || (case["name"]
-                .as_str()
-                .unwrap()
-                .starts_with("object-execution-scope-actor-")
-                && !case["name"]
-                    .as_str()
-                    .unwrap()
-                    .starts_with("object-execution-scope-actor-swap-"))
+    let mut checked = 0;
+    for case in cases_matching(|name| {
+        name.starts_with("object-execution-scope-owner-")
+            || (name.starts_with("object-execution-scope-actor-")
+                && !name.starts_with("object-execution-scope-actor-swap-"))
     }) {
+        checked += 1;
         let mut source: StateEnvelope = serde_json::from_value(case["envelope"].clone()).unwrap();
         source.object_bindings.clear();
         let mut ordinary = NativeSession::compile(source).unwrap();
@@ -515,6 +538,7 @@ fn ordinary_and_arena_actor_and_owner_rules_match_the_same_source_boundaries() {
                 == case["expected"][0]["semantic_state"]["execution_context"]
         );
     }
+    assert!(checked > 0);
 }
 
 #[test]
@@ -1137,18 +1161,2349 @@ fn retrieval_omits_cleared_override_without_mutating_copy_or_finished_step_paylo
 }
 
 #[test]
-fn parked_actor_action_restores_without_compiling_or_popping_the_unbound_card_body() {
+fn revealed_actor_opens_the_same_action_menu_after_restore() {
     let mut session = NativeSession::compile(source("object-execution-revelation-basic")).unwrap();
     session.start_revelation().unwrap();
-    let before = session.export_envelope().unwrap();
-    let mut restored = NativeSession::compile(before.clone()).unwrap();
-    for worker in [&mut session, &mut restored] {
-        assert!(
-            matches!(worker.advance(&ExecutionBudget::default()),Err(EngineError::Unsupported(message)) if message.contains("resolve_card"))
+    let mut restored = NativeSession::compile(session.export_envelope().unwrap()).unwrap();
+    let operation = json!({"kind": "advance"});
+    let result = apply(&mut session, &operation);
+    assert_eq!(result, apply(&mut restored, &operation));
+    assert_eq!(result["request"]["request_type"], "CHOOSE_ACTION");
+    assert!(result["request"]["options"].as_array().unwrap().len() > 1);
+}
+
+#[test]
+fn live_planning_pass_detaches_requests_but_retains_pending_and_rows() {
+    let fixture = case("object-execution-planning-command-pass-requests");
+    let mut session =
+        NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
+            .unwrap();
+    let result = apply(&mut session, &fixture["operations"][0]);
+    assert!(result["error"].is_null());
+    let state = &result["semantic_state"];
+    assert_eq!(
+        state["starting_position_requests"]
+            .as_object()
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(
+        state["execution_context"]["requests"]
+            .as_object()
+            .unwrap()
+            .len(),
+        3
+    );
+    assert_eq!(
+        state["starting_position_requests"]["keep"],
+        state["execution_context"]["kept_request"]
+    );
+    assert_eq!(
+        state["pending_inputs"],
+        state["execution_context"]["pending"]
+    );
+    // The general boundary test also restores this boundary and compares all
+    // instance and aggregate bindings before applying the next operation.
+}
+
+#[test]
+fn live_planning_errors_leave_state_untouched_and_finish_is_idempotent() {
+    for name in [
+        "pass-nonempty",
+        "pass-unknown",
+        "pass-duplicate",
+        "pass-wrong-phase",
+        "finish-missing",
+    ] {
+        let fixture = case(&format!("object-execution-planning-command-{name}"));
+        let mut session =
+            NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
+                .unwrap();
+        let before = serde_json::to_value(session.export_envelope().unwrap()).unwrap();
+        assert_eq!(
+            apply(&mut session, &fixture["operations"][0])["error"],
+            "invalid_planning_action"
         );
         assert_eq!(
-            serde_json::to_value(worker.export_envelope().unwrap()).unwrap(),
-            serde_json::to_value(&before).unwrap()
+            serde_json::to_value(session.export_envelope().unwrap()).unwrap(),
+            before
         );
     }
+    let fixture = case("object-execution-planning-command-finish");
+    let mut session =
+        NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
+            .unwrap();
+    apply(&mut session, &fixture["operations"][0]);
+    let once = serde_json::to_value(session.export_envelope().unwrap()).unwrap();
+    apply(&mut session, &fixture["operations"][1]);
+    assert_eq!(
+        serde_json::to_value(session.export_envelope().unwrap()).unwrap(),
+        once
+    );
+}
+
+#[test]
+fn confirmation_workers_keep_choices_request_ids_and_shared_step_state_private() {
+    let mut root = NativeSession::compile(source("object-execution-confirmation-basic")).unwrap();
+    root.advance(&ExecutionBudget::default()).unwrap();
+    let token = root.last_request.as_ref().unwrap().id;
+    let before = serde_json::to_value(root.export_envelope().unwrap()).unwrap();
+    let mut confirmed = root.clone();
+    let mut retry = root.clone();
+    for (worker, selection) in [(&mut confirmed, "CONFIRM"), (&mut retry, "NO")] {
+        let selection = worker.import_selection(&json!(selection)).unwrap();
+        worker.submit(token, selection).unwrap();
+    }
+    assert!(
+        confirmed
+            .advance(&ExecutionBudget::default())
+            .unwrap()
+            .request
+            .is_none()
+    );
+    let request = retry
+        .advance(&ExecutionBudget::default())
+        .unwrap()
+        .request
+        .unwrap();
+    assert_ne!(retry.request_token(request.id), root.request_token(token));
+    let state = retry.semantic_state().unwrap();
+    assert_eq!(
+        state["execution_context"]["confirmation"],
+        state["execution_context"]["same_step"]
+    );
+    assert_eq!(
+        state["execution_stack"][0],
+        state["execution_context"]["confirmation"]
+    );
+    assert_eq!(
+        serde_json::to_value(root.export_envelope().unwrap()).unwrap(),
+        before
+    );
+}
+
+#[test]
+fn malformed_confirmation_input_rejects_before_pop_unless_rollback_auto_confirms() {
+    use goa2_core::codec::{ObjectKind, ObjectPathPart};
+    let mut envelope = source("object-execution-confirmation-basic");
+    let paths: Vec<_> = envelope
+        .object_bindings
+        .iter()
+        .filter(|binding| binding.kind == ObjectKind::Step)
+        .flat_map(|binding| binding.paths.clone())
+        .collect();
+    for path in paths {
+        let mut value = &mut envelope.state;
+        for part in path {
+            value = match part {
+                ObjectPathPart::Key(key) => &mut value[key],
+                ObjectPathPart::Index(index) => &mut value[index],
+            };
+        }
+        value["pending_input"] = json!(1);
+    }
+    envelope.validate().unwrap();
+    let mut session = NativeSession::compile(envelope.clone()).unwrap();
+    let before = serde_json::to_value(session.export_envelope().unwrap()).unwrap();
+    let error = session.advance(&ExecutionBudget::default()).unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("confirmation input must be a mapping")
+    );
+    assert_eq!(
+        serde_json::to_value(session.export_envelope().unwrap()).unwrap(),
+        before
+    );
+    envelope.state["execution_context"]["rollback_frozen"] = json!(true);
+    let mut frozen = NativeSession::compile(envelope).unwrap();
+    assert!(
+        frozen
+            .advance(&ExecutionBudget::default())
+            .unwrap()
+            .request
+            .is_none()
+    );
+    assert_eq!(
+        frozen.semantic_state().unwrap()["execution_context"]["confirmation"]["pending_input"],
+        1
+    );
+}
+
+#[test]
+fn ordinary_and_live_confirmation_keep_the_same_prompt_and_active_step_input_state() {
+    let mut names = vec![
+        "basic".to_owned(),
+        "retry".to_owned(),
+        "stale".to_owned(),
+        "retained-valid".to_owned(),
+        "retained-invalid".to_owned(),
+        "empty-mapping".to_owned(),
+        "empty-list".to_owned(),
+    ];
+    for flag in ["rollback_frozen", "rollback_reanchor_pending"] {
+        for index in 0..6 {
+            names.push(format!("{flag}-{index}"));
+        }
+    }
+    for name in names {
+        let fixture = case(&format!("object-execution-confirmation-{name}"));
+        let mut envelope: StateEnvelope =
+            serde_json::from_value(fixture["envelope"].clone()).unwrap();
+        let mut live = NativeSession::compile(envelope.clone()).unwrap();
+        envelope.object_bindings.clear();
+        let mut ordinary = NativeSession::compile(envelope).unwrap();
+        for operation in fixture["operations"].as_array().unwrap() {
+            let live = apply(&mut live, operation);
+            let ordinary = apply(&mut ordinary, operation);
+            assert_eq!(live["request"], ordinary["request"], "{name}: {operation}");
+            assert_eq!(live["error"], ordinary["error"], "{name}: {operation}");
+            assert_eq!(
+                live["semantic_state"]["execution_stack"],
+                ordinary["semantic_state"]["execution_stack"],
+                "{name}: {operation}"
+            );
+        }
+    }
+}
+
+#[test]
+fn finalization_workers_keep_repeated_slots_continuations_and_context_private() {
+    let root = NativeSession::compile(source("object-execution-finalization-repeated")).unwrap();
+    let before = serde_json::to_value(root.export_envelope().unwrap()).unwrap();
+    let mut one = root.clone();
+    let mut two = root.clone();
+    for worker in [&mut one, &mut two] {
+        let result = worker.advance_prefix(1).unwrap();
+        assert_eq!(result.events.len(), 1);
+        assert!(
+            worker.semantic_state().unwrap()["execution_context"]
+                .as_object()
+                .unwrap()
+                .is_empty()
+        );
+    }
+    let path: Vec<goa2_core::codec::ObjectPathPart> =
+        serde_json::from_value(json!(["active_effects", 0, "finishing_steps"])).unwrap();
+    two.queue_steps(&path).unwrap();
+    two.advance_prefix(1).unwrap();
+    assert_eq!(
+        one.semantic_state().unwrap()["execution_stack"]
+            .as_array()
+            .unwrap()
+            .len(),
+        3
+    );
+    assert_eq!(
+        two.semantic_state().unwrap()["execution_stack"]
+            .as_array()
+            .unwrap()
+            .len(),
+        6
+    );
+    assert_eq!(
+        one.semantic_state().unwrap()["teams"],
+        two.semantic_state().unwrap()["teams"]
+    );
+    assert_eq!(
+        serde_json::to_value(root.export_envelope().unwrap()).unwrap(),
+        before
+    );
+}
+
+#[test]
+fn minion_walking_executes_after_restore_and_retains_spatial_aliases() {
+    let mut session =
+        NativeSession::compile(source("object-execution-minion-return-walk")).unwrap();
+    session.advance_prefix(1).unwrap();
+    let mut restored = NativeSession::compile(session.export_envelope().unwrap()).unwrap();
+    let actual = apply(&mut session, &json!({"kind":"advance"}));
+    assert_eq!(actual, apply(&mut restored, &json!({"kind":"advance"})));
+    assert_eq!(actual["events"][0]["event_type"], "UNIT_MOVED");
+    assert!(
+        actual["semantic_state"]["execution_stack"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+}
+
+#[test]
+fn minion_destination_workers_keep_team_choices_and_retained_input_private() {
+    let mut root = NativeSession::compile(source("object-execution-minion-return-choice")).unwrap();
+    root.advance_prefix(1).unwrap();
+    let before = root.export_envelope().unwrap();
+    let token = root.last_request.as_ref().unwrap().id;
+    let mut a = root.clone();
+    let mut b = root.clone();
+    for (worker, name) in [(&mut a, "choice"), (&mut b, "choice-last")] {
+        let fixture = case(&format!("object-execution-minion-return-{name}"));
+        let chosen = &fixture["operations"][1]["selection"];
+        let value = worker.import_selection(chosen).unwrap();
+        worker.submit(token, value).unwrap();
+        worker.advance_prefix(1).unwrap();
+        let state = worker.semantic_state().unwrap();
+        assert_eq!(&state["execution_stack"][0]["target_hex_arg"], chosen);
+        assert_eq!(
+            &state["execution_context"]["return_step"]["pending_input"]["selection"],
+            chosen
+        );
+    }
+    assert_ne!(a.semantic_state().unwrap(), b.semantic_state().unwrap());
+    let after = root.export_envelope().unwrap();
+    assert_eq!(before.state, after.state);
+    assert_eq!(before.object_bindings, after.object_bindings);
+}
+
+#[test]
+fn ordinary_and_live_piece_planning_keep_owner_cards_and_raw_buffers_identical() {
+    for name in ["cycle", "pass", "last", "buffers"] {
+        let fixture = case(&format!("object-execution-piece-planning-{name}"));
+        let mut envelope: StateEnvelope =
+            serde_json::from_value(fixture["envelope"].clone()).unwrap();
+        let mut live = NativeSession::compile(envelope.clone()).unwrap();
+        envelope.object_bindings.clear();
+        let mut ordinary = NativeSession::compile(envelope).unwrap();
+        for operation in fixture["operations"].as_array().unwrap() {
+            let live = apply(&mut live, operation);
+            let ordinary = apply(&mut ordinary, operation);
+            assert_eq!(live["error"], ordinary["error"], "{name}: {operation}");
+            for field in [
+                "teams",
+                "pending_inputs",
+                "pending_second_cards",
+                "planning_done",
+                "phase",
+                "current_actor_id",
+                "resolution_owner_id",
+                "unresolved_hero_ids",
+            ] {
+                assert_eq!(
+                    live["semantic_state"][field], ordinary["semantic_state"][field],
+                    "{name}: {field}: {operation}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn minion_placement_fallback_executes_and_restores_dense_and_arena_positions() {
+    for name in ["fallback", "cap-zero", "cap-one"] {
+        let fixture = case(&format!("object-execution-placement-minion-return-{name}"));
+        let mut root =
+            NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
+                .unwrap();
+        root.advance_prefix(1).unwrap();
+        let mut restored = NativeSession::compile(root.export_envelope().unwrap()).unwrap();
+        let actual = apply(&mut root, &json!({"kind":"advance_prefix","steps":1}));
+        assert_eq!(
+            actual,
+            apply(&mut restored, &json!({"kind":"advance_prefix","steps":1}))
+        );
+        assert_eq!(actual["events"][0]["event_type"], "UNIT_PLACED");
+        assert!(
+            actual["semantic_state"]["execution_stack"]
+                .as_array()
+                .unwrap()
+                .is_empty()
+        );
+    }
+}
+
+#[test]
+fn live_discard_private_equality_guards_before_pop_and_preserves_root_clone() {
+    let root = NativeSession::compile(source("object-execution-discard-equal-current")).unwrap();
+    let before = root.export_envelope().unwrap();
+    let mut worker = root.clone();
+    worker.advance_prefix(1).unwrap();
+    let state = worker.semantic_state().unwrap();
+    let hero = &state["teams"]["RED"]["heroes"][0];
+    assert!(hero["current_turn_card"].is_null());
+    assert_eq!(hero["played_cards"][0]["state"], "DISCARD");
+    assert_eq!(root.export_envelope().unwrap().state, before.state);
+    let after = worker.export_envelope().unwrap();
+    let mut restored = NativeSession::compile(after.clone()).unwrap();
+    assert_eq!(restored.export_envelope().unwrap().state, after.state);
+    worker.advance_prefix(1).unwrap();
+    restored.advance_prefix(1).unwrap();
+    assert!(
+        worker.semantic_state().unwrap()["execution_stack"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(
+        worker.export_envelope().unwrap().state,
+        restored.export_envelope().unwrap().state
+    );
+    assert_eq!(
+        worker.export_envelope().unwrap().object_bindings,
+        restored.export_envelope().unwrap().object_bindings
+    );
+    let mut missing = before.clone();
+    for instance in &mut missing.instances {
+        instance.equality = None;
+    }
+    let mut guarded = NativeSession::compile(missing.clone()).unwrap();
+    assert!(
+        guarded
+            .advance_prefix(1)
+            .unwrap_err()
+            .to_string()
+            .contains("private equality metadata")
+    );
+    assert_eq!(guarded.export_envelope().unwrap().state, missing.state);
+    assert_eq!(
+        guarded.export_envelope().unwrap().object_bindings,
+        missing.object_bindings
+    );
+}
+
+#[test]
+fn live_passive_movement_macro_preserves_pending_aliases_across_restore() {
+    let root = NativeSession::compile(source(
+        "object-execution-passive-offer-living_tsunami-before_attack-request",
+    ))
+    .unwrap();
+    let root_before = root.export_envelope().unwrap();
+    let mut worker = root.clone();
+    let request = worker.advance_prefix(1).unwrap().request.unwrap();
+    let yes = worker.import_selection(&json!("YES")).unwrap();
+    worker.submit(request.id, yes).unwrap();
+    worker.advance_prefix(1).unwrap();
+    let before = worker.export_envelope().unwrap();
+    assert_eq!(
+        before.state["execution_stack"]
+            .as_array()
+            .unwrap()
+            .last()
+            .unwrap()["type"],
+        "move_sequence"
+    );
+    let mut restored = NativeSession::compile(before.clone()).unwrap();
+    worker.advance_prefix(1).unwrap();
+    restored.advance_prefix(1).unwrap();
+    assert_eq!(
+        worker.export_envelope().unwrap().state,
+        restored.export_envelope().unwrap().state
+    );
+    assert_eq!(
+        worker.export_envelope().unwrap().object_bindings,
+        restored.export_envelope().unwrap().object_bindings
+    );
+    assert_eq!(root.export_envelope().unwrap().state, root_before.state);
+}
+
+#[test]
+fn accepted_rune_body_and_usage_are_private_to_each_search_worker() {
+    let root = NativeSession::compile(source(
+        "object-execution-passive-body-rune_mastery-before_action-many-runes",
+    ))
+    .unwrap();
+    let root_before = root.export_envelope().unwrap();
+    let mut first = root.clone();
+    let mut second = root.clone();
+    first.advance_prefix(1).unwrap();
+    second.advance_prefix(1).unwrap();
+    let second_before = second.export_envelope().unwrap();
+    let request = first.advance_prefix(1).unwrap().request.unwrap();
+    let choice = first.import_selection(&json!("bird")).unwrap();
+    first.submit(request.id, choice).unwrap();
+    first.advance(&ExecutionBudget::default()).unwrap();
+    let state = first.semantic_state().unwrap();
+    assert_eq!(state["execution_context"]["snorri_ult_rune_action"], "bird");
+    assert_eq!(
+        state["teams"]["RED"]["heroes"][0]["ultimate_card"]["passive_uses_this_turn"],
+        1
+    );
+    assert_eq!(second.export_envelope().unwrap().state, second_before.state);
+    assert_eq!(
+        second.export_envelope().unwrap().object_bindings,
+        second_before.object_bindings
+    );
+    assert_eq!(root.export_envelope().unwrap().state, root_before.state);
+}
+
+#[test]
+fn automatic_hex_keys_preserve_private_identity_across_restore_and_worker_forks() {
+    for variant in ["tile-key", "private-key", "visible-key"] {
+        let name = format!("object-execution-hex-identity-{variant}");
+        let root = NativeSession::compile(source(&name)).unwrap();
+        let before = root.export_envelope().unwrap();
+        assert_eq!(
+            before.board_keys.as_ref().unwrap()[0].path.is_none(),
+            variant == "private-key"
+        );
+        let mut worker = root.clone();
+        let mut restored = NativeSession::compile(before.clone()).unwrap();
+        worker.advance_prefix(1).unwrap();
+        restored.advance_prefix(1).unwrap();
+        let after = worker.export_envelope().unwrap();
+        assert_eq!(after.state, restored.export_envelope().unwrap().state);
+        assert_eq!(
+            after.object_bindings,
+            restored.export_envelope().unwrap().object_bindings
+        );
+        assert_eq!(
+            after.board_keys,
+            restored.export_envelope().unwrap().board_keys
+        );
+        let chosen = serde_json::from_value(json!(["execution_context", "chosen"])).unwrap();
+        let tile = serde_json::from_value(json!(["board", "tiles", "(-4, 0, 4)", "hex"])).unwrap();
+        let binding = after
+            .object_bindings
+            .iter()
+            .find(|binding| binding.paths.contains(&chosen))
+            .unwrap();
+        assert_eq!(binding.paths.contains(&tile), variant == "tile-key");
+        assert!(after.board_keys.as_ref().unwrap()[0].path.is_some());
+        let again = NativeSession::compile(after.clone())
+            .unwrap()
+            .export_envelope()
+            .unwrap();
+        assert_eq!(after.object_bindings, again.object_bindings);
+        assert_eq!(after.board_keys, again.board_keys);
+        assert_eq!(root.export_envelope().unwrap().state, before.state);
+        assert_eq!(
+            root.export_envelope().unwrap().object_bindings,
+            before.object_bindings
+        );
+    }
+}
+
+#[test]
+fn missing_or_malformed_hex_key_identity_is_rejected_without_popping() {
+    let valid = source("object-execution-hex-identity-tile-key");
+    let mut missing = valid.clone();
+    missing.board_keys = None;
+    let mut session = NativeSession::compile(missing.clone()).unwrap();
+    assert!(
+        session
+            .advance_prefix(1)
+            .unwrap_err()
+            .to_string()
+            .contains("board-key")
+    );
+    let after = session.export_envelope().unwrap();
+    assert_eq!(after.state, missing.state);
+    assert_eq!(after.object_bindings, missing.object_bindings);
+    let mut bad = valid.clone();
+    bad.board_keys.as_mut().unwrap().clear();
+    assert!(bad.validate().unwrap_err().contains("count mismatch"));
+    let mut bad = valid.clone();
+    bad.board_keys.as_mut().unwrap()[0].hex = goa2_core::geometry::Hex::new(0, 0, 0).unwrap();
+    assert!(bad.validate().unwrap_err().contains("coordinates mismatch"));
+    let mut bad = valid.clone();
+    bad.board_keys.as_mut().unwrap()[0].path =
+        Some(serde_json::from_value(json!(["execution_context", "chosen"])).unwrap());
+    assert!(bad.validate().unwrap_err().contains("alias coordinates"));
+    let mut bad = valid;
+    let path = bad.board_keys.as_ref().unwrap()[0]
+        .path
+        .as_ref()
+        .unwrap()
+        .clone();
+    let binding = bad
+        .object_bindings
+        .iter_mut()
+        .find(|binding| binding.paths.contains(&path))
+        .unwrap();
+    binding.kind = goa2_core::codec::ObjectKind::Dict;
+    binding.deepcopy_shared = false;
+    assert!(
+        NativeSession::compile(bad)
+            .unwrap_err()
+            .to_string()
+            .contains("immutable Hex")
+    );
+}
+
+#[test]
+fn live_unit_selection_keeps_worker_choices_and_pending_aliases_private() {
+    let mut root =
+        NativeSession::compile(source("object-execution-unit-world-plain-unit")).unwrap();
+    let request = root.advance_prefix(1).unwrap().request.unwrap();
+    let before = root.export_envelope().unwrap();
+    let mut left = root.clone();
+    let mut right = root.clone();
+    for (worker, choice) in [(&mut left, "hero_mrak"), (&mut right, "hero_hanu")] {
+        let selected = worker.import_selection(&json!(choice)).unwrap();
+        worker.submit(request.id, selected).unwrap();
+        worker.advance_prefix(1).unwrap();
+        let after = worker.export_envelope().unwrap();
+        assert_eq!(after.state["execution_context"]["chosen"], choice);
+        assert!(after.state["execution_context"]["selector"]["pending_input"].is_null());
+        assert!(after.state["execution_context"]["selector"]["pending_request_id"].is_null());
+        let restored = NativeSession::compile(after.clone())
+            .unwrap()
+            .export_envelope()
+            .unwrap();
+        assert_eq!(after.state, restored.state);
+        assert_eq!(after.object_bindings, restored.object_bindings);
+    }
+    assert_ne!(
+        left.semantic_state().unwrap(),
+        right.semantic_state().unwrap()
+    );
+    assert_eq!(root.export_envelope().unwrap().state, before.state);
+    assert_eq!(
+        root.export_envelope().unwrap().object_bindings,
+        before.object_bindings
+    );
+}
+
+#[test]
+fn unbound_live_unit_filter_leaves_stack_and_aliases_unchanged() {
+    let mut source = source("object-execution-unit-filter-plain-0");
+    source.state["execution_stack"][0]["filters"][0]["type"] = json!("unbound_unit_fixture");
+    source.state["execution_context"]["selector"]["filters"][0]["type"] =
+        json!("unbound_unit_fixture");
+    source.state["execution_context"]["filters_alias"][0]["type"] = json!("unbound_unit_fixture");
+    let mut session = NativeSession::compile(source).unwrap();
+    let before = session.export_envelope().unwrap();
+    assert!(
+        session
+            .advance_prefix(1)
+            .unwrap_err()
+            .to_string()
+            .contains("live unit filter not bound")
+    );
+    let after = session.export_envelope().unwrap();
+    assert_eq!(after.state, before.state);
+    assert_eq!(after.object_bindings, before.object_bindings);
+}
+
+#[test]
+fn nested_primary_filters_bind_the_card_used_for_fast_travel_color_exceptions() {
+    use goa2_core::{
+        data::Registers,
+        primary::{PrimaryOperands, PrimaryValues},
+        spatial::{SpatialContext, compile_filter},
+        stats::CardStats,
+        targeting::UnitFilter,
+    };
+    let source = case("object-execution-hex-travel-source-gold");
+    let mut envelope: StateEnvelope = serde_json::from_value(source["envelope"].clone()).unwrap();
+    // This rule-only probe does not execute the source selector's arena graph.
+    envelope.object_bindings.clear();
+    envelope.board_keys = None;
+    envelope.state["execution_context"] = json!({});
+    envelope.state["execution_stack"] = json!([]);
+    let mut symbols = Symbols::default();
+    let world = NativeWorld::compile(&envelope, &mut symbols).unwrap();
+    let slots = PrimaryOperands::compile(&mut symbols).unwrap();
+    let values = PrimaryValues {
+        hero: symbols.intern("hero_arien"),
+        card: symbols.intern("noble_blade"),
+        name: symbols.intern("Arien"),
+        stats: CardStats {
+            primary_value: 0,
+            range: 0,
+            radius: None,
+        },
+        ranged: false,
+    };
+    let mut filter=UnitFilter::And(vec![UnitFilter::Spatial(compile_filter(&json!({"type":"fast_travel_destination_filter","unit_id":goa2_core::primary::HERO,"source_card_id":goa2_core::primary::CARD,"require_zone_change":false}),&mut symbols).unwrap())]);
+    slots.unit_filter(&mut filter, &values).unwrap();
+    let UnitFilter::And(children) = filter else {
+        unreachable!()
+    };
+    let UnitFilter::Spatial(filter) = &children[0] else {
+        unreachable!()
+    };
+    let coordinates = ["q", "r", "s"].map(|name| symbols.intern(name));
+    let registers = Registers::default();
+    let spatial = SpatialContext {
+        count_observer: None,
+        world: &world,
+        registers: &registers,
+        symbols: &symbols,
+        actor: Some(values.hero),
+        frame: None,
+        coordinates,
+        range_override: None,
+        through_override: None,
+    };
+    let mut accepted = vec![true; world.tile_hexes().len()];
+    filter
+        .apply_scan(&spatial, world.tile_hexes(), &mut accepted)
+        .unwrap();
+    let expected = source["expected"][0]["request"]["options"]
+        .as_array()
+        .unwrap()
+        .len();
+    assert!(expected > 0);
+    assert_eq!(accepted.into_iter().filter(|yes| *yes).count(), expected);
+}
+
+#[test]
+fn query_result_lists_and_history_are_private_between_search_workers() {
+    let mut root =
+        NativeSession::compile(source("object-execution-query-live-collect-repeat")).unwrap();
+    root.advance_prefix(1).unwrap();
+    let before = root.export_envelope().unwrap();
+    let mut worker = root.clone();
+    let mut restored = NativeSession::compile(before.clone()).unwrap();
+    for session in [&mut worker, &mut restored] {
+        session.advance_prefix(3).unwrap();
+    }
+    let after = worker.export_envelope().unwrap();
+    assert_eq!(after.state, restored.export_envelope().unwrap().state);
+    assert_eq!(
+        after.object_bindings,
+        restored.export_envelope().unwrap().object_bindings
+    );
+    let context = &after.state["execution_context"];
+    assert!(
+        context["units"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("hero_arien"))
+    );
+    assert!(
+        !context["snapshots"][0]
+            .as_array()
+            .unwrap()
+            .contains(&json!("hero_arien"))
+    );
+    assert_eq!(root.export_envelope().unwrap().state, before.state);
+    assert_eq!(
+        root.export_envelope().unwrap().object_bindings,
+        before.object_bindings
+    );
+}
+
+#[test]
+fn unbound_query_predicate_rejects_before_pop_or_context_replacement() {
+    use goa2_core::codec::ObjectPathPart;
+    let mut envelope = source("object-execution-query-world-plain-UNIT");
+    let target = serde_json::from_value(json!(["execution_stack", 1, "filters", 0])).unwrap();
+    let paths = envelope
+        .object_bindings
+        .iter()
+        .find(|binding| binding.paths.contains(&target))
+        .unwrap()
+        .paths
+        .clone();
+    for path in paths {
+        let mut value = &mut envelope.state;
+        for part in path {
+            value = match part {
+                ObjectPathPart::Key(key) => value.get_mut(&key).unwrap(),
+                ObjectPathPart::Index(index) => value.get_mut(index).unwrap(),
+            };
+        }
+        value["type"] = json!("unbound_query_fixture");
+    }
+    let mut session = NativeSession::compile(envelope).unwrap();
+    let before = session.export_envelope().unwrap();
+    assert!(
+        session
+            .advance_prefix(1)
+            .unwrap_err()
+            .to_string()
+            .contains("live unit filter not bound")
+    );
+    let after = session.export_envelope().unwrap();
+    assert_eq!(after.state, before.state);
+    assert_eq!(after.object_bindings, before.object_bindings);
+}
+
+#[test]
+fn retrieval_and_effect_list_replacement_are_private_and_restore_exactly() {
+    let root = NativeSession::compile(source("object-execution-retrieve-effects")).unwrap();
+    let before = root.export_envelope().unwrap();
+    let mut worker = root.clone();
+    let mut restored = NativeSession::compile(before.clone()).unwrap();
+    for session in [&mut worker, &mut restored] {
+        let result = session.advance_prefix(1).unwrap();
+        assert_eq!(result.events.len(), 1);
+    }
+    let after = worker.export_envelope().unwrap();
+    assert_eq!(after.state, restored.export_envelope().unwrap().state);
+    assert_eq!(
+        after.object_bindings,
+        restored.export_envelope().unwrap().object_bindings
+    );
+    assert_eq!(after.state["active_effects"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        after.state["execution_context"]["old_effects"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    assert_eq!(root.export_envelope().unwrap().state, before.state);
+    assert_eq!(
+        root.export_envelope().unwrap().object_bindings,
+        before.object_bindings
+    );
+}
+
+#[test]
+fn retrieval_equality_guard_does_not_commit_staged_card_mutations() {
+    let mut envelope = source("object-execution-retrieve-equal-current");
+    let clone = envelope.state["execution_context"]["clone"]["$goa2_instance"]
+        .as_u64()
+        .unwrap() as usize;
+    envelope.instances[clone].equality = None;
+    let mut session = NativeSession::compile(envelope).unwrap();
+    let before = session.export_envelope().unwrap();
+    assert!(
+        session
+            .advance_prefix(1)
+            .unwrap_err()
+            .to_string()
+            .contains("private equality metadata")
+    );
+    let after = session.export_envelope().unwrap();
+    assert_eq!(after.state, before.state);
+    assert_eq!(after.object_bindings, before.object_bindings);
+}
+
+#[test]
+fn token_properties_and_query_results_are_private_and_restore_after_placement() {
+    for copied in [false, true] {
+        for immune in [false, true] {
+            let name = format!(
+                "object-execution-token-query-{}-{}",
+                if copied { "True" } else { "False" },
+                if immune { "True" } else { "False" }
+            );
+            let root = NativeSession::compile(source(&name)).unwrap();
+            let before = root.export_envelope().unwrap();
+            let mut branch = root.clone();
+            assert_eq!(branch.advance_prefix(1).unwrap().events.len(), 1);
+            let checkpoint = branch.export_envelope().unwrap();
+            let mut restored = NativeSession::compile(checkpoint.clone()).unwrap();
+            for session in [&mut branch, &mut restored] {
+                session.advance_prefix(4).unwrap();
+            }
+            let after = branch.export_envelope().unwrap();
+            let restored = restored.export_envelope().unwrap();
+            assert_eq!(after.state, restored.state);
+            assert_eq!(after.object_bindings, restored.object_bindings);
+            let expanded = after.materialize().unwrap();
+            let context = &expanded["execution_context"];
+            assert_eq!(context["pool_alias"]["owner_id"], json!("hero_wuk"));
+            assert_eq!(
+                context["pool_alias"]["is_immune_to_enemy_actions"],
+                json!(immune)
+            );
+            assert_eq!(
+                context["token_alias"]["owner_id"],
+                json!(if copied { "hero_brogan" } else { "hero_wuk" })
+            );
+            assert_eq!(context["own_units"].as_array().unwrap().len(), 1);
+            assert_eq!(
+                context["enemy_units"].as_array().unwrap().len(),
+                usize::from(copied || !immune)
+            );
+            let untouched = root.export_envelope().unwrap();
+            assert_eq!(untouched.state, before.state);
+            assert_eq!(untouched.object_bindings, before.object_bindings);
+        }
+    }
+}
+
+#[test]
+fn token_path_removal_and_copied_retry_do_not_mutate_the_parent_worker() {
+    for trail in ["False", "True"] {
+        let fixture = case(&format!(
+            "object-execution-token-path-removal-{trail}-True-invalid"
+        ));
+        let root =
+            NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
+                .unwrap();
+        let before = root.export_envelope().unwrap();
+        let mut branch = root.clone();
+        let operations = fixture["operations"].as_array().unwrap();
+        apply(&mut branch, &operations[0]);
+        let checkpoint = branch.export_envelope().unwrap();
+        let mut restored = NativeSession::compile(checkpoint).unwrap();
+        for operation in &operations[1..] {
+            assert_eq!(
+                apply(&mut branch, operation),
+                apply(&mut restored, operation)
+            );
+        }
+        let after = branch.export_envelope().unwrap();
+        assert_eq!(after.state["execution_stack"], json!([]));
+        let untouched = root.export_envelope().unwrap();
+        assert_eq!(untouched.state, before.state);
+        assert_eq!(untouched.object_bindings, before.object_bindings);
+        assert_eq!(untouched.board_keys, before.board_keys);
+    }
+}
+
+#[test]
+fn batch_scratch_search_and_generated_filter_aliases_restore_in_private_workers() {
+    for name in [
+        "object-execution-token-batch-farthest-removals-invalid",
+        "object-execution-token-batch-card-flashback-True-invalid",
+    ] {
+        let fixture = case(name);
+        let root =
+            NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
+                .unwrap();
+        let before = root.export_envelope().unwrap();
+        let mut branch = root.clone();
+        let operations = fixture["operations"].as_array().unwrap();
+        apply(&mut branch, &operations[0]);
+        let checkpoint = branch.export_envelope().unwrap();
+        let mut restored = NativeSession::compile(checkpoint).unwrap();
+        for operation in &operations[1..] {
+            assert_eq!(
+                apply(&mut branch, operation),
+                apply(&mut restored, operation)
+            );
+        }
+        let after = branch.export_envelope().unwrap();
+        assert_eq!(after.state["execution_stack"], json!([]));
+        assert!(
+            after.state["execution_context"]
+                .get("_batch_freed_hexes")
+                .is_none()
+        );
+        let untouched = root.export_envelope().unwrap();
+        assert_eq!(untouched.state, before.state);
+        assert_eq!(untouched.object_bindings, before.object_bindings);
+        assert_eq!(untouched.board_keys, before.board_keys);
+    }
+}
+
+#[test]
+fn unbound_batch_slot_predicate_rejects_before_pop_or_owner_write() {
+    use goa2_core::codec::ObjectPathPart;
+    let mut envelope = source("object-execution-token-batch-reserve-last-first");
+    let target =
+        serde_json::from_value(json!(["execution_stack", 1, "slot_filters", 0, 0])).unwrap();
+    let paths = envelope
+        .object_bindings
+        .iter()
+        .find(|binding| binding.paths.contains(&target))
+        .unwrap()
+        .paths
+        .clone();
+    for path in paths {
+        let mut value = &mut envelope.state;
+        for part in path {
+            value = match part {
+                ObjectPathPart::Key(key) => value.get_mut(&key).unwrap(),
+                ObjectPathPart::Index(index) => value.get_mut(index).unwrap(),
+            };
+        }
+        value["type"] = json!("unbound_batch_fixture");
+    }
+    let mut session = NativeSession::compile(envelope).unwrap();
+    let before = session.export_envelope().unwrap();
+    assert!(
+        session
+            .advance_prefix(1)
+            .unwrap_err()
+            .to_string()
+            .contains("live hex filter not bound")
+    );
+    let after = session.export_envelope().unwrap();
+    assert_eq!(after.state, before.state);
+    assert_eq!(after.object_bindings, before.object_bindings);
+}
+
+#[test]
+fn batch_feasibility_rejects_mismatched_tile_geometry_before_pop() {
+    let mut envelope = source("object-execution-token-batch-plain-first");
+    let key = envelope.state["board"]["tiles"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .next()
+        .unwrap()
+        .clone();
+    let path: Vec<goa2_core::codec::ObjectPathPart> =
+        serde_json::from_value(json!(["board", "tiles", key, "hex"])).unwrap();
+    // Detach the source dict's immutable key from its now-inconsistent Tile.hex.
+    for board_key in envelope.board_keys.as_mut().unwrap() {
+        if board_key.path.as_ref() == Some(&path) {
+            board_key.path = None;
+        }
+    }
+    envelope.state["board"]["tiles"][&key]["hex"] = json!({"q":20,"r":-20,"s":0});
+    let mut session = NativeSession::compile(envelope).unwrap();
+    let before = session.export_envelope().unwrap();
+    assert!(
+        session
+            .advance_prefix(1)
+            .unwrap_err()
+            .to_string()
+            .contains("token batch board tile/key geometry drift")
+    );
+    let after = session.export_envelope().unwrap();
+    assert_eq!(after.state, before.state);
+    assert_eq!(after.object_bindings, before.object_bindings);
+    assert_eq!(after.board_keys, before.board_keys);
+}
+
+#[test]
+fn movement_rechecks_its_live_gate_after_clearing_its_success_output() {
+    for gate in ["active", "skip"] {
+        let fixture = case(&format!("object-execution-walking-alias-success-{gate}"));
+        let mut session =
+            NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
+                .unwrap();
+        let before = session.export_envelope().unwrap();
+        let record = apply(&mut session, &fixture["operations"][0]);
+        assert_eq!(record["events"], json!([]));
+        assert_eq!(
+            record["semantic_state"],
+            fixture["expected"][0]["semantic_state"]
+        );
+        let after = session.export_envelope().unwrap();
+        assert_eq!(
+            after.state["entity_locations"],
+            before.state["entity_locations"]
+        );
+        if gate == "active" {
+            assert!(after.state["execution_context"].get("moved").is_none());
+        } else {
+            assert_eq!(
+                after.state["execution_context"]["moved"],
+                before.state["execution_context"]["moved"]
+            );
+        }
+    }
+}
+
+#[test]
+fn rock_ultimate_discard_continuations_restore_without_mutating_other_workers() {
+    for name in [
+        "object-execution-rock-ultimate-pieces-False-invalid",
+        "object-execution-rock-ultimate-stone-grip-True-True-first",
+    ] {
+        let fixture = case(name);
+        let root =
+            NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
+                .unwrap();
+        let before = root.export_envelope().unwrap();
+        let mut branch = root.clone();
+        let operations = fixture["operations"].as_array().unwrap();
+        apply(&mut branch, &operations[0]);
+        let mut restored = NativeSession::compile(branch.export_envelope().unwrap()).unwrap();
+        restored.last_request = branch.last_request.clone().map(|mut request| {
+            request.id = restored.import_request_token(&branch.request_token(request.id));
+            request
+        });
+        for operation in &operations[1..] {
+            assert_eq!(
+                apply(&mut branch, operation),
+                apply(&mut restored, operation)
+            );
+        }
+        let after = branch.export_envelope().unwrap();
+        assert_eq!(after.state["execution_stack"], json!([]));
+        let untouched = root.export_envelope().unwrap();
+        assert_eq!(untouched.state, before.state);
+        assert_eq!(untouched.object_bindings, before.object_bindings);
+        assert_eq!(untouched.board_keys, before.board_keys);
+    }
+}
+
+#[test]
+fn copied_generated_discard_keeps_its_id_value_and_has_distinct_trace_identity() {
+    let fixture = case("object-execution-rock-ultimate-plain-first");
+    let mut session =
+        NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
+            .unwrap();
+    let operations = fixture["operations"].as_array().unwrap();
+    apply(&mut session, &operations[0]);
+    let before = session.export_envelope().unwrap();
+    let template: Vec<goa2_core::codec::ObjectPathPart> =
+        serde_json::from_value(json!(["execution_stack", 1, "steps_template", 0])).unwrap();
+    let index = before
+        .object_bindings
+        .iter()
+        .position(|binding| binding.paths.contains(&template))
+        .unwrap();
+    let identities = session
+        .generated_step_objects(&before.object_bindings)
+        .unwrap();
+    let original = identities
+        .iter()
+        .find(|(binding, _)| *binding == index)
+        .unwrap()
+        .1;
+    let raw_id = before.state["execution_stack"][1]["steps_template"][0]["step_id"].clone();
+    for operation in &operations[1..7] {
+        apply(&mut session, operation);
+    }
+    let after = session.export_envelope().unwrap();
+    let target: Vec<goa2_core::codec::ObjectPathPart> =
+        serde_json::from_value(json!(["execution_stack", 1])).unwrap();
+    let index = after
+        .object_bindings
+        .iter()
+        .position(|binding| binding.paths.contains(&target))
+        .unwrap();
+    let identities = session
+        .generated_step_objects(&after.object_bindings)
+        .unwrap();
+    let copied = identities
+        .iter()
+        .find(|(binding, _)| *binding == index)
+        .unwrap()
+        .1;
+    assert_ne!(original, copied);
+    assert_eq!(after.state["execution_stack"][1]["step_id"], raw_id);
+    assert!(after.state.get("generated_step_objects").is_none());
+}
+
+#[test]
+fn rock_ultimate_coordinate_guard_is_atomic_and_used_gate_ignores_unused_coordinates() {
+    let mut envelope = source("object-execution-rock-ultimate-plain-first");
+    envelope.state["execution_context"]["rock"]["q"] = json!("bad");
+    let mut session = NativeSession::compile(envelope.clone()).unwrap();
+    let before = session.export_envelope().unwrap();
+    assert!(session.advance_prefix(1).is_err());
+    let after = session.export_envelope().unwrap();
+    assert_eq!(after.state, before.state);
+    assert_eq!(after.object_bindings, before.object_bindings);
+    envelope.state["execution_context"]["rock_ultimate_used"] = json!(true);
+    let mut skipped = NativeSession::compile(envelope).unwrap();
+    skipped.advance_prefix(1).unwrap();
+    assert_eq!(
+        skipped.export_envelope().unwrap().state["execution_context"]["_rock_ult_affected"],
+        json!(["old"])
+    );
+}
+
+#[test]
+fn turret_creation_removal_and_salvage_restore_in_private_workers() {
+    for name in [
+        "object-execution-turret-place-new",
+        "object-execution-turret-reuse-after-remove",
+        "object-execution-turret-queries",
+        "object-execution-turret-salvage-1-False-invalid",
+        "object-execution-turret-salvage-2-True-first",
+        "object-execution-turret-salvage-3-True-invalid",
+    ] {
+        let fixture = case(name);
+        let root =
+            NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
+                .unwrap();
+        let before = root.export_envelope().unwrap();
+        let mut branch = root.clone();
+        let operations = fixture["operations"].as_array().unwrap();
+        apply(&mut branch, &operations[0]);
+        let mut restored = NativeSession::compile(branch.export_envelope().unwrap()).unwrap();
+        restored.last_request = branch.last_request.clone().map(|mut request| {
+            request.id = restored.import_request_token(&branch.request_token(request.id));
+            request
+        });
+        for operation in &operations[1..] {
+            assert_eq!(
+                apply(&mut branch, operation),
+                apply(&mut restored, operation),
+                "{name}"
+            );
+        }
+        assert_eq!(
+            branch.export_envelope().unwrap().state["execution_stack"],
+            json!([])
+        );
+        let untouched = root.export_envelope().unwrap();
+        assert_eq!(untouched.state, before.state);
+        assert_eq!(untouched.object_bindings, before.object_bindings);
+        assert_eq!(untouched.board_keys, before.board_keys);
+    }
+}
+
+#[test]
+fn turret_invalid_owner_and_registration_collision_are_atomic() {
+    for name in [
+        "object-execution-turret-place-owner-key",
+        "object-execution-turret-place-reuse",
+    ] {
+        let mut envelope = source(name);
+        if name.ends_with("owner-key") {
+            envelope.state["execution_context"]["who"] = json!(17);
+        } else {
+            // Change the existing model's class discriminator at all alias paths.
+            envelope.state["misc_entities"]["trinkets_turret"]["entity_kind"] =
+                json!("placeholder");
+            envelope.state["execution_context"]["turret_alias"]["entity_kind"] =
+                json!("placeholder");
+        }
+        let mut session = NativeSession::compile(envelope).unwrap();
+        let before = session.export_envelope().unwrap();
+        assert!(session.advance_prefix(1).is_err());
+        let after = session.export_envelope().unwrap();
+        assert_eq!(after.state, before.state);
+        assert_eq!(after.object_bindings, before.object_bindings);
+        assert_eq!(after.board_keys, before.board_keys);
+    }
+}
+
+#[test]
+fn multi_selection_lists_and_filter_updates_restore_in_private_workers() {
+    for name in [
+        "object-execution-multi-shared-output-invalid",
+        "object-execution-multi-output-filter-first",
+        "object-execution-multi-hex-actor-piece-range-invalid",
+        "object-execution-multi-card-self_destruct-True-invalid",
+        "object-execution-multi-card-emergency_protocol-True-first",
+        "object-execution-multi-injected-request-1.5",
+    ] {
+        let fixture = case(name);
+        let root =
+            NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
+                .unwrap();
+        let before = root.export_envelope().unwrap();
+        let mut branch = root.clone();
+        let operations = fixture["operations"].as_array().unwrap();
+        apply(&mut branch, &operations[0]);
+        let mut restored = NativeSession::compile(branch.export_envelope().unwrap()).unwrap();
+        restored.last_request = branch.last_request.clone().map(|mut request| {
+            request.id = restored.import_request_token(&branch.request_token(request.id));
+            request
+        });
+        for operation in &operations[1..] {
+            assert_eq!(
+                apply(&mut branch, operation),
+                apply(&mut restored, operation),
+                "{name}"
+            );
+        }
+        let untouched = root.export_envelope().unwrap();
+        assert_eq!(untouched.state, before.state);
+        assert_eq!(untouched.object_bindings, before.object_bindings);
+        assert_eq!(untouched.board_keys, before.board_keys);
+    }
+}
+
+#[test]
+fn multi_selection_unbound_filter_is_atomic_and_actorless_bypasses_it() {
+    use goa2_core::codec::ObjectPathPart;
+    let fixture = case("object-execution-multi-output-filter-first");
+    let mut envelope = source("object-execution-multi-output-filter-first");
+    let target: Vec<ObjectPathPart> =
+        serde_json::from_value(json!(["execution_context", "selector", "filters", 0])).unwrap();
+    let paths = envelope
+        .object_bindings
+        .iter()
+        .find(|binding| binding.paths.contains(&target))
+        .unwrap()
+        .paths
+        .clone();
+    for path in paths {
+        let mut value = &mut envelope.state;
+        for part in path {
+            value = match part {
+                ObjectPathPart::Key(key) => value.get_mut(&key).unwrap(),
+                ObjectPathPart::Index(index) => value.get_mut(index).unwrap(),
+            };
+        }
+        value["type"] = json!("unbound_multi_fixture");
+    }
+    let mut session = NativeSession::compile(envelope.clone()).unwrap();
+    let before = session.export_envelope().unwrap();
+    assert!(session.advance_prefix(1).is_err());
+    let after = session.export_envelope().unwrap();
+    assert_eq!(after.state, before.state);
+    assert_eq!(after.object_bindings, before.object_bindings);
+    assert_eq!(after.board_keys, before.board_keys);
+    envelope.state["current_actor_id"] = Value::Null;
+    let mut actorless = NativeSession::compile(envelope).unwrap();
+    apply(&mut actorless, &fixture["operations"][0]);
+    let after = actorless.export_envelope().unwrap();
+    let output: Vec<ObjectPathPart> =
+        serde_json::from_value(json!(["execution_context", "chosen"])).unwrap();
+    let selections: Vec<ObjectPathPart> =
+        serde_json::from_value(json!(["execution_context", "selector", "selections"])).unwrap();
+    assert!(
+        after
+            .object_bindings
+            .iter()
+            .any(|binding| binding.paths.contains(&output) && binding.paths.contains(&selections))
+    );
+}
+
+#[test]
+fn multi_selection_retains_injected_request_and_rejects_early_done() {
+    let mut session =
+        NativeSession::compile(source("object-execution-multi-injected-request-1.5")).unwrap();
+    let request = session.advance_prefix(1).unwrap().request.unwrap();
+    assert_eq!(session.request_token(request.id), "fixture/multi/request");
+    assert!(
+        !session.request_json(&request)["can_skip"]
+            .as_bool()
+            .unwrap()
+    );
+    let selection = session.import_selection(&json!("DONE")).unwrap();
+    session.submit(request.id, selection).unwrap();
+    let request = session.advance_prefix(1).unwrap().request.unwrap();
+    assert!(
+        !session.request_json(&request)["can_skip"]
+            .as_bool()
+            .unwrap()
+    );
+    assert!(
+        session.export_envelope().unwrap().state["execution_context"]["selector"]["selections"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+}
+
+#[test]
+fn defeat_protection_and_terminal_boundaries_restore_in_private_workers() {
+    for name in [
+        "object-execution-defeat-hero-current",
+        "object-execution-defeat-hero-shared-tracking",
+        "object-execution-live-combat-effect-protection-two-skip-False",
+        "object-execution-live-combat-effect-protection-totem-priority-False",
+        "object-execution-live-combat-effect-protection-card-linked-False",
+        "object-execution-defeat-card-emergency_protocol-both-True-invalid",
+        "object-execution-defeat-terminal-hero_swift-RESOLUTION",
+        "object-execution-defeat-terminal-RED-GAME_OVER",
+    ] {
+        let fixture = case(name);
+        let root =
+            NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
+                .unwrap();
+        let before = root.export_envelope().unwrap();
+        let mut branch = root.clone();
+        let operations = fixture["operations"].as_array().unwrap();
+        apply(&mut branch, &operations[0]);
+        let mut restored = NativeSession::compile(branch.export_envelope().unwrap()).unwrap();
+        restored.last_request = branch.last_request.clone().map(|mut request| {
+            request.id = restored.import_request_token(&branch.request_token(request.id));
+            request
+        });
+        for operation in &operations[1..] {
+            assert_eq!(
+                apply(&mut branch, operation),
+                apply(&mut restored, operation),
+                "{name}"
+            );
+        }
+        let untouched = root.export_envelope().unwrap();
+        assert_eq!(untouched.state, before.state);
+        assert_eq!(untouched.object_bindings, before.object_bindings);
+        assert_eq!(untouched.board_keys, before.board_keys);
+    }
+}
+
+#[test]
+fn defeat_log_and_gold_overflow_guards_are_atomic() {
+    for overflow in [false, true] {
+        let mut envelope = source("object-execution-defeat-hero-plain");
+        if overflow {
+            envelope.state["teams"]["RED"]["heroes"][0]["gold"] = json!(i64::MAX);
+        } else {
+            envelope.state["execution_context"]["defeat_log"] = Value::Null;
+        }
+        let mut session = NativeSession::compile(envelope).unwrap();
+        let before = session.export_envelope().unwrap();
+        assert!(session.advance_prefix(1).is_err());
+        let after = session.export_envelope().unwrap();
+        assert_eq!(after.state, before.state);
+        assert_eq!(after.object_bindings, before.object_bindings);
+        assert_eq!(after.board_keys, before.board_keys);
+    }
+}
+
+#[test]
+fn game_over_rejects_ambiguous_winner_without_clearing_shared_stacks() {
+    use goa2_core::codec::ObjectPathPart;
+    let mut envelope = source("object-execution-defeat-terminal-RED-RESOLUTION");
+    let path: Vec<ObjectPathPart> =
+        serde_json::from_value(json!(["execution_context", "defeat_steps", 0])).unwrap();
+    let aliases = envelope
+        .object_bindings
+        .iter()
+        .find(|binding| binding.paths.contains(&path))
+        .unwrap()
+        .paths
+        .clone();
+    for alias in aliases {
+        let mut value = &mut envelope.state;
+        for part in alias {
+            value = match part {
+                ObjectPathPart::Key(key) => value.get_mut(&key).unwrap(),
+                ObjectPathPart::Index(index) => value.get_mut(index).unwrap(),
+            };
+        }
+        value["individual_winner_id"] = json!("hero_swift");
+    }
+    let mut session = NativeSession::compile(envelope).unwrap();
+    let before = session.export_envelope().unwrap();
+    assert!(session.advance_prefix(1).is_err());
+    let after = session.export_envelope().unwrap();
+    assert_eq!(after.state, before.state);
+    assert_eq!(after.object_bindings, before.object_bindings);
+}
+
+#[test]
+fn shared_bounty_budgets_are_private_and_equal_ids_do_not_merge_models() {
+    for suffix in [
+        "1-2-True",
+        "2-2-True",
+        "1-3-True",
+        "2-3-True",
+        "1-2-False",
+        "2-2-False",
+    ] {
+        let fixture = case(&format!("object-execution-defeat-bounty-model-{suffix}"));
+        let root =
+            NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
+                .unwrap();
+        let before = root.export_envelope().unwrap();
+        let mut left = root.clone();
+        let mut right = root.clone();
+        for operation in fixture["operations"].as_array().unwrap() {
+            assert_eq!(apply(&mut left, operation), apply(&mut right, operation));
+        }
+        let after = left.export_envelope().unwrap();
+        let expected = &fixture["expected"].as_array().unwrap().last().unwrap()["semantic_state"];
+        let materialized = after.materialize().unwrap();
+        assert_eq!(materialized["active_effects"], expected["active_effects"]);
+        assert_eq!(materialized["teams"], expected["teams"]);
+        let untouched = root.export_envelope().unwrap();
+        assert_eq!(untouched.state, before.state);
+        assert_eq!(untouched.object_bindings, before.object_bindings);
+    }
+}
+
+#[test]
+fn combat_resolution_snapshots_and_history_restore_in_private_workers() {
+    for name in [
+        "object-execution-combat-live-precision-0",
+        "object-execution-combat-live-precision-7",
+        "object-execution-combat-live-flags-alias-block",
+        "object-execution-combat-snapshot-targeting-independent",
+        "object-execution-combat-snapshot-plain-ANY",
+        "object-execution-combat-track-special-tuple-log",
+        "object-execution-combat-track-special-output-marks",
+    ] {
+        let fixture = case(name);
+        let root =
+            NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
+                .unwrap();
+        let before = root.export_envelope().unwrap();
+        let mut branch = root.clone();
+        let operations = fixture["operations"].as_array().unwrap();
+        apply(&mut branch, &operations[0]);
+        let mut restored = NativeSession::compile(branch.export_envelope().unwrap()).unwrap();
+        for operation in &operations[1..] {
+            assert_eq!(
+                apply(&mut branch, operation),
+                apply(&mut restored, operation),
+                "{name}"
+            );
+        }
+        let untouched = root.export_envelope().unwrap();
+        assert_eq!(untouched.state, before.state);
+        assert_eq!(untouched.object_bindings, before.object_bindings);
+        assert_eq!(untouched.board_keys, before.board_keys);
+    }
+}
+
+#[test]
+fn live_combat_numeric_guards_are_atomic_and_missing_targets_bypass_them() {
+    let mut envelope = source("object-execution-combat-live-flags-custom-key");
+    envelope.state["execution_context"]["defense_value"] = json!("not-numeric");
+    let mut session = NativeSession::compile(envelope.clone()).unwrap();
+    let before = session.export_envelope().unwrap();
+    assert!(session.advance_prefix(1).is_err());
+    let after = session.export_envelope().unwrap();
+    assert_eq!(after.state, before.state);
+    assert_eq!(after.object_bindings, before.object_bindings);
+    envelope.state["execution_context"]
+        .as_object_mut()
+        .unwrap()
+        .shift_remove("custom");
+    let mut missing = NativeSession::compile(envelope).unwrap();
+    missing.advance_prefix(1).unwrap();
+    let state = missing.export_envelope().unwrap().state;
+    assert_eq!(state["execution_context"]["block_succeeded"], json!(false));
+    assert_eq!(
+        state["execution_context"]["last_combat_target"],
+        json!("old")
+    );
+}
+
+#[test]
+fn attack_history_mark_guard_does_not_change_the_saved_log_or_output() {
+    let mut envelope = source("object-execution-combat-track-special-output-marks");
+    envelope.state["execution_context"]["defeat_marks"]["attack_target"] = json!(1.5);
+    let mut session = NativeSession::compile(envelope).unwrap();
+    let before = session.export_envelope().unwrap();
+    assert!(session.advance_prefix(1).is_err());
+    let after = session.export_envelope().unwrap();
+    assert_eq!(after.state, before.state);
+    assert_eq!(after.object_bindings, before.object_bindings);
+}
+
+#[test]
+fn attack_macro_copies_and_filter_aliases_restore_in_private_workers() {
+    for name in [
+        "default",
+        "existing",
+        "optional-shared",
+        "optional-skip",
+        "shared-tracking",
+        "piece-bound-1",
+    ] {
+        let fixture = case(&format!("object-execution-attack-macro-{name}"));
+        let root =
+            NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
+                .unwrap();
+        let before = root.export_envelope().unwrap();
+        let mut branch = root.clone();
+        let operations = fixture["operations"].as_array().unwrap();
+        apply(&mut branch, &operations[0]);
+        let mut restored = NativeSession::compile(branch.export_envelope().unwrap()).unwrap();
+        for operation in &operations[1..] {
+            assert_eq!(
+                apply(&mut branch, operation),
+                apply(&mut restored, operation),
+                "{name}"
+            );
+        }
+        let untouched = root.export_envelope().unwrap();
+        assert_eq!(untouched.state, before.state);
+        assert_eq!(untouched.object_bindings, before.object_bindings);
+        assert_eq!(untouched.board_keys, before.board_keys);
+    }
+}
+
+#[test]
+fn attack_bonus_guard_is_atomic_and_missing_targets_bypass_unused_values() {
+    use goa2_core::codec::ObjectPathPart;
+    let mut envelope = source("object-execution-attack-macro-bonus-int");
+    envelope.state["execution_context"]["damage_bonus"] = json!("not-an-integer");
+    let mut session = NativeSession::compile(envelope.clone()).unwrap();
+    let before = session.export_envelope().unwrap();
+    assert!(session.advance_prefix(1).is_err());
+    let after = session.export_envelope().unwrap();
+    assert_eq!(after.state, before.state);
+    assert_eq!(after.object_bindings, before.object_bindings);
+    let path: Vec<ObjectPathPart> =
+        serde_json::from_value(json!(["execution_context", "attack_alias"])).unwrap();
+    let aliases = envelope
+        .object_bindings
+        .iter()
+        .find(|binding| binding.paths.contains(&path))
+        .unwrap()
+        .paths
+        .clone();
+    for alias in aliases {
+        let mut value = &mut envelope.state;
+        for part in alias {
+            value = match part {
+                ObjectPathPart::Key(key) => value.get_mut(&key).unwrap(),
+                ObjectPathPart::Index(index) => value.get_mut(index).unwrap(),
+            };
+        }
+        value["target_id_key"] = json!("missing_target");
+    }
+    let mut missing = NativeSession::compile(envelope).unwrap();
+    missing.advance_prefix(1).unwrap();
+    let after = missing.export_envelope().unwrap();
+    assert_eq!(
+        after.state["execution_context"]["attack_damage"],
+        json!("old")
+    );
+    assert_eq!(
+        after.state["execution_context"]["defeat_marks"],
+        before.state["execution_context"]["defeat_marks"]
+    );
+}
+
+#[test]
+fn attack_expansion_executes_defense_continuations_and_restores_each_boundary() {
+    let mut session =
+        NativeSession::compile(source("object-execution-attack-macro-existing")).unwrap();
+    session.advance_prefix(1).unwrap();
+    let mut defense = false;
+    for _ in 0..30 {
+        let before = session.export_envelope().unwrap();
+        let stack = before.state["execution_stack"].as_array().unwrap();
+        if stack.is_empty() {
+            assert!(defense);
+            return;
+        }
+        defense |= stack.last().unwrap()["type"] == "resolve_defense_text";
+        let mut restored = NativeSession::compile(before).unwrap();
+        restored.last_request = session.last_request.clone().map(|mut request| {
+            request.id = restored.import_request_token(&session.request_token(request.id));
+            request
+        });
+        let operation = json!({"kind":"advance_prefix","steps":1});
+        let actual = apply(&mut session, &operation);
+        assert_eq!(actual, apply(&mut restored, &operation));
+        if !actual["request"].is_null() {
+            let input = json!({"kind":"input","request_id":"current","selection":"PASS"});
+            assert_eq!(apply(&mut session, &input), apply(&mut restored, &input));
+        }
+    }
+    panic!("attack continuation did not finish");
+}
+
+#[test]
+fn reaction_windows_restore_pending_aliases_and_action_stacks_in_private_workers() {
+    for name in [
+        "Arien-prompt-invalid-pass",
+        "context-stack-aggregate-current",
+        "shield-equal-hand",
+        "shield-unequal-hand",
+        "piece-piece-3",
+        "reused-card",
+        "attack-hero-card",
+        "actor-save-then-read",
+        "actor-numeric",
+    ] {
+        let fixture = case(&format!("object-execution-live-reaction-{name}"));
+        let root =
+            NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
+                .unwrap();
+        let before = root.export_envelope().unwrap();
+        let mut branch = root.clone();
+        let operations = fixture["operations"].as_array().unwrap();
+        apply(&mut branch, &operations[0]);
+        let mut restored = NativeSession::compile(branch.export_envelope().unwrap()).unwrap();
+        restored.last_request = branch.last_request.clone().map(|mut request| {
+            request.id = restored.import_request_token(&branch.request_token(request.id));
+            request
+        });
+        for operation in &operations[1..] {
+            assert_eq!(
+                apply(&mut branch, operation),
+                apply(&mut restored, operation),
+                "{name}"
+            );
+        }
+        let untouched = root.export_envelope().unwrap();
+        assert_eq!(untouched.state, before.state);
+        assert_eq!(untouched.object_bindings, before.object_bindings);
+        assert_eq!(untouched.board_keys, before.board_keys);
+    }
+}
+
+#[test]
+fn invalid_reaction_stack_is_rejected_before_resetting_flags_or_consuming_input() {
+    let mut opening = NativeSession::compile(source(
+        "object-execution-live-reaction-context-stack-null-no-current",
+    ))
+    .unwrap();
+    let request = opening.advance_prefix(1).unwrap().request.unwrap();
+    let wire = opening.request_json(&request);
+    let selected = opening.import_selection(&wire["options"][0]["id"]).unwrap();
+    opening.submit(request.id, selected).unwrap();
+    let mut envelope = opening.export_envelope().unwrap();
+    envelope.state["execution_context"]["current_action_type"] = json!("ATTACK");
+    envelope.state["execution_context"]["auto_block"] = json!(true);
+    let mut session = NativeSession::compile(envelope).unwrap();
+    let before = session.export_envelope().unwrap();
+    assert!(session.advance_prefix(1).is_err());
+    let after = session.export_envelope().unwrap();
+    assert_eq!(after.state, before.state);
+    assert_eq!(after.object_bindings, before.object_bindings);
+}
+
+#[test]
+fn generated_actor_switches_read_live_save_and_actor_keys() {
+    let fixture = case("object-execution-live-reaction-attack-minion");
+    let mut session =
+        NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
+            .unwrap();
+    for operation in fixture["operations"].as_array().unwrap() {
+        apply(&mut session, operation);
+    }
+    let state = session.export_envelope().unwrap().materialize().unwrap();
+    assert_eq!(
+        state["current_actor_id"],
+        state["execution_context"]["defender_id"]
+    );
+    assert_eq!(
+        state["execution_context"]["_pre_pam_actor"],
+        json!("hero_swift")
+    );
+    assert!(
+        !state["execution_context"]
+            .as_object()
+            .unwrap()
+            .contains_key("saved_actor_id")
+    );
+}
+
+#[test]
+fn pre_action_children_and_reentry_restore_in_private_workers() {
+    for name in [
+        "live-targeting-pre-move-mine-blast-first",
+        "live-targeting-pre-discard-one-card-last",
+        "pre-action-discard-alias-shared-step",
+        "pre-action-discard-alias-shared-processed",
+        "pre-action-card-disruptor_grid-defender",
+        "pre-action-card-mastery-first",
+        "live-targeting-attack-pre-leave-radius-False-first",
+        "live-targeting-pre-discard-owner-bound-first",
+    ] {
+        let fixture = case(&format!("object-execution-{name}"));
+        let root =
+            NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
+                .unwrap();
+        let before = root.export_envelope().unwrap();
+        let mut branch = root.clone();
+        let operations = fixture["operations"].as_array().unwrap();
+        apply(&mut branch, &operations[0]);
+        let mut restored = NativeSession::compile(branch.export_envelope().unwrap()).unwrap();
+        restored.last_request = branch.last_request.clone().map(|mut request| {
+            request.id = restored.import_request_token(&branch.request_token(request.id));
+            request
+        });
+        for operation in &operations[1..] {
+            assert_eq!(
+                apply(&mut branch, operation),
+                apply(&mut restored, operation),
+                "{name}"
+            );
+        }
+        let untouched = root.export_envelope().unwrap();
+        assert_eq!(untouched.state, before.state);
+        assert_eq!(untouched.object_bindings, before.object_bindings);
+        assert_eq!(untouched.board_keys, before.board_keys);
+    }
+}
+
+#[test]
+fn pre_action_processed_append_guard_is_atomic_and_unread_state_is_accepted() {
+    use goa2_core::codec::ObjectPathPart;
+    let mut envelope = source("object-execution-pre-action-discard-alias-processed-tuple");
+    let path: Vec<ObjectPathPart> = serde_json::from_value(json!(["active_effects", 0])).unwrap();
+    let aliases = envelope
+        .object_bindings
+        .iter()
+        .find(|binding| binding.paths.contains(&path))
+        .unwrap()
+        .paths
+        .clone();
+    for alias in aliases {
+        let mut value = &mut envelope.state;
+        for part in alias {
+            value = match part {
+                ObjectPathPart::Key(key) => value.get_mut(&key).unwrap(),
+                ObjectPathPart::Index(index) => value.get_mut(index).unwrap(),
+            };
+        }
+        value["id"] = json!("new-disrupt");
+    }
+    let mut session = NativeSession::compile(envelope).unwrap();
+    let before = session.export_envelope().unwrap();
+    assert!(session.advance_prefix(1).is_err());
+    let after = session.export_envelope().unwrap();
+    assert_eq!(after.state, before.state);
+    assert_eq!(after.object_bindings, before.object_bindings);
+    let mut no_effects = NativeSession::compile(source(
+        "object-execution-pre-action-discard-alias-no-effects-null",
+    ))
+    .unwrap();
+    no_effects.advance_prefix(1).unwrap();
+    assert!(no_effects.export_envelope().unwrap().state["execution_context"]["pre_action_alias"]["processed_effect_ids"].is_null());
+}
+
+#[test]
+fn resource_effects_restore_at_every_boundary_and_keep_workers_private() {
+    let mut cases_checked = 0;
+    let mut operations = 0;
+    for case in cases_matching(|name| name.starts_with("object-execution-resource-")) {
+        let envelope: StateEnvelope = serde_json::from_value(case["envelope"].clone()).unwrap();
+        let root = NativeSession::compile(envelope).unwrap();
+        let before = root.export_envelope().unwrap();
+        let mut worker = root.clone();
+        for operation in case["operations"].as_array().unwrap() {
+            let mut restored = NativeSession::compile(worker.export_envelope().unwrap()).unwrap();
+            assert_eq!(
+                apply(&mut worker, operation),
+                apply(&mut restored, operation),
+                "{}",
+                case["name"]
+            );
+            operations += 1;
+        }
+        let after = root.export_envelope().unwrap();
+        assert_eq!(before.state, after.state);
+        assert_eq!(before.object_bindings, after.object_bindings);
+        cases_checked += 1;
+    }
+    assert_eq!(cases_checked, 51);
+    assert_eq!(operations, 207);
+}
+
+#[test]
+fn primary_text_bodies_restore_all_boundaries_and_keep_worker_models_private() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let operations = AtomicUsize::new(0);
+    let count = fixture_parallel::for_each_case(
+        cases_matching(|name| name.starts_with("object-execution-primary-text-")),
+        |case| {
+            let root =
+                NativeSession::compile(serde_json::from_value(case["envelope"].clone()).unwrap())
+                    .unwrap();
+            let before = root.export_envelope().unwrap();
+            let mut worker = root.clone();
+            for operation in case["operations"].as_array().unwrap() {
+                let mut restored =
+                    NativeSession::compile(worker.export_envelope().unwrap()).unwrap();
+                restored.last_request = worker.last_request.clone().map(|mut request| {
+                    request.id = restored.import_request_token(&worker.request_token(request.id));
+                    request
+                });
+                assert_eq!(
+                    apply(&mut worker, operation),
+                    apply(&mut restored, operation),
+                    "{}",
+                    case["name"]
+                );
+                operations.fetch_add(1, Ordering::Relaxed);
+            }
+            let after = root.export_envelope().unwrap();
+            assert_eq!(before.state, after.state);
+            assert_eq!(before.object_bindings, after.object_bindings);
+        },
+    );
+    assert_eq!(count, 711);
+    assert_eq!(operations.load(Ordering::Relaxed), 1911);
+}
+
+#[test]
+fn utility_continuations_restore_all_boundaries_with_private_model_identities() {
+    let mut cases_checked = 0;
+    let mut operations = 0;
+    for case in cases_matching(|name| name.starts_with("object-execution-utility-")) {
+        let root =
+            NativeSession::compile(serde_json::from_value(case["envelope"].clone()).unwrap())
+                .unwrap();
+        let before = root.export_envelope().unwrap();
+        let mut worker = root.clone();
+        for operation in case["operations"].as_array().unwrap() {
+            let mut restored = NativeSession::compile(worker.export_envelope().unwrap()).unwrap();
+            restored.last_request = worker.last_request.clone().map(|mut request| {
+                request.id = restored.import_request_token(&worker.request_token(request.id));
+                request
+            });
+            assert_eq!(
+                apply(&mut worker, operation),
+                apply(&mut restored, operation),
+                "{}",
+                case["name"]
+            );
+            operations += 1;
+        }
+        let after = root.export_envelope().unwrap();
+        assert_eq!(after.state, before.state);
+        assert_eq!(after.object_bindings, before.object_bindings);
+        cases_checked += 1;
+    }
+    assert_eq!(cases_checked, 99);
+    assert_eq!(operations, 1070);
+}
+
+#[test]
+fn push_execution_restores_each_boundary_and_keeps_spatial_and_token_models_private() {
+    let mut count = 0;
+    let mut operations = 0;
+    for case in cases_matching(|name| name.starts_with("object-execution-arena-push-")) {
+        let root =
+            NativeSession::compile(serde_json::from_value(case["envelope"].clone()).unwrap())
+                .unwrap();
+        let before = root.export_envelope().unwrap();
+        let mut worker = root.clone();
+        for operation in case["operations"].as_array().unwrap() {
+            let mut restored = NativeSession::compile(worker.export_envelope().unwrap()).unwrap();
+            restored.last_request = worker.last_request.clone().map(|mut request| {
+                request.id = restored.import_request_token(&worker.request_token(request.id));
+                request
+            });
+            assert_eq!(
+                apply(&mut worker, operation),
+                apply(&mut restored, operation),
+                "{}",
+                case["name"]
+            );
+            operations += 1;
+        }
+        let after = root.export_envelope().unwrap();
+        assert_eq!(before.state, after.state);
+        assert_eq!(before.object_bindings, after.object_bindings);
+        count += 1;
+    }
+    assert_eq!(count, 252);
+    assert_eq!(operations, 1635);
+}
+
+#[test]
+fn card_actions_restore_every_menu_and_lifecycle_boundary_with_private_models() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let operations = AtomicUsize::new(0);
+    let count = fixture_parallel::for_each_case(
+        cases_matching(|name| name.starts_with("object-execution-card-action-")),
+        |case| {
+            let root =
+                NativeSession::compile(serde_json::from_value(case["envelope"].clone()).unwrap())
+                    .unwrap();
+            let before = root.export_envelope().unwrap();
+            let mut worker = root.clone();
+            for operation in case["operations"].as_array().unwrap() {
+                let mut restored =
+                    NativeSession::compile(worker.export_envelope().unwrap()).unwrap();
+                restored.last_request = worker.last_request.clone().map(|mut request| {
+                    request.id = restored.import_request_token(&worker.request_token(request.id));
+                    request
+                });
+                assert_eq!(
+                    apply(&mut worker, operation),
+                    apply(&mut restored, operation),
+                    "{}",
+                    case["name"]
+                );
+                operations.fetch_add(1, Ordering::Relaxed);
+            }
+            let after = root.export_envelope().unwrap();
+            assert_eq!(before.state, after.state);
+            assert_eq!(before.object_bindings, after.object_bindings);
+        },
+    );
+    assert_eq!(count, 632);
+    assert_eq!(operations.load(Ordering::Relaxed), 7268);
+}
+
+#[test]
+fn fast_travel_restores_all_boundaries_with_private_locations_and_generated_models() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let operations = AtomicUsize::new(0);
+    let count = fixture_parallel::for_each_case(
+        cases_matching(|name| name.starts_with("object-execution-arena-travel-")),
+        |case| {
+            let root =
+                NativeSession::compile(serde_json::from_value(case["envelope"].clone()).unwrap())
+                    .unwrap();
+            let before = root.export_envelope().unwrap();
+            let mut worker = root.clone();
+            for operation in case["operations"].as_array().unwrap() {
+                let mut restored =
+                    NativeSession::compile(worker.export_envelope().unwrap()).unwrap();
+                restored.last_request = worker.last_request.clone().map(|mut request| {
+                    request.id = restored.import_request_token(&worker.request_token(request.id));
+                    request
+                });
+                assert_eq!(
+                    apply(&mut worker, operation),
+                    apply(&mut restored, operation),
+                    "{}",
+                    case["name"]
+                );
+                operations.fetch_add(1, Ordering::Relaxed);
+            }
+            let after = root.export_envelope().unwrap();
+            assert_eq!(before.state, after.state);
+            assert_eq!(before.object_bindings, after.object_bindings);
+        },
+    );
+    assert_eq!(count, 184);
+    assert_eq!(operations.load(Ordering::Relaxed), 917);
+}
+
+#[test]
+fn primary_reperformance_restores_every_boundary_and_keeps_outer_scopes_private() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let operations = AtomicUsize::new(0);
+    let count = fixture_parallel::for_each_case(
+        cases_matching(|name| name.starts_with("object-execution-perform-primary-")),
+        |case| {
+            let root =
+                NativeSession::compile(serde_json::from_value(case["envelope"].clone()).unwrap())
+                    .unwrap();
+            let before = root.export_envelope().unwrap();
+            let mut worker = root.clone();
+            for operation in case["operations"].as_array().unwrap() {
+                let mut restored =
+                    NativeSession::compile(worker.export_envelope().unwrap()).unwrap();
+                restored.last_request = worker.last_request.clone().map(|mut request| {
+                    request.id = restored.import_request_token(&worker.request_token(request.id));
+                    request
+                });
+                assert_eq!(
+                    apply(&mut worker, operation),
+                    apply(&mut restored, operation),
+                    "{}",
+                    case["name"]
+                );
+                operations.fetch_add(1, Ordering::Relaxed);
+            }
+            let after = root.export_envelope().unwrap();
+            assert_eq!(before.state, after.state);
+            assert_eq!(before.object_bindings, after.object_bindings);
+        },
+    );
+    assert_eq!(count, 549);
+    assert_eq!(operations.load(Ordering::Relaxed), 1783);
+}
+
+#[test]
+fn arien_primary_flows_restore_each_boundary_with_private_effects_and_positions() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let operations = AtomicUsize::new(0);
+    let count = fixture_parallel::for_each_case(
+        cases_matching(|name| name.starts_with("object-execution-arien-primary-")),
+        |case| {
+            let root =
+                NativeSession::compile(serde_json::from_value(case["envelope"].clone()).unwrap())
+                    .unwrap();
+            let before = root.export_envelope().unwrap();
+            let mut worker = root.clone();
+            for operation in case["operations"].as_array().unwrap() {
+                let mut restored =
+                    NativeSession::compile(worker.export_envelope().unwrap()).unwrap();
+                restored.last_request = worker.last_request.clone().map(|mut request| {
+                    request.id = restored.import_request_token(&worker.request_token(request.id));
+                    request
+                });
+                assert_eq!(
+                    apply(&mut worker, operation),
+                    apply(&mut restored, operation),
+                    "{}",
+                    case["name"]
+                );
+                operations.fetch_add(1, Ordering::Relaxed);
+            }
+            let after = root.export_envelope().unwrap();
+            assert_eq!(before.state, after.state);
+            assert_eq!(before.object_bindings, after.object_bindings);
+        },
+    );
+    assert_eq!(count, 136);
+    assert_eq!(operations.load(Ordering::Relaxed), 2012);
+}
+
+#[test]
+fn copied_card_flows_restore_each_boundary_with_foreign_card_and_scope_aliases() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let operations = AtomicUsize::new(0);
+    let count = fixture_parallel::for_each_case(
+        cases_matching(|name| {
+            name.starts_with("object-execution-perform-card-edge-")
+                || name.starts_with("object-execution-perform-card-flow-")
+                || name.starts_with("object-execution-perform-card-menu-gydion-")
+                || name.starts_with("object-execution-perform-card-menu-misa-")
+                || name.starts_with("object-execution-perform-card-menu-wasp-")
+        }),
+        |case| {
+            let root =
+                NativeSession::compile(serde_json::from_value(case["envelope"].clone()).unwrap())
+                    .unwrap();
+            let before = root.export_envelope().unwrap();
+            let mut worker = root.clone();
+            for operation in case["operations"].as_array().unwrap() {
+                let mut restored =
+                    NativeSession::compile(worker.export_envelope().unwrap()).unwrap();
+                restored.last_request = worker.last_request.clone().map(|mut request| {
+                    request.id = restored.import_request_token(&worker.request_token(request.id));
+                    request
+                });
+                assert_eq!(
+                    apply(&mut worker, operation),
+                    apply(&mut restored, operation),
+                    "{}",
+                    case["name"]
+                );
+                operations.fetch_add(1, Ordering::Relaxed);
+            }
+            let after = root.export_envelope().unwrap();
+            assert_eq!(before.state, after.state);
+            assert_eq!(before.object_bindings, after.object_bindings);
+        },
+    );
+    assert_eq!(count, 181);
+    assert_eq!(operations.load(Ordering::Relaxed), 2216);
+}
+#[test]
+fn mind_grip_restores_every_branch_with_previous_card_and_nested_scope_identity() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let operations = AtomicUsize::new(0);
+    let count = fixture_parallel::for_each_case(
+        cases_matching(|name| name.starts_with("object-execution-mind-grip-")),
+        |case| {
+            let root =
+                NativeSession::compile(serde_json::from_value(case["envelope"].clone()).unwrap())
+                    .unwrap();
+            let before = root.export_envelope().unwrap();
+            let mut worker = root.clone();
+            for operation in case["operations"].as_array().unwrap() {
+                let mut restored =
+                    NativeSession::compile(worker.export_envelope().unwrap()).unwrap();
+                restored.last_request = worker.last_request.clone().map(|mut request| {
+                    request.id = restored.import_request_token(&worker.request_token(request.id));
+                    request
+                });
+                assert_eq!(
+                    apply(&mut worker, operation),
+                    apply(&mut restored, operation),
+                    "{}",
+                    case["name"]
+                );
+                operations.fetch_add(1, Ordering::Relaxed);
+            }
+            let after = root.export_envelope().unwrap();
+            assert_eq!(before.state, after.state);
+            assert_eq!(before.object_bindings, after.object_bindings);
+        },
+    );
+    assert_eq!(count, 115);
+    assert_eq!(operations.load(Ordering::Relaxed), 3036);
+}
+#[test]
+fn tigerclaw_primary_and_primitive_boundaries_restore_with_private_gold_terrain_and_effects() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let operations = AtomicUsize::new(0);
+    let count = fixture_parallel::for_each_case(
+        cases_matching(|name| name.starts_with("object-execution-tiger-primary-")),
+        |case| {
+            let root =
+                NativeSession::compile(serde_json::from_value(case["envelope"].clone()).unwrap())
+                    .unwrap();
+            let before = root.export_envelope().unwrap();
+            let mut worker = root.clone();
+            for operation in case["operations"].as_array().unwrap() {
+                let mut restored =
+                    NativeSession::compile(worker.export_envelope().unwrap()).unwrap();
+                restored.last_request = worker.last_request.clone().map(|mut request| {
+                    request.id = restored.import_request_token(&worker.request_token(request.id));
+                    request
+                });
+                assert_eq!(
+                    apply(&mut worker, operation),
+                    apply(&mut restored, operation),
+                    "{}",
+                    case["name"]
+                );
+                operations.fetch_add(1, Ordering::Relaxed);
+            }
+            let after = root.export_envelope().unwrap();
+            assert_eq!(before.state, after.state);
+            assert_eq!(before.object_bindings, after.object_bindings);
+        },
+    );
+    assert_eq!(count, 161);
+    assert_eq!(operations.load(Ordering::Relaxed), 2488);
+}
+
+#[test]
+fn brogan_bodies_and_queries_restore_each_boundary_with_private_collections_and_effects() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let operations = AtomicUsize::new(0);
+    let count = fixture_parallel::for_each_case(
+        cases_matching(|name| name.starts_with("object-execution-brogan-")),
+        |case| {
+            let root =
+                NativeSession::compile(serde_json::from_value(case["envelope"].clone()).unwrap())
+                    .unwrap();
+            let before = root.export_envelope().unwrap();
+            let mut worker = root.clone();
+            for operation in case["operations"].as_array().unwrap() {
+                let mut restored =
+                    NativeSession::compile(worker.export_envelope().unwrap()).unwrap();
+                restored.last_request = worker.last_request.clone().map(|mut request| {
+                    request.id = restored.import_request_token(&worker.request_token(request.id));
+                    request
+                });
+                assert_eq!(
+                    apply(&mut worker, operation),
+                    apply(&mut restored, operation),
+                    "{}",
+                    case["name"]
+                );
+                operations.fetch_add(1, Ordering::Relaxed);
+            }
+            let after = root.export_envelope().unwrap();
+            assert_eq!(before.state, after.state);
+            assert_eq!(before.object_bindings, after.object_bindings);
+        },
+    );
+    assert_eq!(count, 286);
+    assert_eq!(operations.load(Ordering::Relaxed), 3712);
+}
+
+#[test]
+fn spellbook_operations_restore_each_boundary_with_private_cards_counters_and_continuations() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let operations = AtomicUsize::new(0);
+    let count = fixture_parallel::for_each_case(
+        cases_matching(|name| name.starts_with("object-execution-spellbook-")),
+        |case| {
+            let root =
+                NativeSession::compile(serde_json::from_value(case["envelope"].clone()).unwrap())
+                    .unwrap();
+            let before = root.export_envelope().unwrap();
+            let mut worker = root.clone();
+            for operation in case["operations"].as_array().unwrap() {
+                let mut restored =
+                    NativeSession::compile(worker.export_envelope().unwrap()).unwrap();
+                restored.last_request = worker.last_request.clone().map(|mut request| {
+                    request.id = restored.import_request_token(&worker.request_token(request.id));
+                    request
+                });
+                assert_eq!(
+                    apply(&mut worker, operation),
+                    apply(&mut restored, operation),
+                    "{}",
+                    case["name"]
+                );
+                operations.fetch_add(1, Ordering::Relaxed);
+            }
+            let after = root.export_envelope().unwrap();
+            assert_eq!(before.state, after.state);
+            assert_eq!(before.object_bindings, after.object_bindings);
+        },
+    );
+    assert_eq!(count, 47);
+    assert_eq!(operations.load(Ordering::Relaxed), 177);
+}
+
+#[test]
+fn spell_bodies_restore_each_boundary_with_private_cards_filters_and_respawns() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let operations = AtomicUsize::new(0);
+    let count = fixture_parallel::for_each_case(
+        cases_matching(|name| {
+            name.starts_with("object-execution-spell-body-")
+                || name.starts_with("object-execution-spell-primitive-")
+        }),
+        |case| {
+            let root =
+                NativeSession::compile(serde_json::from_value(case["envelope"].clone()).unwrap())
+                    .unwrap();
+            let before = root.export_envelope().unwrap();
+            let mut worker = root.clone();
+            for operation in case["operations"].as_array().unwrap() {
+                let mut restored =
+                    NativeSession::compile(worker.export_envelope().unwrap()).unwrap();
+                restored.last_request = worker.last_request.clone().map(|mut request| {
+                    request.id = restored.import_request_token(&worker.request_token(request.id));
+                    request
+                });
+                assert_eq!(
+                    apply(&mut worker, operation),
+                    apply(&mut restored, operation),
+                    "{}",
+                    case["name"]
+                );
+                operations.fetch_add(1, Ordering::Relaxed);
+            }
+            let after = root.export_envelope().unwrap();
+            assert_eq!(before.state, after.state);
+            assert_eq!(before.object_bindings, after.object_bindings);
+        },
+    );
+    assert_eq!(count, 304);
+    assert_eq!(operations.load(Ordering::Relaxed), 6113);
+}
+
+#[test]
+fn gydion_ordinary_bodies_restore_each_boundary_with_private_books_and_passives() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let operations = AtomicUsize::new(0);
+    let count = fixture_parallel::for_each_case(
+        cases_matching(|name| name.starts_with("object-execution-gydion-primary-")),
+        |case| {
+            let root =
+                NativeSession::compile(serde_json::from_value(case["envelope"].clone()).unwrap())
+                    .unwrap();
+            let before = root.export_envelope().unwrap();
+            let mut worker = root.clone();
+            for operation in case["operations"].as_array().unwrap() {
+                let mut restored =
+                    NativeSession::compile(worker.export_envelope().unwrap()).unwrap();
+                restored.last_request = worker.last_request.clone().map(|mut request| {
+                    request.id = restored.import_request_token(&worker.request_token(request.id));
+                    request
+                });
+                assert_eq!(
+                    apply(&mut worker, operation),
+                    apply(&mut restored, operation),
+                    "{}",
+                    case["name"]
+                );
+                operations.fetch_add(1, Ordering::Relaxed);
+            }
+            let after = root.export_envelope().unwrap();
+            assert_eq!(before.state, after.state);
+            assert_eq!(before.object_bindings, after.object_bindings);
+        },
+    );
+    assert_eq!(count, 338);
+    assert_eq!(operations.load(Ordering::Relaxed), 9631);
+}
+
+fn primary_family_restores_each_boundary(
+    prefixes: &[&str],
+    expected_cases: usize,
+    expected_operations: usize,
+) {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let operations = AtomicUsize::new(0);
+    let count = fixture_parallel::for_each_case(
+        cases_matching(|name| prefixes.iter().any(|prefix| name.starts_with(prefix))),
+        |case| {
+            let root =
+                NativeSession::compile(serde_json::from_value(case["envelope"].clone()).unwrap())
+                    .unwrap();
+            let before = root.export_envelope().unwrap();
+            let mut worker = root.clone();
+            for operation in case["operations"].as_array().unwrap() {
+                let mut restored =
+                    NativeSession::compile(worker.export_envelope().unwrap()).unwrap();
+                restored.last_request = worker.last_request.clone().map(|mut request| {
+                    request.id = restored.import_request_token(&worker.request_token(request.id));
+                    request
+                });
+                assert_eq!(
+                    apply(&mut worker, operation),
+                    apply(&mut restored, operation),
+                    "{}",
+                    case["name"]
+                );
+                operations.fetch_add(1, Ordering::Relaxed);
+            }
+            let after = root.export_envelope().unwrap();
+            assert_eq!(before.state, after.state);
+            assert_eq!(before.object_bindings, after.object_bindings);
+        },
+    );
+    assert_eq!(count, expected_cases);
+    assert_eq!(operations.load(Ordering::Relaxed), expected_operations);
+}
+
+#[test]
+fn misa_bodies_and_geometry_restore_each_boundary_with_private_effects_and_hex_models() {
+    primary_family_restores_each_boundary(
+        &[
+            "object-execution-misa-primary-",
+            "object-execution-misa-geometry-",
+        ],
+        511,
+        8038,
+    );
+}
+#[test]
+fn wasp_bodies_and_queries_restore_each_boundary_with_private_tokens_filters_and_effects() {
+    primary_family_restores_each_boundary(
+        &[
+            "object-execution-wasp-primary-",
+            "object-execution-wasp-query-",
+        ],
+        428,
+        7971,
+    );
 }

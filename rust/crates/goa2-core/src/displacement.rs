@@ -73,6 +73,69 @@ pub fn push(
     }))
 }
 
+/// Full source push path: topology is anchored at the starting hex and at
+/// every edge; passable tokens can be crossed but never used as landing spaces.
+pub(crate) fn push_path(
+    world: &NativeWorld,
+    origin: Hex,
+    target: Hex,
+    distance: i64,
+    ignore: bool,
+    actor: crate::data::Symbol,
+    victim: crate::data::Symbol,
+) -> Result<Option<(PushResult, Vec<Hex>)>, String> {
+    if origin == target || !origin.straight(target) {
+        return Ok(None);
+    }
+    let d = i64::from(origin.distance(target));
+    let (a, b, c) = origin.coordinates();
+    let (q, r, s) = target.coordinates();
+    let direction = (
+        (i64::from(q) - i64::from(a)) / d,
+        (i64::from(r) - i64::from(b)) / d,
+        (i64::from(s) - i64::from(c)) / d,
+    );
+    let mut path = vec![target];
+    let mut collision = false;
+    for _ in 0..distance {
+        let previous = *path.last().unwrap();
+        let next = offset(previous, direction, 1)?;
+        if !world.on_map(next)
+            || !world.effect_connected(target, next, &[victim])?
+            || !world.effect_connected(previous, next, &[victim])?
+        {
+            collision = true;
+            break;
+        }
+        if world.obstacle_for_actor(next, Some(actor))?
+            && !world.passable_token(next, &[])
+            && !ignore
+        {
+            collision = true;
+            break;
+        }
+        path.push(next);
+    }
+    while path.len() > 1 && world.passable_token(*path.last().unwrap(), &[]) {
+        path.pop();
+        collision = true;
+    }
+    if ignore {
+        while path.len() > 1 && world.obstacle_for_actor(*path.last().unwrap(), Some(actor))? {
+            path.pop();
+            collision = true;
+        }
+    }
+    Ok(Some((
+        PushResult {
+            to: *path.last().unwrap(),
+            distance: path.len() - 1,
+            collision,
+        },
+        path,
+    )))
+}
+
 #[derive(Clone, Debug)]
 pub struct PushSpec {
     pub target: Option<crate::data::Symbol>,

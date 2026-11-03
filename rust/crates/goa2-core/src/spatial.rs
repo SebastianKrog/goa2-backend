@@ -1,7 +1,7 @@
 //! Compiled spatial predicates. Each movement filter prepares one traversal
 //! for the entire ordered candidate scan; nothing is cached across mutations.
 use crate::{
-    data::{Datum, Registers, Symbol, Symbols},
+    data::{Datum, RegisterRead, Symbol, Symbols},
     geometry::Hex,
     world::{EntityKind, NativeWorld},
 };
@@ -23,6 +23,26 @@ pub enum AdjacencyTag {
 }
 #[derive(Clone, Debug)]
 pub enum HexFilter {
+    Reject,
+    AdjacentContext(Symbol),
+    Between {
+        from: Symbol,
+        to: Symbol,
+    },
+    Relative {
+        origin: Origin,
+        reference: Symbol,
+        comparison: crate::queries::Comparison,
+    },
+    CountMatch(crate::targeting::CandidateCount),
+    SpawnTeam(bool),
+    BattleZone,
+    Terrain(bool),
+    And(Vec<HexFilter>),
+    Or(Vec<HexFilter>),
+    Exclude(Vec<Symbol>),
+    Batch(Box<crate::batch::BatchSearch>),
+    Farthest(crate::batch::FarthestAdjacent),
     AdjacentTags(Vec<AdjacencyTag>),
     Spawn {
         wanted: bool,
@@ -34,8 +54,14 @@ pub enum HexFilter {
         battle_only: bool,
         minion_only: bool,
     },
+    BehindTarget {
+        target: Symbol,
+        length: i64,
+        origin: Origin,
+    },
     FastTravel {
         origin: Origin,
+        source_card: Option<Symbol>,
         change: bool,
     },
     Obstacle {
@@ -67,8 +93,9 @@ pub enum HexFilter {
     },
 }
 pub struct SpatialContext<'a> {
+    pub count_observer: Option<&'a crate::data::FilterObservation>,
     pub world: &'a NativeWorld,
-    pub registers: &'a Registers,
+    pub registers: &'a dyn RegisterRead,
     pub symbols: &'a Symbols,
     pub actor: Option<Symbol>,
     pub frame: Option<Option<Symbol>>,
@@ -77,6 +104,32 @@ pub struct SpatialContext<'a> {
     pub through_override: Option<bool>,
 }
 impl SpatialContext<'_> {
+    /// Physical context card wins; otherwise resolve the granting/current printed ID.
+    pub fn fast_travel_card(&self, source_card: Option<Symbol>) -> Option<crate::cards::CardId> {
+        if let Some(value) = self
+            .symbols
+            .lookup("card")
+            .and_then(|key| self.registers.get(key))
+        {
+            return match value {
+                Datum::Instance(id) => Some(crate::cards::CardId(*id)),
+                _ => None,
+            };
+        }
+        let id = source_card
+            .filter(|id| !self.symbols.name(*id).is_empty())
+            .or_else(|| {
+                self.symbols
+                    .lookup("current_card_id")
+                    .and_then(|key| self.registers.get(key))
+                    .and_then(|value| match value {
+                        Datum::Text(id) => Some(*id),
+                        _ => None,
+                    })
+            });
+        id.and_then(|id| self.world.card_by_printed(id))
+    }
+
     pub fn origin(&self, origin: &Origin, fallback: bool) -> Result<Option<Symbol>, String> {
         let literal = if origin.frame {
             self.frame.flatten()
@@ -99,6 +152,16 @@ impl SpatialContext<'_> {
         }
         Ok(if fallback { self.actor } else { None })
     }
+    /// Relative-distance predicates apply Python str() to scalar identities.
+    fn scalar_identity(&self, key: Symbol) -> Option<Symbol> {
+        let value = self.registers.get(key).filter(|v| v.truthy(self.symbols))?;
+        match value {
+            Datum::Text(id) => Some(*id),
+            _ => value
+                .python_scalar_text(self.symbols)
+                .and_then(|text| self.symbols.lookup(&text)),
+        }
+    }
     fn int_override(&self, key: Option<Symbol>, base: Option<i64>) -> Option<i64> {
         match key.and_then(|key| self.registers.get(key)) {
             Some(Datum::Int(n)) => Some(*n),
@@ -108,6 +171,31 @@ impl SpatialContext<'_> {
     }
 }
 impl HexFilter {
+    pub(crate) fn bind_frame(&mut self) {
+        match self {
+            Self::And(filters) | Self::Or(filters) => {
+                for filter in filters {
+                    filter.bind_frame();
+                }
+            }
+            Self::Obstacle { exclude, .. } => {
+                *exclude = Origin {
+                    frame: true,
+                    ..Default::default()
+                }
+            }
+            Self::Movement { origin, .. }
+            | Self::Straight { origin, .. }
+            | Self::ClearLine { origin, .. } => {
+                *origin = Origin {
+                    frame: true,
+                    ..Default::default()
+                }
+            }
+            Self::Range { frame_range, .. } => *frame_range = true,
+            _ => {}
+        }
+    }
     pub fn apply_scan(
         &self,
         context: &SpatialContext<'_>,
@@ -136,6 +224,171 @@ impl HexFilter {
         target_unit: Option<Symbol>,
     ) -> Result<(), String> {
         match self {
+            Self::Reject => accepted.fill(false),
+            Self::AdjacentContext(key) => {
+                let target = match context.registers.get(*key) {
+                    Some(Datum::Text(id)) if !context.symbols.name(*id).is_empty() => {
+                        context.world.position(*id)
+                    }
+                    _ => None,
+                };
+                for (hex, yes) in candidates.iter().zip(accepted.iter_mut()) {
+                    if *yes {
+                        *yes = if let Some(target) = target {
+                            context.world.on_map(*hex)
+                                && context.world.on_map(target)
+                                && hex.distance(target) == 1
+                                && context.world.effect_connected(*hex, target, &[])?
+                        } else {
+                            false
+                        };
+                    }
+                }
+            }
+
+            Self::Between { from, to } => {
+                let start = context
+                    .registers
+                    .get(*from)
+                    .and_then(|v| v.hex(context.coordinates, context.symbols).ok());
+                let end = context
+                    .registers
+                    .get(*to)
+                    .and_then(|v| v.hex(context.coordinates, context.symbols).ok());
+                let segment = start.zip(end).filter(|(a, b)| a != b && a.straight(*b));
+                for (hex, yes) in candidates.iter().zip(accepted.iter_mut()) {
+                    if *yes {
+                        *yes = segment.is_some_and(|(a, b)| {
+                            *hex != a
+                                && *hex != b
+                                && u64::from(a.distance(*hex)) + u64::from(hex.distance(b))
+                                    == u64::from(a.distance(b))
+                        });
+                    }
+                }
+            }
+            Self::Relative {
+                origin,
+                reference,
+                comparison,
+            } => {
+                let literal = origin
+                    .literal
+                    .filter(|id| !context.symbols.name(*id).is_empty());
+                let key_is_truthy = origin.key.is_some_and(|key| {
+                    context
+                        .registers
+                        .get(key)
+                        .is_some_and(|v| v.truthy(context.symbols))
+                });
+                let unit = if literal.is_some() {
+                    literal
+                } else if key_is_truthy {
+                    origin.key.and_then(|key| context.scalar_identity(key))
+                } else {
+                    context.actor
+                };
+                let from = unit.and_then(|id| context.world.resolved_position(id));
+                let reference = context
+                    .scalar_identity(*reference)
+                    .and_then(|id| context.world.resolved_position(id));
+                let span = from.zip(reference);
+                let distance = span
+                    .map(|(a, b)| crate::queries::topology_distance(context.world, a, b))
+                    .transpose()?;
+                for (hex, yes) in candidates.iter().zip(accepted.iter_mut()) {
+                    if !*yes {
+                        continue;
+                    }
+                    *yes = if let Some((from, reference)) = from.zip(distance) {
+                        let next = crate::queries::topology_distance(context.world, from, *hex)?;
+                        comparison.matches_order(next.cmp(&reference))
+                    } else {
+                        false
+                    };
+                }
+            }
+
+            Self::Terrain(wanted) => {
+                for (hex, yes) in candidates.iter().zip(accepted.iter_mut()) {
+                    if *yes {
+                        *yes = context.world.terrain_hex(*hex)? == *wanted;
+                    }
+                }
+            }
+            Self::Exclude(keys) => {
+                for (hex, yes) in candidates.iter().zip(accepted.iter_mut()) {
+                    if !*yes {
+                        continue;
+                    }
+                    for key in keys {
+                        match context.registers.excludes_hex(*key, *hex) {
+                            Some(true) => {
+                                *yes = false;
+                                break;
+                            }
+                            Some(false) => {}
+                            None => match context.registers.get(*key) {
+                                None
+                                | Some(
+                                    Datum::Null
+                                    | Datum::Text(_)
+                                    | Datum::Int(_)
+                                    | Datum::Bool(_)
+                                    | Datum::Float(_)
+                                    | Datum::Instance(_),
+                                ) => {}
+                                _ => {
+                                    return Err(
+                                        "hex exclusion requires live model provenance".into()
+                                    );
+                                }
+                            },
+                        }
+                    }
+                }
+            }
+            Self::And(filters) => {
+                for filter in filters {
+                    if !accepted.iter().any(|value| *value) {
+                        break;
+                    }
+                    filter.apply_scan_with_unit(context, candidates, accepted, target_unit)?;
+                }
+            }
+            Self::Or(filters) => {
+                let original = accepted.to_vec();
+                let mut matched = vec![false; accepted.len()];
+                for filter in filters {
+                    let mut pending = original
+                        .iter()
+                        .zip(&matched)
+                        .map(|(initial, done)| *initial && !*done)
+                        .collect::<Vec<_>>();
+                    if !pending.iter().any(|value| *value) {
+                        break;
+                    }
+                    filter.apply_scan_with_unit(context, candidates, &mut pending, target_unit)?;
+                    for (done, passed) in matched.iter_mut().zip(pending) {
+                        *done |= passed;
+                    }
+                }
+                accepted.copy_from_slice(&matched);
+            }
+            Self::Batch(search) => {
+                for (hex, value) in candidates.iter().zip(accepted.iter_mut()) {
+                    if *value {
+                        *value = search.accepts(*hex, context)?;
+                    }
+                }
+            }
+            Self::Farthest(search) => {
+                for (hex, value) in candidates.iter().zip(accepted.iter_mut()) {
+                    if *value {
+                        *value = search.accepts(*hex, context)?;
+                    }
+                }
+            }
             Self::AdjacentTags(tags) => {
                 for (hex, value) in candidates.iter().zip(accepted.iter_mut()) {
                     if !*value {
@@ -180,6 +433,39 @@ impl HexFilter {
                     *value &= found;
                 }
             }
+            Self::CountMatch(count) => {
+                for (hex, value) in candidates.iter().zip(accepted.iter_mut()) {
+                    if *value {
+                        *value = count.accepts(*hex, context)?;
+                    }
+                }
+            }
+            Self::BattleZone => {
+                let all = context.world.tide_of_darkness(context.actor);
+                for (hex, value) in candidates.iter().zip(accepted.iter_mut()) {
+                    *value &= all || context.world.tile_in_battle_zone(*hex);
+                }
+            }
+            Self::SpawnTeam(friendly) => {
+                let all = context.world.tide_of_darkness(context.actor);
+                let team = context
+                    .actor
+                    .and_then(|id| context.world.entity(id))
+                    .and_then(|e| e.team);
+                for (hex, value) in candidates.iter().zip(accepted.iter_mut()) {
+                    *value &= if !context.world.on_map(*hex) {
+                        false
+                    } else if all {
+                        *friendly && !context.world.terrain(*hex)
+                    } else {
+                        context
+                            .world
+                            .minion_spawn_team(*hex)
+                            .zip(team)
+                            .is_some_and(|(a, b)| (a == b) == *friendly)
+                    };
+                }
+            }
             Self::Spawn {
                 wanted,
                 minion_only,
@@ -221,11 +507,59 @@ impl HexFilter {
                     *value &= found != *forbidden;
                 }
             }
-            Self::FastTravel { origin, change } => {
+            Self::BehindTarget {
+                target,
+                length,
+                origin,
+            } => {
+                let target = match context.registers.get(*target) {
+                    Some(Datum::Text(id)) if !context.symbols.name(*id).is_empty() => {
+                        context.world.position(*id)
+                    }
+                    None | Some(Datum::Null | Datum::Bool(_) | Datum::Int(_) | Datum::Float(_)) => {
+                        None
+                    }
+                    Some(value) if !value.truthy(context.symbols) => None,
+                    Some(value @ Datum::Object(_))
+                        if value
+                            .hex(context.coordinates, context.symbols)
+                            .is_ok_and(|point| {
+                                context.registers.excludes_hex(*target, point) == Some(true)
+                            }) =>
+                    {
+                        None
+                    }
+                    _ => return Err("behind-target identity is unhashable or unbound".into()),
+                };
+                let from = context
+                    .origin(origin, true)?
+                    .and_then(|id| context.world.resolved_position(id));
+                let direction = from
+                    .zip(target)
+                    .and_then(|(from, target)| from.direction_to(target));
+                for (hex, yes) in candidates.iter().zip(accepted.iter_mut()) {
+                    if !*yes {
+                        continue;
+                    }
+                    *yes = if let Some((target, direction)) = target.zip(direction) {
+                        target.direction_to(*hex) == Some(direction)
+                            && i64::from(target.distance(*hex)) <= *length
+                            && context.world.effect_connected(target, *hex, &[])?
+                    } else {
+                        false
+                    };
+                }
+            }
+            Self::FastTravel {
+                origin,
+                source_card,
+                change,
+            } => {
                 let unit = context.origin(origin, true)?;
+                let card = context.fast_travel_card(*source_card);
                 let values = context
                     .world
-                    .fast_travel_destinations(unit, *change, candidates)?;
+                    .fast_travel_destinations_with_card(unit, *change, candidates, card)?;
                 for (target, value) in accepted.iter_mut().zip(values) {
                     *target &= value;
                 }
@@ -369,8 +703,88 @@ pub fn compile_filter(raw: &Value, symbols: &mut Symbols) -> Result<HexFilter, S
         })
     };
     match raw["type"].as_str().ok_or("filter type missing")? {
+        "adjacency_to_context_filter" => Ok(HexFilter::AdjacentContext(
+            symbols.intern(
+                raw["target_key"]
+                    .as_str()
+                    .ok_or("adjacency context key missing")?,
+            ),
+        )),
+        "between_hexes_filter" => Ok(HexFilter::Between {
+            from: symbols.intern(
+                raw["from_hex_key"]
+                    .as_str()
+                    .ok_or("between origin key missing")?,
+            ),
+            to: symbols.intern(
+                raw["to_hex_key"]
+                    .as_str()
+                    .ok_or("between destination key missing")?,
+            ),
+        }),
+        "relative_distance_filter" => {
+            let op = raw["operator"].as_str().unwrap_or(">");
+            if !matches!(op, ">" | ">=" | "==" | "<=" | "<") {
+                return Err("relative distance operator invalid".into());
+            }
+            Ok(HexFilter::Relative {
+                origin: origin(symbols, "origin_id", "origin_key")?,
+                reference: symbols.intern(
+                    raw["reference_key"]
+                        .as_str()
+                        .ok_or("relative reference key missing")?,
+                ),
+                comparison: crate::queries::Comparison::parse(op),
+            })
+        }
+        "terrain_filter" => Ok(HexFilter::Terrain(
+            raw["is_terrain"].as_bool().unwrap_or(true),
+        )),
+        "has_previous_slot_card_filter" => Ok(HexFilter::Reject),
+        "exclude_identity_filter" => Ok(HexFilter::Exclude(
+            raw["exclude_keys"]
+                .as_array()
+                .ok_or("hex exclusion keys missing")?
+                .iter()
+                .map(|value| {
+                    value
+                        .as_str()
+                        .map(|name| symbols.intern(name))
+                        .ok_or("hex exclusion key must be text".to_owned())
+                })
+                .collect::<Result<Vec<_>, _>>()?,
+        )),
+        "and_filter" | "or_filter" => {
+            let children = raw["filters"]
+                .as_array()
+                .ok_or("composite hex filter children missing")?
+                .iter()
+                .map(|child| compile_filter(child, symbols))
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(if raw["type"] == "or_filter" {
+                HexFilter::Or(children)
+            } else {
+                HexFilter::And(children)
+            })
+        }
         "adjacency_filter" => Ok(HexFilter::AdjacentTags(
             serde_json::from_value(raw["target_tags"].clone()).map_err(|e| e.to_string())?,
+        )),
+        "count_match_filter" => {
+            let crate::targeting::UnitFilter::CountMatch(count) =
+                crate::targeting::compile_unit_filter(raw, symbols)?
+            else {
+                unreachable!()
+            };
+            Ok(HexFilter::CountMatch(count))
+        }
+        "battle_zone_filter" => Ok(HexFilter::BattleZone),
+        "spawn_point_team_filter" => Ok(HexFilter::SpawnTeam(
+            match raw["relation"].as_str().unwrap_or("FRIENDLY") {
+                "FRIENDLY" => true,
+                "ENEMY" => false,
+                _ => return Err("spawn team relation invalid".into()),
+            },
         )),
         "spawn_point_filter" => Ok(HexFilter::Spawn {
             wanted: raw["has_spawn_point"].as_bool().unwrap_or(false),
@@ -383,8 +797,9 @@ pub fn compile_filter(raw: &Value, symbols: &mut Symbols) -> Result<HexFilter, S
             minion_only: raw["minion_only"].as_bool().unwrap_or(false),
         }),
         "fast_travel_destination_filter" => {
-            let _source = optional(raw, "source_card_id", symbols)?;
+            let source_card = optional(raw, "source_card_id", symbols)?;
             Ok(HexFilter::FastTravel {
+                source_card,
                 origin: Origin {
                     literal: optional(raw, "unit_id", symbols)?,
                     ..Default::default()
@@ -392,6 +807,20 @@ pub fn compile_filter(raw: &Value, symbols: &mut Symbols) -> Result<HexFilter, S
                 change: raw["require_zone_change"].as_bool().unwrap_or(false),
             })
         }
+        "line_behind_target_filter" => Ok(HexFilter::BehindTarget {
+            target: symbols.intern(
+                raw["target_key"]
+                    .as_str()
+                    .ok_or("behind-target key missing")?,
+            ),
+            length: raw["length"]
+                .as_i64()
+                .ok_or("behind-target length missing")?,
+            origin: Origin {
+                literal: optional(raw, "origin_id", symbols)?,
+                ..Default::default()
+            },
+        }),
         "occupied_filter" => Ok(HexFilter::Obstacle {
             wanted: raw["is_obstacle"].as_bool().unwrap_or(false),
             exclude: origin(symbols, "exclude_id", "exclude_id_key")?,

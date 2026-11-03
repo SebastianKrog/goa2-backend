@@ -3,17 +3,16 @@ use goa2_core::{
     world::NativeWorld,
 };
 use serde_json::Value;
-fn corpus() -> &'static Value {
-    static DATA: std::sync::OnceLock<Value> = std::sync::OnceLock::new();
-    DATA.get_or_init(|| {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../tests/fixtures/displacement-validation.json");
-        serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap()
-    })
+#[path = "../../../test-support/cases.rs"]
+mod fixtures;
+fn path(name: &str) -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/fixtures")
+        .join(name)
 }
 #[test]
 fn displacement_legality_matches_full_python_verdicts() {
-    for case in corpus()["cases"].as_array().unwrap() {
+    let checked = fixtures::visit_array(&path("displacement-validation.json"), "cases", |case| {
         let source = serde_json::from_value(case["envelope"].clone()).unwrap();
         let actual =
             displacement_batch(source, case["queries"].as_array().unwrap().clone()).unwrap();
@@ -27,16 +26,18 @@ fn displacement_legality_matches_full_python_verdicts() {
                 case["name"], index, case["queries"][index]
             );
         }
-    }
+    });
+    assert_eq!(checked, 159);
 }
 #[test]
 fn legality_reads_each_workers_live_effect_origin_without_mutating_shared_definitions() {
-    let case = corpus()["cases"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|c| c["name"] == "displacement-blocked")
-        .unwrap();
+    let case = fixtures::selected_inputs(
+        &path("displacement-validation.json"),
+        "cases",
+        &["displacement-blocked"],
+    )
+    .remove("displacement-blocked")
+    .unwrap();
     let source = serde_json::from_value(case["envelope"].clone()).unwrap();
     let mut symbols = Symbols::default();
     let root = NativeWorld::compile(&source, &mut symbols).unwrap();
@@ -69,17 +70,35 @@ fn legality_reads_each_workers_live_effect_origin_without_mutating_shared_defini
     ));
 }
 
-fn action_corpus() -> &'static Value {
-    static DATA: std::sync::OnceLock<Value> = std::sync::OnceLock::new();
-    DATA.get_or_init(|| {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../tests/fixtures/action-validation.json");
-        serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap()
+fn action_case(name: &str) -> &'static Value {
+    static NAMED: std::sync::OnceLock<std::collections::HashMap<String, Value>> =
+        std::sync::OnceLock::new();
+    NAMED
+        .get_or_init(|| {
+            fixtures::selected_inputs(
+                &path("action-validation.json"),
+                "cases",
+                &["witch-ordinary-negative", "blocked"],
+            )
+        })
+        .get(name)
+        .unwrap()
+}
+fn negative_menu() -> &'static Value {
+    static MENU: std::sync::OnceLock<Value> = std::sync::OnceLock::new();
+    MENU.get_or_init(|| {
+        fixtures::selected_inputs(
+            &path("action-validation.json"),
+            "menus",
+            &["witch-ordinary-negative"],
+        )
+        .remove("witch-ordinary-negative")
+        .unwrap()
     })
 }
 #[test]
 fn actions_repeats_and_movement_caps_match_full_python_verdicts() {
-    for case in action_corpus()["cases"].as_array().unwrap() {
+    let checked = fixtures::visit_array(&path("action-validation.json"), "cases", |case| {
         let envelope = serde_json::from_value(case["envelope"].clone()).unwrap();
         let actual = goa2_core::diagnostics::action_legality_batch(
             envelope,
@@ -96,16 +115,12 @@ fn actions_repeats_and_movement_caps_match_full_python_verdicts() {
                 case["name"], case["queries"][i]
             );
         }
-    }
+    });
+    assert_eq!(checked, 198);
 }
 #[test]
 fn negative_attack_values_are_legal_without_a_specific_card_restriction() {
-    let case = action_corpus()["cases"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|c| c["name"] == "witch-ordinary-negative")
-        .unwrap();
+    let case = action_case("witch-ordinary-negative");
     let queries: Vec<Value> = case["queries"]
         .as_array()
         .unwrap()
@@ -128,12 +143,7 @@ fn negative_attack_values_are_legal_without_a_specific_card_restriction() {
             .iter()
             .all(|v| v["allowed"] == true)
     );
-    let menu = action_corpus()["menus"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|c| c["name"] == "witch-ordinary-negative")
-        .unwrap();
+    let menu = negative_menu();
     let envelope = serde_json::from_value(menu["envelope"].clone()).unwrap();
     let records = goa2_core::diagnostics::action_trace(
         envelope,
@@ -159,12 +169,7 @@ fn negative_attack_values_are_legal_without_a_specific_card_restriction() {
 
 #[test]
 fn action_repeat_and_movement_rules_follow_each_workers_live_origin() {
-    let case = action_corpus()["cases"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|c| c["name"] == "blocked")
-        .unwrap();
+    let case = action_case("blocked");
     let envelope = serde_json::from_value(case["envelope"].clone()).unwrap();
     let mut symbols = Symbols::default();
     let root = NativeWorld::compile(&envelope, &mut symbols).unwrap();

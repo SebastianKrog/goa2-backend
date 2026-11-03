@@ -1,6 +1,6 @@
 //! Typed active-effect storage and lifecycle. Behavioral consumers are separate.
 use crate::{
-    data::{Datum, Registers, Symbol, Symbols},
+    data::{Datum, RegisterRead, Symbol, Symbols},
     world::NativeWorld,
 };
 use serde_json::Value;
@@ -56,6 +56,8 @@ pub struct EffectInstance {
     pub(crate) granted_passive: Option<Symbol>,
     pub(crate) passive_uses: i64,
     pub(crate) remaining_bounty: Option<i64>,
+    /// Search-local binding only; equal effect IDs do not imply model identity.
+    pub(crate) arena_model: Option<crate::objects::ObjectId>,
     pub scope_origin: Option<Symbol>,
     pub barrier_origin: Option<Symbol>,
     pub origin_basic: Option<bool>,
@@ -63,112 +65,64 @@ pub struct EffectInstance {
 }
 impl EffectInstance {
     fn compile(value: &Value, symbols: &mut Symbols) -> Result<Self, String> {
-        let fields = value.as_object().ok_or("effect must be an object")?;
-        let mut text = |key: &str| -> Result<Symbol, String> {
-            Ok(symbols.intern(
-                fields
-                    .get(key)
-                    .and_then(Value::as_str)
-                    .ok_or_else(|| format!("effect {key} missing"))?,
-            ))
-        };
-        let id = text("id")?;
-        let source = text("source_id")?;
-        let kind = fields
-            .get("effect_type")
-            .and_then(Value::as_str)
-            .ok_or("effect type missing")?;
-        let duration = Duration::parse(
-            fields
-                .get("duration")
-                .and_then(Value::as_str)
-                .ok_or("effect duration missing")?,
-        )?;
-        let card = optional_symbol(value, "source_card_id", symbols)?;
-        let linked_card = card.filter(|id| !symbols.name(*id).is_empty());
-        let token = optional_symbol(value, "token_id", symbols)?;
-        let kind_name = kind.to_owned();
-        let kind = symbols.intern(&kind_name);
-        let scope_value = &value["scope"];
-        let global_scope = match scope_value["shape"].as_str() {
-            Some("global") => true,
-            Some("point" | "radius" | "adjacent" | "line" | "zone") => false,
-            _ => return Err("invalid effect scope shape".into()),
-        };
-        let affects = symbols.intern(
-            scope_value["affects"]
-                .as_str()
-                .ok_or("effect scope affects missing")?,
-        );
-        let scope_origin = optional_symbol(scope_value, "origin_id", symbols)?;
-        let barrier_origin = optional_symbol(value, "barrier_origin_id", symbols)?;
-        let origin_basic = match value.get("origin_attack_is_basic") {
-            None | Some(Value::Null) => None,
-            Some(Value::Bool(v)) => Some(*v),
+        let value = Datum::from_json(value, symbols)?;
+        symbols.intern("ATTACK");
+        symbols.intern("origin_id");
+        Self::from_datum(&value, symbols)
+    }
+    pub(crate) fn from_datum(value: &Datum, symbols: &Symbols) -> Result<Self, String> {
+        let record = crate::effect_record::Record::new(value, symbols)?;
+        let scope = record.record("scope")?;
+        let id = record.required_symbol("id")?;
+        let source = record.required_symbol("source_id")?;
+        let kind = record.required_symbol("effect_type")?;
+        let card = record.symbol("source_card_id")?;
+        let attack = symbols
+            .lookup("ATTACK")
+            .ok_or("effect ATTACK symbol missing")?;
+        let origin_key = symbols
+            .lookup("origin_id")
+            .ok_or("effect origin field missing")?;
+        let behavior = crate::effect_rules::Behavior::from_record(record)?;
+        let finishing = record.list("finishing_steps")?.to_vec();
+        let origin_basic = match record.get("origin_attack_is_basic") {
+            Datum::Null => None,
+            Datum::Bool(value) => Some(*value),
             _ => return Err("invalid originating attack flag".into()),
         };
-        let origin_action = optional_symbol(value, "origin_action_type", symbols)?;
-        let attack = symbols.intern("ATTACK");
-        let origin_key = symbols.intern("origin_id");
-        let scope = scope_value
-            .as_object()
-            .ok_or("effect scope missing")?
-            .iter()
-            .map(|(k, v)| Ok((symbols.intern(k), Datum::from_json(v, symbols)?)))
-            .collect::<Result<_, String>>()?;
-        let payload = fields
-            .iter()
-            .map(|(k, v)| Ok((symbols.intern(k), Datum::from_json(v, symbols)?)))
-            .collect::<Result<Vec<_>, String>>()?;
-        let finishing = value["finishing_steps"]
-            .as_array()
-            .ok_or("effect finishing steps missing")?
-            .iter()
-            .map(|v| Datum::from_json(v, symbols))
-            .collect::<Result<_, _>>()?;
         Ok(Self {
             definition: Arc::new(EffectDefinition {
-                behavior: crate::effect_rules::Behavior::compile(value, symbols)?,
-                fields: payload,
+                global_scope: behavior.shape == crate::effect_rules::Shape::Global,
+                fixed_origin: behavior.origin_hex.is_some(),
+                static_barrier: symbols.name(kind) == "static_barrier",
+                behavior,
+                fields: record.fields.to_vec(),
                 kind,
-                affects,
-                scope,
+                affects: scope.required_symbol("affects")?,
+                scope: scope.fields.to_vec(),
                 origin_key,
-                global_scope,
-                fixed_origin: !scope_value["origin_hex"].is_null(),
-                static_barrier: kind_name == "static_barrier",
                 attack,
                 finishing,
-                after_cards_played: kind_name == "after_cards_played_trigger",
-                reversed_initiative: kind_name == "reversed_initiative",
+                after_cards_played: symbols.name(kind) == "after_cards_played_trigger",
+                reversed_initiative: symbols.name(kind) == "reversed_initiative",
             }),
             id,
-            granted_passive: optional_symbol(value, "granted_passive_effect_id", symbols)?,
-            remaining_bounty: match &value["max_value"] {
-                Value::Null => None,
-                v => Some(v.as_i64().ok_or("invalid bounty limit")?),
-            },
-            passive_uses: value["passive_uses_this_turn"]
-                .as_i64()
-                .ok_or("invalid effect passive usage")?,
-            scope_origin,
-            barrier_origin,
-            origin_basic,
-            origin_action,
             source,
             card,
-            linked_card,
-            token,
-            duration,
-            created_turn: value["created_at_turn"]
-                .as_i64()
-                .ok_or("effect turn missing")?,
-            created_round: value["created_at_round"]
-                .as_i64()
-                .ok_or("effect round missing")?,
-            active: value["is_active"]
-                .as_bool()
-                .ok_or("effect activation missing")?,
+            linked_card: card.filter(|id| !symbols.name(*id).is_empty()),
+            token: record.symbol("token_id")?,
+            duration: Duration::parse(record.text("duration").ok_or("effect duration missing")?)?,
+            created_turn: record.integer("created_at_turn")?,
+            created_round: record.integer("created_at_round")?,
+            active: record.flag("is_active")?,
+            granted_passive: record.symbol("granted_passive_effect_id")?,
+            passive_uses: record.integer("passive_uses_this_turn")?,
+            remaining_bounty: record.optional_integer("max_value")?,
+            arena_model: None,
+            scope_origin: scope.symbol("origin_id")?,
+            barrier_origin: record.symbol("barrier_origin_id")?,
+            origin_basic,
+            origin_action: record.symbol("origin_action_type")?,
         })
     }
     pub fn is_active(&self, round: i64, turn: i64) -> bool {
@@ -196,6 +150,9 @@ impl EffectInstance {
             }
     }
     pub fn export(&self, symbols: &Symbols) -> Value {
+        self.payload(symbols).to_json(symbols)
+    }
+    pub(crate) fn payload(&self, symbols: &Symbols) -> Datum {
         let mut fields = self.definition.fields.clone();
         let mut scope = self.definition.scope.clone();
         if let Some((_, origin)) = scope
@@ -242,20 +199,10 @@ impl EffectInstance {
             "origin_attack_is_basic",
             self.origin_basic.map_or(Datum::Null, Datum::Bool),
         );
-        Datum::Object(fields).to_json(symbols)
+        Datum::Object(fields)
     }
 }
-fn optional_symbol(
-    value: &Value,
-    key: &str,
-    symbols: &mut Symbols,
-) -> Result<Option<Symbol>, String> {
-    match value.get(key) {
-        None | Some(Value::Null) => Ok(None),
-        Some(Value::String(s)) => Ok(Some(symbols.intern(s))),
-        _ => Err(format!("effect {key} must be text or null")),
-    }
-}
+
 #[derive(Clone, Debug, Default)]
 pub struct EffectStore {
     pub instances: Vec<EffectInstance>,
@@ -385,26 +332,31 @@ impl NativeWorld {
         self.has_effects = !self.effects.instances.is_empty();
         before - self.effects.instances.len()
     }
-    pub fn expire_effects_by_source(&mut self, source: Symbol) {
-        let mut expiring = Vec::new();
-        let mut cards = Vec::new();
-        for (index, e) in self.effects.instances.iter().enumerate() {
-            if e.token.is_some() {
-                continue;
-            }
-            let owner = e.linked_card.and_then(|card| {
-                self.heroes
-                    .iter()
-                    .find(|h| self.card_for_hero_printed(h.id, card).is_some())
-                    .map(|h| h.id)
-            });
-            if owner.unwrap_or(e.source) == source {
-                expiring.push(index);
-                if let Some(card) = e.linked_card {
-                    cards.push(card);
+    pub(crate) fn expiring_source_rows(&self, source: Symbol) -> Vec<usize> {
+        self.effects
+            .instances
+            .iter()
+            .enumerate()
+            .filter_map(|(index, e)| {
+                if e.token.is_some() {
+                    return None;
                 }
-            }
-        }
+                let owner = e.linked_card.and_then(|card| {
+                    self.heroes
+                        .iter()
+                        .find(|h| self.card_for_hero_printed(h.id, card).is_some())
+                        .map(|h| h.id)
+                });
+                (owner.unwrap_or(e.source) == source).then_some(index)
+            })
+            .collect()
+    }
+    pub fn expire_effects_by_source(&mut self, source: Symbol) {
+        let expiring = self.expiring_source_rows(source);
+        let cards = expiring
+            .iter()
+            .filter_map(|index| self.effects.instances[*index].linked_card)
+            .collect();
         // This sweep removes matching instances, not all rows sharing their IDs.
         let mut index = 0;
         self.effects.instances.retain(|_| {
@@ -472,7 +424,7 @@ pub struct CreationContext<'a> {
     pub round: i64,
     pub turn: i64,
     pub actor: Option<Symbol>,
-    pub registers: &'a Registers,
+    pub registers: &'a dyn RegisterRead,
 }
 impl NativeWorld {
     pub fn create_effect(

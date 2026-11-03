@@ -1,0 +1,34 @@
+{
+  "new_arena_consumers": [
+    "record_hex",
+    "compute_hex",
+    "check_adjacency",
+    "may_repeat_once (both source repeat classes)"
+  ],
+  "nested_step_validation_shared_by": [
+    "effect_finishing",
+    "repeat",
+    "for_each"
+  ],
+  "workspace_tests_passed": 321,
+  "workspace_tests_filtered": 1,
+  "not_rerun": "every_shared_execution_boundary_restores_values_aliases_and_request_generations (older all-corpus restore gate)",
+  "source_contracts_passed": 11,
+  "new_restore_boundaries": 1070,
+  "release_parity": {
+    "cases": 99,
+    "operations": 1070,
+    "corpus_sha256": "e76ab1f8c73a4f3a299d0817196de2f08197e3977550e5eaa77c9d63f6561218",
+    "state_request_event_and_identity_parity": true
+  },
+  "live_corpus_cases": 8725,
+  "live_corpus_operations": 43256,
+  "live_index_sha256": "2e9964c68c9506e80d6f26f4fa8b6c1041f518ee2394a378efe3752c6a05f76e",
+  "live_semantic_sha256": "cb692f51f22f44dd969339fc1b373907e59d9cf99664c581ff414e2fdb8dde00",
+  "rustfmt": true,
+  "clippy_strict": true,
+  "black_ruff": true,
+  "frozen_src_and_lock_unchanged": true,
+  "engine_complete": false,
+  "search_complete": false
+}

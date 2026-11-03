@@ -6,6 +6,9 @@ use goa2_core::interpreter::{EngineError, ExecutionBudget, NativeSession};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::io::{self, BufRead, Write};
+#[cfg(test)]
+#[path = "../../../test-support/parallel.rs"]
+mod fixture_parallel;
 
 #[derive(Deserialize)]
 struct Request {
@@ -70,6 +73,10 @@ enum Operation {
     EffectTrace {
         envelope: StateEnvelope,
         operations: Vec<Value>,
+    },
+    CardEquality {
+        envelope: StateEnvelope,
+        queries: Vec<Value>,
     },
     CardTrace {
         envelope: StateEnvelope,
@@ -150,6 +157,9 @@ fn execute(
             envelope,
             operations,
         } => goa2_core::diagnostics::effect_trace(envelope, operations),
+        Operation::CardEquality { envelope, queries } => {
+            goa2_core::diagnostics::card_equality_batch(envelope, queries)
+        }
         Operation::CardTrace {
             envelope,
             operations,
@@ -180,8 +190,18 @@ fn execute(
 }
 /// Diagnostic boundary; the interpreter itself consumes no JSON.
 fn stack_trace(envelope: StateEnvelope, operations: Vec<Value>) -> Result<Value, String> {
-    let mut session = NativeSession::compile(envelope).map_err(|e| e.to_string())?;
     let mut records = Vec::new();
+    replay_trace(envelope, operations, |record| records.push(record))?;
+    Ok(json!({"records":records}))
+}
+/// Fixture verification consumes one complete operation snapshot at a time.
+/// The worker adapter above retains its existing collected wire response.
+fn replay_trace(
+    envelope: StateEnvelope,
+    operations: Vec<Value>,
+    mut record_ready: impl FnMut(Value),
+) -> Result<(), String> {
+    let mut session = NativeSession::compile(envelope).map_err(|e| e.to_string())?;
     for operation in operations {
         let mut request = Value::Null;
         let mut events = Vec::new();
@@ -336,12 +356,18 @@ fn stack_trace(envelope: StateEnvelope, operations: Vec<Value>) -> Result<Value,
             );
             record["instance_bindings"] = serde_json::to_value(envelope.instance_bindings()?)
                 .map_err(|error| error.to_string())?;
+            record["generated_step_objects"] = serde_json::to_value(
+                session
+                    .generated_step_objects(&envelope.object_bindings)
+                    .map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
             record["object_bindings"] =
                 serde_json::to_value(envelope.object_bindings).map_err(|e| e.to_string())?;
         }
-        records.push(record);
+        record_ready(record);
     }
-    Ok(json!({"records":records}))
+    Ok(())
 }
 fn main() -> io::Result<()> {
     let mut board = None;
@@ -396,6 +422,7 @@ mod tests {
 #[cfg(test)]
 mod trace_tests {
     use super::*;
+
     use std::collections::HashMap;
     fn normalize_id(value: &mut Value, ids: &mut HashMap<String, String>) {
         if let Some(id) = value.as_str() {
@@ -407,14 +434,20 @@ mod trace_tests {
         step: &mut Value,
         ids: &mut HashMap<String, String>,
         steps: &mut HashMap<String, String>,
+        identity: Option<Option<usize>>,
     ) {
-        if let Some(id) = step
-            .get("step_id")
-            .and_then(Value::as_str)
-            .filter(|id| id.starts_with("native-step-"))
-        {
+        let key = match identity {
+            Some(Some(id)) => Some(format!("object/{id}")),
+            Some(None) => None,
+            None => step
+                .get("step_id")
+                .and_then(Value::as_str)
+                .filter(|id| id.starts_with("native-step-"))
+                .map(str::to_owned),
+        };
+        if let Some(key) = key {
             let next = format!("dynamic-step/{}", steps.len() + 1);
-            step["step_id"] = Value::String(steps.entry(id.to_owned()).or_insert(next).clone());
+            step["step_id"] = Value::String(steps.entry(key).or_insert(next).clone());
         }
         normalize_id(&mut step["pending_request_id"], ids);
     }
@@ -423,7 +456,7 @@ mod trace_tests {
         ids: &mut HashMap<String, String>,
         steps: &mut HashMap<String, String>,
     ) {
-        normalize_step_fields(step, ids, steps);
+        normalize_step_fields(step, ids, steps, None);
         if let Some(children) = step.get_mut("steps_template").and_then(Value::as_array_mut) {
             for child in children {
                 normalize_step(child, ids, steps);
@@ -440,24 +473,53 @@ mod trace_tests {
         unordered_mine_keys: Vec<String>,
     }
     fn verify_case(case: TraceCase) {
-        let mut actual = stack_trace(case.envelope, case.operations)
-            .unwrap_or_else(|error| panic!("{}: {error}", case.name));
+        let TraceCase {
+            name,
+            envelope,
+            operations,
+            expected,
+            unordered_mine_keys,
+        } = case;
         let mut ids = HashMap::new();
         let mut steps = HashMap::new();
-        for record in actual["records"].as_array_mut().unwrap() {
-            if !case.unordered_mine_keys.is_empty() {
+        let mut checked = 0;
+        replay_trace(envelope, operations, |mut record| {
+            if !unordered_mine_keys.is_empty() {
                 goa2_core::diagnostics::normalize_mine_choice_record(
-                    record,
-                    &case.unordered_mine_keys,
+                    &mut record,
+                    &unordered_mine_keys,
                 );
             }
             if !record["request"].is_null() {
                 normalize_id(&mut record["request"]["id"], &mut ids);
             }
-            if let Some(bindings) = record["object_bindings"].as_array().cloned() {
-                for binding in bindings.iter().filter(|binding| binding["kind"] == "step") {
+            let generated = record
+                .as_object_mut()
+                .unwrap()
+                .remove("generated_step_objects")
+                .map(|value| {
+                    serde_json::from_value::<Vec<(usize, usize)>>(value)
+                        .unwrap()
+                        .into_iter()
+                        .collect::<HashMap<usize, usize>>()
+                });
+            // Borrow disjoint fields rather than clone every identity/path row.
+            let (mut semantic, mut bindings) = (None, None);
+            for (key, value) in record.as_object_mut().unwrap() {
+                match key.as_str() {
+                    "semantic_state" => semantic = Some(value),
+                    "object_bindings" => bindings = Some(value),
+                    _ => {}
+                }
+            }
+            let semantic = semantic.unwrap();
+            if let Some(bindings) = bindings.and_then(|value| value.as_array()) {
+                for (index, binding) in bindings.iter().enumerate() {
+                    if binding["kind"] != "step" {
+                        continue;
+                    }
                     for path in binding["paths"].as_array().unwrap() {
-                        let mut step = &mut record["semantic_state"];
+                        let mut step = &mut *semantic;
                         for part in path.as_array().unwrap() {
                             step = if let Some(key) = part.as_str() {
                                 &mut step[key]
@@ -465,31 +527,38 @@ mod trace_tests {
                                 &mut step[part.as_u64().unwrap() as usize]
                             };
                         }
-                        normalize_step_fields(step, &mut ids, &mut steps);
+                        normalize_step_fields(
+                            step,
+                            &mut ids,
+                            &mut steps,
+                            generated.as_ref().map(|ids| ids.get(&index).copied()),
+                        );
                     }
                 }
             } else {
-                for step in record["semantic_state"]["execution_stack"]
-                    .as_array_mut()
-                    .unwrap()
-                {
+                for step in semantic["execution_stack"].as_array_mut().unwrap() {
                     normalize_step(step, &mut ids, &mut steps);
                 }
             }
-        }
-        let actual = actual["records"].as_array().unwrap();
-        assert_eq!(actual.len(), case.expected.len());
-        for (index, (got, want)) in actual.iter().zip(&case.expected).enumerate() {
+            let want = expected
+                .get(checked)
+                .unwrap_or_else(|| panic!("{name}: unexpected operation {checked}"));
             assert!(
-                got == want,
-                "{} operation {index} differs from the Python state/request/event snapshot",
-                case.name
+                record == *want,
+                "{name} operation {checked} differs from the Python state/request/event snapshot"
             );
-        }
+            checked += 1;
+        })
+        .unwrap_or_else(|error| panic!("{name}: {error}"));
+        assert_eq!(
+            checked,
+            expected.len(),
+            "{name}: missing operation snapshots"
+        );
     }
     #[test]
     fn live_shared_steps_and_context_match_python_values_requests_and_identity() {
-        verify_index("object-execution.json", Some(211));
+        verify_index("object-execution.json", Some(13766));
     }
     #[test]
     fn every_native_transition_matches_python_full_state_request_and_event_order() {
@@ -517,13 +586,15 @@ mod trace_tests {
         if let Some(count) = expected_count {
             assert_eq!(index.cases.len(), count);
         }
-        for entry in index.cases {
+        let total = index.cases.len();
+        let checked = fixture_parallel::for_each_case(index.cases.into_iter(), |entry| {
             let case: TraceCase = serde_json::from_reader(std::io::BufReader::new(
                 std::fs::File::open(base.join(entry.path)).unwrap(),
             ))
             .unwrap();
             assert_eq!(case.name, entry.name);
             verify_case(case);
-        }
+        });
+        assert_eq!(checked, total, "every oracle case must run");
     }
 }

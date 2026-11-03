@@ -1,0 +1,31 @@
+{
+  "new_arena_consumers": [
+    "resolve_card",
+    "choose_acting_piece"
+  ],
+  "source_scenes": 632,
+  "new_restore_boundaries": 7268,
+  "native_guard_identity_tests": 6,
+  "source_contracts": 2,
+  "workspace_passed": 333,
+  "workspace_filtered": 1,
+  "not_rerun": "every_shared_execution_boundary_restores_values_aliases_and_request_generations (older all-corpus restore gate)",
+  "independent_release_parity": {
+    "cases": 632,
+    "operations": 7268,
+    "corpus_sha256": "bc5d46ca463bd19f013c315de0e1c1ed1fca545882daffe720a965239a9972c8",
+    "workers": 4,
+    "state_request_event_and_identity_parity": true,
+    "seconds": 48.41
+  },
+  "live_corpus_cases": 9609,
+  "live_corpus_operations": 52159,
+  "live_index_sha256": "558bf4fbf0eba69312451cdc6e05e0913fd945e8bc5d9aeb18ae32b9d4452ad4",
+  "live_semantic_sha256": "6085f395f5f48471226f09c97ce084f7c1ef3b8e1d530d86eec9f8a4a7f63e76",
+  "rustfmt": true,
+  "clippy_strict": true,
+  "black_ruff": true,
+  "frozen_src_and_lock_unchanged": true,
+  "engine_complete": false,
+  "search_complete": false
+}

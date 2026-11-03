@@ -19,6 +19,7 @@ pub struct ActionMenu {
     pub card: Symbol,
     pub name: Symbol,
     pub options: Vec<ActionOption>,
+    pub copied: bool,
 }
 #[derive(Clone, Copy, Debug)]
 pub enum Passive {
@@ -62,6 +63,7 @@ pub enum ActionStep {
     Clear,
     Hold(Symbol),
     Defend(Symbol),
+    PerformLog(Symbol, ActionKind),
     Context(Symbol, Datum),
 }
 #[derive(Clone, Debug)]
@@ -73,6 +75,8 @@ pub enum ActionResolution {
 pub struct ActionRules {
     current_card: Symbol,
     current_action: Symbol,
+    performing_card: Symbol,
+    performing_owner: Symbol,
     attack_effect: Symbol,
     attack_card: Symbol,
     basic_type: Symbol,
@@ -115,6 +119,8 @@ impl ActionRules {
         Self {
             current_card: symbols.intern("current_card_id"),
             current_action: symbols.intern("current_action_type"),
+            performing_card: symbols.intern("performing_card_id"),
+            performing_owner: symbols.intern("performing_card_owner_id"),
             attack_effect: symbols.intern("attack_effect_id"),
             attack_card: symbols.intern("attack_card_id"),
             basic_type: symbols.intern("basic_action_type"),
@@ -144,7 +150,7 @@ impl ActionRules {
         selected: Option<&Datum>,
         context: &mut Registers,
     ) -> Result<ActionResolution, String> {
-        let Some(h) = world.heroes.iter().find(|h| h.id == hero) else {
+        let Some(h) = world.hero(hero) else {
             return Ok(ActionResolution::Finished(Vec::new()));
         };
         let Some(id) = h.current else {
@@ -154,15 +160,40 @@ impl ActionRules {
         if !presence {
             return Ok(ActionResolution::Finished(Vec::new()));
         }
+        self.resolve_for_card(world, hero, id, selected, context, None)
+    }
+    /// Copy a physical card without changing either hero's turn-card binding.
+    pub fn resolve_copied(
+        &self,
+        world: &NativeWorld,
+        hero: Symbol,
+        id: crate::cards::CardId,
+        selected: Option<&Datum>,
+        context: &mut Registers,
+        owner_and_suppress: (Symbol, bool),
+    ) -> Result<ActionResolution, String> {
+        self.resolve_for_card(world, hero, id, selected, context, Some(owner_and_suppress))
+    }
+    fn resolve_for_card(
+        &self,
+        world: &NativeWorld,
+        hero: Symbol,
+        id: crate::cards::CardId,
+        selected: Option<&Datum>,
+        context: &mut Registers,
+        copied: Option<(Symbol, bool)>,
+    ) -> Result<ActionResolution, String> {
         let instance = world.card(id).ok_or("missing active card")?;
         let card = &world.definitions.cards[instance.definition];
-        if card.spell {
+        if card.spell && copied.is_none() {
             return Err("spell current-face action recipes not compiled".into());
         }
         if world.has_uncompiled_auras {
             return Err("action prevention aura closure not compiled".into());
         }
-        context.set(self.current_card, Datum::Text(card.printed_id));
+        if copied.is_none() {
+            context.set(self.current_card, Datum::Text(card.printed_id));
+        }
         let primary = if instance.facedown {
             None
         } else {
@@ -175,11 +206,23 @@ impl ActionRules {
                 k
             }
         });
+        let legality_context = Registers::default();
         let available = |kind| -> Result<bool, String> {
             Ok(world
-                .action_legality(hero, kind, Some(id), context)?
+                .action_legality(
+                    hero,
+                    kind,
+                    Some(id),
+                    if copied.is_some() {
+                        &legality_context
+                    } else {
+                        context
+                    },
+                )?
                 .allowed
-                && (kind != ActionKind::FastTravel || world.has_safe_travel_zone(hero)))
+                && (copied.is_some()
+                    || kind != ActionKind::FastTravel
+                    || world.has_safe_travel_zone(hero)))
         };
         let mut options = Vec::new();
         let mut add = |kind: ActionKind, base: Option<i64>, primary_label| -> Result<(), String> {
@@ -189,7 +232,9 @@ impl ActionRules {
             let stat = match kind {
                 ActionKind::Movement => Some(Stat::Movement),
                 ActionKind::Attack => Some(Stat::Attack),
-                ActionKind::Defense | ActionKind::DefenseSkill => Some(Stat::Defense),
+                ActionKind::Defense | ActionKind::DefenseSkill if copied.is_none() => {
+                    Some(Stat::Defense)
+                }
                 _ => None,
             };
             let value = if let Some(stat) = stat {
@@ -234,13 +279,22 @@ impl ActionRules {
                 card: card.printed_id,
                 name: card.name,
                 options,
+                copied: copied.is_some(),
             }));
         };
         context.set(
             self.current_action,
             Datum::Text(self.kinds[chosen.kind.index()]),
         );
+        if let Some((owner, _)) = copied {
+            context.set(self.current_card, Datum::Text(card.printed_id));
+            context.set(self.performing_card, Datum::Text(card.printed_id));
+            context.set(self.performing_owner, Datum::Text(owner));
+        }
         let kind = chosen.kind;
+        // Execution checks both the raw primary and DEFENSE_SKILL's SKILL alias.
+        // Decision facts deliberately retain the source normalized-role test.
+        let primary_effect = Some(kind) == primary || Some(kind) == normalized;
         let mut steps = vec![
             ActionStep::ChoosePiece(hero),
             ActionStep::Passive(Passive::BeforeAction),
@@ -261,7 +315,7 @@ impl ActionRules {
                 .unwrap_or(chosen.value)
         };
         let range = card.range.filter(|v| *v != 0).unwrap_or(1);
-        if chosen.primary_effect {
+        if primary_effect {
             steps.extend([
                 ActionStep::PreMovement(hero),
                 ActionStep::PreDiscard(hero),
@@ -285,12 +339,13 @@ impl ActionRules {
                     range,
                 }),
                 ActionKind::Clear => steps.push(ActionStep::Clear),
-                ActionKind::Hold => steps.push(ActionStep::Hold(hero)),
-                ActionKind::Defense => steps.push(ActionStep::Defend(hero)),
+                ActionKind::Hold if copied.is_none() => steps.push(ActionStep::Hold(hero)),
+                ActionKind::Defense if copied.is_none() => steps.push(ActionStep::Defend(hero)),
+                _ if copied.is_some() => steps.push(ActionStep::PerformLog(hero, kind)),
                 _ => {}
             }
         }
-        let effect = chosen.primary_effect && !instance.facedown; // Nonempty IDs handled by the compiled definition flag below.
+        let effect = primary_effect && !instance.facedown; // Nonempty IDs handled by the compiled definition flag below.
         if kind == ActionKind::Attack {
             if effect && card.has_effect {
                 steps.extend([
@@ -341,10 +396,12 @@ impl ActionRules {
                 ActionStep::Passive(Passive::AfterBasicAction),
             ]);
         }
-        if chosen.primary_effect {
+        if primary_effect {
             steps.push(ActionStep::Passive(Passive::AfterPrimaryAction));
         }
-        steps.push(ActionStep::Passive(Passive::AfterResolveCard));
+        if !copied.is_some_and(|(_, suppress)| suppress) {
+            steps.push(ActionStep::Passive(Passive::AfterResolveCard));
+        }
         Ok(ActionResolution::Finished(steps))
     }
 }
@@ -359,7 +416,7 @@ impl ActionMenu {
             facts.entry(name.to_owned()).or_insert_with(|| json!({"action_role":if o.primary_effect {"primary"} else {"secondary"},"defense_stat":null,"defense_kind":null}));
             json!({"id":name,"text":format!("{}: {name} ({})",if o.primary_label {"Primary"} else {"Secondary"},o.display.map_or_else(||"-".into(),|v|v.to_string())),"metadata":{"type":name,"value":o.value}})
         }).collect::<Vec<_>>();
-        json!({"id":id,"request_type":"CHOOSE_ACTION","player_id":symbols.name(self.hero),"prompt":format!("Choose action for card {}",symbols.name(self.name)),"options":options,"can_skip":false,"can_rollback":false,"context":{},"decision_context":{"purpose":"action","actor_id":symbols.name(self.hero),"source_card_id":symbols.name(self.card),"choice_facts":facts}})
+        json!({"id":id,"request_type":"CHOOSE_ACTION","player_id":symbols.name(self.hero),"prompt":if self.copied {format!("Choose an action to perform on {}",symbols.name(self.name))} else {format!("Choose action for card {}",symbols.name(self.name))},"options":options,"can_skip":false,"can_rollback":false,"context":{},"decision_context":{"purpose":"action","actor_id":symbols.name(self.hero),"source_card_id":symbols.name(self.card),"choice_facts":facts}})
     }
 }
 impl ActionStep {
@@ -374,7 +431,7 @@ impl ActionStep {
             Self::FastTravel { .. } => "fast_travel",
             Self::Attack { .. } => "attack_sequence",
             Self::Clear => "clear_select",
-            Self::Hold(_) | Self::Defend(_) => "log",
+            Self::Hold(_) | Self::Defend(_) | Self::PerformLog(..) => "log",
             Self::Context(..) => "context",
         }
     }
@@ -408,6 +465,9 @@ impl ActionStep {
             Self::Hold(h) => wire["message"] = json!(format!("{} Holds.", symbols.name(*h))),
             Self::Defend(h) => {
                 wire["message"] = json!(format!("{} Defends (Active).", symbols.name(*h)))
+            }
+            Self::PerformLog(h, kind) => {
+                wire["message"] = json!(format!("{} performs {}.", symbols.name(*h), kind.name()));
             }
             Self::Context(key, value) => {
                 wire["key"] = json!(symbols.name(*key));

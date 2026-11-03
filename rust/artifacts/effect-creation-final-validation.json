@@ -1,0 +1,42 @@
+{
+  "milestone": "live effect creation and shared typed effect parsing",
+  "engine_complete": false,
+  "search_complete": false,
+  "new_live_scenes": 152,
+  "new_live_operations": 646,
+  "combined_live_scenes": 7489,
+  "combined_live_operations": 35651,
+  "index_sha256": "f0cea285d789b89195310acc7600466a88a83162296f08859159dd674d7c29a6",
+  "semantic_sha256": "b967f5ccd1d4781d03c738c6274de855897f0101f51ea57ade06c8409faee255",
+  "new_source_contracts_passed": 8,
+  "new_native_regressions": 3,
+  "new_iterate_state_request_event_identity_parity": true,
+  "strict_clippy_passed": true,
+  "rustfmt_passed": true,
+  "black_ruff_passed": true,
+  "frozen_python_and_lock_unchanged": true,
+  "instruction_metadata_sha256": "73767e22f951131459ec97042705037988c5d5ad795194ebdcad21862b657d75",
+  "full_workspace_verification": {
+    "tests_passed": 305,
+    "suite_results": 16,
+    "failures": 0,
+    "restore_each_live_operation": 35651,
+    "unchanged_canonical_scenes": 6592,
+    "unchanged_canonical_operations": 27145
+  },
+  "full_release_verification": {
+    "cases": 7489,
+    "operations": 35651,
+    "corpus_sha256": "f0cea285d789b89195310acc7600466a88a83162296f08859159dd674d7c29a6",
+    "workers": 4,
+    "state_request_event_and_identity_parity": true,
+    "seconds": 405.96
+  },
+  "fresh_source_inventory": {
+    "cases": 7489,
+    "operations": 35651,
+    "index_sha256": "f0cea285d789b89195310acc7600466a88a83162296f08859159dd674d7c29a6",
+    "semantic_sha256": "b967f5ccd1d4781d03c738c6274de855897f0101f51ea57ade06c8409faee255"
+  },
+  "committed": false
+}

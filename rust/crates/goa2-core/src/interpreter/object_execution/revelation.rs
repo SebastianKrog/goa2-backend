@@ -7,14 +7,19 @@ use crate::{
 };
 
 impl NativeSession {
-    fn hero_model_bound(&self, objects: &BoundObjects, hero: Symbol) -> Option<ObjectId> {
+    pub(super) fn hero_model_bound(
+        &self,
+        objects: &BoundObjects,
+        hero: Symbol,
+    ) -> Option<ObjectId> {
+        let owner = self.world.hero(hero)?.id;
         objects
             .phases
             .heroes
             .iter()
-            .find_map(|(id, model)| (*id == hero).then_some(*model))
+            .find_map(|(id, model)| (*id == owner).then_some(*model))
     }
-    fn model_card_bound(
+    pub(super) fn model_card_bound(
         &self,
         objects: &BoundObjects,
         model: ObjectId,
@@ -231,17 +236,14 @@ impl NativeSession {
                 && self.planning.two_cards(&self.world, *hero)
                 && objects.arena.field(second, *hero).is_none()
                 && !done.contains(hero)
-                && self
-                    .world
-                    .hero(*hero)
-                    .is_some_and(|hero| !hero.hand.is_empty())
+                && self.hero_hand_nonempty_bound(objects, *hero)?
             {
                 return Ok(true);
             }
         }
         Ok(false)
     }
-    fn reveal_knowledge_bound(
+    pub(super) fn reveal_knowledge_bound(
         &mut self,
         objects: &mut BoundObjects,
         hero: Symbol,
@@ -296,7 +298,7 @@ impl NativeSession {
             .map_err(unsupported)?;
         self.reveal_knowledge_bound(objects, hero, printed)
     }
-    fn complete_pass_bound(
+    pub(super) fn resolve_turn_slot_bound(
         &mut self,
         objects: &mut BoundObjects,
         hero: Symbol,
@@ -306,6 +308,15 @@ impl NativeSession {
         self.world
             .resolve_current_card(hero, Some(self.world.combat.turn))
             .map_err(card_error)?;
+        self.sync_resolved_slot_bound(objects, hero, model, current)
+    }
+    pub(super) fn sync_resolved_slot_bound(
+        &mut self,
+        objects: &mut BoundObjects,
+        hero: Symbol,
+        model: ObjectId,
+        current: Option<crate::cards::CardId>,
+    ) -> Result<()> {
         let Some(ObjectValue::Object(played)) =
             objects.arena.field(model, objects.phases.k(Field::Played))
         else {
@@ -368,7 +379,8 @@ impl NativeSession {
                 objects.phases.k(Field::ResolvedCount),
                 ObjectValue::Atom(Datum::Int(count)),
             )
-            .map_err(unsupported)
+            .map_err(unsupported)?;
+        self.sync_card_collections_bound(objects)
     }
     /// Source start_revelation_phase, including two-card retrieval ordering.
     pub fn start_revelation(&mut self) -> Result<()> {
@@ -403,7 +415,9 @@ impl NativeSession {
                 continue;
             };
             match value {
-                ObjectValue::Atom(Datum::Null) => self.complete_pass_bound(objects, hero, model)?,
+                ObjectValue::Atom(Datum::Null) => {
+                    self.resolve_turn_slot_bound(objects, hero, model)?
+                }
                 ObjectValue::Atom(Datum::Instance(instance)) => {
                     let card = CardId(instance);
                     self.reveal_card_bound(objects, hero, card)?;

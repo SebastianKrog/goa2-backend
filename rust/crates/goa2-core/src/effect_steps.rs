@@ -1,6 +1,6 @@
 //! CreateEffectStep bindings. All model/JSON work occurs during compilation.
 use crate::{
-    data::{Datum, Registers, Symbol, Symbols},
+    data::{Datum, RegisterRead, Symbol, Symbols},
     effects::{CreationContext, EffectCreateSpec},
     world::NativeWorld,
 };
@@ -41,8 +41,7 @@ fn defaults() -> Result<&'static Value> {
         let data: Value =
             serde_json::from_str(include_str!("../../../tests/fixtures/effect-defaults.json"))
                 .map_err(|e| e.to_string())?;
-        let manifest: Value = serde_json::from_str(include_str!("../../../oracle-manifest.json"))
-            .map_err(|e| e.to_string())?;
+        let manifest = crate::codec::oracle_manifest()?;
         if data["schema_version"] != 1 || data["source_sha256"] != manifest["source_sha256"] {
             return Err("effect defaults identity mismatch".into());
         }
@@ -79,6 +78,28 @@ fn context_text(value: Option<&Datum>, s: &Symbols) -> Result<Option<Symbol>> {
         Some(Datum::Text(v)) => Ok(Some(*v)),
         _ => Err("non-string effect identity requires source model coercion".into()),
     }
+}
+type LiveEffectCatalog = (Datum, Vec<Symbol>, Vec<Symbol>, Vec<Symbol>);
+pub(crate) fn live_catalog(s: &mut Symbols) -> Result<LiveEffectCatalog> {
+    let data = defaults()?;
+    let prototype = Datum::from_json(&data["prototype"], s)?;
+    let mut ids = |name: &str| {
+        data[name]
+            .as_array()
+            .ok_or("invalid effect catalog".to_owned())?
+            .iter()
+            .map(|value| {
+                value
+                    .as_str()
+                    .map(|name| s.intern(name))
+                    .ok_or("invalid effect catalog ID".to_owned())
+            })
+            .collect::<Result<Vec<_>>>()
+    };
+    let kinds = ids("effect_types")?;
+    let actions = ids("actions")?;
+    let colors = ids("colors")?;
+    Ok((prototype, kinds, actions, colors))
 }
 impl EffectStepSpec {
     pub fn compile(raw: &Value, s: &mut Symbols) -> Result<Self> {
@@ -324,7 +345,7 @@ impl EffectStepSpec {
     fn resolve_finishing(
         &self,
         steps: &[Datum],
-        ctx: &Registers,
+        ctx: &dyn RegisterRead,
         s: &Symbols,
     ) -> Result<Vec<Datum>> {
         let mut result = steps.to_vec();

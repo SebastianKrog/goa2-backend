@@ -7,17 +7,24 @@ use goa2_core::{
     world::NativeWorld,
 };
 use serde_json::{Value, json};
-fn corpus() -> &'static Value {
-    static DATA: std::sync::OnceLock<Value> = std::sync::OnceLock::new();
-    DATA.get_or_init(|| {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../tests/fixtures/hex-filters.json");
-        serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap()
-    })
+#[path = "../../../test-support/cases.rs"]
+mod fixtures;
+fn path() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/hex-filters.json")
+}
+fn case(name: &str) -> &'static Value {
+    static NAMED: std::sync::OnceLock<std::collections::HashMap<String, Value>> =
+        std::sync::OnceLock::new();
+    NAMED
+        .get_or_init(|| {
+            fixtures::selected_inputs(&path(), "cases", &["base-topology-split", "barrier"])
+        })
+        .get(name)
+        .unwrap()
 }
 #[test]
 fn complete_effect_aware_hex_filter_scans_match_python() {
-    for case in corpus()["cases"].as_array().unwrap() {
+    let checked = fixtures::visit_array(&path(), "cases", |case| {
         let envelope = serde_json::from_value(case["envelope"].clone()).unwrap();
         let actual = hex_filter_batch(envelope, case["queries"].as_array().unwrap().clone())
             .unwrap_or_else(|e| panic!("{}: {e}", case["name"]));
@@ -31,16 +38,12 @@ fn complete_effect_aware_hex_filter_scans_match_python() {
                 case["name"], case["queries"][i]["filter"]
             );
         }
-    }
+    });
+    assert_eq!(checked, 201);
 }
 #[test]
 fn geometric_range_and_inverse_straight_line_keep_their_topology_contracts() {
-    let case = corpus()["cases"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|c| c["name"] == "base-topology-split")
-        .unwrap();
+    let case = case("base-topology-split");
     let envelope = serde_json::from_value(case["envelope"].clone()).unwrap();
     let candidate = json!({"q":-1,"r":0,"s":1});
     let queries = vec![
@@ -55,12 +58,7 @@ fn geometric_range_and_inverse_straight_line_keep_their_topology_contracts() {
 }
 #[test]
 fn obstacle_filters_use_worker_private_live_barrier_origins() {
-    let case = corpus()["cases"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|c| c["name"] == "barrier")
-        .unwrap();
+    let case = case("barrier");
     let envelope = serde_json::from_value(case["envelope"].clone()).unwrap();
     let mut symbols = Symbols::default();
     let world = NativeWorld::compile(&envelope, &mut symbols).unwrap();
@@ -77,6 +75,7 @@ fn obstacle_filters_use_worker_private_live_barrier_origins() {
         filter
             .apply_scan(
                 &SpatialContext {
+                    count_observer: None,
                     world,
                     registers: &context,
                     symbols: &symbols,

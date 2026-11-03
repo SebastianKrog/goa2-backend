@@ -123,7 +123,9 @@ impl NativeWorld {
         Ok(())
     }
     pub fn resolve_current_card(&mut self, hero: Symbol, turn: Option<i64>) -> Result<()> {
-        let h = self.lifecycle_hero(hero)?;
+        let h = self
+            .hero_index(hero)
+            .ok_or(CardError::Illegal("hero not found"))?;
         let turn = match turn {
             Some(turn) => turn,
             None => {
@@ -144,10 +146,14 @@ impl NativeWorld {
                 "turn slot allocation exceeds supported limit",
             ));
         }
+        if let Some(card) = self.heroes[h].current
+            && self.card(card).is_none()
+        {
+            return Err(CardError::Illegal("unknown card instance"));
+        }
         let length = self.heroes[h].played.len().max(turn as usize);
         self.heroes[h].played.resize(length, None);
         if let Some(card) = self.heroes[h].current {
-            self.normal_card(card)?;
             self.change_lifecycle(card, CardLifecycle::Resolved);
             self.heroes[h].played[turn as usize - 1] = Some(card);
             self.heroes[h].current = None;

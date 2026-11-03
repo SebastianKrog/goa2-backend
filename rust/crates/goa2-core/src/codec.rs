@@ -7,6 +7,17 @@ use std::collections::HashSet;
 pub const ORACLE_REVISION: &str = "00becf4a68615afa410f8eabe0c841809af0427b";
 const REFERENCE_KEY: &str = "$goa2_instance";
 
+pub(crate) fn oracle_manifest() -> Result<&'static Value, String> {
+    static MANIFEST: std::sync::OnceLock<Result<Value, String>> = std::sync::OnceLock::new();
+    MANIFEST
+        .get_or_init(|| {
+            serde_json::from_str(include_str!("../../../oracle-manifest.json"))
+                .map_err(|error| error.to_string())
+        })
+        .as_ref()
+        .map_err(Clone::clone)
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum InstanceKind {
@@ -20,11 +31,21 @@ pub struct Definition {
     pub kind: InstanceKind,
     pub fields: Map<String, Value>,
 }
+/// Python model equality includes this state although normal JSON omits it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct InstanceEquality {
+    pub model: String,
+    pub definition_revision: i64,
+    pub json_metadata: bool,
+}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Instance {
     pub definition: u32,
     pub fields: Map<String, Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub equality: Option<InstanceEquality>,
 }
 
 /// Paths refer to the compact state tree, retaining physical instance references.
@@ -68,6 +89,14 @@ pub fn object_at_path<'a>(root: &'a Value, path: &[ObjectPathPart]) -> Result<&'
     Ok(value)
 }
 
+/// Immutable board dictionary keys may alias a visible Hex or remain private.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BoardKey {
+    pub hex: crate::geometry::Hex,
+    pub path: Option<Vec<ObjectPathPart>>,
+}
+
 /// Native transport identity history, separate from rule/search state.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -88,6 +117,8 @@ pub struct StateEnvelope {
     pub state: Value,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub object_bindings: Vec<ObjectBinding>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub board_keys: Option<Vec<BoardKey>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub native_resume: Option<NativeResume>,
 }
@@ -121,8 +152,7 @@ impl StateEnvelope {
         {
             return Err("unsupported state schema, oracle revision or rules version".into());
         }
-        let manifest: Value = serde_json::from_str(include_str!("../../../oracle-manifest.json"))
-            .map_err(|e| e.to_string())?;
+        let manifest = oracle_manifest()?;
         if manifest["source_sha256"].as_str() != Some(&self.source_sha256) {
             return Err("oracle source content mismatch".into());
         }
@@ -141,10 +171,39 @@ impl StateEnvelope {
             {
                 return Err("definition and mutable fields overlap".into());
             }
+            if let Some(equality) = &instance.equality
+                && (definition.kind == InstanceKind::Token || equality.model.is_empty())
+            {
+                return Err("invalid physical equality metadata".into());
+            }
             // Definitions and instance fields are atomic records. Nested
             // instance references must not create cycles or implicit aliases.
-            reject_reference(&Value::Object(definition.fields.clone()))?;
-            reject_reference(&Value::Object(instance.fields.clone()))?;
+            reject_record(&definition.fields)?;
+            reject_record(&instance.fields)?;
+        }
+        if let Some(keys) = &self.board_keys {
+            let tiles = self.state["board"]["tiles"]
+                .as_object()
+                .ok_or("board-key tile dictionary missing")?;
+            if keys.len() != tiles.len() {
+                return Err("board-key binding count mismatch".into());
+            }
+            for (binding, key) in keys.iter().zip(tiles.keys()) {
+                let (q, r, s) = binding.hex.coordinates();
+                crate::geometry::Hex::new(q, r, s)?;
+                if *key != format!("({q}, {r}, {s})") {
+                    return Err("board-key coordinates mismatch".into());
+                }
+                if let Some(path) = &binding.path {
+                    let value = object_at_path(&self.state, path)?;
+                    if value["q"].as_i64() != Some(i64::from(q))
+                        || value["r"].as_i64() != Some(i64::from(r))
+                        || value["s"].as_i64() != Some(i64::from(s))
+                    {
+                        return Err("board-key alias coordinates mismatch".into());
+                    }
+                }
+            }
         }
         self.validate_object_bindings()?;
         let expanded = self.materialize()?;
@@ -292,16 +351,18 @@ impl StateEnvelope {
         ))
     }
 }
+fn reject_record(fields: &Map<String, Value>) -> Result<(), String> {
+    if fields.contains_key(REFERENCE_KEY) {
+        return Err("reserved reference inside instance record".into());
+    }
+    for item in fields.values() {
+        reject_reference(item)?;
+    }
+    Ok(())
+}
 fn reject_reference(value: &Value) -> Result<(), String> {
     match value {
-        Value::Object(fields) => {
-            if fields.contains_key(REFERENCE_KEY) {
-                return Err("reserved reference inside instance record".into());
-            }
-            for item in fields.values() {
-                reject_reference(item)?;
-            }
-        }
+        Value::Object(fields) => reject_record(fields)?,
         Value::Array(items) => {
             for item in items {
                 reject_reference(item)?;
@@ -316,8 +377,7 @@ mod tests {
     use super::*;
     use serde_json::json;
     fn envelope() -> StateEnvelope {
-        let manifest: Value =
-            serde_json::from_str(include_str!("../../../oracle-manifest.json")).unwrap();
+        let manifest = oracle_manifest().unwrap();
         serde_json::from_value(json!({
             "schema_version":1,"oracle_revision":ORACLE_REVISION,"source_sha256":manifest["source_sha256"],"rules_version":9,
             "definitions":[{"kind":"card","fields":{"id":"same_printed_id","range_value":1}}],

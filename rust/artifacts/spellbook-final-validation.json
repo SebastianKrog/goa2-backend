@@ -1,0 +1,39 @@
+{
+  "lifecycle_operations": [
+    "cast_spell",
+    "wish_sequence",
+    "prepare_spellbook",
+    "remove_prepared_spells"
+  ],
+  "reviewed_ordinary_primary_faces": 109,
+  "ordinary_faces": 596,
+  "complete_spell_bodies": 0,
+  "total_spell_bodies": 22,
+  "source_cases": 47,
+  "source_operations": 177,
+  "bounded_restore_cases": 47,
+  "bounded_restore_operations": 177,
+  "native_guard_live_operand_and_isolation_tests": 7,
+  "source_contracts": 9,
+  "workspace_passed": 382,
+  "workspace_filtered": 1,
+  "not_rerun": "older all-corpus exhaustive restore gate",
+  "independent_release_parity": {
+    "cases": 47,
+    "operations": 177,
+    "corpus_sha256": "5af988b117cd365bba84a20c1d0d8e93ca21171eabf1e8fd1d1bad7e4677e8d7",
+    "workers": 4,
+    "state_request_event_and_identity_parity": true,
+    "seconds": 1.59
+  },
+  "live_cases": 11744,
+  "live_operations": 74472,
+  "live_index_sha256": "c5876ee3b9af6a69d6f06d556d77549d2906804c03238babb113aadda61aa470",
+  "live_semantic_sha256": "64b2e9fd11bee8ce3e6b1cf8a7f268cc25b48e42b796e38e725371ced4e279db",
+  "frozen_source_and_lock_unchanged": true,
+  "strict_clippy": true,
+  "rustfmt": true,
+  "black_ruff": true,
+  "engine_complete": false,
+  "search_complete": false
+}

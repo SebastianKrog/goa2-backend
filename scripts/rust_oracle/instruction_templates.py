@@ -6,17 +6,21 @@ import sys
 from oracle import ROOT, verify_sources
 
 sys.path.insert(0, str(ROOT / "src"))
-from goa2.domain.models import TargetType
+from goa2.domain.models import TargetType, TokenType, Turret
 from goa2.engine.filters_geometry import InStraightLineFilter, StraightLinePathFilter
 from goa2.engine.filters_hex import (
     FastTravelDestinationFilter,
+    HexBatchCompletableFilter,
     MovementPathFilter,
     ObstacleFilter,
     RangeFilter,
+    TokenRemovalCompletableFilter,
 )
 from goa2.engine.steps import (
     AdvanceTurnStep,
     AttackSequenceStep,
+    CastSpellStep,
+    CheckContextConditionStep,
     CheckLanePushStep,
     CheckMinionProtectionStep,
     CheckPassiveAbilitiesStep,
@@ -45,10 +49,15 @@ from goa2.engine.steps import (
     MoveSequenceStep,
     MoveUnitStep,
     OfferPassiveStep,
+    OfferRockUltimateStep,
+    PerformCardActionStep,
     PlaceMarkerStep,
+    PlaceTokenStep,
     PlaceUnitStep,
+    PrepareSpellbookStep,
     ReactionWindowStep,
     RemoveMarkerStep,
+    RemovePreparedSpellsStep,
     RemoveTokenStep,
     RemoveUnitStep,
     ResolveCardStep,
@@ -72,7 +81,153 @@ from goa2.engine.steps import (
     TriggerGameOverStep,
     TriggerMineStep,
     ValidateRepeatStep,
+    WishSequenceStep,
 )
+
+
+def passive_continuations():
+    """Freeze source-created structure; Rust binds live owners and rule values."""
+    from live_passive_traces import build, enable
+    from model_traces import setup
+    from shared_objects import capture
+
+    from goa2.data.heroes.registry import HeroRegistry
+    from goa2.domain.models import CardState, RuneType
+    from goa2.engine.effects import CardEffect, CardEffectRegistry
+
+    setup()
+    methods = {
+        key: type(effect).get_passive_steps.__qualname__
+        for key, effect in CardEffectRegistry._effects.items()
+        if type(effect).get_passive_steps is not CardEffect.get_passive_steps
+    }
+    recipes = {}
+
+    def freeze(key, steps, owner):
+        whole_bindings, _ = capture(steps, [step.model_dump(mode="json") for step in steps])
+        if any(len(binding["paths"]) != 1 for binding in whole_bindings):
+            raise ValueError("passive continuation has shared body children")
+        rows = []
+        for step in steps:
+            raw = step.model_dump(mode="json")
+            bindings, _ = capture(step, raw)
+            if any(len(binding["paths"]) != 1 for binding in bindings):
+                raise ValueError("passive continuation requires shared-child recipe bindings")
+
+            def bind(value):
+                if isinstance(value, dict):
+                    return {k: "template" if k == "step_id" else bind(v) for k, v in value.items()}
+                if isinstance(value, list):
+                    return [bind(v) for v in value]
+                return "template-passive-owner" if value == owner else value
+
+            rows.append({"fields": bind(raw), "objects": bindings})
+        recipes[key] = rows
+
+    for name, definition in sorted(HeroRegistry._heroes.items()):
+        for original in [
+            *definition.deck,
+            *([definition.ultimate_card] if definition.ultimate_card else []),
+        ]:
+            effect = CardEffectRegistry.get(original.effect_id)
+            configs = effect.get_passive_configs() if effect else []
+            if not configs or original.effect_id in {"flurry_of_blows", "cloak_and_daggers"}:
+                continue
+            state, hero = build(name)
+            card = next(
+                c for c in [*hero.deck, hero.ultimate_card] if c is not None and c.id == original.id
+            )
+            hero.level = 8
+            card.state, card.is_facedown = CardState.RESOLVED, False
+            enable(state, hero, card, original.effect_id)
+            enemy = next(team.heroes[0] for team in state.teams.values() if team.color != hero.team)
+            if original.effect_id == "a_complicated_profession":
+                state.execution_context["marker_target_id"] = str(enemy.id)
+            if original.effect_id == "big_sodding_gun":
+                state.execution_context["push_victim_id"] = str(enemy.id)
+            if original.effect_id == "rune_mastery":
+                hero.rune_slots = {i + 1: rune for i, rune in enumerate(RuneType)}
+            steps = effect.get_passive_steps(
+                state, hero, card, configs[0].trigger, state.execution_context
+            )
+            if not steps:
+                raise ValueError(f"passive continuation fixture is empty: {original.effect_id}")
+            freeze(original.effect_id, steps, str(hero.id))
+    state, hero = build("Takahide")
+    effect = CardEffectRegistry.get("cloak_and_daggers")
+    from goa2.domain.models import ActionType, PassiveTrigger
+
+    for action in (ActionType.ATTACK, ActionType.MOVEMENT):
+        context = {
+            "basic_action_type": action.value,
+            "basic_action_value": 3,
+            "basic_action_range": 2,
+        }
+        freeze(
+            "cloak_and_daggers/" + action.value,
+            effect.get_passive_steps(
+                state, hero, hero.ultimate_card, PassiveTrigger.AFTER_BASIC_ACTION, context
+            ),
+            str(hero.id),
+        )
+    for mask in range(4):
+        state, hero = build("Arien")
+        sequence = MoveSequenceStep(
+            unit_id=str(hero.id),
+            range_val=1,
+            force_straight_line=bool(mask & 1),
+            force_full_distance=bool(mask & 2),
+        )
+        freeze("movement/" + str(mask), sequence.resolve(state, {}).new_steps, str(hero.id))
+    state, hero = build("Wuk")
+    point = next(h for h in state.board.tiles if h not in state.entity_locations.values())
+    for token, hex in zip(
+        state.token_pool[TokenType.TREE], list(state.board.tiles)[:3], strict=True
+    ):
+        if hex in state.entity_locations.values():
+            hex = next(h for h in state.board.tiles if h not in state.entity_locations.values())
+        state.place_entity(token.id, hex)
+    point = next(h for h in state.board.tiles if h not in state.entity_locations.values())
+    step = PlaceTokenStep(
+        token_type=TokenType.TREE,
+        hex_key="target_hex",
+        owner_id_key="token_owner",
+        output_key="placed",
+        existing_token_key="existing",
+        overflow_selection_key="overflow",
+        is_immune_to_enemy_actions=True,
+    )
+    freeze("token/overflow", step.resolve(state, {"target_hex": point}).new_steps, str(hero.id))
+    freeze(
+        "token/batch_primitives",
+        [
+            SelectStep(target_type=TargetType.HEX, prompt="", is_mandatory=True),
+            SelectStep(
+                target_type=TargetType.NUMBER,
+                prompt="",
+                output_key="batch_choice",
+                number_options=[1, 0],
+                number_labels={1: "Place tokens", 0: "Skip"},
+                override_player_id_key="batch_owner",
+                is_mandatory=True,
+            ),
+            CheckContextConditionStep(
+                input_key="batch_choice", operator="==", threshold=1, output_key="batch_go"
+            ),
+            SetContextFlagStep(key="batch_done", value=True),
+        ],
+        str(hero.id),
+    )
+    state, hero = build("Mrak")
+    hero.level = 8
+    enemy = state.get_hero("hero_brogan")
+    from goa2.domain.hex import Hex
+
+    state.place_entity(enemy.id, Hex(q=2, r=0, s=-2))
+    rock = Hex(q=1, r=0, s=-1)
+    step = OfferRockUltimateStep(rock_hex_keys=["rock"])
+    freeze("token/rock_ultimate", step.resolve(state, {"rock": rock}).new_steps, str(hero.id))
+    return {"methods": methods, "recipes": recipes}
 
 
 def export():
@@ -160,6 +315,11 @@ def export():
         "displacement": ResolveDisplacementStep(step_id="template"),
         "fast_travel_unit": FastTravelUnitStep(step_id="template"),
         "travel_filter": FastTravelDestinationFilter(),
+        "cast_spell": CastSpellStep(step_id="template", allowed_spell_ids=[]),
+        "perform_card": PerformCardActionStep(step_id="template"),
+        "wish_sequence": WishSequenceStep(step_id="template", caster_id="template"),
+        "prepare_spellbook": PrepareSpellbookStep(step_id="template"),
+        "remove_prepared_spells": RemovePreparedSpellsStep(step_id="template"),
         "resolve_card": ResolveCardStep(step_id="template", hero_id="template"),
         "confirm_resolution": ConfirmResolutionStep(step_id="template", hero_id="template"),
         "finalize_hero": FinalizeHeroTurnStep(step_id="template", hero_id="template"),
@@ -245,6 +405,23 @@ def export():
             is not CardEffect.get_action_prevention_reason
         ),
         "registered_effects": sorted(CardEffectRegistry._effects),
+        "passive_continuations": passive_continuations(),
+        "turret_default": Turret(id="trinkets_turret", name="Turret").model_dump(mode="json"),
+        "token_batch_filters": {
+            "obstacle": ObstacleFilter().model_dump(mode="json"),
+            "hex": HexBatchCompletableFilter(
+                slot_index=0, slot_keys=[], slot_filters=[]
+            ).model_dump(mode="json"),
+            "removal": TokenRemovalCompletableFilter(
+                token_type=TokenType.TREE, slot_keys=[], slot_filters=[]
+            ).model_dump(mode="json"),
+        },
+        "token_types": [kind.value for kind in TokenType],
+        "passive_offer_predicates": {
+            key: type(effect).should_offer_passive.__qualname__
+            for key, effect in CardEffectRegistry._effects.items()
+            if type(effect).should_offer_passive is not CardEffect.should_offer_passive
+        },
         "passive_configs": {
             key: [
                 {

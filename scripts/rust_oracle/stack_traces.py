@@ -1089,6 +1089,38 @@ def corpus():
     return {**payload, "corpus_sha256": digest(payload)}
 
 
+def write_corpus_stream(path, metadata, cases):
+    """Freeze source snapshots one case at a time, with the same semantic digest."""
+    metadata = dict(metadata)
+    if metadata.get("schema_version") != 1 or any(
+        key in metadata for key in ("cases", "corpus_sha256", "semantic_sha256")
+    ):
+        raise ValueError("invalid streaming trace metadata")
+    hasher = hashlib.sha256()
+    hasher.update((canonical(metadata)[:-1] + ',"cases":[').encode())
+    directory = path.parent / path.stem
+    directory.mkdir(parents=True, exist_ok=True)
+    entries = []
+    for index, case in enumerate(cases):
+        encoded = canonical(case).encode()
+        if index:
+            hasher.update(b",")
+        hasher.update(encoded)
+        identity = hashlib.sha256(encoded).hexdigest()
+        relative = f"{path.stem}/{identity}.json"
+        target = path.parent / relative
+        temporary = target.with_suffix(".json.tmp")
+        temporary.unlink(missing_ok=True)
+        temporary.write_bytes(encoded + b"\n")
+        temporary.replace(target)
+        entries.append({"name": case["name"], "path": relative, "case_sha256": identity})
+    hasher.update(b"]}")
+    metadata["schema_version"] = 2
+    return _install_index(
+        path, {**metadata, "semantic_sha256": hasher.hexdigest(), "cases": entries}
+    )
+
+
 def write_corpus(path, source):
     """Store complete snapshots separately; the small index checks every case."""
     source = dict(source)
@@ -1136,17 +1168,40 @@ def read_index(path):
     return source, identity
 
 
-def read_case(path, entry):
+def _case_file(path, entry):
     identity = entry["case_sha256"]
     if len(identity) != 64 or any(c not in "0123456789abcdef" for c in identity):
         raise ValueError("invalid trace case identity")
     relative = f"{path.stem}/{identity}.json"
     if entry["path"] != relative:
         raise ValueError("trace case path mismatch")
-    case = json.loads((path.parent / relative).read_text())
-    if digest(case) != identity or case["name"] != entry["name"]:
+    return path.parent / relative
+
+
+def _read_case_encoded(path, entry):
+    identity = entry["case_sha256"]
+    case = json.loads(_case_file(path, entry).read_text())
+    encoded = canonical(case).encode()
+    if hashlib.sha256(encoded).hexdigest() != identity or case["name"] != entry["name"]:
         raise ValueError("trace case content identity mismatch")
-    return case
+    return case, encoded
+
+
+def _verified_case_encoding(path, entry):
+    """Hash immutable canonical bytes without expanding every snapshot model.
+
+    The SHA is the same canonical-case identity used by full readers. Check the
+    exact leading name as well; alternate formatting/order uses the full parser.
+    """
+    encoded = _case_file(path, entry).read_bytes().removesuffix(b"\n")
+    prefix = ('{"name":' + canonical(entry["name"]) + ",").encode()
+    if encoded.startswith(prefix) and hashlib.sha256(encoded).hexdigest() == entry["case_sha256"]:
+        return encoded
+    return _read_case_encoded(path, entry)[1]
+
+
+def read_case(path, entry):
+    return _read_case_encoded(path, entry)[0]
 
 
 def merge_corpora(path, additions_path):
@@ -1182,10 +1237,10 @@ def merge_corpora(path, additions_path):
     directory.mkdir(parents=True, exist_ok=True)
     entries = []
     for index, (source_path, entry) in enumerate(sources):
-        case = read_case(source_path, entry)
+        encoded = _verified_case_encoding(source_path, entry)
         if index:
             hasher.update(b",")
-        hasher.update(canonical(case).encode())
+        hasher.update(encoded)
         relative = f"{path.stem}/{entry['case_sha256']}.json"
         if source_path != path:
             target = path.parent / relative
@@ -1199,7 +1254,7 @@ def merge_corpora(path, additions_path):
             try:
                 os.link(source_path.parent / entry["path"], temporary)
             except OSError:
-                temporary.write_text(json.dumps(case, separators=(",", ":")) + "\n")
+                temporary.write_bytes(encoded + b"\n")
             temporary.replace(target)
         entries.append(
             {"name": entry["name"], "path": relative, "case_sha256": entry["case_sha256"]}

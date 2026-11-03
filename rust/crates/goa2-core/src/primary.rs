@@ -7,6 +7,7 @@ use crate::{
     targeting::UnitFilter,
 };
 use serde_json::Value;
+use std::sync::Arc;
 pub const HERO: &str = "native-primary-hero";
 pub const CARD: &str = "native-primary-card";
 pub const PRIMARY: i64 = 1234567891;
@@ -26,13 +27,32 @@ pub struct PrimaryValues {
 pub struct PrimaryOperands {
     hero: Symbol,
     card: Symbol,
+    radius_defaults: Arc<[(i64, i64)]>,
 }
 impl PrimaryOperands {
-    pub fn compile(s: &mut Symbols) -> Self {
-        Self {
+    pub fn compile(s: &mut Symbols) -> Result<Self, String> {
+        let radius_defaults = catalog()?["radius_fallbacks"]
+            .as_object()
+            .ok_or("primary radius fallbacks missing")?
+            .iter()
+            .map(|(slot, value)| {
+                Ok((
+                    slot.parse::<i64>().map_err(|e| e.to_string())?,
+                    value.as_i64().ok_or("primary radius fallback invalid")?,
+                ))
+            })
+            .collect::<Result<Vec<_>, String>>()?;
+        Ok(Self {
             hero: s.intern(HERO),
             card: s.intern(CARD),
-        }
+            radius_defaults: Arc::from(radius_defaults),
+        })
+    }
+    pub fn radius_default(&self, slot: i64, radius: Option<i64>) -> Option<i64> {
+        self.radius_defaults
+            .iter()
+            .find(|(key, _)| *key == slot)
+            .map(|(_, default)| radius.filter(|v| *v != 0).unwrap_or(*default))
     }
     pub fn symbol(&self, value: Symbol, v: &PrimaryValues) -> Symbol {
         if value == self.hero {
@@ -48,7 +68,7 @@ impl PrimaryOperands {
             *id = self.symbol(*id, v);
         }
     }
-    pub fn number(value: i64, v: &PrimaryValues) -> Result<i64, String> {
+    pub fn number(&self, value: i64, v: &PrimaryValues) -> Result<i64, String> {
         match value {
             PRIMARY => Ok(v.stats.primary_value),
             RANGE => Ok(v.stats.range),
@@ -56,13 +76,17 @@ impl PrimaryOperands {
                 .stats
                 .radius
                 .ok_or("required primary radius is absent".into()),
-            _ => Ok(value),
+            _ => Ok(self.radius_default(value, v.stats.radius).unwrap_or(value)),
         }
     }
-    pub fn optional_number(value: &mut Option<i64>, v: &PrimaryValues) -> Result<(), String> {
+    pub fn optional_number(
+        &self,
+        value: &mut Option<i64>,
+        v: &PrimaryValues,
+    ) -> Result<(), String> {
         *value = match *value {
             Some(RADIUS) => v.stats.radius,
-            Some(n) => Some(Self::number(n, v)?),
+            Some(n) => Some(self.number(n, v)?),
             None => None,
         };
         Ok(())
@@ -70,35 +94,89 @@ impl PrimaryOperands {
     fn origin(&self, o: &mut Origin, v: &PrimaryValues) {
         self.optional_symbol(&mut o.literal, v);
     }
+    fn count_match(
+        &self,
+        count: &mut crate::targeting::CandidateCount,
+        v: &PrimaryValues,
+    ) -> Result<(), String> {
+        count.min = self.number(count.min, v)?;
+        self.optional_number(&mut count.max, v)?;
+        for filter in &mut count.filters {
+            self.unit_filter(filter, v)?;
+        }
+        Ok(())
+    }
     pub fn hex_filter(&self, f: &mut HexFilter, v: &PrimaryValues) -> Result<(), String> {
         match f {
+            HexFilter::CountMatch(count) => self.count_match(count, v)?,
+            HexFilter::And(filters) | HexFilter::Or(filters) => {
+                for filter in filters {
+                    self.hex_filter(filter, v)?;
+                }
+            }
+            HexFilter::Batch(search) => {
+                for filters in &mut search.filters {
+                    for filter in filters {
+                        self.hex_filter(filter, v)?;
+                    }
+                }
+            }
+            HexFilter::Farthest(search) => self.origin(&mut search.origin, v),
             HexFilter::Range {
                 origin, min, max, ..
             } => {
                 self.origin(origin, v);
-                Self::optional_number(min, v)?;
-                Self::optional_number(max, v)?;
+                self.optional_number(min, v)?;
+                self.optional_number(max, v)?;
             }
             HexFilter::Movement { origin, range, .. } => {
                 self.origin(origin, v);
-                *range = i32::try_from(Self::number(i64::from(*range), v)?)
+                *range = i32::try_from(self.number(i64::from(*range), v)?)
                     .map_err(|_| "primary movement range outside i32")?;
             }
             HexFilter::Obstacle { exclude, .. } => self.origin(exclude, v),
-            HexFilter::Straight { origin, .. }
-            | HexFilter::ClearLine { origin, .. }
-            | HexFilter::FastTravel { origin, .. } => self.origin(origin, v),
-            HexFilter::Spawn { .. }
+            HexFilter::Relative { origin, .. }
+            | HexFilter::BehindTarget { origin, .. }
+            | HexFilter::Straight { origin, .. }
+            | HexFilter::ClearLine { origin, .. } => self.origin(origin, v),
+            HexFilter::FastTravel {
+                origin,
+                source_card,
+                ..
+            } => {
+                self.origin(origin, v);
+                self.optional_symbol(source_card, v);
+            }
+            HexFilter::AdjacentContext(_)
+            | HexFilter::Between { .. }
+            | HexFilter::SpawnTeam(_)
+            | HexFilter::BattleZone
+            | HexFilter::Exclude(_)
+            | HexFilter::Spawn { .. }
             | HexFilter::AdjacentSpawn { .. }
-            | HexFilter::AdjacentTags(_) => {}
+            | HexFilter::AdjacentTags(_)
+            | HexFilter::Reject
+            | HexFilter::Terrain(_) => {}
         }
         Ok(())
     }
     pub fn unit_filter(&self, f: &mut UnitFilter, v: &PrimaryValues) -> Result<(), String> {
         match f {
+            UnitFilter::CountMatch(count) => self.count_match(count, v)?,
+            UnitFilter::Cards { min, max, .. } => {
+                self.optional_number(min, v)?;
+                self.optional_number(max, v)?;
+            }
+            UnitFilter::BatchRemoval(search) => {
+                for filters in &mut search.batch.filters {
+                    for filter in filters {
+                        self.hex_filter(filter, v)?;
+                    }
+                }
+            }
             UnitFilter::Range(f) | UnitFilter::Spatial(f) => self.hex_filter(f, v)?,
             UnitFilter::BehindEmpty(origin) => self.origin(origin, v),
-            UnitFilter::Or(filters) => {
+            UnitFilter::Or(filters) | UnitFilter::And(filters) => {
                 for filter in filters {
                     self.unit_filter(filter, v)?;
                 }
@@ -110,7 +188,7 @@ impl PrimaryOperands {
 }
 impl PrimaryValues {
     /// Boundary-only substitution. Step execution binds typed operands instead.
-    pub fn patch_wire(&self, wire: &mut Value, s: &Symbols) {
+    pub fn patch_wire(&self, wire: &mut Value, s: &Symbols, slots: &PrimaryOperands) {
         match wire {
             Value::String(text) if text == HERO => *wire = Value::from(s.name(self.hero)),
             Value::String(text) if text == CARD => *wire = Value::from(s.name(self.card)),
@@ -124,16 +202,21 @@ impl PrimaryValues {
                 Some(PRIMARY) => *wire = Value::from(self.stats.primary_value),
                 Some(RANGE) => *wire = Value::from(self.stats.range),
                 Some(RADIUS) => *wire = self.stats.radius.map_or(Value::Null, Value::from),
-                _ => {}
+                Some(n) => {
+                    if let Some(value) = slots.radius_default(n, self.stats.radius) {
+                        *wire = Value::from(value);
+                    }
+                }
+                None => {}
             },
             Value::Array(items) => {
                 for item in items {
-                    self.patch_wire(item, s);
+                    self.patch_wire(item, s, slots);
                 }
             }
             Value::Object(fields) => {
                 for (_, value) in fields {
-                    self.patch_wire(value, s);
+                    self.patch_wire(value, s, slots);
                 }
             }
             _ => {}
@@ -151,9 +234,8 @@ fn load_catalog() -> Result<Value, String> {
     let source: Value =
         serde_json::from_str(include_str!("../../../tests/fixtures/primary-effects.json"))
             .map_err(|e| e.to_string())?;
-    let manifest: Value = serde_json::from_str(include_str!("../../../oracle-manifest.json"))
-        .map_err(|e| e.to_string())?;
-    if source["schema_version"] != 1
+    let manifest = crate::codec::oracle_manifest()?;
+    if source["schema_version"] != 2
         || source["source_sha256"] != manifest["source_sha256"]
         || source["operands"]
             != serde_json::json!({"hero":HERO,"card":CARD,"primary":PRIMARY,"range":RANGE,"radius":RADIUS})

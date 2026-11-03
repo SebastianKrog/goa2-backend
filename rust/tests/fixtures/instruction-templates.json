@@ -813,6 +813,2899 @@
     "worthy_opponent",
     "x_marks_the_spot"
   ],
+  "passive_continuations": {
+    "methods": {
+      "living_tsunami": "LivingTsunamiEffect.get_passive_steps",
+      "a_complicated_profession": "AComplicatedProfessionEffect.get_passive_steps",
+      "jinx": "JinxEffect.get_passive_steps",
+      "legend_of_the_skies": "LegendOfTheSkiesEffect.get_passive_steps",
+      "battle_fury": "BattleFuryEffect.get_passive_steps",
+      "the_archwizard": "TheArchwizardEffect.get_passive_steps",
+      "flurry_of_blows": "FlurryOfBlowsEffect.get_passive_steps",
+      "what_the_hell_are_you": "WhatTheHellAreYouEffect.get_passive_steps",
+      "big_sodding_gun": "BigSoddingGunEffect.get_passive_steps",
+      "wild_hunt": "WildHuntEffect.get_passive_steps",
+      "rune_mastery": "RuneMasteryEffect.get_passive_steps",
+      "bullet_time": "BulletTimeEffect.get_passive_steps",
+      "reign_of_winter": "ReignOfWinterEffect.get_passive_steps",
+      "cloak_and_daggers": "CloakAndDaggersEffect.get_passive_steps",
+      "high_voltage": "HighVoltageEffect.get_passive_steps",
+      "dragon_knight": "DragonKnightEffect.get_passive_steps",
+      "march_of_nature": "MarchOfNatureEffect.get_passive_steps"
+    },
+    "recipes": {
+      "living_tsunami": [
+        {
+          "fields": {
+            "type": "move_sequence",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": false,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "unit_id": "template-passive-owner",
+            "range_val": 1,
+            "range_stat_type": null,
+            "destination_key": "target_hex",
+            "pass_through_obstacles": false,
+            "force_straight_line": false,
+            "force_full_distance": false
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            }
+          ]
+        }
+      ],
+      "a_complicated_profession": [
+        {
+          "fields": {
+            "type": "force_discard",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "victim_id": null,
+            "victim_key": "marker_target_id",
+            "card_is_basic": null,
+            "immunity_source_id": null
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            }
+          ]
+        }
+      ],
+      "jinx": [
+        {
+          "fields": {
+            "type": "set_actor",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "actor_key": null,
+            "actor_id": "template-passive-owner",
+            "save_key": "_cordelia_jinx_saved_actor"
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            }
+          ]
+        },
+        {
+          "fields": {
+            "type": "select_step",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "target_type": "HEX",
+            "prompt": "Move exactly 1 space",
+            "output_key": "cordelia_jinx_destination",
+            "decision_purpose": null,
+            "filters": [
+              {
+                "type": "range_filter",
+                "max_range": 1,
+                "min_range": 1,
+                "origin_id": "template-passive-owner",
+                "origin_key": null,
+                "origin_hex_key": null,
+                "max_range_key": null,
+                "min_range_key": null,
+                "distance_mode": "topology"
+              },
+              {
+                "type": "movement_path_filter",
+                "range_val": 1,
+                "unit_id": "template-passive-owner",
+                "unit_key": null,
+                "pass_through_obstacles": false
+              },
+              {
+                "type": "occupied_filter",
+                "is_obstacle": false,
+                "exclude_id": null,
+                "exclude_id_key": null
+              }
+            ],
+            "auto_select_if_one": false,
+            "context_hero_id": null,
+            "context_hero_id_key": null,
+            "card_container": "HAND",
+            "card_containers": null,
+            "restrict_played_to_shields": false,
+            "include_facedown": false,
+            "number_options": [],
+            "number_labels": {},
+            "skip_immunity_filter": false,
+            "skip_self_filter": false,
+            "override_player_id": null,
+            "override_player_id_key": null,
+            "card_action_types": null,
+            "card_colors": null,
+            "card_color_key": null,
+            "card_tier_key": null,
+            "card_is_basic": null,
+            "card_is_active": null,
+            "card_has_item": null,
+            "allowed_card_ids": null,
+            "exclude_card_id_keys": null,
+            "card_states": null,
+            "exclude_card_states": null,
+            "selected_card_color_key": null,
+            "selected_card_tier_key": null
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            },
+            {
+              "kind": "list",
+              "paths": [
+                [
+                  "filters"
+                ]
+              ]
+            },
+            {
+              "kind": "model",
+              "paths": [
+                [
+                  "filters",
+                  0
+                ]
+              ]
+            },
+            {
+              "kind": "model",
+              "paths": [
+                [
+                  "filters",
+                  1
+                ]
+              ]
+            },
+            {
+              "kind": "model",
+              "paths": [
+                [
+                  "filters",
+                  2
+                ]
+              ]
+            },
+            {
+              "kind": "list",
+              "paths": [
+                [
+                  "number_options"
+                ]
+              ]
+            },
+            {
+              "kind": "dict",
+              "paths": [
+                [
+                  "number_labels"
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "fields": {
+            "type": "move_unit",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "unit_id": "template-passive-owner",
+            "unit_key": null,
+            "destination_key": "cordelia_jinx_destination",
+            "target_hex_arg": null,
+            "range_val": 1,
+            "is_movement_action": false,
+            "pass_through_obstacles": false,
+            "force_straight_line": false,
+            "crossed_obstacles_output_key": null,
+            "success_output_key": null,
+            "mine_path_prechosen": false
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            }
+          ]
+        },
+        {
+          "fields": {
+            "type": "set_actor",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "actor_key": "_cordelia_jinx_saved_actor",
+            "actor_id": null,
+            "save_key": "_cordelia_jinx_discard_actor"
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            }
+          ]
+        }
+      ],
+      "legend_of_the_skies": [
+        {
+          "fields": {
+            "type": "set_context_flag",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "key": "ult_prev_card_id",
+            "value": "walk_the_plank"
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            }
+          ]
+        },
+        {
+          "fields": {
+            "type": "perform_primary_action",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "card_key": "ult_prev_card_id",
+            "hero_id": "template-passive-owner",
+            "exclude_target_key": null
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            }
+          ]
+        }
+      ],
+      "battle_fury": [
+        {
+          "fields": {
+            "type": "perform_primary_action",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "card_key": "discarded_card_id",
+            "hero_id": "template-passive-owner",
+            "exclude_target_key": null
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            }
+          ]
+        }
+      ],
+      "the_archwizard": [
+        {
+          "fields": {
+            "type": "set_context_flag",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "key": "archwizard_replaced_prepare",
+            "value": true
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            }
+          ]
+        },
+        {
+          "fields": {
+            "type": "cast_spell",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "allowed_spell_ids": [
+              "wish"
+            ],
+            "caster_id": "template-passive-owner",
+            "caster_key": null
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            },
+            {
+              "kind": "list",
+              "paths": [
+                [
+                  "allowed_spell_ids"
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "what_the_hell_are_you": [
+        {
+          "fields": {
+            "type": "collect_units",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "target_type": "UNIT",
+            "filters": [
+              {
+                "type": "unit_type_filter",
+                "unit_type": "HERO"
+              },
+              {
+                "type": "team_filter",
+                "relation": "ENEMY"
+              },
+              {
+                "type": "range_filter",
+                "max_range": 5,
+                "min_range": 0,
+                "origin_id": null,
+                "origin_key": null,
+                "origin_hex_key": null,
+                "max_range_key": null,
+                "min_range_key": null,
+                "distance_mode": "topology"
+              }
+            ],
+            "output_key": "wthau_victims",
+            "skip_immunity_filter": false,
+            "skip_self_filter": false
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            },
+            {
+              "kind": "list",
+              "paths": [
+                [
+                  "filters"
+                ]
+              ]
+            },
+            {
+              "kind": "model",
+              "paths": [
+                [
+                  "filters",
+                  0
+                ]
+              ]
+            },
+            {
+              "kind": "model",
+              "paths": [
+                [
+                  "filters",
+                  1
+                ]
+              ]
+            },
+            {
+              "kind": "model",
+              "paths": [
+                [
+                  "filters",
+                  2
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "fields": {
+            "type": "for_each",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "list_key": "wthau_victims",
+            "item_key": "wthau_victim",
+            "steps_template": [
+              {
+                "type": "force_discard_or_defeat",
+                "step_id": "template",
+                "pending_input": null,
+                "pending_request_id": null,
+                "is_mandatory": true,
+                "active_if_key": null,
+                "skip_if_key": null,
+                "victim_key": "wthau_victim",
+                "killer_id": null,
+                "killer_key": null,
+                "immunity_source_id": null
+              }
+            ],
+            "current_index": 0
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            },
+            {
+              "kind": "list",
+              "paths": [
+                [
+                  "steps_template"
+                ]
+              ]
+            },
+            {
+              "kind": "step",
+              "paths": [
+                [
+                  "steps_template",
+                  0
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "big_sodding_gun": [
+        {
+          "fields": {
+            "type": "force_discard_or_defeat",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "victim_key": "push_victim_id",
+            "killer_id": null,
+            "killer_key": null,
+            "immunity_source_id": null
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            }
+          ]
+        }
+      ],
+      "wild_hunt": [
+        {
+          "fields": {
+            "type": "select_step",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": false,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "target_type": "HEX",
+            "prompt": "Wild Hunt: Select a straight-line destination",
+            "output_key": "wild_hunt_dest",
+            "decision_purpose": null,
+            "filters": [
+              {
+                "type": "range_filter",
+                "max_range": 2,
+                "min_range": 2,
+                "origin_id": "template-passive-owner",
+                "origin_key": null,
+                "origin_hex_key": null,
+                "max_range_key": null,
+                "min_range_key": null,
+                "distance_mode": "topology"
+              },
+              {
+                "type": "in_straight_line_filter",
+                "origin_id": "template-passive-owner",
+                "origin_key": null
+              },
+              {
+                "type": "straight_line_path_filter",
+                "origin_id": "template-passive-owner",
+                "origin_key": null,
+                "pass_through_obstacles": false
+              },
+              {
+                "type": "occupied_filter",
+                "is_obstacle": false,
+                "exclude_id": null,
+                "exclude_id_key": null
+              }
+            ],
+            "auto_select_if_one": false,
+            "context_hero_id": null,
+            "context_hero_id_key": null,
+            "card_container": "HAND",
+            "card_containers": null,
+            "restrict_played_to_shields": false,
+            "include_facedown": false,
+            "number_options": [],
+            "number_labels": {},
+            "skip_immunity_filter": false,
+            "skip_self_filter": false,
+            "override_player_id": null,
+            "override_player_id_key": null,
+            "card_action_types": null,
+            "card_colors": null,
+            "card_color_key": null,
+            "card_tier_key": null,
+            "card_is_basic": null,
+            "card_is_active": null,
+            "card_has_item": null,
+            "allowed_card_ids": null,
+            "exclude_card_id_keys": null,
+            "card_states": null,
+            "exclude_card_states": null,
+            "selected_card_color_key": null,
+            "selected_card_tier_key": null
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            },
+            {
+              "kind": "list",
+              "paths": [
+                [
+                  "filters"
+                ]
+              ]
+            },
+            {
+              "kind": "model",
+              "paths": [
+                [
+                  "filters",
+                  0
+                ]
+              ]
+            },
+            {
+              "kind": "model",
+              "paths": [
+                [
+                  "filters",
+                  1
+                ]
+              ]
+            },
+            {
+              "kind": "model",
+              "paths": [
+                [
+                  "filters",
+                  2
+                ]
+              ]
+            },
+            {
+              "kind": "model",
+              "paths": [
+                [
+                  "filters",
+                  3
+                ]
+              ]
+            },
+            {
+              "kind": "list",
+              "paths": [
+                [
+                  "number_options"
+                ]
+              ]
+            },
+            {
+              "kind": "dict",
+              "paths": [
+                [
+                  "number_labels"
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "fields": {
+            "type": "move_unit",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": "wild_hunt_dest",
+            "skip_if_key": null,
+            "unit_id": "template-passive-owner",
+            "unit_key": null,
+            "destination_key": "wild_hunt_dest",
+            "target_hex_arg": null,
+            "range_val": 2,
+            "is_movement_action": false,
+            "pass_through_obstacles": false,
+            "force_straight_line": true,
+            "crossed_obstacles_output_key": null,
+            "success_output_key": null,
+            "mine_path_prechosen": false
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            }
+          ]
+        }
+      ],
+      "rune_mastery": [
+        {
+          "fields": {
+            "type": "choose_rune",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "output_key": "snorri_ult_rune_action",
+            "options": [
+              "bird",
+              "anvil",
+              "horn"
+            ],
+            "prompt": "Rune Mastery: choose a second active rune",
+            "matching_options": [],
+            "matches_output_key": null,
+            "value_map": {},
+            "value_output_key": null
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            },
+            {
+              "kind": "list",
+              "paths": [
+                [
+                  "options"
+                ]
+              ]
+            },
+            {
+              "kind": "list",
+              "paths": [
+                [
+                  "matching_options"
+                ]
+              ]
+            },
+            {
+              "kind": "dict",
+              "paths": [
+                [
+                  "value_map"
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "bullet_time": [
+        {
+          "fields": {
+            "type": "perform_primary_action",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "card_key": "basic_action_card_id",
+            "hero_id": "template-passive-owner",
+            "exclude_target_key": "last_combat_target"
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            }
+          ]
+        }
+      ],
+      "reign_of_winter": [
+        {
+          "fields": {
+            "type": "select_step",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": false,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "target_type": "UNIT",
+            "prompt": "Select an enemy hero in radius",
+            "output_key": "reign_victim",
+            "decision_purpose": null,
+            "filters": [
+              {
+                "type": "unit_type_filter",
+                "unit_type": "HERO"
+              },
+              {
+                "type": "team_filter",
+                "relation": "ENEMY"
+              },
+              {
+                "type": "range_filter",
+                "max_range": 4,
+                "min_range": 0,
+                "origin_id": null,
+                "origin_key": null,
+                "origin_hex_key": null,
+                "max_range_key": null,
+                "min_range_key": null,
+                "distance_mode": "topology"
+              }
+            ],
+            "auto_select_if_one": false,
+            "context_hero_id": null,
+            "context_hero_id_key": null,
+            "card_container": "HAND",
+            "card_containers": null,
+            "restrict_played_to_shields": false,
+            "include_facedown": false,
+            "number_options": [],
+            "number_labels": {},
+            "skip_immunity_filter": false,
+            "skip_self_filter": false,
+            "override_player_id": null,
+            "override_player_id_key": null,
+            "card_action_types": null,
+            "card_colors": null,
+            "card_color_key": null,
+            "card_tier_key": null,
+            "card_is_basic": null,
+            "card_is_active": null,
+            "card_has_item": null,
+            "allowed_card_ids": null,
+            "exclude_card_id_keys": null,
+            "card_states": null,
+            "exclude_card_states": null,
+            "selected_card_color_key": null,
+            "selected_card_tier_key": null
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            },
+            {
+              "kind": "list",
+              "paths": [
+                [
+                  "filters"
+                ]
+              ]
+            },
+            {
+              "kind": "model",
+              "paths": [
+                [
+                  "filters",
+                  0
+                ]
+              ]
+            },
+            {
+              "kind": "model",
+              "paths": [
+                [
+                  "filters",
+                  1
+                ]
+              ]
+            },
+            {
+              "kind": "model",
+              "paths": [
+                [
+                  "filters",
+                  2
+                ]
+              ]
+            },
+            {
+              "kind": "list",
+              "paths": [
+                [
+                  "number_options"
+                ]
+              ]
+            },
+            {
+              "kind": "dict",
+              "paths": [
+                [
+                  "number_labels"
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "fields": {
+            "type": "choose_card_color",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": "reign_victim",
+            "skip_if_key": null,
+            "output_key": "reign_color",
+            "player_id_key": null,
+            "prompt": "Choose a color for Reign of Winter"
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            }
+          ]
+        },
+        {
+          "fields": {
+            "type": "force_discard_by_color",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": "reign_victim",
+            "skip_if_key": null,
+            "victim_key": "reign_victim",
+            "color": null,
+            "color_key": "reign_color",
+            "output_key": "card_to_discard"
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            }
+          ]
+        }
+      ],
+      "high_voltage": [
+        {
+          "fields": {
+            "type": "select_step",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": false,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "target_type": "UNIT",
+            "prompt": "Select enemy minion to defeat (High Voltage)",
+            "output_key": "hv_minion",
+            "decision_purpose": null,
+            "filters": [
+              {
+                "type": "unit_type_filter",
+                "unit_type": "MINION"
+              },
+              {
+                "type": "team_filter",
+                "relation": "ENEMY"
+              },
+              {
+                "type": "range_filter",
+                "max_range": 3,
+                "min_range": 0,
+                "origin_id": null,
+                "origin_key": null,
+                "origin_hex_key": null,
+                "max_range_key": null,
+                "min_range_key": null,
+                "distance_mode": "topology"
+              }
+            ],
+            "auto_select_if_one": false,
+            "context_hero_id": null,
+            "context_hero_id_key": null,
+            "card_container": "HAND",
+            "card_containers": null,
+            "restrict_played_to_shields": false,
+            "include_facedown": false,
+            "number_options": [],
+            "number_labels": {},
+            "skip_immunity_filter": false,
+            "skip_self_filter": false,
+            "override_player_id": null,
+            "override_player_id_key": null,
+            "card_action_types": null,
+            "card_colors": null,
+            "card_color_key": null,
+            "card_tier_key": null,
+            "card_is_basic": null,
+            "card_is_active": null,
+            "card_has_item": null,
+            "allowed_card_ids": null,
+            "exclude_card_id_keys": null,
+            "card_states": null,
+            "exclude_card_states": null,
+            "selected_card_color_key": null,
+            "selected_card_tier_key": null
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            },
+            {
+              "kind": "list",
+              "paths": [
+                [
+                  "filters"
+                ]
+              ]
+            },
+            {
+              "kind": "model",
+              "paths": [
+                [
+                  "filters",
+                  0
+                ]
+              ]
+            },
+            {
+              "kind": "model",
+              "paths": [
+                [
+                  "filters",
+                  1
+                ]
+              ]
+            },
+            {
+              "kind": "model",
+              "paths": [
+                [
+                  "filters",
+                  2
+                ]
+              ]
+            },
+            {
+              "kind": "list",
+              "paths": [
+                [
+                  "number_options"
+                ]
+              ]
+            },
+            {
+              "kind": "dict",
+              "paths": [
+                [
+                  "number_labels"
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "fields": {
+            "type": "select_step",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": false,
+            "active_if_key": "hv_minion",
+            "skip_if_key": null,
+            "target_type": "UNIT",
+            "prompt": "Select adjacent enemy hero to force discard",
+            "output_key": "hv_hero",
+            "decision_purpose": null,
+            "filters": [
+              {
+                "type": "unit_type_filter",
+                "unit_type": "HERO"
+              },
+              {
+                "type": "team_filter",
+                "relation": "ENEMY"
+              },
+              {
+                "type": "adjacency_to_context_filter",
+                "target_key": "hv_minion"
+              }
+            ],
+            "auto_select_if_one": false,
+            "context_hero_id": null,
+            "context_hero_id_key": null,
+            "card_container": "HAND",
+            "card_containers": null,
+            "restrict_played_to_shields": false,
+            "include_facedown": false,
+            "number_options": [],
+            "number_labels": {},
+            "skip_immunity_filter": false,
+            "skip_self_filter": false,
+            "override_player_id": null,
+            "override_player_id_key": null,
+            "card_action_types": null,
+            "card_colors": null,
+            "card_color_key": null,
+            "card_tier_key": null,
+            "card_is_basic": null,
+            "card_is_active": null,
+            "card_has_item": null,
+            "allowed_card_ids": null,
+            "exclude_card_id_keys": null,
+            "card_states": null,
+            "exclude_card_states": null,
+            "selected_card_color_key": null,
+            "selected_card_tier_key": null
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            },
+            {
+              "kind": "list",
+              "paths": [
+                [
+                  "filters"
+                ]
+              ]
+            },
+            {
+              "kind": "model",
+              "paths": [
+                [
+                  "filters",
+                  0
+                ]
+              ]
+            },
+            {
+              "kind": "model",
+              "paths": [
+                [
+                  "filters",
+                  1
+                ]
+              ]
+            },
+            {
+              "kind": "model",
+              "paths": [
+                [
+                  "filters",
+                  2
+                ]
+              ]
+            },
+            {
+              "kind": "list",
+              "paths": [
+                [
+                  "number_options"
+                ]
+              ]
+            },
+            {
+              "kind": "dict",
+              "paths": [
+                [
+                  "number_labels"
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "fields": {
+            "type": "defeat_unit",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": "hv_minion",
+            "skip_if_key": null,
+            "victim_id": null,
+            "victim_key": "hv_minion",
+            "killer_id": "template-passive-owner",
+            "assist_multiplier": 1
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            }
+          ]
+        },
+        {
+          "fields": {
+            "type": "force_discard",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "victim_id": null,
+            "victim_key": "hv_hero",
+            "card_is_basic": null,
+            "immunity_source_id": null
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            }
+          ]
+        }
+      ],
+      "dragon_knight": [
+        {
+          "fields": {
+            "type": "select_step",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "target_type": "CARD",
+            "prompt": "Select a faceup skill card to perform",
+            "output_key": "dragon_knight_skill_card",
+            "decision_purpose": null,
+            "filters": [],
+            "auto_select_if_one": false,
+            "context_hero_id": null,
+            "context_hero_id_key": null,
+            "card_container": "PLAYED",
+            "card_containers": null,
+            "restrict_played_to_shields": false,
+            "include_facedown": false,
+            "number_options": [],
+            "number_labels": {},
+            "skip_immunity_filter": false,
+            "skip_self_filter": false,
+            "override_player_id": null,
+            "override_player_id_key": null,
+            "card_action_types": [
+              "SKILL"
+            ],
+            "card_colors": null,
+            "card_color_key": null,
+            "card_tier_key": null,
+            "card_is_basic": null,
+            "card_is_active": null,
+            "card_has_item": null,
+            "allowed_card_ids": [
+              "gnaw"
+            ],
+            "exclude_card_id_keys": null,
+            "card_states": null,
+            "exclude_card_states": null,
+            "selected_card_color_key": null,
+            "selected_card_tier_key": null
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            },
+            {
+              "kind": "list",
+              "paths": [
+                [
+                  "filters"
+                ]
+              ]
+            },
+            {
+              "kind": "list",
+              "paths": [
+                [
+                  "number_options"
+                ]
+              ]
+            },
+            {
+              "kind": "dict",
+              "paths": [
+                [
+                  "number_labels"
+                ]
+              ]
+            },
+            {
+              "kind": "list",
+              "paths": [
+                [
+                  "card_action_types"
+                ]
+              ]
+            },
+            {
+              "kind": "list",
+              "paths": [
+                [
+                  "allowed_card_ids"
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "fields": {
+            "type": "perform_primary_action",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": "dragon_knight_skill_card",
+            "skip_if_key": null,
+            "card_key": "dragon_knight_skill_card",
+            "hero_id": "template-passive-owner",
+            "exclude_target_key": null
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            }
+          ]
+        }
+      ],
+      "march_of_nature": [
+        {
+          "fields": {
+            "type": "select_step",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": false,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "target_type": "HEX",
+            "prompt": "Place a Tree token in radius",
+            "output_key": "march_tree_hex",
+            "decision_purpose": null,
+            "filters": [
+              {
+                "type": "range_filter",
+                "max_range": 3,
+                "min_range": 0,
+                "origin_id": null,
+                "origin_key": null,
+                "origin_hex_key": null,
+                "max_range_key": null,
+                "min_range_key": null,
+                "distance_mode": "topology"
+              },
+              {
+                "type": "occupied_filter",
+                "is_obstacle": false,
+                "exclude_id": null,
+                "exclude_id_key": null
+              }
+            ],
+            "auto_select_if_one": false,
+            "context_hero_id": null,
+            "context_hero_id_key": null,
+            "card_container": "HAND",
+            "card_containers": null,
+            "restrict_played_to_shields": false,
+            "include_facedown": false,
+            "number_options": [],
+            "number_labels": {},
+            "skip_immunity_filter": false,
+            "skip_self_filter": false,
+            "override_player_id": null,
+            "override_player_id_key": null,
+            "card_action_types": null,
+            "card_colors": null,
+            "card_color_key": null,
+            "card_tier_key": null,
+            "card_is_basic": null,
+            "card_is_active": null,
+            "card_has_item": null,
+            "allowed_card_ids": null,
+            "exclude_card_id_keys": null,
+            "card_states": null,
+            "exclude_card_states": null,
+            "selected_card_color_key": null,
+            "selected_card_tier_key": null
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            },
+            {
+              "kind": "list",
+              "paths": [
+                [
+                  "filters"
+                ]
+              ]
+            },
+            {
+              "kind": "model",
+              "paths": [
+                [
+                  "filters",
+                  0
+                ]
+              ]
+            },
+            {
+              "kind": "model",
+              "paths": [
+                [
+                  "filters",
+                  1
+                ]
+              ]
+            },
+            {
+              "kind": "list",
+              "paths": [
+                [
+                  "number_options"
+                ]
+              ]
+            },
+            {
+              "kind": "dict",
+              "paths": [
+                [
+                  "number_labels"
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "fields": {
+            "type": "place_token",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": "march_tree_hex",
+            "skip_if_key": null,
+            "token_type": "tree",
+            "hex_key": "march_tree_hex",
+            "owner_id_key": null,
+            "output_key": null,
+            "existing_token_key": null,
+            "overflow_selection_key": "overflow_token_to_remove",
+            "is_immune_to_enemy_actions": false
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            }
+          ]
+        }
+      ],
+      "cloak_and_daggers/ATTACK": [
+        {
+          "fields": {
+            "type": "check_lane_push",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "lane_id": null
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            }
+          ]
+        },
+        {
+          "fields": {
+            "type": "attack_sequence",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "damage": 3,
+            "range_val": 2,
+            "is_ranged": false,
+            "target_id_key": null,
+            "target_output_key": null,
+            "target_filters": [
+              {
+                "type": "exclude_identity_filter",
+                "exclude_self": true,
+                "exclude_keys": [
+                  "last_combat_target"
+                ]
+              }
+            ],
+            "damage_bonus_key": null,
+            "range_bonus_key": null,
+            "damage_stat_type": null,
+            "range_stat_type": null,
+            "defense_uses_initiative": false
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            },
+            {
+              "kind": "list",
+              "paths": [
+                [
+                  "target_filters"
+                ]
+              ]
+            },
+            {
+              "kind": "model",
+              "paths": [
+                [
+                  "target_filters",
+                  0
+                ]
+              ]
+            },
+            {
+              "kind": "list",
+              "paths": [
+                [
+                  "target_filters",
+                  0,
+                  "exclude_keys"
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "cloak_and_daggers/MOVEMENT": [
+        {
+          "fields": {
+            "type": "check_lane_push",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "lane_id": null
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            }
+          ]
+        },
+        {
+          "fields": {
+            "type": "move_sequence",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "unit_id": "template-passive-owner",
+            "range_val": 3,
+            "range_stat_type": null,
+            "destination_key": "target_hex",
+            "pass_through_obstacles": false,
+            "force_straight_line": false,
+            "force_full_distance": false
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            }
+          ]
+        }
+      ],
+      "movement/0": [
+        {
+          "fields": {
+            "type": "select_step",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "target_type": "HEX",
+            "prompt": "Select Movement Destination (Range 1)",
+            "output_key": "target_hex",
+            "decision_purpose": null,
+            "filters": [
+              {
+                "type": "occupied_filter",
+                "is_obstacle": false,
+                "exclude_id": "template-passive-owner",
+                "exclude_id_key": null
+              },
+              {
+                "type": "movement_path_filter",
+                "range_val": 1,
+                "unit_id": "template-passive-owner",
+                "unit_key": null,
+                "pass_through_obstacles": false
+              }
+            ],
+            "auto_select_if_one": false,
+            "context_hero_id": null,
+            "context_hero_id_key": null,
+            "card_container": "HAND",
+            "card_containers": null,
+            "restrict_played_to_shields": false,
+            "include_facedown": false,
+            "number_options": [],
+            "number_labels": {},
+            "skip_immunity_filter": false,
+            "skip_self_filter": false,
+            "override_player_id": null,
+            "override_player_id_key": null,
+            "card_action_types": null,
+            "card_colors": null,
+            "card_color_key": null,
+            "card_tier_key": null,
+            "card_is_basic": null,
+            "card_is_active": null,
+            "card_has_item": null,
+            "allowed_card_ids": null,
+            "exclude_card_id_keys": null,
+            "card_states": null,
+            "exclude_card_states": null,
+            "selected_card_color_key": null,
+            "selected_card_tier_key": null
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            },
+            {
+              "kind": "list",
+              "paths": [
+                [
+                  "filters"
+                ]
+              ]
+            },
+            {
+              "kind": "model",
+              "paths": [
+                [
+                  "filters",
+                  0
+                ]
+              ]
+            },
+            {
+              "kind": "model",
+              "paths": [
+                [
+                  "filters",
+                  1
+                ]
+              ]
+            },
+            {
+              "kind": "list",
+              "paths": [
+                [
+                  "number_options"
+                ]
+              ]
+            },
+            {
+              "kind": "dict",
+              "paths": [
+                [
+                  "number_labels"
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "fields": {
+            "type": "move_unit",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "unit_id": "template-passive-owner",
+            "unit_key": null,
+            "destination_key": "target_hex",
+            "target_hex_arg": null,
+            "range_val": 1,
+            "is_movement_action": true,
+            "pass_through_obstacles": false,
+            "force_straight_line": false,
+            "crossed_obstacles_output_key": null,
+            "success_output_key": null,
+            "mine_path_prechosen": false
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            }
+          ]
+        }
+      ],
+      "movement/1": [
+        {
+          "fields": {
+            "type": "select_step",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "target_type": "HEX",
+            "prompt": "Select Movement Destination (Range 1)",
+            "output_key": "target_hex",
+            "decision_purpose": null,
+            "filters": [
+              {
+                "type": "occupied_filter",
+                "is_obstacle": false,
+                "exclude_id": "template-passive-owner",
+                "exclude_id_key": null
+              },
+              {
+                "type": "movement_path_filter",
+                "range_val": 1,
+                "unit_id": "template-passive-owner",
+                "unit_key": null,
+                "pass_through_obstacles": false
+              },
+              {
+                "type": "in_straight_line_filter",
+                "origin_id": "template-passive-owner",
+                "origin_key": null
+              },
+              {
+                "type": "straight_line_path_filter",
+                "origin_id": "template-passive-owner",
+                "origin_key": null,
+                "pass_through_obstacles": false
+              }
+            ],
+            "auto_select_if_one": false,
+            "context_hero_id": null,
+            "context_hero_id_key": null,
+            "card_container": "HAND",
+            "card_containers": null,
+            "restrict_played_to_shields": false,
+            "include_facedown": false,
+            "number_options": [],
+            "number_labels": {},
+            "skip_immunity_filter": false,
+            "skip_self_filter": false,
+            "override_player_id": null,
+            "override_player_id_key": null,
+            "card_action_types": null,
+            "card_colors": null,
+            "card_color_key": null,
+            "card_tier_key": null,
+            "card_is_basic": null,
+            "card_is_active": null,
+            "card_has_item": null,
+            "allowed_card_ids": null,
+            "exclude_card_id_keys": null,
+            "card_states": null,
+            "exclude_card_states": null,
+            "selected_card_color_key": null,
+            "selected_card_tier_key": null
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            },
+            {
+              "kind": "list",
+              "paths": [
+                [
+                  "filters"
+                ]
+              ]
+            },
+            {
+              "kind": "model",
+              "paths": [
+                [
+                  "filters",
+                  0
+                ]
+              ]
+            },
+            {
+              "kind": "model",
+              "paths": [
+                [
+                  "filters",
+                  1
+                ]
+              ]
+            },
+            {
+              "kind": "model",
+              "paths": [
+                [
+                  "filters",
+                  2
+                ]
+              ]
+            },
+            {
+              "kind": "model",
+              "paths": [
+                [
+                  "filters",
+                  3
+                ]
+              ]
+            },
+            {
+              "kind": "list",
+              "paths": [
+                [
+                  "number_options"
+                ]
+              ]
+            },
+            {
+              "kind": "dict",
+              "paths": [
+                [
+                  "number_labels"
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "fields": {
+            "type": "move_unit",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "unit_id": "template-passive-owner",
+            "unit_key": null,
+            "destination_key": "target_hex",
+            "target_hex_arg": null,
+            "range_val": 1,
+            "is_movement_action": true,
+            "pass_through_obstacles": false,
+            "force_straight_line": true,
+            "crossed_obstacles_output_key": null,
+            "success_output_key": null,
+            "mine_path_prechosen": false
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            }
+          ]
+        }
+      ],
+      "movement/2": [
+        {
+          "fields": {
+            "type": "select_step",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "target_type": "HEX",
+            "prompt": "Select Movement Destination (Range 1)",
+            "output_key": "target_hex",
+            "decision_purpose": null,
+            "filters": [
+              {
+                "type": "occupied_filter",
+                "is_obstacle": false,
+                "exclude_id": "template-passive-owner",
+                "exclude_id_key": null
+              },
+              {
+                "type": "movement_path_filter",
+                "range_val": 1,
+                "unit_id": "template-passive-owner",
+                "unit_key": null,
+                "pass_through_obstacles": false
+              },
+              {
+                "type": "range_filter",
+                "max_range": 1,
+                "min_range": 1,
+                "origin_id": null,
+                "origin_key": null,
+                "origin_hex_key": null,
+                "max_range_key": null,
+                "min_range_key": null,
+                "distance_mode": "topology"
+              }
+            ],
+            "auto_select_if_one": false,
+            "context_hero_id": null,
+            "context_hero_id_key": null,
+            "card_container": "HAND",
+            "card_containers": null,
+            "restrict_played_to_shields": false,
+            "include_facedown": false,
+            "number_options": [],
+            "number_labels": {},
+            "skip_immunity_filter": false,
+            "skip_self_filter": false,
+            "override_player_id": null,
+            "override_player_id_key": null,
+            "card_action_types": null,
+            "card_colors": null,
+            "card_color_key": null,
+            "card_tier_key": null,
+            "card_is_basic": null,
+            "card_is_active": null,
+            "card_has_item": null,
+            "allowed_card_ids": null,
+            "exclude_card_id_keys": null,
+            "card_states": null,
+            "exclude_card_states": null,
+            "selected_card_color_key": null,
+            "selected_card_tier_key": null
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            },
+            {
+              "kind": "list",
+              "paths": [
+                [
+                  "filters"
+                ]
+              ]
+            },
+            {
+              "kind": "model",
+              "paths": [
+                [
+                  "filters",
+                  0
+                ]
+              ]
+            },
+            {
+              "kind": "model",
+              "paths": [
+                [
+                  "filters",
+                  1
+                ]
+              ]
+            },
+            {
+              "kind": "model",
+              "paths": [
+                [
+                  "filters",
+                  2
+                ]
+              ]
+            },
+            {
+              "kind": "list",
+              "paths": [
+                [
+                  "number_options"
+                ]
+              ]
+            },
+            {
+              "kind": "dict",
+              "paths": [
+                [
+                  "number_labels"
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "fields": {
+            "type": "move_unit",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "unit_id": "template-passive-owner",
+            "unit_key": null,
+            "destination_key": "target_hex",
+            "target_hex_arg": null,
+            "range_val": 1,
+            "is_movement_action": true,
+            "pass_through_obstacles": false,
+            "force_straight_line": false,
+            "crossed_obstacles_output_key": null,
+            "success_output_key": null,
+            "mine_path_prechosen": false
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            }
+          ]
+        }
+      ],
+      "movement/3": [
+        {
+          "fields": {
+            "type": "select_step",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "target_type": "HEX",
+            "prompt": "Select Movement Destination (Range 1)",
+            "output_key": "target_hex",
+            "decision_purpose": null,
+            "filters": [
+              {
+                "type": "occupied_filter",
+                "is_obstacle": false,
+                "exclude_id": "template-passive-owner",
+                "exclude_id_key": null
+              },
+              {
+                "type": "movement_path_filter",
+                "range_val": 1,
+                "unit_id": "template-passive-owner",
+                "unit_key": null,
+                "pass_through_obstacles": false
+              },
+              {
+                "type": "in_straight_line_filter",
+                "origin_id": "template-passive-owner",
+                "origin_key": null
+              },
+              {
+                "type": "straight_line_path_filter",
+                "origin_id": "template-passive-owner",
+                "origin_key": null,
+                "pass_through_obstacles": false
+              },
+              {
+                "type": "range_filter",
+                "max_range": 1,
+                "min_range": 1,
+                "origin_id": null,
+                "origin_key": null,
+                "origin_hex_key": null,
+                "max_range_key": null,
+                "min_range_key": null,
+                "distance_mode": "topology"
+              }
+            ],
+            "auto_select_if_one": false,
+            "context_hero_id": null,
+            "context_hero_id_key": null,
+            "card_container": "HAND",
+            "card_containers": null,
+            "restrict_played_to_shields": false,
+            "include_facedown": false,
+            "number_options": [],
+            "number_labels": {},
+            "skip_immunity_filter": false,
+            "skip_self_filter": false,
+            "override_player_id": null,
+            "override_player_id_key": null,
+            "card_action_types": null,
+            "card_colors": null,
+            "card_color_key": null,
+            "card_tier_key": null,
+            "card_is_basic": null,
+            "card_is_active": null,
+            "card_has_item": null,
+            "allowed_card_ids": null,
+            "exclude_card_id_keys": null,
+            "card_states": null,
+            "exclude_card_states": null,
+            "selected_card_color_key": null,
+            "selected_card_tier_key": null
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            },
+            {
+              "kind": "list",
+              "paths": [
+                [
+                  "filters"
+                ]
+              ]
+            },
+            {
+              "kind": "model",
+              "paths": [
+                [
+                  "filters",
+                  0
+                ]
+              ]
+            },
+            {
+              "kind": "model",
+              "paths": [
+                [
+                  "filters",
+                  1
+                ]
+              ]
+            },
+            {
+              "kind": "model",
+              "paths": [
+                [
+                  "filters",
+                  2
+                ]
+              ]
+            },
+            {
+              "kind": "model",
+              "paths": [
+                [
+                  "filters",
+                  3
+                ]
+              ]
+            },
+            {
+              "kind": "model",
+              "paths": [
+                [
+                  "filters",
+                  4
+                ]
+              ]
+            },
+            {
+              "kind": "list",
+              "paths": [
+                [
+                  "number_options"
+                ]
+              ]
+            },
+            {
+              "kind": "dict",
+              "paths": [
+                [
+                  "number_labels"
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "fields": {
+            "type": "move_unit",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "unit_id": "template-passive-owner",
+            "unit_key": null,
+            "destination_key": "target_hex",
+            "target_hex_arg": null,
+            "range_val": 1,
+            "is_movement_action": true,
+            "pass_through_obstacles": false,
+            "force_straight_line": true,
+            "crossed_obstacles_output_key": null,
+            "success_output_key": null,
+            "mine_path_prechosen": false
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            }
+          ]
+        }
+      ],
+      "token/overflow": [
+        {
+          "fields": {
+            "type": "select_step",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "target_type": "UNIT_OR_TOKEN",
+            "prompt": "Select a tree token to remove from the board.",
+            "output_key": "overflow",
+            "decision_purpose": null,
+            "filters": [
+              {
+                "type": "unit_type_filter",
+                "unit_type": "TOKEN"
+              },
+              {
+                "type": "token_type_filter",
+                "token_type": "tree"
+              }
+            ],
+            "auto_select_if_one": false,
+            "context_hero_id": null,
+            "context_hero_id_key": null,
+            "card_container": "HAND",
+            "card_containers": null,
+            "restrict_played_to_shields": false,
+            "include_facedown": false,
+            "number_options": [],
+            "number_labels": {},
+            "skip_immunity_filter": true,
+            "skip_self_filter": true,
+            "override_player_id": null,
+            "override_player_id_key": "token_owner",
+            "card_action_types": null,
+            "card_colors": null,
+            "card_color_key": null,
+            "card_tier_key": null,
+            "card_is_basic": null,
+            "card_is_active": null,
+            "card_has_item": null,
+            "allowed_card_ids": null,
+            "exclude_card_id_keys": null,
+            "card_states": null,
+            "exclude_card_states": null,
+            "selected_card_color_key": null,
+            "selected_card_tier_key": null
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            },
+            {
+              "kind": "list",
+              "paths": [
+                [
+                  "filters"
+                ]
+              ]
+            },
+            {
+              "kind": "model",
+              "paths": [
+                [
+                  "filters",
+                  0
+                ]
+              ]
+            },
+            {
+              "kind": "model",
+              "paths": [
+                [
+                  "filters",
+                  1
+                ]
+              ]
+            },
+            {
+              "kind": "list",
+              "paths": [
+                [
+                  "number_options"
+                ]
+              ]
+            },
+            {
+              "kind": "dict",
+              "paths": [
+                [
+                  "number_labels"
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "fields": {
+            "type": "remove_token",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "token_id": null,
+            "token_key": "overflow"
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            }
+          ]
+        },
+        {
+          "fields": {
+            "type": "place_token",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "token_type": "tree",
+            "hex_key": "target_hex",
+            "owner_id_key": "token_owner",
+            "output_key": "placed",
+            "existing_token_key": "existing",
+            "overflow_selection_key": "overflow",
+            "is_immune_to_enemy_actions": true
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            }
+          ]
+        }
+      ],
+      "token/batch_primitives": [
+        {
+          "fields": {
+            "type": "select_step",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "target_type": "HEX",
+            "prompt": "",
+            "output_key": "selection",
+            "decision_purpose": null,
+            "filters": [],
+            "auto_select_if_one": false,
+            "context_hero_id": null,
+            "context_hero_id_key": null,
+            "card_container": "HAND",
+            "card_containers": null,
+            "restrict_played_to_shields": false,
+            "include_facedown": false,
+            "number_options": [],
+            "number_labels": {},
+            "skip_immunity_filter": false,
+            "skip_self_filter": false,
+            "override_player_id": null,
+            "override_player_id_key": null,
+            "card_action_types": null,
+            "card_colors": null,
+            "card_color_key": null,
+            "card_tier_key": null,
+            "card_is_basic": null,
+            "card_is_active": null,
+            "card_has_item": null,
+            "allowed_card_ids": null,
+            "exclude_card_id_keys": null,
+            "card_states": null,
+            "exclude_card_states": null,
+            "selected_card_color_key": null,
+            "selected_card_tier_key": null
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            },
+            {
+              "kind": "list",
+              "paths": [
+                [
+                  "filters"
+                ]
+              ]
+            },
+            {
+              "kind": "list",
+              "paths": [
+                [
+                  "number_options"
+                ]
+              ]
+            },
+            {
+              "kind": "dict",
+              "paths": [
+                [
+                  "number_labels"
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "fields": {
+            "type": "select_step",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "target_type": "NUMBER",
+            "prompt": "",
+            "output_key": "batch_choice",
+            "decision_purpose": null,
+            "filters": [],
+            "auto_select_if_one": false,
+            "context_hero_id": null,
+            "context_hero_id_key": null,
+            "card_container": "HAND",
+            "card_containers": null,
+            "restrict_played_to_shields": false,
+            "include_facedown": false,
+            "number_options": [
+              1,
+              0
+            ],
+            "number_labels": {
+              "1": "Place tokens",
+              "0": "Skip"
+            },
+            "skip_immunity_filter": false,
+            "skip_self_filter": false,
+            "override_player_id": null,
+            "override_player_id_key": "batch_owner",
+            "card_action_types": null,
+            "card_colors": null,
+            "card_color_key": null,
+            "card_tier_key": null,
+            "card_is_basic": null,
+            "card_is_active": null,
+            "card_has_item": null,
+            "allowed_card_ids": null,
+            "exclude_card_id_keys": null,
+            "card_states": null,
+            "exclude_card_states": null,
+            "selected_card_color_key": null,
+            "selected_card_tier_key": null
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            },
+            {
+              "kind": "list",
+              "paths": [
+                [
+                  "filters"
+                ]
+              ]
+            },
+            {
+              "kind": "list",
+              "paths": [
+                [
+                  "number_options"
+                ]
+              ]
+            },
+            {
+              "kind": "dict",
+              "paths": [
+                [
+                  "number_labels"
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "fields": {
+            "type": "check_context_condition",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "input_key": "batch_choice",
+            "operator": "==",
+            "threshold": 1,
+            "output_key": "batch_go"
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            }
+          ]
+        },
+        {
+          "fields": {
+            "type": "set_context_flag",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "key": "batch_done",
+            "value": true
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            }
+          ]
+        }
+      ],
+      "token/rock_ultimate": [
+        {
+          "fields": {
+            "type": "select_step",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "target_type": "NUMBER",
+            "prompt": "Rock and a Hard Place: each enemy hero adjacent to a placed Rock discards a card. Apply?",
+            "output_key": "rock_ult_choice",
+            "decision_purpose": null,
+            "filters": [],
+            "auto_select_if_one": false,
+            "context_hero_id": null,
+            "context_hero_id_key": null,
+            "card_container": "HAND",
+            "card_containers": null,
+            "restrict_played_to_shields": false,
+            "include_facedown": false,
+            "number_options": [
+              1,
+              0
+            ],
+            "number_labels": {
+              "1": "Apply",
+              "0": "Skip"
+            },
+            "skip_immunity_filter": false,
+            "skip_self_filter": false,
+            "override_player_id": null,
+            "override_player_id_key": null,
+            "card_action_types": null,
+            "card_colors": null,
+            "card_color_key": null,
+            "card_tier_key": null,
+            "card_is_basic": null,
+            "card_is_active": null,
+            "card_has_item": null,
+            "allowed_card_ids": null,
+            "exclude_card_id_keys": null,
+            "card_states": null,
+            "exclude_card_states": null,
+            "selected_card_color_key": null,
+            "selected_card_tier_key": null
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            },
+            {
+              "kind": "list",
+              "paths": [
+                [
+                  "filters"
+                ]
+              ]
+            },
+            {
+              "kind": "list",
+              "paths": [
+                [
+                  "number_options"
+                ]
+              ]
+            },
+            {
+              "kind": "dict",
+              "paths": [
+                [
+                  "number_labels"
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "fields": {
+            "type": "check_context_condition",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "input_key": "rock_ult_choice",
+            "operator": "==",
+            "threshold": 1,
+            "output_key": "rock_ult_yes"
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            }
+          ]
+        },
+        {
+          "fields": {
+            "type": "set_context_flag",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": "rock_ult_yes",
+            "skip_if_key": null,
+            "key": "rock_ultimate_used",
+            "value": true
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            }
+          ]
+        },
+        {
+          "fields": {
+            "type": "for_each",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": "rock_ult_yes",
+            "skip_if_key": null,
+            "list_key": "_rock_ult_affected",
+            "item_key": "_rock_ult_victim",
+            "steps_template": [
+              {
+                "type": "force_discard",
+                "step_id": "template",
+                "pending_input": null,
+                "pending_request_id": null,
+                "is_mandatory": true,
+                "active_if_key": null,
+                "skip_if_key": null,
+                "victim_id": null,
+                "victim_key": "_rock_ult_victim",
+                "card_is_basic": null,
+                "immunity_source_id": null
+              }
+            ],
+            "current_index": 0
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            },
+            {
+              "kind": "list",
+              "paths": [
+                [
+                  "steps_template"
+                ]
+              ]
+            },
+            {
+              "kind": "step",
+              "paths": [
+                [
+                  "steps_template",
+                  0
+                ]
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "turret_default": {
+    "id": "trinkets_turret",
+    "name": "Turret",
+    "entity_kind": "turret",
+    "owner_id": null,
+    "is_obstacle": true
+  },
+  "token_batch_filters": {
+    "obstacle": {
+      "type": "occupied_filter",
+      "is_obstacle": false,
+      "exclude_id": null,
+      "exclude_id_key": null
+    },
+    "hex": {
+      "type": "hex_batch_completable_filter",
+      "slot_index": 0,
+      "slot_keys": [],
+      "slot_filters": [],
+      "free_hexes": [],
+      "removable_hexes": [],
+      "removal_budget": 0
+    },
+    "removal": {
+      "type": "token_removal_completable_filter",
+      "token_type": "tree",
+      "slot_keys": [],
+      "slot_filters": [],
+      "remaining_removals": 1
+    }
+  },
+  "token_types": [
+    "smoke_bomb",
+    "grenade",
+    "mine_blast",
+    "mine_dud",
+    "zombie",
+    "pyro",
+    "barrier",
+    "ice",
+    "totem",
+    "tree",
+    "rock",
+    "magma",
+    "glitch",
+    "illusion",
+    "familiar"
+  ],
+  "passive_offer_predicates": {
+    "jinx": "JinxEffect.should_offer_passive",
+    "legend_of_the_skies": "LegendOfTheSkiesEffect.should_offer_passive",
+    "battle_fury": "BattleFuryEffect.should_offer_passive",
+    "the_archwizard": "TheArchwizardEffect.should_offer_passive",
+    "rune_mastery": "RuneMasteryEffect.should_offer_passive",
+    "bullet_time": "BulletTimeEffect.should_offer_passive",
+    "reign_of_winter": "ReignOfWinterEffect.should_offer_passive",
+    "dragon_knight": "DragonKnightEffect.should_offer_passive"
+  },
   "passive_configs": {
     "spell_break": [],
     "noble_blade": [],
@@ -2280,6 +5173,69 @@
       "unit_id": null,
       "require_zone_change": false,
       "source_card_id": null
+    },
+    "cast_spell": {
+      "type": "cast_spell",
+      "step_id": "template",
+      "pending_input": null,
+      "pending_request_id": null,
+      "is_mandatory": true,
+      "active_if_key": null,
+      "skip_if_key": null,
+      "allowed_spell_ids": [],
+      "caster_id": null,
+      "caster_key": null
+    },
+    "perform_card": {
+      "type": "perform_card_action",
+      "step_id": "template",
+      "pending_input": null,
+      "pending_request_id": null,
+      "is_mandatory": true,
+      "active_if_key": null,
+      "skip_if_key": null,
+      "card_key": "selected_card",
+      "card_owner_key": null,
+      "hero_id": null,
+      "previous_slot": false,
+      "token_type_override": null,
+      "skip_markers": false,
+      "suppress_after_resolve_card": false
+    },
+    "wish_sequence": {
+      "type": "wish_sequence",
+      "step_id": "template",
+      "pending_input": null,
+      "pending_request_id": null,
+      "is_mandatory": true,
+      "active_if_key": null,
+      "skip_if_key": null,
+      "caster_id": "template",
+      "started": false,
+      "required_casts": 3,
+      "perform_wish_action": false
+    },
+    "prepare_spellbook": {
+      "type": "prepare_spellbook",
+      "step_id": "template",
+      "pending_input": null,
+      "pending_request_id": null,
+      "is_mandatory": true,
+      "active_if_key": null,
+      "skip_if_key": null
+    },
+    "remove_prepared_spells": {
+      "type": "remove_prepared_spells",
+      "step_id": "template",
+      "pending_input": null,
+      "pending_request_id": null,
+      "is_mandatory": true,
+      "active_if_key": null,
+      "skip_if_key": null,
+      "caster_id": null,
+      "caster_key": null,
+      "max_removals": 3,
+      "removed_spell_ids": []
     },
     "resolve_card": {
       "type": "resolve_card",

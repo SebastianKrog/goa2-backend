@@ -225,7 +225,7 @@ def aura_states():
         yield "aura-" + variant, state, h, pieces
 
 
-def drive(name, state, steps, *, mode="normal"):
+def drive(name, state, steps, *, mode="normal", emit=None):
     from stack_traces import reference_trace
 
     from goa2.domain.input import InputResponse, selection_value
@@ -234,7 +234,7 @@ def drive(name, state, steps, *, mode="normal"):
     for i, step in enumerate(steps):
         step.step_id = f"fixture/sequence/{name}/{i}"
     push_steps(state, steps)
-    envelope = export_state(state)
+    envelope = export_state(state) if emit is None else None
     probe = copy.deepcopy(state)
     ops = []
     invalid = False
@@ -286,6 +286,9 @@ def drive(name, state, steps, *, mode="normal"):
     if name == "movement-sequence-base-plain-skip":
         assert probe.get_position("hero_brogan") == state.get_position("hero_brogan")
         assert probe.execution_context.get("after") is True
+    if emit is not None:
+        emit(name, state, ops)
+        return None, seen
     return {
         "name": name,
         "envelope": envelope,
@@ -402,13 +405,12 @@ def controlled_cases():
     return result
 
 
-def cases(advance, answer):
+def sequence_scenes():
     from terrain_traces import states
 
     from goa2.domain.models import StatType
     from goa2.engine.steps import MoveSequenceStep, SetContextFlagStep
 
-    result = []
     for name, state, h, _pieces, _ in states():
         if name.startswith("mine") or name == "petrify-missing-location":
             continue
@@ -424,13 +426,10 @@ def cases(advance, answer):
                 force_full_distance=mode == "full",
                 is_mandatory=mode != "skip",
             )
-            case, _ = drive(
-                "movement-sequence-" + name + "-" + mode,
-                source,
-                [step, SetContextFlagStep(key="after", value=True)],
-                mode=mode,
-            )
-            result.append(case)
+            yield "movement-sequence-" + name + "-" + mode, source, [
+                step,
+                SetContextFlagStep(key="after", value=True),
+            ], mode
     for name, state, _h, _pieces in aura_states():
         for mode in ["normal", "straight", "full", "invalid"]:
             source = copy.deepcopy(state)
@@ -442,13 +441,16 @@ def cases(advance, answer):
                 force_straight_line=mode == "straight",
                 force_full_distance=mode == "full",
             )
-            case, _ = drive(
-                "movement-sequence-" + name + "-" + mode,
-                source,
-                [step, SetContextFlagStep(key="after", value=True)],
-                mode=mode,
-            )
-            result.append(case)
+            yield "movement-sequence-" + name + "-" + mode, source, [
+                step,
+                SetContextFlagStep(key="after", value=True),
+            ], mode
+
+
+def cases(advance, answer):
+    result = [
+        drive(name, state, steps, mode=mode)[0] for name, state, steps, mode in sequence_scenes()
+    ]
     result.extend(controlled_cases())
     return result
 

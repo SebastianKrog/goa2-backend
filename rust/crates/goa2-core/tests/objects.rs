@@ -5,28 +5,32 @@ use goa2_core::{
 };
 use serde_json::{Value, json};
 
-fn cases() -> Vec<Value> {
+fn cases() -> impl Iterator<Item = Value> {
+    cases_matching(|_| true)
+}
+fn cases_matching(predicate: impl Fn(&str) -> bool) -> impl Iterator<Item = Value> {
     let base = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures"));
-    let index: Value =
-        serde_json::from_reader(std::fs::File::open(base.join("object-arena.json")).unwrap())
-            .unwrap();
+    let index: Value = serde_json::from_reader(std::io::BufReader::new(
+        std::fs::File::open(base.join("object-arena.json")).unwrap(),
+    ))
+    .unwrap();
     assert_eq!(index["schema_version"], 2);
     index["cases"]
         .as_array()
         .unwrap()
-        .iter()
-        .map(|entry| {
-            serde_json::from_reader(
+        .clone()
+        .into_iter()
+        .filter(move |entry| predicate(entry["name"].as_str().unwrap()))
+        .map(move |entry| {
+            serde_json::from_reader(std::io::BufReader::new(
                 std::fs::File::open(base.join(entry["path"].as_str().unwrap())).unwrap(),
-            )
+            ))
             .unwrap()
         })
-        .collect()
 }
 fn case(name: &str) -> Value {
-    cases()
-        .into_iter()
-        .find(|case| case["name"] == name)
+    cases_matching(|candidate| candidate == name)
+        .next()
         .unwrap()
 }
 fn envelope(case: &Value) -> StateEnvelope {
@@ -36,9 +40,9 @@ fn envelope(case: &Value) -> StateEnvelope {
 #[test]
 fn real_source_models_steps_and_containers_match_values_identity_and_ordered_keys() {
     let mut operations = 0;
-    let cases = cases();
-    assert_eq!(cases.len(), 12);
-    for case in cases {
+    let mut checked = 0;
+    for case in cases() {
+        checked += 1;
         let source = envelope(&case);
         source.validate().unwrap();
         assert_eq!(serde_json::to_value(&source).unwrap(), case["envelope"]);
@@ -51,6 +55,7 @@ fn real_source_models_steps_and_containers_match_values_identity_and_ordered_key
             case["name"]
         );
     }
+    assert_eq!(checked, 12);
     assert_eq!(operations, 49);
 }
 
@@ -123,10 +128,7 @@ fn malformed_aliases_cycles_and_frozen_writes_reject_before_semantic_mutation() 
             )
             .is_err()
     );
-    let frozen = cases()
-        .into_iter()
-        .find(|item| item["name"] == "objects-frozen")
-        .unwrap();
+    let frozen = self::case("objects-frozen");
     let mut arena = ObjectArena::compile(&envelope(&frozen)).unwrap();
     let change = arena.compile_mutation(&frozen["operations"][0]).unwrap();
     let before = arena.compact_state().unwrap();

@@ -71,6 +71,17 @@ impl Hex {
                 .collect(),
         )
     }
+    pub fn direction_to(self, other: Self) -> Option<(i64, i64, i64)> {
+        let distance = self.distance(other);
+        if distance == 0 || !self.straight(other) {
+            return None;
+        }
+        Some((
+            (i64::from(other.q) - i64::from(self.q)) / i64::from(distance),
+            (i64::from(other.r) - i64::from(self.r)) / i64::from(distance),
+            (i64::from(other.s) - i64::from(self.s)) / i64::from(distance),
+        ))
+    }
     pub fn distance(self, other: Self) -> u32 {
         self.q
             .abs_diff(other.q)

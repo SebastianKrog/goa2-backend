@@ -100,6 +100,13 @@ def export_state_with_shared_objects(state):
     aliases, objects = capture(state, envelope["state"])
     if aliases:
         envelope["object_bindings"] = aliases
+    by_identity = {
+        id(value): binding["paths"][0] for value, binding in zip(objects, aliases, strict=True)
+    }
+    envelope["board_keys"] = [
+        {"hex": key.model_dump(mode="json"), "path": by_identity.get(id(key))}
+        for key in state.board.tiles
+    ]
     return envelope, objects
 
 

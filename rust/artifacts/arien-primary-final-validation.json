@@ -1,0 +1,46 @@
+{
+  "new_primary_bodies": [
+    "spell_break",
+    "ebb_and_flow",
+    "dangerous_current",
+    "raging_stream",
+    "violent_torrent",
+    "slippery_ground",
+    "deluge"
+  ],
+  "custom_primary_recipes": 45,
+  "registered_base_noop_faces": 45,
+  "ordinary_faces_remaining": 506,
+  "complete_spell_bodies": 0,
+  "source_scenes": 200,
+  "new_restore_boundaries": 2150,
+  "native_guard_identity_tests": 6,
+  "source_contracts": 7,
+  "workspace_passed": 352,
+  "workspace_filtered": 1,
+  "not_rerun": "every_shared_execution_boundary_restores_values_aliases_and_request_generations (older all-corpus restore gate)",
+  "independent_release_parity": {
+    "cases": 200,
+    "operations": 2150,
+    "corpus_sha256": "8a973247c330d9758c4231a8221b984ae553719302fd78e2e4c7d1cdb755a22b",
+    "workers": 4,
+    "state_request_event_and_identity_parity": true,
+    "seconds": 13.97
+  },
+  "canonical_min_release_regressions": {
+    "cases": 4,
+    "operations": 16,
+    "corpus_sha256": "c8b9b7ec3def91413a7124441c6eefce295f0f15a1f7d2aa0ba664e6c3a12994",
+    "state_request_event_parity": true
+  },
+  "live_corpus_cases": 10241,
+  "live_corpus_operations": 56397,
+  "live_index_sha256": "7b518512eef4388cb8bd7b24f1a7030109478be5c7da880a66f4b6f72cca09fd",
+  "live_semantic_sha256": "aaf42bff8297bd8e40b92f0007e882e0e8f0a4ecc218cdd122ecc4c1a9a1703f",
+  "rustfmt": true,
+  "clippy_strict": true,
+  "black_ruff": true,
+  "frozen_src_and_lock_unchanged": true,
+  "engine_complete": false,
+  "search_complete": false
+}

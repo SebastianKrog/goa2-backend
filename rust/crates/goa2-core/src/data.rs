@@ -44,6 +44,16 @@ pub enum Datum {
     Instance(u32),
 }
 impl Datum {
+    pub(crate) fn python_scalar_text(&self, symbols: &Symbols) -> Option<String> {
+        Some(match self {
+            Self::Null => "None".into(),
+            Self::Bool(value) => if *value { "True" } else { "False" }.into(),
+            Self::Int(value) => value.to_string(),
+            Self::Float(value) => python_float_text(*value),
+            Self::Text(id) => symbols.name(*id).to_owned(),
+            _ => return None,
+        })
+    }
     pub fn from_json(value: &Value, symbols: &mut Symbols) -> Result<Self, String> {
         Ok(match value {
             Value::Null => Self::Null,
@@ -196,8 +206,58 @@ impl Datum {
         }
     }
 }
+/// Read-only context shared by dense execution and sparse live predicate inputs.
+pub trait RegisterRead: Sync {
+    fn get(&self, key: Symbol) -> Option<&Datum>;
+    /// Python Hex equality needs model provenance, not just coordinate fields.
+    fn excludes_hex(&self, _key: Symbol, _hex: crate::geometry::Hex) -> Option<bool> {
+        None
+    }
+}
+#[derive(Clone, Debug, Default)]
+pub(crate) struct SparseRegisters(
+    pub Vec<(Symbol, Datum)>,
+    pub Vec<(Symbol, Vec<crate::geometry::Hex>)>,
+);
+impl RegisterRead for SparseRegisters {
+    fn excludes_hex(&self, key: Symbol, hex: crate::geometry::Hex) -> Option<bool> {
+        self.1
+            .iter()
+            .find_map(|(field, values)| (*field == key).then(|| values.contains(&hex)))
+    }
+    fn get(&self, key: Symbol) -> Option<&Datum> {
+        self.0
+            .iter()
+            .find_map(|(id, value)| (*id == key).then_some(value))
+    }
+}
+/// Mutation interface for typed rules with either dense or sparse context.
+pub trait RegisterWrite: RegisterRead {
+    fn set(&mut self, key: Symbol, value: Datum);
+}
+impl RegisterWrite for SparseRegisters {
+    fn set(&mut self, key: Symbol, value: Datum) {
+        self.1.retain(|(field, _)| *field != key);
+        if let Some((_, slot)) = self.0.iter_mut().find(|(id, _)| *id == key) {
+            *slot = value;
+        } else {
+            self.0.push((key, value));
+        }
+    }
+}
+impl RegisterWrite for Registers {
+    fn set(&mut self, key: Symbol, value: Datum) {
+        Registers::set(self, key, value);
+    }
+}
+impl RegisterRead for Registers {
+    fn get(&self, key: Symbol) -> Option<&Datum> {
+        Registers::get(self, key)
+    }
+}
+
 /// Missing and present-null values are different. Keys are resolved once at import.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Registers {
     slots: Vec<Option<Datum>>,
     order: Vec<Symbol>,
@@ -245,6 +305,33 @@ impl Registers {
         )
     }
 }
+/// Python repr's fixed/scientific thresholds and explicit signed exponent.
+fn python_float_text(value: f64) -> String {
+    if value.is_nan() {
+        return "nan".into();
+    }
+    if value.is_infinite() {
+        return if value.is_sign_negative() {
+            "-inf"
+        } else {
+            "inf"
+        }
+        .into();
+    }
+    let scientific = format!("{value:e}");
+    let (mantissa, exponent) = scientific.split_once('e').unwrap();
+    let exponent: i32 = exponent.parse().unwrap();
+    if !(-4..16).contains(&exponent) {
+        format!("{mantissa}e{exponent:+03}")
+    } else {
+        let mut text = value.to_string();
+        if !text.contains('.') {
+            text.push_str(".0");
+        }
+        text
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -330,5 +417,26 @@ mod tests {
             let datum = Datum::from_json(&value, &mut symbols).unwrap();
             assert_eq!(datum.to_integer(&symbols).unwrap(), expected);
         }
+    }
+}
+
+/// Per-worker observation of a predicate's temporary context binding. Clones
+/// start clean: completed preflights must never leak into another search branch.
+#[derive(Debug, Default)]
+pub struct FilterObservation(std::sync::atomic::AtomicBool);
+impl Clone for FilterObservation {
+    fn clone(&self) -> Self {
+        Self::default()
+    }
+}
+impl FilterObservation {
+    pub fn clear(&self) {
+        self.0.store(false, std::sync::atomic::Ordering::Relaxed);
+    }
+    pub fn record(&self) {
+        self.0.store(true, std::sync::atomic::Ordering::Relaxed);
+    }
+    pub fn observed(&self) -> bool {
+        self.0.load(std::sync::atomic::Ordering::Relaxed)
     }
 }

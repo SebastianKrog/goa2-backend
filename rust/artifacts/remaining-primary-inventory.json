@@ -1,0 +1,3163 @@
+{
+  "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+  "scope": "Ordinary primary-body coverage only; defense/passive/world/search completeness remain separate gates. All 22 spell bodies are tracked separately.",
+  "counts": {
+    "reviewed_recipe": 113,
+    "base_noop": 45,
+    "remaining_body": 435,
+    "missing_registry": 3
+  },
+  "total": 596,
+  "missing_registry": [
+    "over_the_top",
+    "chaos_incarnate",
+    "rock_and_a_hard_place"
+  ],
+  "heroes": [
+    {
+      "hero": "Arien",
+      "cards": [
+        {
+          "card_id": "ebb_and_flow",
+          "effect_id": "ebb_and_flow",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "stranger_tide",
+          "effect_id": "stranger_tide",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "deluge",
+          "effect_id": "deluge",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "master_duelist",
+          "effect_id": "master_duelist",
+          "status": "base_noop"
+        },
+        {
+          "card_id": "violent_torrent",
+          "effect_id": "violent_torrent",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "tidal_blast",
+          "effect_id": "tidal_blast",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "arcane_whirlpool",
+          "effect_id": "arcane_whirlpool",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "magical_current",
+          "effect_id": "magical_current",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "expert_duelist",
+          "effect_id": "expert_duelist",
+          "status": "base_noop"
+        },
+        {
+          "card_id": "slippery_ground",
+          "effect_id": "slippery_ground",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "rogue_wave",
+          "effect_id": "rogue_wave",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "raging_stream",
+          "effect_id": "raging_stream",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "spell_break",
+          "effect_id": "spell_break",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "noble_blade",
+          "effect_id": "noble_blade",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "aspiring_duelist",
+          "effect_id": "aspiring_duelist",
+          "status": "base_noop"
+        },
+        {
+          "card_id": "dangerous_current",
+          "effect_id": "dangerous_current",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "liquid_leap",
+          "effect_id": "liquid_leap",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "living_tsunami",
+          "effect_id": "living_tsunami",
+          "status": "base_noop"
+        }
+      ]
+    },
+    {
+      "hero": "Bain",
+      "cards": [
+        {
+          "card_id": "hunter_seeker",
+          "effect_id": "hunter_seeker",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "arbalest",
+          "effect_id": "arbalest",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "high_ground",
+          "effect_id": "high_ground",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "perfect_getaway",
+          "effect_id": "perfect_getaway",
+          "status": "base_noop"
+        },
+        {
+          "card_id": "another_one",
+          "effect_id": "another_one",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "were_not_done_yet",
+          "effect_id": "were_not_done_yet",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "hand_crossbow",
+          "effect_id": "hand_crossbow",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "heavy_crossbow",
+          "effect_id": "heavy_crossbow",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "vantage_point",
+          "effect_id": "vantage_point",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "narrow_escape",
+          "effect_id": "narrow_escape",
+          "status": "base_noop"
+        },
+        {
+          "card_id": "dead_mans_hand",
+          "effect_id": "dead_mans_hand",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "drinking_buddies",
+          "effect_id": "drinking_buddies",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "get_over_here",
+          "effect_id": "get_over_here",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "dead_or_alive",
+          "effect_id": "dead_or_alive",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "light_crossbow",
+          "effect_id": "light_crossbow",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "close_call",
+          "effect_id": "close_call",
+          "status": "base_noop"
+        },
+        {
+          "card_id": "a_game_of_chance",
+          "effect_id": "a_game_of_chance",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "a_complicated_profession",
+          "effect_id": "a_complicated_profession",
+          "status": "base_noop"
+        }
+      ]
+    },
+    {
+      "hero": "Brogan",
+      "cards": [
+        {
+          "card_id": "throwing_spear",
+          "effect_id": "throwing_spear",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "furious_charge",
+          "effect_id": "furious_charge",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "master_skald",
+          "effect_id": "master_skald",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "fortify",
+          "effect_id": "fortify",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "counterattack",
+          "effect_id": "counterattack",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "savage_kick",
+          "effect_id": "savage_kick",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "throwing_axe",
+          "effect_id": "throwing_axe",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "bullrush",
+          "effect_id": "bullrush",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "war_drummer",
+          "effect_id": "war_drummer",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "bolster",
+          "effect_id": "bolster",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "shield_bash",
+          "effect_id": "shield_bash",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "mighty_punch",
+          "effect_id": "mighty_punch",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "bulwark",
+          "effect_id": "bulwark",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "onslaught",
+          "effect_id": "onslaught",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "brogan_shield",
+          "effect_id": "shield",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "brutal_jab",
+          "effect_id": "brutal_jab",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "mad_dash",
+          "effect_id": "mad_dash",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "one_man_army",
+          "effect_id": "one_man_army",
+          "status": "reviewed_recipe"
+        }
+      ]
+    },
+    {
+      "hero": "Brynn",
+      "cards": [
+        {
+          "card_id": "hide_traces",
+          "effect_id": "hide_traces",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "expedition_leader",
+          "effect_id": "expedition_leader",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "deadfall_trap",
+          "effect_id": "deadfall_trap",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "die_hard",
+          "effect_id": "die_hard",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "peak_precision",
+          "effect_id": "peak_precision",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "split_throw",
+          "effect_id": "split_throw",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "cover_tracks",
+          "effect_id": "cover_tracks",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "mountain_guide",
+          "effect_id": "mountain_guide",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "log_trap",
+          "effect_id": "log_trap",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "true_grit",
+          "effect_id": "true_grit",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "elevated_ambush",
+          "effect_id": "elevated_ambush",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "split_attack",
+          "effect_id": "split_attack",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "tread_lightly",
+          "effect_id": "tread_lightly",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "bear_trap",
+          "effect_id": "bear_trap",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "brynn_high_ground",
+          "effect_id": "brynn_high_ground",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "decoy",
+          "effect_id": "decoy",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "familiar_ground",
+          "effect_id": "familiar_ground",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "over the top",
+          "effect_id": "over_the_top",
+          "status": "missing_registry"
+        }
+      ]
+    },
+    {
+      "hero": "Cordelia",
+      "cards": [
+        {
+          "card_id": "this_is_my_broomstick",
+          "effect_id": "this_is_my_broomstick",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "fatal_bonds",
+          "effect_id": "fatal_bonds",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "toxic_tranquility",
+          "effect_id": "toxic_tranquility",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "potion_explosion",
+          "effect_id": "potion_explosion",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "enchanted_path",
+          "effect_id": "enchanted_path",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "recipe_for_disaster",
+          "effect_id": "recipe_for_disaster",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "broomstick_beatdown",
+          "effect_id": "broomstick_beatdown",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "collateral_misfortune",
+          "effect_id": "collateral_misfortune",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "fungal_favor",
+          "effect_id": "fungal_favor",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "vile_vial",
+          "effect_id": "vile_vial",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "candy_trail",
+          "effect_id": "candy_trail",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "trouble_brewing",
+          "effect_id": "trouble_brewing",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "broom_for_improvement",
+          "effect_id": "broom_for_improvement",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "healing_spores",
+          "effect_id": "healing_spores",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "charmed_step",
+          "effect_id": "charmed_step",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "bewitch",
+          "effect_id": "bewitch",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "jinx",
+          "effect_id": "jinx",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "witching_hour",
+          "effect_id": "witching_hour",
+          "status": "base_noop"
+        }
+      ]
+    },
+    {
+      "hero": "Cutter",
+      "cards": [
+        {
+          "card_id": "broadside",
+          "effect_id": "broadside",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "a_fistful_of_coins",
+          "effect_id": "a_fistful_of_coins",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "crashland",
+          "effect_id": "crashland",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "outsmart",
+          "effect_id": "outsmart",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "fearless_lunge",
+          "effect_id": "fearless_lunge",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "tumble_shot",
+          "effect_id": "tumble_shot",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "barrage",
+          "effect_id": "barrage",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "x_marks_the_spot",
+          "effect_id": "x_marks_the_spot",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "ramming_speed",
+          "effect_id": "ramming_speed",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "outmaneuver",
+          "effect_id": "outmaneuver",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "bold_thrust",
+          "effect_id": "bold_thrust",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "evasive_shot",
+          "effect_id": "evasive_shot",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "bombardment",
+          "effect_id": "bombardment",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "brace_for_impact",
+          "effect_id": "brace_for_impact",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "daring_strike",
+          "effect_id": "daring_strike",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "grappling_bolt",
+          "effect_id": "grappling_bolt",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "walk_the_plank",
+          "effect_id": "walk_the_plank",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "legend_of_the_skies",
+          "effect_id": "legend_of_the_skies",
+          "status": "base_noop"
+        }
+      ]
+    },
+    {
+      "hero": "Dodger",
+      "cards": [
+        {
+          "card_id": "aegis_of_doom",
+          "effect_id": "aegis_of_doom",
+          "status": "base_noop"
+        },
+        {
+          "card_id": "enfeeblement",
+          "effect_id": "enfeeblement",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "middlefinger_of_death",
+          "effect_id": "middlefinger_of_death",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "blazing_skull",
+          "effect_id": "blazing_skull",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "necromastery",
+          "effect_id": "necromastery",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "darkest_ritual",
+          "effect_id": "darkest_ritual",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "vampiric_shield",
+          "effect_id": "vampiric_shield",
+          "status": "base_noop"
+        },
+        {
+          "card_id": "weakness",
+          "effect_id": "weakness",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "finger_of_death",
+          "effect_id": "finger_of_death",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "burning_skull",
+          "effect_id": "burning_skull",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "necromancy",
+          "effect_id": "necromancy",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "darker_ritual",
+          "effect_id": "darker_ritual",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "death_trap",
+          "effect_id": "death_trap",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "dread_razor",
+          "effect_id": "dread_razor",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "shield_of_decay",
+          "effect_id": "shield_of_decay",
+          "status": "base_noop"
+        },
+        {
+          "card_id": "littlefinger_of_death",
+          "effect_id": "littlefinger_of_death",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "dark_ritual",
+          "effect_id": "dark_ritual",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "tide_of_darkness",
+          "effect_id": "tide_of_darkness",
+          "status": "base_noop"
+        }
+      ]
+    },
+    {
+      "hero": "Emmitt",
+      "cards": [
+        {
+          "card_id": "time_warp",
+          "effect_id": "time_warp",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "time_bomb",
+          "effect_id": "time_bomb",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "back_to_the_future",
+          "effect_id": "back_to_the_future",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "future_proof",
+          "effect_id": "future_proof",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "temporal_judgment",
+          "effect_id": "temporal_judgment",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "deja_vu",
+          "effect_id": "deja_vu",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "time_loop",
+          "effect_id": "time_loop",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "time_trap",
+          "effect_id": "time_trap",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "fast_forward",
+          "effect_id": "fast_forward",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "time_capsule",
+          "effect_id": "time_capsule",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "temporal_slam",
+          "effect_id": "temporal_slam",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "flashback",
+          "effect_id": "flashback",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "time_snare",
+          "effect_id": "time_snare",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "time_walk",
+          "effect_id": "time_walk",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "temporal_punch",
+          "effect_id": "temporal_punch",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "unstable_timeline",
+          "effect_id": "unstable_timeline",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "reverse_time",
+          "effect_id": "reverse_time",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "alternative_timelines",
+          "effect_id": "alternative_timelines",
+          "status": "base_noop"
+        }
+      ]
+    },
+    {
+      "hero": "Garrus",
+      "cards": [
+        {
+          "card_id": "send_flying",
+          "effect_id": "send_flying",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "hunt_down",
+          "effect_id": "hunt_down",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "testudo",
+          "effect_id": "testudo",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "terrify",
+          "effect_id": "terrify",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "heavy_pilum",
+          "effect_id": "heavy_pilum",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "battle_ready",
+          "effect_id": "battle_ready",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "blunt_force",
+          "effect_id": "blunt_force",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "chase",
+          "effect_id": "chase",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "form_up",
+          "effect_id": "form_up",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "threaten",
+          "effect_id": "threaten",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "light_pilum",
+          "effect_id": "light_pilum",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "make_a_stand",
+          "effect_id": "make_a_stand",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "chilling_howl",
+          "effect_id": "chilling_howl",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "angry_strike",
+          "effect_id": "angry_strike",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "trace",
+          "effect_id": "trace",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "menace",
+          "effect_id": "menace",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "hold_ground",
+          "effect_id": "hold_ground",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "battle_fury",
+          "effect_id": "battle_fury",
+          "status": "base_noop"
+        }
+      ]
+    },
+    {
+      "hero": "Gydion",
+      "cards": [
+        {
+          "card_id": "greater_evocation",
+          "effect_id": "greater_evocation",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "greater_necromancy",
+          "effect_id": "greater_necromancy",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "greater_abjuration",
+          "effect_id": "greater_abjuration",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "greater_conjuration",
+          "effect_id": "greater_conjuration",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "greater_enchantment",
+          "effect_id": "greater_enchantment",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "greater_transmutation",
+          "effect_id": "greater_transmutation",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "lesser_evocation",
+          "effect_id": "lesser_evocation",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "lesser_necromancy",
+          "effect_id": "lesser_necromancy",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "lesser_abjuration",
+          "effect_id": "lesser_abjuration",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "lesser_conjuration",
+          "effect_id": "lesser_conjuration",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "lesser_enchantment",
+          "effect_id": "lesser_enchantment",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "lesser_transmutation",
+          "effect_id": "lesser_transmutation",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "elementary_evocation",
+          "effect_id": "elementary_evocation",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "elementary_abjuration",
+          "effect_id": "elementary_abjuration",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "elementary_enchantment",
+          "effect_id": "elementary_enchantment",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "cantrip",
+          "effect_id": "cantrip",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "prepare_spells",
+          "effect_id": "prepare_spells",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "the_archwizard",
+          "effect_id": "the_archwizard",
+          "status": "base_noop"
+        }
+      ]
+    },
+    {
+      "hero": "Hanu",
+      "cards": [
+        {
+          "card_id": "safe_travels",
+          "effect_id": "safe_travels",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "that_way",
+          "effect_id": "that_way",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "see_nothing",
+          "effect_id": "see_nothing",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "monkey_business",
+          "effect_id": "monkey_business",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "trusted_sidekick",
+          "effect_id": "trusted_sidekick",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "pile_on",
+          "effect_id": "pile_on",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "there_and_back_again",
+          "effect_id": "there_and_back_again",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "this_way",
+          "effect_id": "this_way",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "monkey_twist",
+          "effect_id": "monkey_twist",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "hear_nothing",
+          "effect_id": "hear_nothing",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "even_the_odds",
+          "effect_id": "even_the_odds",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "outnumber",
+          "effect_id": "outnumber",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "unexpected_journey",
+          "effect_id": "unexpected_journey",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "monkey_trick",
+          "effect_id": "monkey_trick",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "helping_hand",
+          "effect_id": "helping_hand",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "hurry_up",
+          "effect_id": "hurry_up",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "fight_and_flight",
+          "effect_id": "fight_and_flight",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "the_ultimate_trick",
+          "effect_id": "the_ultimate_trick",
+          "status": "remaining_body"
+        }
+      ]
+    },
+    {
+      "hero": "Ignatia",
+      "cards": [
+        {
+          "card_id": "scorching_blaze",
+          "effect_id": "scorching_blaze",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "violent_conflagration",
+          "effect_id": "violent_conflagration",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "path_of_flames",
+          "effect_id": "path_of_flames",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "chaos_gate",
+          "effect_id": "chaos_gate",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "loosely_aimed_firebolts",
+          "effect_id": "loosely_aimed_firebolts",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "imminent_eruption",
+          "effect_id": "imminent_eruption",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "searing_heat",
+          "effect_id": "searing_heat",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "spontaneous_immolation",
+          "effect_id": "spontaneous_immolation",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "path_of_cinders",
+          "effect_id": "path_of_cinders",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "unstable_portal",
+          "effect_id": "unstable_portal",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "erratic_fireblast",
+          "effect_id": "erratic_fireblast",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "crack_of_doom",
+          "effect_id": "crack_of_doom",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "abrupt_combustion",
+          "effect_id": "abrupt_combustion",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "path_of_ashes",
+          "effect_id": "path_of_ashes",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "playing_with_fire",
+          "effect_id": "playing_with_fire",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "equilibrium",
+          "effect_id": "equilibrium",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "chaos_bolt",
+          "effect_id": "chaos_bolt",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "chaos_incarnate",
+          "effect_id": "chaos_incarnate",
+          "status": "missing_registry"
+        }
+      ]
+    },
+    {
+      "hero": "Min",
+      "cards": [
+        {
+          "card_id": "cobra_stance",
+          "effect_id": "cobra_stance",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "dragon_stance",
+          "effect_id": "dragon_stance",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "holy_death_grenade",
+          "effect_id": "holy_death_grenade",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "minefield",
+          "effect_id": "minefield",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "perfect_self",
+          "effect_id": "perfect_self",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "ruse",
+          "effect_id": "ruse",
+          "status": "base_noop"
+        },
+        {
+          "card_id": "viper_stance",
+          "effect_id": "viper_stance",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "tiger_stance",
+          "effect_id": "tiger_stance",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "death_grenade",
+          "effect_id": "death_grenade",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "cluster_mine",
+          "effect_id": "cluster_mine",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "inner_strength",
+          "effect_id": "inner_strength",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "vanish",
+          "effect_id": "vanish",
+          "status": "base_noop"
+        },
+        {
+          "card_id": "fast_as_lightning",
+          "effect_id": "fast_as_lightning",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "smoke_bomb",
+          "effect_id": "smoke_bomb",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "crane_stance",
+          "effect_id": "crane_stance",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "trip_mine",
+          "effect_id": "trip_mine",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "poof",
+          "effect_id": "poof",
+          "status": "base_noop"
+        },
+        {
+          "card_id": "flurry_of_blows",
+          "effect_id": "flurry_of_blows",
+          "status": "base_noop"
+        }
+      ]
+    },
+    {
+      "hero": "Misa",
+      "cards": [
+        {
+          "card_id": "thunder_shot",
+          "effect_id": "thunder_shot",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "worthy_opponent",
+          "effect_id": "worthy_opponent",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "death_from_above",
+          "effect_id": "death_from_above",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "crushing_squall",
+          "effect_id": "crushing_squall",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "storm_spirit",
+          "effect_id": "storm_spirit",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "mastery",
+          "effect_id": "mastery",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "power_shot",
+          "effect_id": "power_shot",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "matter_of_honor",
+          "effect_id": "matter_of_honor",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "dash_and_slash",
+          "effect_id": "dash_and_slash",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "gust_of_wind",
+          "effect_id": "gust_of_wind",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "living_tornado",
+          "effect_id": "living_tornado",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "discipline",
+          "effect_id": "discipline",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "swoop_in",
+          "effect_id": "swoop_in",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "watch_how_i_soar",
+          "effect_id": "watch_how_i_soar",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "challenge_accepted",
+          "effect_id": "challenge_accepted",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "sudden_breeze",
+          "effect_id": "sudden_breeze",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "focus",
+          "effect_id": "focus",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "power_overwhelming",
+          "effect_id": "power_overwhelming",
+          "status": "reviewed_recipe"
+        }
+      ]
+    },
+    {
+      "hero": "Mortimer",
+      "cards": [
+        {
+          "card_id": "braaaaaaaains",
+          "effect_id": "braaaaaaaains",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "racing_dead",
+          "effect_id": "racing_dead",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "army_of_darkness",
+          "effect_id": "army_of_darkness",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "crowd_surf",
+          "effect_id": "crowd_surf",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "stalking_scalpers",
+          "effect_id": "stalking_scalpers",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "macabre_mayhem",
+          "effect_id": "macabre_mayhem",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "braains",
+          "effect_id": "braains",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "walking_dead",
+          "effect_id": "walking_dead",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "gathering_horde",
+          "effect_id": "gathering_horde",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "crowd_drift",
+          "effect_id": "crowd_drift",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "robbing_zombies",
+          "effect_id": "robbing_zombies",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "morbid_mosh",
+          "effect_id": "morbid_mosh",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "awaken",
+          "effect_id": "awaken",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "knife_of_the_living_dead",
+          "effect_id": "knife_of_the_living_dead",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "crawling_dead",
+          "effect_id": "crawling_dead",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "corpse_slam",
+          "effect_id": "corpse_slam",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "stage_dive",
+          "effect_id": "stage_dive",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "master_of_puppets",
+          "effect_id": "master_of_puppets",
+          "status": "remaining_body"
+        }
+      ]
+    },
+    {
+      "hero": "Mrak",
+      "cards": [
+        {
+          "card_id": "avalanche",
+          "effect_id": "avalanche",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "strolling_stone",
+          "effect_id": "strolling_stone",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "boulderdozer",
+          "effect_id": "boulderdozer",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "ground_shaker",
+          "effect_id": "ground_shaker",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "epicenter",
+          "effect_id": "epicenter",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "rock_solid",
+          "effect_id": "rock_solid",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "rockslide",
+          "effect_id": "rockslide",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "rolling_stone",
+          "effect_id": "rolling_stone",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "boulder_blitz",
+          "effect_id": "boulder_blitz",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "stomping_step",
+          "effect_id": "stomping_step",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "seismic_assault",
+          "effect_id": "seismic_assault",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "stone_carapace",
+          "effect_id": "stone_carapace",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "treacherous_ground",
+          "effect_id": "treacherous_ground",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "boulder_rush",
+          "effect_id": "boulder_rush",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "seismic_slam",
+          "effect_id": "seismic_slam",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "stone_grip",
+          "effect_id": "stone_grip",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "fissure",
+          "effect_id": "fissure",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "rock_and_a_hard_place",
+          "effect_id": "rock_and_a_hard_place",
+          "status": "missing_registry"
+        }
+      ]
+    },
+    {
+      "hero": "NebKher",
+      "cards": [
+        {
+          "card_id": "an_illusion_of_choice",
+          "effect_id": "an_illusion_of_choice",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "shift_reality",
+          "effect_id": "shift_reality",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "master_of_illusions",
+          "effect_id": "master_of_illusions",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "illusionary_army",
+          "effect_id": "illusionary_army",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "phantasmal_champion",
+          "effect_id": "phantasmal_champion",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "devious_scheme",
+          "effect_id": "devious_scheme",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "time_to_reconsider",
+          "effect_id": "time_to_reconsider",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "crack_in_reality",
+          "effect_id": "crack_in_reality",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "multiple_projections",
+          "effect_id": "multiple_projections",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "illusionary_force",
+          "effect_id": "illusionary_force",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "phantasmal_warrior",
+          "effect_id": "phantasmal_warrior",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "twist_fate",
+          "effect_id": "twist_fate",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "imbue_doubt",
+          "effect_id": "imbue_doubt",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "fleeting_image",
+          "effect_id": "fleeting_image",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "phantasmal_sentry",
+          "effect_id": "phantasmal_sentry",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "diabolical_laughter",
+          "effect_id": "diabolical_laughter",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "mind_grip",
+          "effect_id": "mind_grip",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "what_the_hell_are_you",
+          "effect_id": "what_the_hell_are_you",
+          "status": "base_noop"
+        }
+      ]
+    },
+    {
+      "hero": "Razzle",
+      "cards": [
+        {
+          "card_id": "team_spirit",
+          "effect_id": "team_spirit",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "aaaand_its_gone",
+          "effect_id": "aaaand_its_gone",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "wire_dancers",
+          "effect_id": "wire_dancers",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "spectacle",
+          "effect_id": "spectacle",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "into_thin_air",
+          "effect_id": "into_thin_air",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "ransack",
+          "effect_id": "ransack",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "group_performance",
+          "effect_id": "group_performance",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "magic_trick",
+          "effect_id": "magic_trick",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "high_wire",
+          "effect_id": "high_wire",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "theatrics",
+          "effect_id": "theatrics",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "hit_and_gone",
+          "effect_id": "hit_and_gone",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "rummage",
+          "effect_id": "rummage",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "alleyoop",
+          "effect_id": "alleyoop",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "tightrope",
+          "effect_id": "tightrope",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "phantom_strike",
+          "effect_id": "phantom_strike",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "crowd_control",
+          "effect_id": "crowd_control",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "stunt_doubles",
+          "effect_id": "stunt_doubles",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "twin_strike",
+          "effect_id": "twin_strike",
+          "status": "base_noop"
+        }
+      ]
+    },
+    {
+      "hero": "Rowenna",
+      "cards": [
+        {
+          "card_id": "paragon_of_valor",
+          "effect_id": "paragon_of_valor",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "paragon_of_grace",
+          "effect_id": "paragon_of_grace",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "opening_volley",
+          "effect_id": "opening_volley",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "grand_melee",
+          "effect_id": "grand_melee",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "glorious_triumph",
+          "effect_id": "glorious_triumph",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "defend_the_innocent",
+          "effect_id": "defend_the_innocent",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "feat_of_bravery",
+          "effect_id": "feat_of_bravery",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "fair_share",
+          "effect_id": "fair_share",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "opening_shots",
+          "effect_id": "opening_shots",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "melee",
+          "effect_id": "melee",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "protect_the_weak",
+          "effect_id": "protect_the_weak",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "accept_surrender",
+          "effect_id": "accept_surrender",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "throw_the_gauntlet",
+          "effect_id": "throw_the_gauntlet",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "code_of_chivalry",
+          "effect_id": "code_of_chivalry",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "token_of_gratitude",
+          "effect_id": "token_of_gratitude",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "close_quarters",
+          "effect_id": "close_quarters",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "stand_guard",
+          "effect_id": "stand_guard",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "fabled_lance",
+          "effect_id": "fabled_lance",
+          "status": "base_noop"
+        }
+      ]
+    },
+    {
+      "hero": "Sabina",
+      "cards": [
+        {
+          "card_id": "covering_fire",
+          "effect_id": "covering_fire",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "path_to_victory",
+          "effect_id": "path_to_victory",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "dead_shot",
+          "effect_id": "dead_shot",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "unwavering_resolve",
+          "effect_id": "unwavering_resolve",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "ready_and_waiting",
+          "effect_id": "ready_and_waiting",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "bullet_hell",
+          "effect_id": "bullet_hell",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "close_support",
+          "effect_id": "close_support",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "shootout",
+          "effect_id": "shootout",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "gunslinger",
+          "effect_id": "gunslinger",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "marching_orders",
+          "effect_id": "marching_orders",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "steady_advance",
+          "effect_id": "steady_advance",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "roger_roger",
+          "effect_id": "roger_roger",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "point_blank_shot",
+          "effect_id": "point_blank_shot",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "back_to_back",
+          "effect_id": "back_to_back",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "troop_movement",
+          "effect_id": "troop_movement",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "listen_up",
+          "effect_id": "listen_up",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "quickdraw",
+          "effect_id": "quickdraw",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "big_sodding_gun",
+          "effect_id": "big_sodding_gun",
+          "status": "base_noop"
+        }
+      ]
+    },
+    {
+      "hero": "Silverarrow",
+      "cards": [
+        {
+          "card_id": "clear_shot",
+          "effect_id": "clear_shot",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "rain_of_arrows",
+          "effect_id": "rain_of_arrows",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "grappling_branches",
+          "effect_id": "grappling_branches",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "treetop_sentinel",
+          "effect_id": "treetop_sentinel",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "lead_astray",
+          "effect_id": "lead_astray",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "natures_blessing",
+          "effect_id": "natures_blessing",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "opportunity_shot",
+          "effect_id": "opportunity_shot",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "long_shot",
+          "effect_id": "long_shot",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "warning_shot",
+          "effect_id": "warning_shot",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "entangling_vines",
+          "effect_id": "entangling_vines",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "divert_attention",
+          "effect_id": "divert_attention",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "fae_healing",
+          "effect_id": "fae_healing",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "shoot_and_scoot",
+          "effect_id": "shoot_and_scoot",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "trailblazer",
+          "effect_id": "trailblazer",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "snap_shot",
+          "effect_id": "snap_shot",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "grasping_roots",
+          "effect_id": "grasping_roots",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "disorient",
+          "effect_id": "disorient",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "wild_hunt",
+          "effect_id": "wild_hunt",
+          "status": "base_noop"
+        }
+      ]
+    },
+    {
+      "hero": "Snorri",
+      "cards": [
+        {
+          "card_id": "runeblaster",
+          "effect_id": "runeblaster",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "runic_battleaxe",
+          "effect_id": "runic_battleaxe",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "runebomb",
+          "effect_id": "runebomb",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "oath_of_perseverance",
+          "effect_id": "oath_of_perseverance",
+          "status": "base_noop"
+        },
+        {
+          "card_id": "ancestral_grace",
+          "effect_id": "ancestral_grace",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "deep_passage",
+          "effect_id": "deep_passage",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "runecaster",
+          "effect_id": "runecaster",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "runic_hammer",
+          "effect_id": "runic_hammer",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "runetrap",
+          "effect_id": "runetrap",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "oath_of_fortitude",
+          "effect_id": "oath_of_fortitude",
+          "status": "base_noop"
+        },
+        {
+          "card_id": "ancestral_boon",
+          "effect_id": "ancestral_boon",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "hidden_passage",
+          "effect_id": "hidden_passage",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "runic_dagger",
+          "effect_id": "runic_dagger",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "oath_of_endurance",
+          "effect_id": "oath_of_endurance",
+          "status": "base_noop"
+        },
+        {
+          "card_id": "safe_passage",
+          "effect_id": "safe_passage",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "inscribe_the_runes",
+          "effect_id": "inscribe_the_runes",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "rune_sigils",
+          "effect_id": "rune_sigils",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "rune_mastery",
+          "effect_id": "rune_mastery",
+          "status": "base_noop"
+        }
+      ]
+    },
+    {
+      "hero": "Swift",
+      "cards": [
+        {
+          "card_id": "drop_trooper",
+          "effect_id": "drop_trooper",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "mobile_scout",
+          "effect_id": "mobile_scout",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "killing_ground",
+          "effect_id": "killing_ground",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "hunting_season",
+          "effect_id": "hunting_season",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "killshot",
+          "effect_id": "killshot",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "super_shotgun",
+          "effect_id": "super_shotgun",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "assault_jump",
+          "effect_id": "assault_jump",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "delayed_jump",
+          "effect_id": "delayed_jump",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "pin_down",
+          "effect_id": "pin_down",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "mark_for_death",
+          "effect_id": "mark_for_death",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "prepared_shot",
+          "effect_id": "prepared_shot",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "shotgun",
+          "effect_id": "shotgun",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "steam_jump",
+          "effect_id": "steam_jump",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "suppress",
+          "effect_id": "suppress",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "snipe",
+          "effect_id": "snipe",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "bounce",
+          "effect_id": "bounce",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "reload",
+          "effect_id": "reload",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "bullet_time",
+          "effect_id": "bullet_time",
+          "status": "base_noop"
+        }
+      ]
+    },
+    {
+      "hero": "Takahide",
+      "cards": [
+        {
+          "card_id": "the_right_hand",
+          "effect_id": "the_right_hand",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "tactical_gambit",
+          "effect_id": "tactical_gambit",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "commit_reserves",
+          "effect_id": "commit_reserves",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "loyal_retainer",
+          "effect_id": "loyal_retainer",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "hold_my_sake",
+          "effect_id": "hold_my_sake",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "blade_helix",
+          "effect_id": "blade_helix",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "chosen_champion",
+          "effect_id": "chosen_champion",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "calculated_risk",
+          "effect_id": "calculated_risk",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "bring_the_relief",
+          "effect_id": "bring_the_relief",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "pledge_of_allegiance",
+          "effect_id": "pledge_of_allegiance",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "lead_from_the_front",
+          "effect_id": "lead_from_the_front",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "spinning_blade",
+          "effect_id": "spinning_blade",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "proven_warrior",
+          "effect_id": "proven_warrior",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "come_to_aid",
+          "effect_id": "come_to_aid",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "set_an_example",
+          "effect_id": "set_an_example",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "bushido",
+          "effect_id": "bushido",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "float_like_a_butterfly",
+          "effect_id": "float_like_a_butterfly",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "sting_like_a_bee",
+          "effect_id": "sting_like_a_bee",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "strike_like_a_tiger",
+          "effect_id": "strike_like_a_tiger",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "ready_for_war",
+          "effect_id": "ready_for_war",
+          "status": "remaining_body"
+        }
+      ]
+    },
+    {
+      "hero": "Tali",
+      "cards": [
+        {
+          "card_id": "venerated_totem",
+          "effect_id": "venerated_totem",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "pack_ice",
+          "effect_id": "pack_ice",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "warrior_spirit",
+          "effect_id": "warrior_spirit",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "blizzard",
+          "effect_id": "blizzard",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "spirit_bear",
+          "effect_id": "spirit_bear",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "winter_scepter",
+          "effect_id": "winter_scepter",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "ancestral_totem",
+          "effect_id": "ancestral_totem",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "wall_of_frost",
+          "effect_id": "wall_of_frost",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "guardian_spirit",
+          "effect_id": "guardian_spirit",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "snowstorm",
+          "effect_id": "snowstorm",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "spirit_wolf",
+          "effect_id": "spirit_wolf",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "winter_spear",
+          "effect_id": "winter_spear",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "glacial_barrier",
+          "effect_id": "glacial_barrier",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "cold_snap",
+          "effect_id": "cold_snap",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "winter_dagger",
+          "effect_id": "winter_dagger",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "commune_with_spirits",
+          "effect_id": "commune_with_spirits",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "ice_blast",
+          "effect_id": "ice_blast",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "reign_of_winter",
+          "effect_id": "reign_of_winter",
+          "status": "base_noop"
+        }
+      ]
+    },
+    {
+      "hero": "Tigerclaw",
+      "cards": [
+        {
+          "card_id": "poisoned_dart",
+          "effect_id": "poisoned_dart",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "master_thief",
+          "effect_id": "master_thief",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "riposte",
+          "effect_id": "riposte",
+          "status": "base_noop"
+        },
+        {
+          "card_id": "evade",
+          "effect_id": "evade",
+          "status": "base_noop"
+        },
+        {
+          "card_id": "backstab_with_a_ballista",
+          "effect_id": "backstab_with_a_ballista",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "leaping_strike",
+          "effect_id": "leaping_strike",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "poisoned_dagger",
+          "effect_id": "poisoned_dagger",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "pick_pocket",
+          "effect_id": "pick_pocket",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "sidestep",
+          "effect_id": "sidestep",
+          "status": "base_noop"
+        },
+        {
+          "card_id": "parry",
+          "effect_id": "parry",
+          "status": "base_noop"
+        },
+        {
+          "card_id": "combat_reflexes",
+          "effect_id": "combat_reflexes",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "backstab",
+          "effect_id": "backstab",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "blend_into_shadows",
+          "effect_id": "blend_into_shadows",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "blink_strike",
+          "effect_id": "blink_strike",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "hit_and_run",
+          "effect_id": "hit_and_run",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "light_fingered",
+          "effect_id": "light_fingered",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "dodge",
+          "effect_id": "dodge",
+          "status": "base_noop"
+        },
+        {
+          "card_id": "cloak_and_daggers",
+          "effect_id": "cloak_and_daggers",
+          "status": "base_noop"
+        }
+      ]
+    },
+    {
+      "hero": "Trinkets",
+      "cards": [
+        {
+          "card_id": "flame_belcher",
+          "effect_id": "flame_belcher",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "supercharged_cannon",
+          "effect_id": "supercharged_cannon",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "deployable_bastion",
+          "effect_id": "deployable_bastion",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "disruptor_grid",
+          "effect_id": "disruptor_grid",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "emergency_protocol",
+          "effect_id": "emergency_protocol",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "perfected_design",
+          "effect_id": "perfected_design",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "steam_discharge",
+          "effect_id": "steam_discharge",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "gatling_gun",
+          "effect_id": "gatling_gun",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "deployable_barrier",
+          "effect_id": "deployable_barrier",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "disruptor_pulse",
+          "effect_id": "disruptor_pulse",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "self_destruct",
+          "effect_id": "self_destruct",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "updated_design",
+          "effect_id": "updated_design",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "salvage_parts",
+          "effect_id": "salvage_parts",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "rapid_redeployment",
+          "effect_id": "rapid_redeployment",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "makeshift_minigun",
+          "effect_id": "makeshift_minigun",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "disruptor_jolt",
+          "effect_id": "disruptor_jolt",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "early_prototype",
+          "effect_id": "early_prototype",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "unlimited_firepower",
+          "effect_id": "unlimited_firepower",
+          "status": "base_noop"
+        }
+      ]
+    },
+    {
+      "hero": "Ursafar",
+      "cards": [
+        {
+          "card_id": "tear",
+          "effect_id": "tear",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "feeding_frenzy",
+          "effect_id": "feeding_frenzy",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "eyes_of_flame",
+          "effect_id": "eyes_of_flame",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "unstoppable_force",
+          "effect_id": "unstoppable_force",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "evolutionary_response",
+          "effect_id": "evolutionary_response",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "apex_predator",
+          "effect_id": "apex_predator",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "rip",
+          "effect_id": "rip",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "prey_abundance",
+          "effect_id": "prey_abundance",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "cold_ire",
+          "effect_id": "cold_ire",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "rampaging_beast",
+          "effect_id": "rampaging_beast",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "instinctive_reaction",
+          "effect_id": "instinctive_reaction",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "eyes_on_the_prey",
+          "effect_id": "eyes_on_the_prey",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "claws_that_catch",
+          "effect_id": "claws_that_catch",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "angry_roar",
+          "effect_id": "angry_roar",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "prey_drive",
+          "effect_id": "prey_drive",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "prowling_brute",
+          "effect_id": "prowling_brute",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "sniff_out",
+          "effect_id": "sniff_out",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "unbound_fury",
+          "effect_id": "unbound_fury",
+          "status": "remaining_body"
+        }
+      ]
+    },
+    {
+      "hero": "Wasp",
+      "cards": [
+        {
+          "card_id": "electrocute",
+          "effect_id": "electrocute",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "mass_telekinesis",
+          "effect_id": "mass_telekinesis",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "charged_boomerang",
+          "effect_id": "charged_boomerang",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "reflect_projectiles",
+          "effect_id": "reflect_projectiles",
+          "status": "base_noop"
+        },
+        {
+          "card_id": "center_of_mass",
+          "effect_id": "center_of_mass",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "kinetic_blast",
+          "effect_id": "kinetic_blast",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "thunder_boomerang",
+          "effect_id": "thunder_boomerang",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "electroblast",
+          "effect_id": "electroblast",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "control_gravity",
+          "effect_id": "control_gravity",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "kinetic_repulse",
+          "effect_id": "kinetic_repulse",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "telekinesis",
+          "effect_id": "telekinesis",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "deflect_projectiles",
+          "effect_id": "deflect_projectiles",
+          "status": "base_noop"
+        },
+        {
+          "card_id": "stop_projectiles",
+          "effect_id": "stop_projectiles",
+          "status": "base_noop"
+        },
+        {
+          "card_id": "magnetic_dagger",
+          "effect_id": "magnetic_dagger",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "static_barrier",
+          "effect_id": "static_barrier",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "lift_up",
+          "effect_id": "lift_up",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "shock",
+          "effect_id": "shock",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "high_voltage",
+          "effect_id": "high_voltage",
+          "status": "base_noop"
+        }
+      ]
+    },
+    {
+      "hero": "Whisper",
+      "cards": [
+        {
+          "card_id": "blood_frenzy",
+          "effect_id": "blood_frenzy",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "blood_pilgrimage",
+          "effect_id": "blood_pilgrimage",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "greater_good",
+          "effect_id": "greater_good",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "blooming_nightmare",
+          "effect_id": "blooming_nightmare",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "sealed_fate",
+          "effect_id": "sealed_fate",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "creeping_shadow",
+          "effect_id": "creeping_shadow",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "blood_fury",
+          "effect_id": "blood_fury",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "sanguine_path",
+          "effect_id": "sanguine_path",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "lesser_evil",
+          "effect_id": "lesser_evil",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "sprouts_of_panic",
+          "effect_id": "sprouts_of_panic",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "cruel_twist",
+          "effect_id": "cruel_twist",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "shadow_walk",
+          "effect_id": "shadow_walk",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "death_seeker",
+          "effect_id": "death_seeker",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "swift_justice",
+          "effect_id": "swift_justice",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "crimson_trail",
+          "effect_id": "crimson_trail",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "seeds_of_fear",
+          "effect_id": "seeds_of_fear",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "shadow_step",
+          "effect_id": "shadow_step",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "grim_reaper",
+          "effect_id": "grim_reaper",
+          "status": "remaining_body"
+        }
+      ]
+    },
+    {
+      "hero": "Widget",
+      "cards": [
+        {
+          "card_id": "diversionary_assault",
+          "effect_id": "diversionary_assault",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "airborne_assault",
+          "effect_id": "airborne_assault",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "gnaw",
+          "effect_id": "gnaw",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "scorching_breath",
+          "effect_id": "scorching_breath",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "carry_away",
+          "effect_id": "carry_away",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "safe_landing",
+          "effect_id": "safe_landing",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "diversionary_attack",
+          "effect_id": "diversionary_attack",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "airborne_attack",
+          "effect_id": "airborne_attack",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "nibble",
+          "effect_id": "nibble",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "flaming_breath",
+          "effect_id": "flaming_breath",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "drag_off",
+          "effect_id": "drag_off",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "take_off",
+          "effect_id": "take_off",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "diversionary_strike",
+          "effect_id": "diversionary_strike",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "fight_as_one",
+          "effect_id": "fight_as_one",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "fiery_breath",
+          "effect_id": "fiery_breath",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "dragon_bond",
+          "effect_id": "dragon_bond",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "all_aboard",
+          "effect_id": "all_aboard",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "dragon_knight",
+          "effect_id": "dragon_knight",
+          "status": "base_noop"
+        }
+      ]
+    },
+    {
+      "hero": "Wuk",
+      "cards": [
+        {
+          "card_id": "monstrous_throw",
+          "effect_id": "monstrous_throw",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "treetop_ride",
+          "effect_id": "treetop_ride",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "assert_dominance",
+          "effect_id": "assert_dominance",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "abundance",
+          "effect_id": "abundance",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "angry_stampede",
+          "effect_id": "angry_stampede",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "natures_champion",
+          "effect_id": "natures_champion",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "mighty_throw",
+          "effect_id": "mighty_throw",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "into_the_canopy",
+          "effect_id": "into_the_canopy",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "claim_dominance",
+          "effect_id": "claim_dominance",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "tree_of_plenty",
+          "effect_id": "tree_of_plenty",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "trample",
+          "effect_id": "trample",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "natures_guardian",
+          "effect_id": "natures_guardian",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "toss_away",
+          "effect_id": "toss_away",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "gifts_of_nature",
+          "effect_id": "gifts_of_nature",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "natures_protector",
+          "effect_id": "natures_protector",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "mystic_saplings",
+          "effect_id": "mystic_saplings",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "tree_slam",
+          "effect_id": "tree_slam",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "march_of_nature",
+          "effect_id": "march_of_nature",
+          "status": "base_noop"
+        }
+      ]
+    },
+    {
+      "hero": "Xargatha",
+      "cards": [
+        {
+          "card_id": "dominate",
+          "effect_id": "dominate",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "final_embrace",
+          "effect_id": "final_embrace",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "devoted_followers",
+          "effect_id": "devoted_followers",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "turn_into_statues",
+          "effect_id": "turn_into_statues",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "lethal_spin",
+          "effect_id": "lethal_spin",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "rapid_thrusts",
+          "effect_id": "rapid_thrusts",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "sirens_call",
+          "effect_id": "sirens_call",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "cleave",
+          "effect_id": "cleave",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "charm",
+          "effect_id": "charm",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "stone_gaze",
+          "effect_id": "stone_gaze",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "threatening_slash",
+          "effect_id": "threatening_slash",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "long_thrust",
+          "effect_id": "long_thrust",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "deadly_swipe",
+          "effect_id": "deadly_swipe",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "fresh_converts",
+          "effect_id": "fresh_converts",
+          "status": "reviewed_recipe"
+        },
+        {
+          "card_id": "petrifying_stare",
+          "effect_id": "petrifying_stare",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "constrict",
+          "effect_id": "constrict",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "control",
+          "effect_id": "control",
+          "status": "remaining_body"
+        },
+        {
+          "card_id": "metamorphosis",
+          "effect_id": "metamorphosis",
+          "status": "remaining_body"
+        }
+      ]
+    }
+  ]
+}

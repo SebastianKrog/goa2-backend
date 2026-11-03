@@ -1,4 +1,4 @@
-"""Full real-handler transitions for reviewed primary effects and primitive fallback."""
+"""Full real-handler transitions for reviewed dense primary recipes and fallback."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from state_codec import export_state
 
 def cases(advance, answer, *, effects=None, include_common=True):
     from model_traces import setup
-    from primary_templates import EFFECTS
+    from primary_templates import DENSE_EFFECTS as EFFECTS
     from stack_traces import reference_trace
 
     from goa2.domain.input import InputResponse

@@ -2,7 +2,7 @@
 //! lives in `passives`; remaining effect bodies reject explicitly.
 use crate::{
     cards::CardId,
-    data::{Datum, Registers, Symbol, Symbols},
+    data::{Datum, RegisterRead, Registers, Symbol, Symbols},
     stats::Stat,
     world::{ActionKind, CardLifecycle, NativeWorld},
 };
@@ -21,19 +21,24 @@ pub struct DefenseCard {
 pub struct DefenseMenu {
     pub owner: Symbol,
     pub cards: Vec<DefenseCard>,
-    pub attack: Option<i64>,
+    pub attack: Option<Datum>,
     pub modifier: i64,
-    pub needed: Option<i64>,
+    pub needed: Option<Datum>,
     pub initiative: bool,
 }
 impl DefenseMenu {
     pub fn to_json(&self, id: String, symbols: &Symbols) -> Value {
         let owner = symbols.name(self.owner);
         let label = if self.initiative { "Init" } else { "Def" };
-        let prompt = if let Some(attack) = self.attack {
+        let prompt = if let Some(attack) = &self.attack {
             format!(
-                "Player {owner}, select a Defense card. Attack: {attack}, Defense needed: {} (minion mod: {:+})",
-                self.needed.unwrap(),
+                "Player {owner}, select a Defense card. Attack: {}, Defense needed: {} (minion mod: {:+})",
+                attack.python_scalar_text(symbols).unwrap(),
+                self.needed
+                    .as_ref()
+                    .unwrap()
+                    .python_scalar_text(symbols)
+                    .unwrap(),
                 self.modifier
             )
         } else {
@@ -42,7 +47,7 @@ impl DefenseMenu {
         let mut options=self.cards.iter().map(|c|json!({"id":symbols.name(c.id),"text":format!("{} ({label}: {})",symbols.name(c.name),c.total),"metadata":{"defense_value":c.total,"base_defense":c.base}})).collect::<Vec<_>>();
         options.push(json!({"id":"PASS","text":"PASS","metadata":{}}));
         let facts:serde_json::Map<String,Value>=self.cards.iter().map(|c|(symbols.name(c.id).into(),json!({"action_role":null,"defense_stat":if self.initiative{"INITIATIVE"}else{"DEFENSE"},"defense_kind":if c.primary{"primary"}else{"secondary"}}))).collect();
-        json!({"id":id,"request_type":"SELECT_CARD_OR_PASS","player_id":owner,"prompt":prompt,"options":options,"can_skip":false,"can_rollback":false,"context":{"attack_value":self.attack,"minion_modifier":self.modifier,"defense_needed":self.needed},"decision_context":{"purpose":"defense","actor_id":owner,"source_card_id":null,"choice_facts":facts}})
+        json!({"id":id,"request_type":"SELECT_CARD_OR_PASS","player_id":owner,"prompt":prompt,"options":options,"can_skip":false,"can_rollback":false,"context":{"attack_value":self.attack.as_ref().map(|v|v.to_json(symbols)),"minion_modifier":self.modifier,"defense_needed":self.needed.as_ref().map(|v|v.to_json(symbols))},"decision_context":{"purpose":"defense","actor_id":owner,"source_card_id":null,"choice_facts":facts}})
     }
 }
 #[derive(Clone, Debug)]
@@ -185,60 +190,7 @@ impl ReactionRules {
             self.pass(ctx, target);
             return Ok(Window::Done);
         };
-        let truth = |key| ctx.get(key).is_some_and(|v| v.truthy(symbols));
-        let block_primary = truth(self.block_primary);
-        let initiative = truth(self.initiative);
-        let stat = if initiative {
-            Stat::Initiative
-        } else {
-            Stat::Defense
-        };
-        let mut cards = Vec::new();
-        let mut candidates = hero.hand.clone();
-        for shield in world.active_shield_cards(hero.id) {
-            if !candidates.contains(&shield) {
-                candidates.push(shield);
-            }
-        }
-        for id in &candidates {
-            let card = world.card(*id).ok_or("reaction card missing")?;
-            if card.facedown {
-                continue;
-            }
-            let def = &world.definitions.cards[card.definition];
-            let primary = matches!(
-                def.primary,
-                Some(ActionKind::Defense | ActionKind::DefenseSkill)
-            );
-            let secondary = def
-                .secondary
-                .iter()
-                .find(|(a, _)| *a == ActionKind::Defense)
-                .map(|(_, v)| *v);
-            if (block_primary && primary && secondary.is_none())
-                || (!primary && secondary.is_none())
-            {
-                continue;
-            }
-            let base = if initiative {
-                card.initiative_override.unwrap_or(def.initiative)
-            } else if primary {
-                def.primary_value.unwrap_or(0)
-            } else {
-                secondary.unwrap_or(0)
-            };
-            let total =
-                world.computed_stat_for_card_in_context(target, stat, base, Some(*id), ctx)?;
-            cards.push(DefenseCard {
-                physical: *id,
-                id: def.printed_id,
-                name: def.name,
-                base,
-                total,
-                primary: primary && !block_primary,
-                color: def.color,
-            });
-        }
+        let (cards, initiative) = self.cards(world, ctx, symbols, target)?;
         if let Some(Datum::Text(id)) = selected {
             if *id == self.pass {
                 self.pass(ctx, target);
@@ -266,28 +218,143 @@ impl ReactionRules {
                 });
             }
         }
+        let menu = self.menu(world, ctx, target, actor, cards, initiative)?;
+        ctx.set(self.modifier, Datum::Int(menu.modifier));
+        Ok(Window::Wait(menu))
+    }
+    /// Shared ordered card/stat calculation. Callers own context/list mutation.
+    pub fn cards(
+        &self,
+        world: &NativeWorld,
+        ctx: &dyn RegisterRead,
+        symbols: &Symbols,
+        target: Symbol,
+    ) -> Result<(Vec<DefenseCard>, bool), String> {
+        let hero = world.hero(target).ok_or("reaction hero missing")?;
+        let truth = |key| ctx.get(key).is_some_and(|v| v.truthy(symbols));
+        let block_primary = truth(self.block_primary);
+        let initiative = truth(self.initiative);
+        let stat = if initiative {
+            Stat::Initiative
+        } else {
+            Stat::Defense
+        };
+        let eligible = |id: CardId| -> Result<bool, String> {
+            let card = world.card(id).ok_or("reaction card missing")?;
+            if card.facedown {
+                return Ok(false);
+            }
+            let def = &world.definitions.cards[card.definition];
+            let primary = matches!(
+                def.primary,
+                Some(ActionKind::Defense | ActionKind::DefenseSkill)
+            );
+            let secondary = def
+                .secondary
+                .iter()
+                .any(|(action, _)| *action == ActionKind::Defense);
+            Ok((primary || secondary) && (!block_primary || !primary || secondary))
+        };
+        let mut candidates = Vec::new();
+        for id in &hero.hand {
+            if eligible(*id)? {
+                candidates.push(*id);
+            }
+        }
+        for id in world.active_shield_cards(hero.id) {
+            if eligible(id)? {
+                let mut duplicate = false;
+                for existing in &candidates {
+                    if world.card_model_equal(*existing, id)? {
+                        duplicate = true;
+                        break;
+                    }
+                }
+                if !duplicate {
+                    candidates.push(id);
+                }
+            }
+        }
+        // Source deduplicates shields before computing option values. Avoid
+        // recomputing the same model's stats for duplicate shield references.
+        let mut cards = Vec::with_capacity(candidates.len());
+        for id in candidates {
+            let card = world.card(id).ok_or("reaction card missing")?;
+            let def = &world.definitions.cards[card.definition];
+            let primary = matches!(
+                def.primary,
+                Some(ActionKind::Defense | ActionKind::DefenseSkill)
+            );
+            let secondary = def
+                .secondary
+                .iter()
+                .find(|(action, _)| *action == ActionKind::Defense)
+                .map(|(_, value)| *value);
+            let base = if initiative {
+                card.initiative_override.unwrap_or(def.initiative)
+            } else if primary {
+                def.primary_value.unwrap_or(0)
+            } else {
+                secondary.unwrap_or(0)
+            };
+            let total =
+                world.computed_stat_for_card_in_context(target, stat, base, Some(id), ctx)?;
+            cards.push(DefenseCard {
+                physical: id,
+                id: def.printed_id,
+                name: def.name,
+                base,
+                total,
+                primary: primary && !block_primary,
+                color: def.color,
+            });
+        }
+        Ok((cards, initiative))
+    }
+    pub fn menu(
+        &self,
+        world: &NativeWorld,
+        ctx: &dyn RegisterRead,
+        target: Symbol,
+        actor: Option<Symbol>,
+        cards: Vec<DefenseCard>,
+        initiative: bool,
+    ) -> Result<DefenseMenu, String> {
         let modifier = world.minion_defense(target, actor)?;
-        ctx.set(self.modifier, Datum::Int(modifier));
         let attack = match ctx.get(self.attack) {
             None | Some(Datum::Null) => None,
-            Some(Datum::Int(n)) => Some(*n),
-            Some(Datum::Bool(b)) => Some(i64::from(*b)),
-            _ => return Err("noninteger attack context not compiled".into()),
+            Some(value @ (Datum::Int(_) | Datum::Bool(_) | Datum::Float(_))) => Some(value.clone()),
+            _ => return Err("nonnumeric attack context not compiled".into()),
         };
         let needed = attack
-            .map(|n| {
-                n.checked_sub(modifier)
-                    .ok_or("defense requirement exceeds i64")
+            .as_ref()
+            .map(|value| match value {
+                Datum::Float(value) => {
+                    let result = *value - modifier as f64;
+                    if !result.is_finite() {
+                        return Err("nonfinite defense requirement not compiled".into());
+                    }
+                    Ok(Datum::Float(result))
+                }
+                Datum::Int(value) => value
+                    .checked_sub(modifier)
+                    .map(Datum::Int)
+                    .ok_or_else(|| "defense requirement exceeds i64".to_owned()),
+                Datum::Bool(value) => i64::from(*value)
+                    .checked_sub(modifier)
+                    .map(Datum::Int)
+                    .ok_or_else(|| "defense requirement exceeds i64".to_owned()),
+                _ => unreachable!(),
             })
             .transpose()?;
-        Ok(Window::Wait(DefenseMenu {
-            owner: hero.id,
+        Ok(DefenseMenu {
+            owner: world.hero(target).ok_or("reaction owner missing")?.id,
             cards,
             attack,
             modifier,
             needed,
             initiative,
-        }))
+        })
     }
     pub fn discard(
         &self,

@@ -1,23 +1,31 @@
 //! Full frozen-Python terrain, token traversal, and effect-aware movement parity.
+#[path = "../../../test-support/cases.rs"]
+mod cases;
 use goa2_core::{
     data::Symbols,
     diagnostics::terrain_batch,
     geometry::{Hex, MovementQuery},
     world::NativeWorld,
 };
-use serde_json::Value;
 
-fn corpus() -> &'static Value {
-    static DATA: std::sync::OnceLock<Value> = std::sync::OnceLock::new();
-    DATA.get_or_init(|| {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../tests/fixtures/terrain-validation.json");
-        serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap()
+fn corpus_path() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/fixtures/terrain-validation.json")
+}
+fn named_cases() -> &'static std::collections::HashMap<String, serde_json::Value> {
+    static SELECTED: std::sync::OnceLock<std::collections::HashMap<String, serde_json::Value>> =
+        std::sync::OnceLock::new();
+    SELECTED.get_or_init(|| {
+        cases::selected_inputs(
+            &corpus_path(),
+            "cases",
+            &["barrier", "mine", "mine-supply-only"],
+        )
     })
 }
 #[test]
 fn actor_obstacles_petrification_tokens_and_stateful_paths_match_python() {
-    for case in corpus()["cases"].as_array().unwrap() {
+    let checked = cases::visit_array(&corpus_path(), "cases", |case| {
         let source = serde_json::from_value(case["envelope"].clone()).unwrap();
         let actual = terrain_batch(source, case["queries"].as_array().unwrap().clone())
             .unwrap_or_else(|error| panic!("{}: {error}", case["name"]));
@@ -31,16 +39,12 @@ fn actor_obstacles_petrification_tokens_and_stateful_paths_match_python() {
                 case["name"], case["queries"][i]
             );
         }
-    }
+    });
+    assert_eq!(checked, 196);
 }
 #[test]
 fn moving_barrier_origins_are_private_to_workers() {
-    let case = corpus()["cases"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|c| c["name"] == "barrier")
-        .unwrap();
+    let case = &named_cases()["barrier"];
     let envelope = serde_json::from_value(case["envelope"].clone()).unwrap();
     let mut symbols = Symbols::default();
     let root = NativeWorld::compile(&envelope, &mut symbols).unwrap();
@@ -58,12 +62,7 @@ fn moving_barrier_origins_are_private_to_workers() {
 }
 #[test]
 fn shared_path_batch_does_not_cache_locations_between_mutations() {
-    let case = corpus()["cases"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|c| c["name"] == "barrier")
-        .unwrap();
+    let case = &named_cases()["barrier"];
     let envelope = serde_json::from_value(case["envelope"].clone()).unwrap();
     let mut symbols = Symbols::default();
     let root = NativeWorld::compile(&envelope, &mut symbols).unwrap();
@@ -100,12 +99,7 @@ fn shared_path_batch_does_not_cache_locations_between_mutations() {
 
 #[test]
 fn passable_tokens_allow_crossing_but_not_landing_or_a_moved_token() {
-    let case = corpus()["cases"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|c| c["name"] == "mine")
-        .unwrap();
+    let case = &named_cases()["mine"];
     let mut envelope: goa2_core::codec::StateEnvelope =
         serde_json::from_value(case["envelope"].clone()).unwrap();
     let corridor = [
@@ -154,12 +148,7 @@ fn passable_tokens_allow_crossing_but_not_landing_or_a_moved_token() {
 }
 #[test]
 fn supply_only_mines_are_detected_without_rejecting_movement() {
-    let case = corpus()["cases"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|c| c["name"] == "mine-supply-only")
-        .unwrap();
+    let case = &named_cases()["mine-supply-only"];
     let envelope = serde_json::from_value(case["envelope"].clone()).unwrap();
     let mut symbols = Symbols::default();
     let world = NativeWorld::compile(&envelope, &mut symbols).unwrap();

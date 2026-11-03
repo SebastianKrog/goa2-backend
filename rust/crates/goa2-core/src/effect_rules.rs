@@ -1,12 +1,12 @@
 //! Shared typed effect scope, topology and stat-immunity rules.
+use crate::effect_record::Record;
 use crate::{
-    data::{Symbol, Symbols},
+    data::Symbol,
     effects::EffectInstance,
     geometry::Hex,
     stats::Stat,
     world::{EntityKind, NativeWorld},
 };
-use serde_json::Value;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Kind {
@@ -127,8 +127,8 @@ impl Behavior {
         }
         Ok(())
     }
-    pub fn compile(v: &Value, s: &mut Symbols) -> Result<Self, String> {
-        let kind = match v["effect_type"].as_str() {
+    pub(crate) fn from_record(v: Record<'_>) -> Result<Self, String> {
+        let kind = match v.text("effect_type") {
             Some("placement_prevention") => Kind::PlacementPrevention,
             Some("movement_zone") => Kind::MovementZone,
             Some("repeat_prevention") => Kind::RepeatPrevention,
@@ -154,8 +154,8 @@ impl Behavior {
             Some("illusion_minion_equivalence") => Kind::IllusionMinions,
             _ => Kind::Other,
         };
-        let scope = &v["scope"];
-        let shape = match scope["shape"].as_str() {
+        let scope = v.record("scope")?;
+        let shape = match scope.text("shape") {
             Some("global") => Shape::Global,
             Some("point") => Shape::Point,
             Some("adjacent") => Shape::Adjacent,
@@ -164,7 +164,7 @@ impl Behavior {
             Some("zone") => Shape::Zone,
             _ => return Err("invalid effect shape".into()),
         };
-        let affects = match scope["affects"].as_str() {
+        let affects = match scope.text("affects") {
             Some("all_units") => Affects::All,
             Some("self") => Affects::SelfOnly,
             Some("friendly_units") => Affects::Friendly,
@@ -176,114 +176,48 @@ impl Behavior {
             Some("all_minions") => Affects::Minions,
             _ => return Err("invalid effect affects".into()),
         };
-        let integer = |key: &str| {
-            v[key]
-                .as_i64()
-                .ok_or_else(|| format!("invalid effect {key}"))
-        };
-        let flag = |key: &str| {
-            v[key]
-                .as_bool()
-                .ok_or_else(|| format!("invalid effect {key}"))
-        };
-        let hex = |value: &Value| -> Result<Option<Hex>, String> {
-            if value.is_null() {
-                Ok(None)
-            } else {
-                serde_json::from_value(value.clone())
-                    .map(Some)
-                    .map_err(|e| e.to_string())
-            }
-        };
         Ok(Self {
             kind,
             shape,
             affects,
-            range: scope["range"].as_i64().ok_or("invalid scope range")?,
-            origin_hex: hex(&scope["origin_hex"])?,
-            stat: v["stat_type"].as_str().map(Stat::parse).transpose()?,
-            value: integer("stat_value")?,
-            minimum: if v["apply_stat_value_only_if_result_at_least"].is_null() {
-                None
-            } else {
-                Some(integer("apply_stat_value_only_if_result_at_least")?)
-            },
-            subject: v["subject_id"]
-                .as_str()
-                .filter(|v| !v.is_empty())
-                .map(|v| s.intern(v)),
-            restrictions: v["restrictions"]
-                .as_array()
-                .ok_or("invalid action restrictions")?
-                .iter()
-                .map(|v| serde_json::from_value(v.clone()).map_err(|e| e.to_string()))
-                .collect::<Result<_, String>>()?,
-            except_colors: v["except_card_colors"]
-                .as_array()
-                .ok_or("invalid card color exceptions")?
-                .iter()
-                .map(|v| {
-                    v.as_str()
-                        .map(|v| s.intern(v))
-                        .ok_or("invalid exception color".into())
-                })
-                .collect::<Result<_, String>>()?,
-            maximum: if v["max_value"].is_null() {
-                None
-            } else {
-                Some(integer("max_value")?)
-            },
-            actions_only: flag("limit_actions_only")?,
-            barrier_radius: integer("barrier_radius")?,
-            grants_through: flag("grants_pass_through_obstacles")?,
-            controlled_card: v["controlled_card_id"].as_str().map(|v| s.intern(v)),
-            protected_types: serde_json::from_value(v["protected_minion_types"].clone())
-                .map_err(|e| e.to_string())?,
-            discard_colors: v["allowed_discard_colors"]
-                .as_array()
-                .ok_or("invalid protection colors")?
-                .iter()
-                .map(|v| {
-                    v.as_str()
-                        .map(|v| s.intern(v))
-                        .ok_or("invalid protection color".into())
-                })
-                .collect::<Result<_, String>>()?,
-            sacrifice: flag("sacrifice_origin_token")?,
-            discard_or_defeat: flag("discard_or_defeat")?,
-            friendly_actors: flag("blocks_friendly_actors")?,
-            enemy_actors: flag("blocks_enemy_actors")?,
-            self_actors: flag("blocks_self")?,
-            displacement: v["displacement_blocks"]
-                .as_array()
-                .ok_or("invalid displacement restrictions")?
-                .iter()
-                .map(|v| {
-                    crate::validation::DisplacementKind::parse(
-                        v.as_str().ok_or("invalid displacement type")?,
-                    )
-                })
+            range: scope.integer("range")?,
+            origin_hex: scope.hex("origin_hex")?,
+            stat: v.text("stat_type").map(Stat::parse).transpose()?,
+            value: v.integer("stat_value")?,
+            minimum: v.optional_integer("apply_stat_value_only_if_result_at_least")?,
+            subject: v
+                .symbol("subject_id")?
+                .filter(|id| !v.symbols.name(*id).is_empty()),
+            restrictions: v.actions("restrictions")?,
+            except_colors: v.ids("except_card_colors")?,
+            maximum: v.optional_integer("max_value")?,
+            actions_only: v.flag("limit_actions_only")?,
+            barrier_radius: v.integer("barrier_radius")?,
+            grants_through: v.flag("grants_pass_through_obstacles")?,
+            controlled_card: v.symbol("controlled_card_id")?,
+            protected_types: v.minions("protected_minion_types")?,
+            discard_colors: v.ids("allowed_discard_colors")?,
+            sacrifice: v.flag("sacrifice_origin_token")?,
+            discard_or_defeat: v.flag("discard_or_defeat")?,
+            friendly_actors: v.flag("blocks_friendly_actors")?,
+            enemy_actors: v.flag("blocks_enemy_actors")?,
+            self_actors: v.flag("blocks_self")?,
+            displacement: v
+                .ids("displacement_blocks")?
+                .into_iter()
+                .map(|id| crate::validation::DisplacementKind::parse(v.symbols.name(id)))
                 .collect::<Result<_, _>>()?,
-            basic_only: flag("basic_attacks_only")?,
-            non_basic_only: flag("non_basic_attacks_only")?,
-            except_attackers: v["except_attacker_ids"]
-                .as_array()
-                .ok_or("invalid except attackers")?
-                .iter()
-                .map(|v| {
-                    v.as_str()
-                        .map(|v| s.intern(v))
-                        .ok_or("invalid except attacker".into())
-                })
-                .collect::<Result<_, String>>()?,
-            axis: match v["split_axis"].as_str() {
+            basic_only: v.flag("basic_attacks_only")?,
+            non_basic_only: v.flag("non_basic_attacks_only")?,
+            except_attackers: v.ids("except_attacker_ids")?,
+            axis: match v.text("split_axis") {
                 Some("q") => Some(0),
                 Some("r") => Some(1),
                 Some("s") => Some(2),
                 _ => None,
             },
-            split: integer("split_value")?,
-            isolated: hex(&v["isolated_hex"])?,
+            split: v.integer("split_value")?,
+            isolated: v.hex("isolated_hex")?,
         })
     }
 }

@@ -2,7 +2,7 @@
 //! Minion defense includes actor-bound illusion equivalence.
 use crate::{
     cards::CardError,
-    data::{Datum, Registers, Symbol, Symbols},
+    data::{Datum, RegisterWrite, Registers, Symbol, Symbols},
     world::{EntityKind, MinionKind, NativeWorld},
 };
 use serde_json::{Value, json};
@@ -78,6 +78,18 @@ impl CombatState {
             defeated: ids("heroes_defeated_this_round")?,
             outcome: None,
         })
+    }
+    pub(crate) fn set_team_life(
+        &mut self,
+        team: Symbol,
+        life: i64,
+    ) -> std::result::Result<(), String> {
+        self.teams
+            .iter_mut()
+            .find(|row| row.key == team)
+            .ok_or("combat team missing")?
+            .life = life;
+        Ok(())
     }
     pub fn export(&self, state: &mut Value, symbols: &Symbols) {
         state["turn"] = json!(self.turn);
@@ -282,7 +294,7 @@ impl CombatRules {
     pub fn resolve(
         &self,
         world: &NativeWorld,
-        context: &mut Registers,
+        context: &mut impl RegisterWrite,
         symbols: &Symbols,
         actor: Option<Symbol>,
         target_key: Symbol,
@@ -319,7 +331,8 @@ impl CombatRules {
             (false, None, Datum::Int(0))
         } else if auto {
             (true, None, Datum::Int(0))
-        } else if let Some(defense) = defense {
+        } else {
+            // Source calculates the modifier before testing for absent defense.
             let modifier = if ignore {
                 Datum::Int(0)
             } else {
@@ -336,24 +349,24 @@ impl CombatRules {
                     ),
                 }
             };
-            let bonus = if initiative {
-                0
+            if let Some(defense) = defense {
+                let bonus = if initiative {
+                    0
+                } else {
+                    context
+                        .get(self.bonus)
+                        .unwrap_or(&Datum::Int(0))
+                        .to_integer(symbols)
+                        .map_err(|e| unsupported(&e))?
+                        .ok_or_else(|| rule("invalid defense bonus"))?
+                };
+                let total = numeric(&defense)?
+                    .add(CombatNumber::Int(i128::from(bonus)))
+                    .add(numeric(&modifier)?);
+                (total.ge_i64(damage), Some(defense), modifier)
             } else {
-                context
-                    .get(self.bonus)
-                    .unwrap_or(&Datum::Int(0))
-                    .to_integer(symbols)
-                    .map_err(|e| unsupported(&e))?
-                    .ok_or_else(|| rule("invalid defense bonus"))?
-            };
-            let modifier_value = integer(&modifier)?;
-            let total = integer(&defense)?
-                .checked_add(bonus)
-                .and_then(|v| v.checked_add(modifier_value))
-                .ok_or_else(|| unsupported("combat total outside i64"))?;
-            (total >= damage, Some(defense), modifier)
-        } else {
-            (false, None, Datum::Int(0))
+                (false, None, Datum::Int(0))
+            }
         };
         context.set(self.block, Datum::Bool(blocked));
         let event = CombatEvent::Resolved {
@@ -654,12 +667,45 @@ impl CombatRules {
         Ok(events)
     }
 }
-fn integer(value: &Datum) -> Result<i64> {
+enum CombatNumber {
+    Int(i128),
+    Float(f64),
+}
+fn numeric(value: &Datum) -> Result<CombatNumber> {
     match value {
-        Datum::Int(n) => Ok(*n),
-        Datum::Bool(b) => Ok(i64::from(*b)),
-        Datum::Float(_) => Err(unsupported("floating combat values not compiled")),
-        _ => Err(rule("non-numeric combat value")),
+        Datum::Int(value) => Ok(CombatNumber::Int(i128::from(*value))),
+        Datum::Bool(value) => Ok(CombatNumber::Int(i128::from(*value))),
+        Datum::Float(value) => Ok(CombatNumber::Float(*value)),
+        _ => Err(unsupported("combat value requires numeric data")),
+    }
+}
+impl CombatNumber {
+    fn add(self, other: Self) -> Self {
+        match (self, other) {
+            (Self::Int(a), Self::Int(b)) => Self::Int(a + b),
+            (Self::Float(a), Self::Int(b)) => Self::Float(a + b as f64),
+            (Self::Int(a), Self::Float(b)) => Self::Float(a as f64 + b),
+            (Self::Float(a), Self::Float(b)) => Self::Float(a + b),
+        }
+    }
+    fn ge_i64(self, target: i64) -> bool {
+        match self {
+            Self::Int(value) => value >= i128::from(target),
+            Self::Float(value) => {
+                // Internal float overflow is a valid comparison. Do not round
+                // the i64 target through f64 above its 53-bit precision.
+                if value.is_nan() {
+                    false
+                } else if value >= 9223372036854775808.0 {
+                    true
+                } else if value < -9223372036854775808.0 {
+                    false
+                } else {
+                    let whole = value as i64;
+                    whole > target || whole == target && value >= whole as f64
+                }
+            }
+        }
     }
 }
 fn gain(world: &mut NativeWorld, hero: Symbol, amount: i64) -> Result<()> {

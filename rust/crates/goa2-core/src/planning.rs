@@ -294,8 +294,8 @@ impl Planning {
         if self.phase != Phase::Planning {
             return Ok(());
         }
-        // Phase API resolves heroes by exact identity; piece IDs are not players.
-        let Some(index) = world.heroes.iter().position(|h| h.id == hero) else {
+        // Source get_hero resolves pieces, while planning keys keep the caller ID.
+        let Some(index) = world.hero_index(hero) else {
             return Ok(());
         };
         let is_second = if let Some((_, first)) = self.pending.iter().find(|(h, _)| *h == hero) {
@@ -330,11 +330,7 @@ impl Planning {
         if self.phase != Phase::Planning {
             return Err(illegal("not planning"));
         }
-        let index = world
-            .heroes
-            .iter()
-            .position(|h| h.id == hero)
-            .ok_or(illegal("unknown hero"))?;
+        let index = world.hero_index(hero).ok_or(illegal("unknown hero"))?;
         let pos = self
             .pending
             .iter()
@@ -350,18 +346,16 @@ impl Planning {
             world.unplay_card(hero, first)?;
             world.heroes[index].current = None;
         }
-        self.done.retain(|h| *h != hero);
+        if let Some(index) = self.done.iter().position(|h| *h == hero) {
+            self.done.remove(index);
+        }
         Ok(())
     }
     pub fn pass(&mut self, world: &mut NativeWorld, hero: Symbol) -> Result<()> {
         if self.phase != Phase::Planning {
             return Err(illegal("not planning"));
         }
-        let h = world
-            .heroes
-            .iter()
-            .find(|h| h.id == hero)
-            .ok_or(illegal("unknown hero"))?;
+        let h = world.hero(hero).ok_or(illegal("unknown hero"))?;
         if self.pending.iter().any(|(h, _)| *h == hero) || !h.hand.is_empty() {
             return Err(illegal("cannot pass"));
         }
@@ -402,12 +396,12 @@ impl Planning {
         world.combat.unresolved.clear();
         for (hero, first) in &self.pending {
             let Some(card) = first else {
-                if world.heroes.iter().any(|h| h.id == *hero) {
+                if world.hero_index(*hero).is_some() {
                     world.resolve_current_card(*hero, Some(world.combat.turn))?;
                 }
                 continue;
             };
-            let Some(index) = world.heroes.iter().position(|h| h.id == *hero) else {
+            let Some(index) = world.hero_index(*hero) else {
                 continue;
             };
             let reveal = |world: &mut NativeWorld, card: CardId| -> Result<()> {

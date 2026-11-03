@@ -9,7 +9,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -50,6 +50,7 @@ pub struct CardDefinition {
     pub printed_id: Symbol,
     pub effect: Symbol,
     pub has_effect: bool,
+    pub effect_absent: bool,
     pub aura: crate::auras::CardAura,
     pub action_prevention: bool,
     pub has_item: bool,
@@ -66,10 +67,17 @@ pub struct CardDefinition {
     pub secondary: Vec<(ActionKind, i64)>,
     pub basic: bool,
 }
+#[derive(Clone, Copy, Debug)]
+pub struct CardEquality {
+    pub model: Symbol,
+    pub revision: i64,
+    pub json_metadata: bool,
+}
 #[derive(Clone, Debug)]
 pub struct CardInstance {
     pub definition: usize,
     pub source_instance: u32,
+    pub equality: Option<CardEquality>,
     pub lifecycle: CardLifecycle,
     pub facedown: bool,
     pub played_this_round: bool,
@@ -107,6 +115,9 @@ pub struct EntityDefinition {
 pub struct WorldDefinitions {
     pub entities: Vec<EntityDefinition>,
     pub cards: Vec<CardDefinition>,
+    pub(crate) card_equality_fields: Vec<Datum>,
+    pub(crate) card_model: Symbol,
+    pub(crate) spell_model: Symbol,
     pub zones: crate::zones::ZoneGraph,
     pub(crate) stat_context: crate::stats::PerformingCardKeys,
     pub(crate) effect_empty: Symbol,
@@ -119,6 +130,7 @@ pub struct WorldDefinitions {
     tile_keys: Vec<String>,
     tile_zones: Vec<Option<Symbol>>,
     tile_spawns: Vec<Option<bool>>,
+    tile_spawn_teams: Vec<Option<Symbol>>,
     tile_hexes: Vec<Hex>,
     loaded_map: bool,
 }
@@ -130,6 +142,8 @@ pub struct NativeWorld {
     pub cards: Vec<CardInstance>,
     pub card_by_instance: Vec<Option<usize>>,
     entity_by_symbol: Vec<Option<usize>>,
+    entity_overrides: Arc<HashMap<usize, EntityDefinition>>,
+    board_entity_overrides: Arc<HashMap<Symbol, EntityDefinition>>,
     pub(crate) locations: Vec<(Symbol, Hex)>,
     location_by_symbol: Vec<Option<usize>>,
     occupants: Vec<Option<Symbol>>,
@@ -208,6 +222,7 @@ impl NativeWorld {
             .as_array()
             .ok_or("aura catalog missing")?;
         let mut definition_map = vec![None; source.definitions.len()];
+        let mut card_equality_fields = Vec::new();
         let mut card_definitions = Vec::new();
         for (index, definition) in source.definitions.iter().enumerate() {
             if definition.kind == InstanceKind::Token {
@@ -215,11 +230,16 @@ impl NativeWorld {
             }
             let fields = &definition.fields;
             let printed_id = symbols.intern(fields["id"].as_str().ok_or("card identity missing")?);
-            let effect = symbols.intern(fields["effect_id"].as_str().ok_or("card effect missing")?);
+            let effect = symbols.intern(match fields.get("effect_id") {
+                Some(Value::Null) => "",
+                Some(Value::String(value)) => value,
+                _ => return Err("card effect missing".into()),
+            });
             let color = fields["color"].as_str().map(|v| symbols.intern(v));
             let tier = symbols.intern(fields["tier"].as_str().ok_or("card tier missing")?);
             let range = fields.get("range_value").and_then(Value::as_i64);
             definition_map[index] = Some(card_definitions.len());
+            card_equality_fields.push(Datum::from_json(&Value::Object(fields.clone()), symbols)?);
             card_definitions.push(CardDefinition {
                 name: symbols.intern(fields["name"].as_str().ok_or("card name missing")?),
                 printed_id,
@@ -231,6 +251,7 @@ impl NativeWorld {
                     .map(crate::stats::Stat::parse)
                     .transpose()?,
                 has_effect: !fields["effect_id"].as_str().unwrap_or("").is_empty(),
+                effect_absent: fields["effect_id"].is_null(),
                 aura: crate::auras::CardAura::compile(
                     fields["effect_id"].as_str().unwrap_or(""),
                     aura_catalog.iter().any(|id| id == &fields["effect_id"]),
@@ -277,6 +298,11 @@ impl NativeWorld {
             card_by_instance[instance_id] = Some(cards.len());
             cards.push(CardInstance {
                 definition,
+                equality: instance.equality.as_ref().map(|equality| CardEquality {
+                    model: symbols.intern(&equality.model),
+                    revision: equality.definition_revision,
+                    json_metadata: equality.json_metadata,
+                }),
                 source_instance: u32::try_from(instance_id)
                     .map_err(|_| "too many physical instances")?,
                 lifecycle: serde_json::from_value(fields["state"].clone())
@@ -354,6 +380,7 @@ impl NativeWorld {
         let mut tile_keys = Vec::new();
         let mut tile_zones = Vec::new();
         let mut tile_spawns = Vec::new();
+        let mut tile_spawn_teams = Vec::new();
         for (key, value) in semantic["board"]["tiles"]
             .as_object()
             .ok_or("board tiles missing")?
@@ -377,6 +404,11 @@ impl NativeWorld {
                     _ => return Err("invalid tile spawn type".into()),
                 }),
             });
+            tile_spawn_teams.push(
+                value["spawn_point"]["team"]
+                    .as_str()
+                    .map(|id| symbols.intern(id)),
+            );
             tile_keys.push(key.clone());
             tile_zones.push(value["zone_id"].as_str().map(|s| symbols.intern(s)));
         }
@@ -450,10 +482,14 @@ impl NativeWorld {
                 mine_supply,
                 effect_empty: symbols.intern(""),
                 cards: card_definitions,
+                card_equality_fields,
+                card_model: symbols.intern("goa2.domain.models.card.Card"),
+                spell_model: symbols.intern("goa2.domain.models.spell.SpellCard"),
                 geometry,
                 tile_keys,
                 tile_zones,
                 tile_spawns,
+                tile_spawn_teams,
                 tile_hexes: tiles.iter().map(|t| t.hex).collect(),
                 loaded_map: semantic["board"]["map_id"]
                     .as_str()
@@ -462,6 +498,8 @@ impl NativeWorld {
             cards,
             card_by_instance,
             entity_by_symbol,
+            entity_overrides: Arc::new(HashMap::new()),
+            board_entity_overrides: Arc::new(HashMap::new()),
             locations,
             location_by_symbol,
             occupants,
@@ -509,7 +547,13 @@ impl NativeWorld {
             hero.export_collections(&mut source.state, symbols);
         }
         for card in &self.cards {
-            let fields = &mut source.instances[card.source_instance as usize].fields;
+            let instance = &mut source.instances[card.source_instance as usize];
+            instance.equality = card.equality.map(|value| crate::codec::InstanceEquality {
+                model: symbols.name(value.model).into(),
+                definition_revision: value.revision,
+                json_metadata: value.json_metadata,
+            });
+            let fields = &mut instance.fields;
             fields.insert("state".into(), json!(card.lifecycle));
             fields.insert("is_facedown".into(), json!(card.facedown));
             fields.insert("played_this_round".into(), json!(card.played_this_round));
@@ -528,10 +572,70 @@ impl NativeWorld {
         self.entity_by_symbol.get(id.0).and_then(|index| *index)
     }
     pub fn entity(&self, id: Symbol) -> Option<&EntityDefinition> {
+        if let Some(entity) = self.board_entity_overrides.get(&id) {
+            return Some(entity);
+        }
         self.entity_by_symbol
             .get(id.0)
             .and_then(|v| *v)
-            .map(|index| &self.definitions.entities[index])
+            .map(|index| {
+                self.entity_overrides
+                    .get(&index)
+                    .unwrap_or(&self.definitions.entities[index])
+            })
+    }
+    pub(crate) fn upsert_board_entity(
+        &mut self,
+        id: Symbol,
+        name: Symbol,
+        owner: Option<Symbol>,
+    ) -> Result<(), String> {
+        let mut entity = if let Some(row) = self.entity(id) {
+            if row.kind != EntityKind::Other {
+                return Err("board entity identity collides with a unit/token".into());
+            }
+            row.clone()
+        } else {
+            EntityDefinition {
+                id,
+                name,
+                kind: EntityKind::Other,
+                owner: None,
+                team: None,
+                lane: None,
+                roster: None,
+                token_type: None,
+                immune_enemy_actions: false,
+                has_team: false,
+                passable: false,
+                multi_piece: false,
+                minion_kind: None,
+            }
+        };
+        entity.name = name;
+        entity.owner = owner;
+        Arc::make_mut(&mut self.board_entity_overrides).insert(id, entity);
+        Ok(())
+    }
+    pub(crate) fn set_token_properties(
+        &mut self,
+        id: Symbol,
+        owner: Option<Symbol>,
+        immune: bool,
+    ) -> Result<(), String> {
+        let index = self
+            .entity_by_symbol
+            .get(id.0)
+            .and_then(|v| *v)
+            .ok_or("token entity missing")?;
+        let mut row = self.entity(id).ok_or("token entity missing")?.clone();
+        if row.kind != EntityKind::Token {
+            return Err("token property target is not a token".into());
+        }
+        row.owner = owner;
+        row.immune_enemy_actions = immune;
+        Arc::make_mut(&mut self.entity_overrides).insert(index, row);
+        Ok(())
     }
     pub fn position(&self, id: Symbol) -> Option<Hex> {
         self.location_by_symbol
@@ -656,6 +760,16 @@ impl NativeWorld {
             .id(hex)
             .and_then(|id| self.definitions.tile_spawns[id.index()])
             .is_some_and(|minion| !minion_only || minion)
+    }
+    pub(crate) fn minion_spawn_team(&self, hex: Hex) -> Option<Symbol> {
+        self.spawn_at(hex, true)
+            .then(|| {
+                self.definitions
+                    .geometry
+                    .id(hex)
+                    .and_then(|id| self.definitions.tile_spawn_teams[id.index()])
+            })
+            .flatten()
     }
     pub fn tile_in_battle_zone(&self, hex: Hex) -> bool {
         self.definitions

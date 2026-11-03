@@ -15,3 +15,11 @@ serde_json = { version = "1", features = ["preserve_order"] }
 [profile.release]
 lto = "thin"
 codegen-units = 1
+
+# Fast local rule/test iteration. Keep release for final throughput measurements.
+[profile.iterate]
+inherits = "release"
+opt-level = 2
+lto = false
+codegen-units = 16
+incremental = true

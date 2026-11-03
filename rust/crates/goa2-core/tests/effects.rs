@@ -8,36 +8,41 @@ use goa2_core::{
 };
 use serde_json::Value;
 use std::sync::{Arc, OnceLock};
-fn corpus() -> &'static Value {
-    static DATA: OnceLock<Value> = OnceLock::new();
-    DATA.get_or_init(|| {
-        serde_json::from_str(
-            &std::fs::read_to_string(
-                std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                    .join("../../tests/fixtures/effects.json"),
+#[path = "../../../test-support/cases.rs"]
+mod fixtures;
+fn path() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/effects.json")
+}
+fn case(name: &str) -> &'static Value {
+    static NAMED: OnceLock<std::collections::HashMap<String, Value>> = OnceLock::new();
+    NAMED
+        .get_or_init(|| {
+            fixtures::selected_inputs(
+                &path(),
+                "cases",
+                &[
+                    "all-types-ordered-lifecycle",
+                    "creation-origin-radius-False-None",
+                    "creation-card-hand-False",
+                    "creation-dedup-dormant",
+                ],
             )
-            .unwrap(),
-        )
+        })
+        .get(name)
         .unwrap()
-    })
 }
 #[test]
 fn effect_lifecycle_matches_python_full_state_and_finishing_order() {
-    for case in corpus()["cases"].as_array().unwrap() {
+    let checked = fixtures::visit_array(&path(), "cases", |case| {
         let envelope = serde_json::from_value(case["envelope"].clone()).unwrap();
         let got = effect_trace(envelope, case["operations"].as_array().unwrap().clone()).unwrap();
         assert_eq!(got["records"], case["expected"], "{}", case["name"]);
-    }
+    });
+    assert_eq!(checked, 123);
 }
 #[test]
 fn effects_share_immutable_payloads_but_keep_activation_and_removal_private() {
-    let data = corpus();
-    let case = data["cases"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|c| c["name"] == "all-types-ordered-lifecycle")
-        .unwrap();
+    let case = case("all-types-ordered-lifecycle");
     let envelope: StateEnvelope = serde_json::from_value(case["envelope"].clone()).unwrap();
     let mut symbols = Symbols::default();
     let root = NativeWorld::compile(&envelope, &mut symbols).unwrap();
@@ -63,12 +68,7 @@ fn effects_share_immutable_payloads_but_keep_activation_and_removal_private() {
 
 #[test]
 fn effect_creation_workers_share_templates_but_not_counters_or_origins() {
-    let case = corpus()["cases"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|c| c["name"] == "creation-origin-radius-False-None")
-        .unwrap();
+    let case = case("creation-origin-radius-False-None");
     let envelope: StateEnvelope = serde_json::from_value(case["envelope"].clone()).unwrap();
     let mut symbols = Symbols::default();
     let root = NativeWorld::compile(&envelope, &mut symbols).unwrap();
@@ -133,12 +133,7 @@ fn exhausted_creation_counter_rejects_before_mutation_but_dedup_is_still_a_no_op
         ("creation-card-hand-False", false),
         ("creation-dedup-dormant", true),
     ] {
-        let case = corpus()["cases"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .find(|c| c["name"] == name)
-            .unwrap();
+        let case = case(name);
         let mut envelope: StateEnvelope = serde_json::from_value(case["envelope"].clone()).unwrap();
         envelope.state["next_entity_id"] = serde_json::json!(i64::MAX);
         let mut symbols = Symbols::default();

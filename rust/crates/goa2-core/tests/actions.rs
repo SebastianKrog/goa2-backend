@@ -7,8 +7,12 @@ use goa2_core::{
 };
 use serde_json::{Value, json};
 use std::collections::HashMap;
-fn corpus() -> Value {
-    serde_json::from_str(include_str!("../../../tests/fixtures/actions.json")).unwrap()
+#[path = "../../../test-support/cases.rs"]
+mod fixtures;
+fn path(name: &str) -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/fixtures")
+        .join(name)
 }
 fn normalize_step(step: &mut Value, ids: &mut HashMap<String, String>) {
     if let Some(raw) = step["step_id"]
@@ -27,7 +31,7 @@ fn normalize_step(step: &mut Value, ids: &mut HashMap<String, String>) {
 }
 #[test]
 fn every_registered_hero_menu_and_action_recipe_matches_python() {
-    for case in corpus()["cases"].as_array().unwrap() {
+    let checked = fixtures::visit_array(&path("actions.json"), "cases", |case| {
         let envelope = serde_json::from_value(case["envelope"].clone()).unwrap();
         let mut result =
             action_trace(envelope, case["operations"].as_array().unwrap().clone()).unwrap();
@@ -47,24 +51,22 @@ fn every_registered_hero_menu_and_action_recipe_matches_python() {
             }
             assert!(record == want, "{} operation {i} differs", case["name"]);
         }
-    }
+    });
+    assert_eq!(checked, 38);
 }
 #[test]
 fn all_map_zone_candidates_and_non_enemy_entities_match_python() {
-    for case in corpus()["travel"].as_array().unwrap() {
+    let checked = fixtures::visit_array(&path("actions.json"), "travel", |case| {
         let envelope = serde_json::from_value(case["envelope"].clone()).unwrap();
         let result = travel_zones(envelope, case["queries"].as_array().unwrap().clone()).unwrap();
         assert_eq!(result["results"], case["expected"], "{}", case["name"]);
-    }
+    });
+    assert_eq!(checked, 13);
 }
 #[test]
 fn fast_travel_uses_each_workers_current_locations() {
-    let cases = corpus();
-    let case = cases["travel"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|c| c["name"] == "generated-enemy")
+    let case = fixtures::selected_inputs(&path("actions.json"), "travel", &["generated-enemy"])
+        .remove("generated-enemy")
         .unwrap();
     let envelope: StateEnvelope = serde_json::from_value(case["envelope"].clone()).unwrap();
     let mut symbols = Symbols::default();
@@ -87,10 +89,7 @@ fn fast_travel_uses_each_workers_current_locations() {
 }
 #[test]
 fn effect_restrictions_and_card_hooks_match_full_menu_and_recipe_records() {
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests/fixtures/action-validation.json");
-    let data: Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
-    for case in data["menus"].as_array().unwrap() {
+    let checked = fixtures::visit_array(&path("action-validation.json"), "menus", |case| {
         let envelope = serde_json::from_value(case["envelope"].clone()).unwrap();
         let mut actual = action_trace(envelope, case["operations"].as_array().unwrap().clone())
             .unwrap_or_else(|error| panic!("{}: {error}", case["name"]));
@@ -111,5 +110,6 @@ fn effect_restrictions_and_card_hooks_match_full_menu_and_recipe_records() {
                 case["name"], case["operations"][i]
             );
         }
-    }
+    });
+    assert_eq!(checked, 31);
 }

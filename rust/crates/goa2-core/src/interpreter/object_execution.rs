@@ -1,8 +1,68 @@
 //! Live shared-object execution and controlled effect/card-lifecycle bindings.
 //! Other world-changing instructions stay guarded until their dense slots bind.
 use super::*;
+mod acting_piece;
+mod actor;
+#[cfg(test)]
+mod arien_tests;
+mod attack_sequence;
+mod card_actions;
+mod card_selection;
+mod combat_resolution;
+mod coordinates;
+mod defeat;
+mod defense_bodies;
+mod discard;
+mod effect_creation;
+mod forced_discard;
+#[cfg(test)]
+mod gydion_tests;
+mod hex_selection;
+mod markers;
+#[cfg(test)]
+mod mind_grip_tests;
+mod mines;
+mod minion_respawn;
+mod minion_return;
+#[cfg(test)]
+mod misa_tests;
+mod movement;
+mod movement_sequence;
+mod multi_selection;
+mod passive_bodies;
+mod passives;
+mod perform_card;
+mod perform_primary;
 mod phases;
+mod placement;
+mod planning_commands;
+mod pre_action;
+mod primary_bodies;
+mod push;
+mod queries;
+mod reaction_window;
+mod repeat;
+mod resolution;
+mod resources;
+mod retrieval;
 mod revelation;
+mod rock_ultimate;
+mod rune_choice;
+mod spell_bodies;
+mod spells;
+mod step_isolation;
+#[cfg(test)]
+mod tigerclaw_tests;
+mod token_batch;
+mod token_paths;
+mod tokens;
+mod travel;
+mod turrets;
+mod unit_selection;
+#[cfg(test)]
+mod utility_tests;
+#[cfg(test)]
+mod wasp_tests;
 use crate::{
     codec::{ObjectKind, ObjectPathPart},
     objects::{ObjectArena, ObjectId, ObjectValue},
@@ -28,6 +88,10 @@ struct FinishingProgram {
     step_id: Symbol,
     actor_id: Symbol,
     phase_recipes: Vec<(&'static str, StepRecipe)>,
+    passive_bodies: passive_bodies::BodyRules,
+    defense_bodies: Arc<defense_bodies::DefenseRules>,
+    primary_bodies: Arc<primary_bodies::PrimaryRules>,
+    action_bodies: Arc<card_actions::ActionBindings>,
 }
 #[derive(Clone, Debug)]
 pub(super) struct BoundObjects {
@@ -54,6 +118,8 @@ pub(super) struct BoundObjects {
     number_options: Symbol,
     scheduler: Option<Arc<FinishingProgram>>,
     phases: phases::PhaseBindings,
+    tokens: tokens::TokenBindings,
+    effect_creation: Arc<effect_creation::EffectBindings>,
 }
 impl BoundObjects {
     pub fn compile(source: &StateEnvelope) -> Result<Option<Self>> {
@@ -62,7 +128,7 @@ impl BoundObjects {
         }
         if !matches!(
             source.validate().map_err(unsupported)?.phase,
-            Phase::Planning | Phase::Resolution | Phase::Cleanup
+            Phase::Planning | Phase::Resolution | Phase::Cleanup | Phase::GameOver
         ) {
             return Err(unsupported("shared-object phase flow not yet bound"));
         }
@@ -118,6 +184,8 @@ impl BoundObjects {
             ));
         }
         let phases = phases::PhaseBindings::compile(source, &mut arena)?;
+        let tokens = tokens::TokenBindings::compile(source, &mut arena)?;
+        let effect_creation = Arc::new(effect_creation::EffectBindings::compile(&mut arena)?);
         Ok(Some(Self {
             arena,
             stack,
@@ -142,6 +210,8 @@ impl BoundObjects {
             number_options,
             scheduler: None,
             phases,
+            tokens,
+            effect_creation,
         }))
     }
     fn supported(step: &Value) -> bool {
@@ -161,6 +231,77 @@ impl BoundObjects {
                 | "minion_battle"
                 | "check_lane_push"
                 | "end_phase_cleanup"
+                | "return_minion_to_zone"
+                | "mine_path_choice"
+                | "trigger_mine"
+                | "force_discard"
+                | "discard_card"
+                | "retrieve_card"
+                | "check_passive_abilities"
+                | "offer_passive"
+                | "mark_passive_used"
+                | "move_sequence"
+                | "push_unit"
+                | "record_hex"
+                | "compute_hex"
+                | "check_adjacency"
+                | "may_repeat_once"
+                | "choose_acting_piece"
+                | "fast_travel_sequence"
+                | "fast_travel_unit"
+                | "perform_primary_action"
+                | "perform_card_action"
+                | "cast_spell"
+                | "wish_sequence"
+                | "prepare_spellbook"
+                | "remove_prepared_spells"
+                | "multi_select"
+                | "collect_units"
+                | "count"
+                | "check_context_condition"
+                | "count_cards"
+                | "check_hero_defeated_this_round"
+                | "check_unit_filters"
+                | "check_distance"
+                | "check_unit_type"
+                | "combine_boolean_context"
+                | "respawn_minion_at_hex"
+                | "force_discard_or_defeat"
+                | "choose_rune"
+                | "choose_card_color"
+                | "force_discard_by_color"
+                | "defeat_unit"
+                | "resolve_combat"
+                | "snapshot_adjacent_heroes"
+                | "check_target_defeated"
+                | "remove_unit"
+                | "trigger_game_over"
+                | "check_minion_protection"
+                | "place_token"
+                | "remove_token"
+                | "place_token_batch"
+                | "offer_rock_ultimate"
+                | "place_turret"
+                | "remove_turret"
+                | "place_tokens_in_line"
+                | "place_token_trail"
+                | "attack_sequence"
+                | "reaction_window"
+                | "resolve_card_text"
+                | "resolve_defense_text"
+                | "gain_coins"
+                | "lose_coins"
+                | "steal_coins"
+                | "restore_spent_life_counter"
+                | "resolve_on_block_effect"
+                | "resolve_pre_action_movement"
+                | "resolve_pre_action_discard"
+                | "move_unit"
+                | "place_unit"
+                | "swap_units"
+                | "create_effect"
+                | "place_marker"
+                | "remove_marker"
                 | "retrieve_unresolved_card"
                 | "resolve_tie_breaker"
                 | "resolve_card"
@@ -169,7 +310,10 @@ impl BoundObjects {
                 | "respawn_hero"
                 | "flip_tie_breaker_coin",
             ) => true,
-            Some("select_step") => step["target_type"] == "NUMBER",
+            Some("select_step") => matches!(
+                step["target_type"].as_str(),
+                Some("NUMBER" | "CARD" | "HEX" | "UNIT" | "UNIT_OR_TOKEN")
+            ),
             Some("for_each") => step["steps_template"]
                 .as_array()
                 .is_some_and(|steps| steps.iter().all(Self::supported)),
@@ -177,10 +321,84 @@ impl BoundObjects {
         }
     }
     fn parked_type(step: &Value) -> bool {
-        matches!(
-            step["type"].as_str(),
-            Some("resolve_card" | "confirm_resolution" | "finalize_hero_turn" | "respawn_hero")
-        )
+        (step["type"] == "select_step" && step["target_type"] != "NUMBER")
+            || matches!(
+                step["type"].as_str(),
+                Some(
+                    "resolve_card"
+                        | "respawn_hero"
+                        | "move_unit"
+                        | "place_unit"
+                        | "swap_units"
+                        | "create_effect"
+                        | "place_marker"
+                        | "remove_marker"
+                        | "mine_path_choice"
+                        | "trigger_mine"
+                        | "force_discard"
+                        | "discard_card"
+                        | "retrieve_card"
+                        | "check_passive_abilities"
+                        | "offer_passive"
+                        | "mark_passive_used"
+                        | "move_sequence"
+                        | "push_unit"
+                        | "record_hex"
+                        | "compute_hex"
+                        | "check_adjacency"
+                        | "may_repeat_once"
+                        | "choose_acting_piece"
+                        | "fast_travel_sequence"
+                        | "fast_travel_unit"
+                        | "perform_primary_action"
+                        | "perform_card_action"
+                        | "cast_spell"
+                        | "wish_sequence"
+                        | "prepare_spellbook"
+                        | "remove_prepared_spells"
+                        | "multi_select"
+                        | "collect_units"
+                        | "count"
+                        | "check_context_condition"
+                        | "count_cards"
+                        | "check_hero_defeated_this_round"
+                        | "check_unit_filters"
+                        | "check_distance"
+                        | "check_unit_type"
+                        | "combine_boolean_context"
+                        | "respawn_minion_at_hex"
+                        | "force_discard_or_defeat"
+                        | "choose_rune"
+                        | "choose_card_color"
+                        | "force_discard_by_color"
+                        | "defeat_unit"
+                        | "resolve_combat"
+                        | "snapshot_adjacent_heroes"
+                        | "check_target_defeated"
+                        | "remove_unit"
+                        | "trigger_game_over"
+                        | "check_minion_protection"
+                        | "place_token"
+                        | "remove_token"
+                        | "place_token_batch"
+                        | "offer_rock_ultimate"
+                        | "place_turret"
+                        | "remove_turret"
+                        | "place_tokens_in_line"
+                        | "place_token_trail"
+                        | "attack_sequence"
+                        | "reaction_window"
+                        | "resolve_card_text"
+                        | "resolve_defense_text"
+                        | "gain_coins"
+                        | "lose_coins"
+                        | "steal_coins"
+                        | "restore_spent_life_counter"
+                        | "resolve_on_block_effect"
+                        | "resolve_pre_action_movement"
+                        | "resolve_pre_action_discard"
+                )
+            )
     }
     pub fn compile_wire(
         wire: &Value,
@@ -188,7 +406,7 @@ impl BoundObjects {
         symbols: &mut Symbols,
     ) -> Result<usize> {
         fn sanitize(wire: &mut Value) {
-            if BoundObjects::parked_type(wire) {
+            if BoundObjects::parked_type(wire) || wire["type"] == "return_minion_to_zone" {
                 wire["type"] = json!("finished_expiring_effect");
             }
             if let Some(templates) = wire.get_mut("steps_template").and_then(Value::as_array_mut) {
@@ -200,11 +418,169 @@ impl BoundObjects {
         fn restore(
             index: usize,
             wire: &Value,
-            steps: &mut [CompiledStep],
+            steps: &mut Vec<CompiledStep>,
             symbols: &mut Symbols,
         ) -> Result<()> {
             steps[index].wire = wire.clone();
-            if BoundObjects::parked_type(wire) {
+            if wire["type"] == "return_minion_to_zone" {
+                steps[index].instruction = Instruction::LiveReturnMinions;
+            } else if wire["type"] == "select_step" && wire["target_type"] == "HEX" {
+                steps[index].instruction = Instruction::LiveHexSelect;
+            } else if wire["type"] == "select_step"
+                && matches!(wire["target_type"].as_str(), Some("UNIT" | "UNIT_OR_TOKEN"))
+            {
+                steps[index].instruction = Instruction::LiveUnitSelect;
+            } else if wire["type"] == "resolve_pre_action_movement" {
+                steps[index].instruction = Instruction::LivePreMovement;
+            } else if wire["type"] == "resolve_pre_action_discard" {
+                steps[index].instruction = Instruction::LivePreDiscard;
+            } else if wire["type"] == "reaction_window" {
+                steps[index].instruction = Instruction::LiveReaction;
+            } else if wire["type"] == "attack_sequence" {
+                steps[index].instruction = Instruction::LiveAttackSequence;
+            } else if wire["type"] == "resolve_combat" {
+                steps[index].instruction = Instruction::LiveCombatResolve;
+            } else if wire["type"] == "snapshot_adjacent_heroes" {
+                steps[index].instruction = Instruction::LiveAdjacentSnapshot;
+            } else if wire["type"] == "check_target_defeated" {
+                steps[index].instruction = Instruction::LiveTargetDefeated;
+            } else if wire["type"] == "defeat_unit" {
+                steps[index].instruction = Instruction::LiveDefeat;
+            } else if wire["type"] == "remove_unit" {
+                steps[index].instruction = Instruction::LiveRemoveUnit;
+            } else if wire["type"] == "trigger_game_over" {
+                steps[index].instruction = Instruction::LiveGameOver;
+            } else if wire["type"] == "check_minion_protection" {
+                steps[index].instruction = Instruction::LiveProtection;
+            } else if wire["type"] == "multi_select" {
+                steps[index].instruction = Instruction::LiveMultiSelect;
+            } else if wire["type"] == "check_context_condition" {
+                steps[index].instruction = Instruction::LiveContextCondition;
+            } else if matches!(wire["type"].as_str(), Some("count" | "collect_units")) {
+                steps[index].instruction = Instruction::LiveQuery {
+                    collect: wire["type"] == "collect_units",
+                };
+            } else if wire["type"] == "select_step" && wire["target_type"] == "CARD" {
+                steps[index].instruction = Instruction::LiveCardSelect;
+            } else if wire["type"] == "check_passive_abilities" {
+                steps[index].instruction = Instruction::LivePassive;
+            } else if wire["type"] == "offer_passive" {
+                steps[index].instruction = Instruction::LiveOfferPassive;
+            } else if wire["type"] == "choose_rune" {
+                steps[index].instruction = Instruction::LiveRuneChoice;
+            } else if wire["type"] == "mark_passive_used" {
+                steps[index].instruction = Instruction::LiveMarkPassive;
+            } else if wire["type"] == "place_token" {
+                steps[index].instruction = Instruction::LiveTokenPlace;
+            } else if wire["type"] == "place_tokens_in_line" || wire["type"] == "place_token_trail"
+            {
+                steps[index].instruction = Instruction::LiveTokenPath {
+                    trail: wire["type"] == "place_token_trail",
+                };
+            } else if wire["type"] == "place_turret" || wire["type"] == "remove_turret" {
+                steps[index].instruction = Instruction::LiveTurret {
+                    remove: wire["type"] == "remove_turret",
+                };
+            } else if wire["type"] == "offer_rock_ultimate" {
+                steps[index].instruction = Instruction::LiveRockUltimate;
+            } else if wire["type"] == "place_token_batch" {
+                steps[index].instruction = Instruction::LiveTokenBatch;
+            } else if wire["type"] == "remove_token" {
+                steps[index].instruction = Instruction::LiveTokenRemove;
+            } else if wire["type"] == "retrieve_card" {
+                steps[index].instruction = Instruction::LiveRetrieve;
+            } else if wire["type"] == "discard_card" {
+                steps[index].instruction = Instruction::LiveDiscard;
+            } else if wire["type"] == "force_discard_or_defeat" {
+                steps[index].instruction = Instruction::LiveDiscardOrDefeat;
+            } else if wire["type"] == "force_discard" {
+                steps[index].instruction = Instruction::LiveForceDiscard;
+            } else if wire["type"] == "mine_path_choice" {
+                steps[index].instruction = Instruction::LiveMineChoice;
+            } else if wire["type"] == "trigger_mine" {
+                steps[index].instruction = Instruction::LiveTriggerMines;
+            } else if wire["type"] == "move_sequence" {
+                steps[index].instruction = Instruction::LiveMoveSequence;
+            } else if wire["type"] == "move_unit" {
+                steps[index].instruction = Instruction::LiveMove;
+            } else if matches!(
+                wire["type"].as_str(),
+                Some("record_hex" | "compute_hex" | "check_adjacency")
+            ) {
+                steps[index].instruction =
+                    Instruction::LiveCoordinates(match wire["type"].as_str().unwrap() {
+                        "record_hex" => CoordinateOp::Record,
+                        "compute_hex" => CoordinateOp::Compute,
+                        _ => CoordinateOp::Adjacency,
+                    });
+            } else if wire["type"] == "fast_travel_sequence" || wire["type"] == "fast_travel_unit" {
+                steps[index].instruction = Instruction::LiveTravel {
+                    sequence: wire["type"] == "fast_travel_sequence",
+                };
+            } else if wire["type"] == "perform_primary_action" {
+                steps[index].instruction = Instruction::LivePerformPrimary;
+            } else if wire["type"] == "perform_card_action" {
+                steps[index].instruction = Instruction::LivePerformCard;
+            } else if wire["type"] == "resolve_card" {
+                steps[index].instruction = Instruction::LiveCardAction;
+            } else if wire["type"] == "choose_acting_piece" {
+                steps[index].instruction = Instruction::LiveChoosePiece;
+            } else if wire["type"] == "push_unit" {
+                steps[index].instruction = Instruction::LivePush;
+            } else if wire["type"] == "may_repeat_once" {
+                let templates = wire["steps_template"]
+                    .as_array()
+                    .ok_or_else(|| unsupported("repeat templates missing"))?
+                    .iter()
+                    .map(|child| BoundObjects::compile_wire(child, steps, symbols))
+                    .collect::<Result<Vec<_>>>()?;
+                steps[index].instruction = Instruction::LiveRepeat { templates };
+            } else if wire["type"] == "resolve_card_text" {
+                steps[index].instruction = Instruction::LivePrimaryText;
+            } else if wire["type"] == "resolve_defense_text"
+                || wire["type"] == "resolve_on_block_effect"
+            {
+                steps[index].instruction = Instruction::LiveDefenseBody {
+                    on_block: wire["type"] == "resolve_on_block_effect",
+                };
+            } else if matches!(
+                wire["type"].as_str(),
+                Some("gain_coins" | "lose_coins" | "steal_coins" | "restore_spent_life_counter")
+            ) {
+                steps[index].instruction = Instruction::LiveResource;
+            } else if let Some(op) = match wire["type"].as_str() {
+                Some("cast_spell") => Some(crate::spells::SpellOp::Cast),
+                Some("wish_sequence") => Some(crate::spells::SpellOp::Wish),
+                Some("prepare_spellbook") => Some(crate::spells::SpellOp::Prepare),
+                Some("remove_prepared_spells") => Some(crate::spells::SpellOp::Remove),
+                _ => None,
+            } {
+                steps[index].instruction = Instruction::LiveSpell(op);
+            } else if wire["type"] == "check_unit_type" {
+                steps[index].instruction = Instruction::LiveUnitTypeCheck;
+            } else if wire["type"] == "combine_boolean_context" {
+                steps[index].instruction = Instruction::LiveBooleanCombine;
+            } else if wire["type"] == "check_distance" {
+                steps[index].instruction = Instruction::LiveDistanceCheck;
+            } else if wire["type"] == "check_unit_filters" {
+                steps[index].instruction = Instruction::LiveCheckUnitFilters;
+            } else if wire["type"] == "respawn_minion_at_hex" {
+                steps[index].instruction = Instruction::LiveMinionRespawn;
+            } else if wire["type"] == "count_cards" {
+                steps[index].instruction = Instruction::LiveCardCount;
+            } else if wire["type"] == "check_hero_defeated_this_round" {
+                steps[index].instruction = Instruction::LiveRoundDefeat;
+            } else if wire["type"] == "create_effect" {
+                steps[index].instruction = Instruction::LiveCreateEffect;
+            } else if wire["type"] == "place_marker" || wire["type"] == "remove_marker" {
+                steps[index].instruction = Instruction::LiveMarker {
+                    remove: wire["type"] == "remove_marker",
+                };
+            } else if wire["type"] == "swap_units" {
+                steps[index].instruction = Instruction::LiveSwap;
+            } else if wire["type"] == "place_unit" {
+                steps[index].instruction = Instruction::LivePlace;
+            } else if BoundObjects::parked_type(wire) {
                 steps[index].instruction =
                     Instruction::ParkedPhase(symbols.intern(wire["type"].as_str().unwrap()));
             }
@@ -232,7 +608,34 @@ impl BoundObjects {
         symbols: &mut Symbols,
     ) -> Result<()> {
         let mut recipe = |name: &str| -> Result<StepRecipe> {
-            let wire = combat_template(name)?;
+            let mut wire = combat_template(match name {
+                "return_movement" => "move_unit",
+                "return_placement" => "place_unit",
+                "attack_select" => "select_unit",
+                "pre_action_select" => "select_hex",
+                other => other,
+            })?;
+            if matches!(name, "return_movement" | "return_placement") {
+                wire["is_mandatory"] = json!(false);
+                if name == "return_movement" {
+                    wire["is_movement_action"] = json!(false);
+                }
+            }
+            if name == "attack_select" {
+                let mut range = combat_template("range")?;
+                range["max_range"] = json!(1);
+                wire["prompt"] = json!("Select Attack Target");
+                wire["filters"] = json!([range, {"type":"team_filter", "relation":"ENEMY"}]);
+            }
+            if name == "pre_action_select" {
+                let mut obstacle = combat_template("obstacle")?;
+                obstacle["is_obstacle"] = json!(false);
+                obstacle["exclude_id"] = json!("template");
+                let mut path = combat_template("movement_path")?;
+                path["unit_id"] = json!("template");
+                wire["is_mandatory"] = json!(false);
+                wire["filters"] = json!([obstacle, path]);
+            }
             let instruction = Self::compile_wire(&wire, steps, symbols)?;
             let fields = Datum::from_json(&wire, symbols).map_err(unsupported)?;
             Ok(StepRecipe {
@@ -257,10 +660,45 @@ impl BoundObjects {
                 "finalize_hero",
                 "respawn",
                 "flip_coin",
+                "return_minions",
+                "return_movement",
+                "return_placement",
+                "mine_path_choice",
+                "trigger_mine",
+                "force_discard",
+                "select_card",
+                "discard_card",
+                "passive",
+                "offer_passive",
+                "mark_passive",
+                "defeat",
+                "remove_unit",
+                "minion_protection",
+                "game_over",
+                "attack_select",
+                "pre_action_select",
+                "move_unit",
+                "set_actor",
+                "reaction",
+                "pre_movement",
+                "pre_discard",
+                "defense_text",
+                "resolve_combat",
+                "on_block",
+                "restore_action",
+                "cast_spell",
+                "perform_card",
+                "wish_sequence",
+                "prepare_spellbook",
+                "remove_prepared_spells",
             ]
             .into_iter()
             .map(|name| Ok((name, recipe(name)?)))
             .collect::<Result<Vec<_>>>()?,
+            passive_bodies: passive_bodies::BodyRules::compile(steps, symbols)?,
+            defense_bodies: Arc::new(defense_bodies::DefenseRules::compile(steps, symbols)?),
+            primary_bodies: Arc::new(primary_bodies::PrimaryRules::compile(steps, symbols)?),
+            action_bodies: Arc::new(card_actions::ActionBindings::compile(steps, symbols)?),
             step_id: symbols.intern("step_id"),
             actor_id: symbols.intern("actor_id"),
         }));
@@ -440,7 +878,9 @@ impl BoundObjects {
             return Ok(());
         }
         Arc::make_mut(&mut self.programs).insert(object, instruction);
-        if let Instruction::ForEach { templates, .. } = &steps[instruction].instruction {
+        if let Instruction::ForEach { templates, .. } | Instruction::LiveRepeat { templates } =
+            &steps[instruction].instruction
+        {
             let objects = self.template_objects(object)?;
             if objects.len() != templates.len() {
                 return Err(unsupported("loop template binding drift"));
@@ -674,6 +1114,7 @@ impl BoundObjects {
 pub(super) fn world_projection(source: &StateEnvelope) -> StateEnvelope {
     let mut projection = source.clone();
     projection.object_bindings.clear();
+    projection.board_keys = None;
     projection.state["execution_context"] = json!({});
     projection.state["execution_stack"] = json!([]);
     if let Some(effects) = projection.state["active_effects"].as_array_mut() {
@@ -685,7 +1126,7 @@ pub(super) fn world_projection(source: &StateEnvelope) -> StateEnvelope {
 }
 
 impl NativeSession {
-    fn with_live_objects<T>(
+    pub(super) fn with_live_objects<T>(
         &mut self,
         action: impl FnOnce(&mut Self, &mut BoundObjects) -> Result<T>,
     ) -> Result<T> {
@@ -717,6 +1158,10 @@ impl NativeSession {
         stop_after: Option<usize>,
     ) -> Result<AdvanceResult> {
         let mut result = AdvanceResult::default();
+        if self.planning.phase == Phase::GameOver {
+            self.last_request = None;
+            return Ok(result);
+        }
         if !self.stack.is_empty() {
             budget.check(0)?;
         }
@@ -726,44 +1171,675 @@ impl NativeSession {
                 return Ok(result);
             }
             budget.check(result.steps)?;
-            let top = self.stack.last().unwrap();
-            let conditions = &self.steps[top.instruction].conditions;
-            let skipped = conditions.active.is_some_and(|key| {
-                !objects
-                    .arena
-                    .context_value(key)
-                    .is_some_and(|value| objects.arena.truthy(&value))
-            }) || conditions.skip.is_some_and(|key| {
+            self.count_observer.clear();
+            let top_instruction = self.stack.last().unwrap().instruction;
+            let top_object = self.stack.last().unwrap().object;
+            let conditions = &self.steps[top_instruction].conditions;
+            let move_success = if matches!(
+                self.steps[top_instruction].instruction,
+                Instruction::LiveMove
+            ) {
+                self.movement_output_bound(
+                    objects,
+                    top_object.ok_or_else(|| unsupported("live movement step missing"))?,
+                    phases::Field::Success,
+                )?
+            } else {
+                None
+            };
+            let active = if let Some(id) = top_object {
+                self.passive_optional_text_bound(objects, id, phases::Field::ActiveIf)?
+            } else {
+                conditions.active
+            };
+            let skip = if let Some(id) = top_object {
+                self.passive_optional_text_bound(objects, id, phases::Field::SkipIf)?
+            } else {
+                conditions.skip
+            };
+            let skipped = active
+                .filter(|key| !self.symbols.name(*key).is_empty())
+                .is_some_and(|key| {
+                    !objects
+                        .arena
+                        .context_value(key)
+                        .is_some_and(|value| objects.arena.truthy(&value))
+                })
+                || skip
+                    .filter(|key| !self.symbols.name(*key).is_empty())
+                    .is_some_and(|key| {
+                        objects
+                            .arena
+                            .context_value(key)
+                            .is_some_and(|value| !matches!(value, ObjectValue::Atom(Datum::Null)))
+                    });
+            let top_mandatory = match top_object.and_then(|id| {
                 objects
                     .arena
-                    .context_value(key)
-                    .is_some_and(|value| !matches!(value, ObjectValue::Atom(Datum::Null)))
-            });
+                    .field(id, objects.phases.k(phases::Field::Mandatory))
+            }) {
+                None => conditions.mandatory,
+                Some(ObjectValue::Atom(Datum::Bool(value))) => value,
+                _ => return Err(unsupported("live mandatory flag must be boolean")),
+            };
+            let movement_inner_skip =
+                move_success.is_some_and(|key| conditions.active == Some(key));
             let actor_choice = if !skipped
                 && matches!(
-                    self.steps[top.instruction].instruction,
+                    self.steps[top_instruction].instruction,
                     Instruction::Flow(crate::turn::FlowStep::Next)
                 ) {
                 Some(self.actor_choice_bound(objects)?)
             } else {
                 None
             };
+            let return_plan = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveReturnMinions
+                ) {
+                Some(self.preflight_return_bound(
+                    objects,
+                    top_object.ok_or_else(|| unsupported("live minion-return step missing"))?,
+                )?)
+            } else {
+                None
+            };
+            let placement = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LivePlace
+                ) {
+                Some(self.preflight_place_bound(
+                    objects,
+                    top_object.ok_or_else(|| unsupported("live placement step missing"))?,
+                )?)
+            } else {
+                None
+            };
+            let travel_plan = if !skipped {
+                if let Instruction::LiveTravel { sequence } =
+                    self.steps[top_instruction].instruction
+                {
+                    Some(self.preflight_travel_bound(
+                        objects,
+                        top_object.ok_or_else(|| unsupported("live travel step missing"))?,
+                        sequence,
+                    )?)
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+            let perform_primary = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LivePerformPrimary
+                ) {
+                Some(
+                    self.preflight_perform_primary_bound(
+                        objects,
+                        top_object
+                            .ok_or_else(|| unsupported("live primary performance step missing"))?,
+                    )?,
+                )
+            } else {
+                None
+            };
+            let perform_card = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LivePerformCard
+                ) {
+                Some(self.preflight_perform_card_bound(
+                    objects,
+                    top_object.ok_or_else(|| unsupported("live copied-card step missing"))?,
+                )?)
+            } else {
+                None
+            };
+            let card_action = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveCardAction
+                ) {
+                Some(self.preflight_card_action_bound(
+                    objects,
+                    top_object.ok_or_else(|| unsupported("live card-action step missing"))?,
+                )?)
+            } else {
+                None
+            };
+            let acting_piece = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveChoosePiece
+                ) {
+                Some(self.preflight_acting_piece_bound(
+                    objects,
+                    top_object.ok_or_else(|| unsupported("live acting-piece step missing"))?,
+                )?)
+            } else {
+                None
+            };
+            let push = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LivePush
+                ) {
+                Some(self.preflight_push_bound(
+                    objects,
+                    top_object.ok_or_else(|| unsupported("live push step missing"))?,
+                )?)
+            } else {
+                None
+            };
+            let repeat = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveRepeat { .. }
+                ) {
+                Some(self.preflight_repeat_bound(
+                    objects,
+                    top_object.ok_or_else(|| unsupported("live repeat step missing"))?,
+                )?)
+            } else {
+                None
+            };
+            let coordinates = if !skipped
+                && let Instruction::LiveCoordinates(op) = self.steps[top_instruction].instruction
+            {
+                Some(self.preflight_coordinates_bound(
+                    objects,
+                    top_object.ok_or_else(|| unsupported("live coordinate step missing"))?,
+                    op,
+                )?)
+            } else {
+                None
+            };
+            let primary_text = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LivePrimaryText
+                ) {
+                Some(self.preflight_primary_text_bound(
+                    objects,
+                    top_object.ok_or_else(|| unsupported("live primary text step missing"))?,
+                )?)
+            } else {
+                None
+            };
+            let defense_body = if !skipped
+                && let Instruction::LiveDefenseBody { on_block } =
+                    self.steps[top_instruction].instruction
+            {
+                Some(self.preflight_defense_bound(objects, on_block)?)
+            } else {
+                None
+            };
+            let resource = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveResource
+                ) {
+                Some(self.preflight_resource_bound(
+                    objects,
+                    top_object.ok_or_else(|| unsupported("live resource step missing"))?,
+                )?)
+            } else {
+                None
+            };
+            let effect_creation = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveCreateEffect
+                ) {
+                Some(self.preflight_create_effect_bound(
+                    objects,
+                    top_object.ok_or_else(|| unsupported("live create effect step missing"))?,
+                )?)
+            } else {
+                None
+            };
+            let marker = if !skipped
+                && let Instruction::LiveMarker { remove } = self.steps[top_instruction].instruction
+            {
+                Some(self.preflight_marker_bound(
+                    objects,
+                    top_object.ok_or_else(|| unsupported("live marker step missing"))?,
+                    remove,
+                )?)
+            } else {
+                None
+            };
+            let swap = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveSwap
+                ) {
+                Some(self.preflight_swap_bound(
+                    objects,
+                    top_object.ok_or_else(|| unsupported("live swap step missing"))?,
+                )?)
+            } else {
+                None
+            };
+            let movement = if !skipped
+                && !movement_inner_skip
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveMove
+                ) {
+                Some(self.preflight_move_bound(objects, top_object.unwrap())?)
+            } else {
+                None
+            };
+            let mine_choice = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveMineChoice
+                ) {
+                Some(self.preflight_mine_choice_bound(objects, top_object.unwrap())?)
+            } else {
+                None
+            };
+            let mine_trigger = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveTriggerMines
+                ) {
+                Some(self.preflight_mine_trigger_bound(objects, top_object.unwrap())?)
+            } else {
+                None
+            };
+            let sequence = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveMoveSequence
+                ) {
+                Some(self.preflight_move_sequence_bound(objects, top_object.unwrap())?)
+            } else {
+                None
+            };
+            let hex_selection = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveHexSelect
+                ) {
+                Some(self.preflight_hex_selection_bound(
+                    objects,
+                    top_object.unwrap(),
+                    top_mandatory,
+                )?)
+            } else {
+                None
+            };
+            let token_place = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveTokenPlace
+                ) {
+                Some(self.preflight_token_place_bound(objects, top_object.unwrap())?)
+            } else {
+                None
+            };
+            let token_path = if !skipped
+                && let Instruction::LiveTokenPath { trail } =
+                    self.steps[top_instruction].instruction
+            {
+                Some(self.preflight_token_path_bound(objects, top_object.unwrap(), trail)?)
+            } else {
+                None
+            };
+            let token_batch = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveTokenBatch
+                ) {
+                Some(self.preflight_token_batch_bound(objects, top_object.unwrap())?)
+            } else {
+                None
+            };
+            let turret = if !skipped
+                && let Instruction::LiveTurret { remove } = self.steps[top_instruction].instruction
+            {
+                Some(self.preflight_turret_bound(objects, top_object.unwrap(), remove)?)
+            } else {
+                None
+            };
+            let rock_ultimate = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveRockUltimate
+                ) {
+                self.preflight_rock_ultimate_bound(objects, top_object.unwrap())?
+            } else {
+                None
+            };
+            let token_remove = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveTokenRemove
+                ) {
+                self.preflight_token_remove_bound(objects, top_object.unwrap())?
+            } else {
+                None
+            };
+            let retrieve = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveRetrieve
+                ) {
+                self.preflight_retrieve_bound(objects, top_object.unwrap())?
+            } else {
+                None
+            };
+            let minion_respawn = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveMinionRespawn
+                ) {
+                Some(self.preflight_minion_respawn_bound(objects, top_object.unwrap())?)
+            } else {
+                None
+            };
+            let spell_plan = if !skipped {
+                if let Instruction::LiveSpell(op) = self.steps[top_instruction].instruction {
+                    Some(self.preflight_spell_bound(objects, top_object.unwrap(), op)?)
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+            let query = if !skipped {
+                match self.steps[top_instruction].instruction {
+                    Instruction::LiveQuery { collect } => {
+                        Some(self.preflight_query_bound(objects, top_object.unwrap(), collect)?)
+                    }
+                    Instruction::LiveCheckUnitFilters => {
+                        Some(self.preflight_unit_filters_query_bound(objects, top_object.unwrap())?)
+                    }
+                    Instruction::LiveUnitTypeCheck => {
+                        Some(self.preflight_unit_type_check_bound(objects, top_object.unwrap())?)
+                    }
+                    Instruction::LiveBooleanCombine => {
+                        Some(self.preflight_boolean_combine_bound(objects, top_object.unwrap())?)
+                    }
+                    Instruction::LiveDistanceCheck => {
+                        Some(self.preflight_distance_check_bound(objects, top_object.unwrap())?)
+                    }
+                    Instruction::LiveCardCount => {
+                        Some(self.preflight_card_count_bound(objects, top_object.unwrap())?)
+                    }
+                    Instruction::LiveRoundDefeat => {
+                        Some(self.preflight_round_defeat_bound(objects, top_object.unwrap())?)
+                    }
+                    Instruction::LiveContextCondition => {
+                        Some(self.preflight_context_condition_bound(objects, top_object.unwrap())?)
+                    }
+                    _ => None,
+                }
+            } else {
+                None
+            };
+            let unit_selection = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveUnitSelect
+                ) {
+                Some(self.preflight_unit_selection_bound(
+                    objects,
+                    top_object.unwrap(),
+                    top_mandatory,
+                )?)
+            } else {
+                None
+            };
+            let attack = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveAttackSequence
+                ) {
+                Some(self.preflight_attack_sequence_bound(objects, top_object.unwrap())?)
+            } else {
+                None
+            };
+            let actor = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::SetActor { .. }
+                ) {
+                Some(self.preflight_actor_bound(objects, top_object.unwrap())?)
+            } else {
+                None
+            };
+            let pre_move = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LivePreMovement
+                ) {
+                self.preflight_pre_movement_bound(objects, top_object.unwrap())?
+            } else {
+                None
+            };
+            let pre_discard = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LivePreDiscard
+                ) {
+                Some(self.preflight_pre_discard_bound(objects, top_object.unwrap())?)
+            } else {
+                None
+            };
+            let reaction = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveReaction
+                ) {
+                Some(self.preflight_reaction_bound(objects, top_object.unwrap())?)
+            } else {
+                None
+            };
+            let combat_resolve = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveCombatResolve
+                ) {
+                Some(self.preflight_combat_resolution_bound(objects, top_object.unwrap())?)
+            } else {
+                None
+            };
+            let adjacent = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveAdjacentSnapshot
+                ) {
+                Some(self.preflight_adjacent_snapshot_bound(objects, top_object.unwrap())?)
+            } else {
+                None
+            };
+            let target_defeated = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveTargetDefeated
+                ) {
+                Some(self.preflight_target_defeated_bound(objects, top_object.unwrap())?)
+            } else {
+                None
+            };
+            let defeat = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveDefeat
+                ) {
+                self.preflight_defeat_bound(objects, top_object.unwrap())?
+            } else {
+                None
+            };
+            let removal = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveRemoveUnit
+                ) {
+                self.preflight_remove_unit_bound(objects, top_object.unwrap())?
+            } else {
+                None
+            };
+            let game_over = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveGameOver
+                ) {
+                Some(self.preflight_game_over_bound(objects, top_object.unwrap())?)
+            } else {
+                None
+            };
+            let protection = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveProtection
+                ) {
+                Some(self.preflight_protection_bound(objects, top_object.unwrap())?)
+            } else {
+                None
+            };
+            let multi_selection = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveMultiSelect
+                ) {
+                Some(self.preflight_multi_selection_bound(
+                    objects,
+                    top_object.unwrap(),
+                    top_mandatory,
+                )?)
+            } else {
+                None
+            };
+            let rune = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveRuneChoice
+                ) {
+                Some(self.preflight_rune_bound(objects, top_object.unwrap())?)
+            } else {
+                None
+            };
+            let passive = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LivePassive
+                ) {
+                Some(self.preflight_passive_bound(objects, top_object.unwrap())?)
+            } else {
+                None
+            };
+            let offer = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveOfferPassive
+                ) {
+                Some(self.preflight_offer_bound(objects, top_object.unwrap())?)
+            } else {
+                None
+            };
+            let mark = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveMarkPassive
+                ) {
+                Some(self.preflight_mark_bound(objects, top_object.unwrap())?)
+            } else {
+                None
+            };
+            let discard = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveDiscard
+                ) {
+                Some(self.preflight_discard_bound(objects, top_object.unwrap())?)
+            } else {
+                None
+            };
+            let discard_or_defeat = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveDiscardOrDefeat
+                ) {
+                self.preflight_discard_or_defeat_bound(objects, top_object.unwrap())?
+            } else {
+                None
+            };
+            let forced_discard = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveForceDiscard
+                ) {
+                Some(self.preflight_forced_discard_bound(objects, top_object.unwrap())?)
+            } else {
+                None
+            };
+            let card_selection = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveCardSelect
+                ) {
+                Some(self.preflight_card_selection_bound(
+                    objects,
+                    top_object.unwrap(),
+                    top_mandatory,
+                )?)
+            } else {
+                None
+            };
             if !skipped {
                 if matches!(
-                    self.steps[top.instruction].instruction,
+                    self.steps[top_instruction].instruction,
                     Instruction::Flow(crate::turn::FlowStep::Advance)
                 ) {
                     objects.phases.effect_ids(
                         &objects.arena,
-                        top.object
-                            .ok_or_else(|| unsupported("live advance step missing"))?,
+                        top_object.ok_or_else(|| unsupported("live advance step missing"))?,
+                    )?;
+                }
+                if matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::Flow(crate::turn::FlowStep::Confirm(_))
+                ) {
+                    self.preflight_confirm_bound(
+                        objects,
+                        top_object.ok_or_else(|| unsupported("live confirmation step missing"))?,
+                    )?;
+                }
+                if matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::Flow(crate::turn::FlowStep::Finalize(_))
+                ) {
+                    self.preflight_finalize_bound(
+                        objects,
+                        top_object.ok_or_else(|| unsupported("live finalization step missing"))?,
                     )?;
                 }
                 self.check_bound_phase(
                     objects,
-                    &self.steps[top.instruction].instruction,
+                    &self.steps[top_instruction].instruction,
                     actor_choice.as_ref(),
                 )?;
+            }
+            // CountMatch restores a non-null previous origin, but Python's
+            // finally block removes an explicit null just like an absent key.
+            // Apply that cleanup only after a successful staged evaluation and
+            // before the instruction writes its own output (possibly this key).
+            if self.count_observer.observed()
+                && let Some(key) = self.symbols.lookup("_cmf_origin_hex")
+                && matches!(
+                    objects.arena.context_value(key),
+                    Some(ObjectValue::Atom(Datum::Null))
+                )
+            {
+                objects.arena.remove_context(key).map_err(unsupported)?;
             }
             result.steps += 1;
             let mut frame = self.stack.pop().unwrap();
@@ -776,51 +1852,71 @@ impl NativeSession {
             }
             // Pending state is on the actual shared step, never the frame copy.
             frame.request = objects.token(id)?;
+            // The handler skips first. MoveUnit.resolve then clears success
+            // and repeats its own skip check below; preserve both boundaries.
+            if !skipped && let Some(key) = move_success {
+                objects.arena.remove_context(key).map_err(unsupported)?;
+            }
             let compiled = &self.steps[frame.instruction];
-            let conditions = &compiled.conditions;
-            if conditions.active.is_some_and(|key| {
-                !objects
-                    .arena
-                    .context_value(key)
-                    .is_some_and(|value| objects.arena.truthy(&value))
-            }) || conditions.skip.is_some_and(|key| {
-                objects
-                    .arena
-                    .context_value(key)
-                    .is_some_and(|value| !matches!(value, ObjectValue::Atom(Datum::Null)))
-            }) {
+            if skipped
+                || active
+                    .filter(|key| !self.symbols.name(*key).is_empty())
+                    .is_some_and(|key| {
+                        !objects
+                            .arena
+                            .context_value(key)
+                            .is_some_and(|value| objects.arena.truthy(&value))
+                    })
+                || skip
+                    .filter(|key| !self.symbols.name(*key).is_empty())
+                    .is_some_and(|key| {
+                        objects
+                            .arena
+                            .context_value(key)
+                            .is_some_and(|value| !matches!(value, ObjectValue::Atom(Datum::Null)))
+                    })
+            {
                 continue;
             }
-            let mandatory = conditions.mandatory;
+            let mandatory = top_mandatory;
             let mut request = None;
             match &compiled.instruction {
-                Instruction::Set { key, .. } => {
+                Instruction::Set { .. } => {
+                    let key = self.passive_text_bound(objects, id, phases::Field::FlagKey)?;
                     let value = objects
                         .arena
                         .field(id, objects.value)
                         .ok_or_else(|| unsupported("live Set.value missing"))?;
-                    objects
-                        .arena
-                        .set_context(*key, value)
-                        .map_err(unsupported)?;
+                    objects.arena.set_context(key, value).map_err(unsupported)?;
                 }
-                Instruction::Add { key, amount } => {
-                    let value = match objects.arena.context_value(*key) {
-                        Some(ObjectValue::Atom(Datum::Float(v))) => {
-                            Datum::Float(v + *amount as f64)
+                Instruction::Add { .. } => {
+                    let key = self.passive_text_bound(objects, id, phases::Field::FlagKey)?;
+                    let amount = match objects
+                        .arena
+                        .field(id, objects.phases.k(phases::Field::Amount))
+                    {
+                        Some(ObjectValue::Atom(Datum::Int(value))) => value,
+                        Some(ObjectValue::Atom(Datum::Bool(value))) => i64::from(value),
+                        _ => {
+                            return Err(unsupported(
+                                "live context addition amount must be an integer",
+                            ));
                         }
+                    };
+                    let value = match objects.arena.context_value(key) {
+                        Some(ObjectValue::Atom(Datum::Float(v))) => Datum::Float(v + amount as f64),
                         Some(ObjectValue::Atom(Datum::Int(v))) => Datum::Int(
-                            v.checked_add(*amount)
+                            v.checked_add(amount)
                                 .ok_or_else(|| unsupported("integer addition outside i64"))?,
                         ),
                         Some(ObjectValue::Atom(Datum::Bool(v))) => Datum::Int(
                             i64::from(v)
-                                .checked_add(*amount)
+                                .checked_add(amount)
                                 .ok_or_else(|| unsupported("integer addition outside i64"))?,
                         ),
-                        _ => Datum::Int(*amount),
+                        _ => Datum::Int(amount),
                     };
-                    objects.write(*key, value)?;
+                    objects.write(key, value)?;
                 }
                 Instruction::Record { input, output } => {
                     if let Some(value) = objects
@@ -851,6 +1947,342 @@ impl NativeSession {
                         }
                     }
                 }
+                Instruction::LiveCardSelect => {
+                    request = self.card_selection_bound(
+                        objects,
+                        id,
+                        card_selection
+                            .ok_or_else(|| unsupported("live card selection plan missing"))?,
+                        mandatory,
+                    )?;
+                }
+                Instruction::LiveMoveSequence => self.move_sequence_bound(
+                    objects,
+                    sequence.ok_or_else(|| unsupported("move sequence plan missing"))?,
+                    mandatory,
+                )?,
+                Instruction::LiveHexSelect => {
+                    request = self.hex_selection_bound(
+                        objects,
+                        id,
+                        hex_selection.ok_or_else(|| unsupported("hex selection plan missing"))?,
+                        mandatory,
+                    )?
+                }
+                Instruction::LiveTokenPlace => result.events.extend(self.token_place_bound(
+                    objects,
+                    token_place.ok_or_else(|| unsupported("token placement plan missing"))?,
+                )?),
+                Instruction::LiveTokenPath { .. } => self.token_path_bound(
+                    objects,
+                    id,
+                    token_path.ok_or_else(|| unsupported("token path plan missing"))?,
+                )?,
+                Instruction::LiveTokenBatch => self.token_batch_bound(
+                    objects,
+                    token_batch.ok_or_else(|| unsupported("batch plan missing"))?,
+                    mandatory,
+                )?,
+                Instruction::LiveTurret { .. } => result.events.extend(self.turret_bound(
+                    objects,
+                    turret.ok_or_else(|| unsupported("turret plan missing"))?,
+                    mandatory,
+                )?),
+                Instruction::LiveRockUltimate => {
+                    self.rock_ultimate_bound(objects, rock_ultimate)?
+                }
+                Instruction::LiveTokenRemove => result
+                    .events
+                    .extend(self.token_remove_bound(objects, token_remove)?),
+                Instruction::LiveRetrieve => result
+                    .events
+                    .extend(self.retrieve_card_bound(objects, retrieve)?),
+                Instruction::LiveQuery { .. }
+                | Instruction::LiveContextCondition
+                | Instruction::LiveCheckUnitFilters
+                | Instruction::LiveDistanceCheck
+                | Instruction::LiveUnitTypeCheck
+                | Instruction::LiveBooleanCombine
+                | Instruction::LiveCardCount
+                | Instruction::LiveRoundDefeat => {
+                    self.query_bound(
+                        objects,
+                        query.ok_or_else(|| unsupported("live query plan missing"))?,
+                    )?;
+                }
+                Instruction::LiveUnitSelect => {
+                    request = self.unit_selection_bound(
+                        objects,
+                        id,
+                        unit_selection.ok_or_else(|| unsupported("unit selection plan missing"))?,
+                        mandatory,
+                    )?;
+                }
+                Instruction::LiveAttackSequence => self.attack_sequence_bound(
+                    objects,
+                    id,
+                    attack.ok_or_else(|| unsupported("attack plan missing"))?,
+                    mandatory,
+                )?,
+                Instruction::LivePreMovement => self.pre_movement_bound(objects, pre_move)?,
+                Instruction::LivePreDiscard => self.pre_discard_bound(
+                    objects,
+                    id,
+                    pre_discard.ok_or_else(|| unsupported("pre-discard plan missing"))?,
+                )?,
+                Instruction::LiveReaction => {
+                    request = self.reaction_bound(
+                        objects,
+                        id,
+                        reaction.ok_or_else(|| unsupported("reaction plan missing"))?,
+                    )?
+                }
+                Instruction::LiveCombatResolve => result.events.extend(
+                    self.combat_resolution_bound(
+                        objects,
+                        combat_resolve
+                            .ok_or_else(|| unsupported("combat resolution plan missing"))?,
+                    )?,
+                ),
+                Instruction::LiveAdjacentSnapshot => self.adjacent_snapshot_bound(
+                    objects,
+                    adjacent.ok_or_else(|| unsupported("adjacent snapshot plan missing"))?,
+                )?,
+                Instruction::LiveTargetDefeated => {
+                    let (key, value) =
+                        target_defeated.ok_or_else(|| unsupported("target defeat plan missing"))?;
+                    objects
+                        .arena
+                        .set_context(key, ObjectValue::Atom(Datum::Bool(value)))
+                        .map_err(unsupported)?;
+                }
+                Instruction::LiveDefeat => {
+                    result.events.extend(self.defeat_bound(objects, defeat)?)
+                }
+                Instruction::LiveRemoveUnit => result
+                    .events
+                    .extend(self.remove_unit_bound(objects, removal)?),
+                Instruction::LiveGameOver => result.events.push(self.game_over_bound(
+                    objects,
+                    game_over.ok_or_else(|| unsupported("game over plan missing"))?,
+                )?),
+                Instruction::LiveProtection => {
+                    let (offer, events) = self.protection_bound(
+                        objects,
+                        protection.ok_or_else(|| unsupported("protection plan missing"))?,
+                    )?;
+                    request = offer;
+                    result.events.extend(events);
+                }
+                Instruction::LiveMultiSelect => {
+                    request = self.multi_selection_bound(
+                        objects,
+                        id,
+                        multi_selection
+                            .ok_or_else(|| unsupported("multi selection plan missing"))?,
+                    )?;
+                }
+                Instruction::LiveRuneChoice => {
+                    request = self.rune_bound(
+                        objects,
+                        id,
+                        rune.ok_or_else(|| unsupported("rune selection plan missing"))?,
+                    )?
+                }
+                Instruction::LivePassive => self.passive_bound(
+                    objects,
+                    passive.ok_or_else(|| unsupported("passive plan missing"))?,
+                )?,
+                Instruction::LiveOfferPassive => {
+                    request = self.offer_bound(
+                        objects,
+                        offer.ok_or_else(|| unsupported("passive offer plan missing"))?,
+                    )?
+                }
+                Instruction::LiveMarkPassive => self.mark_passive_bound(
+                    objects,
+                    mark.ok_or_else(|| unsupported("passive mark plan missing"))?,
+                )?,
+                Instruction::LiveDiscard => {
+                    self.discard_bound(
+                        objects,
+                        discard.ok_or_else(|| unsupported("discard plan missing"))?,
+                    )?;
+                }
+                Instruction::LiveDiscardOrDefeat => {
+                    self.discard_or_defeat_bound(objects, discard_or_defeat)?;
+                }
+                Instruction::LiveForceDiscard => {
+                    self.forced_discard_bound(
+                        objects,
+                        forced_discard.ok_or_else(|| unsupported("forced discard plan missing"))?,
+                    )?;
+                }
+                Instruction::LiveMineChoice => {
+                    request = self.mine_choice_bound(
+                        objects,
+                        id,
+                        mine_choice.ok_or_else(|| unsupported("live mine choice plan missing"))?,
+                    )?;
+                }
+                Instruction::LiveTriggerMines => {
+                    result.events.extend(
+                        self.mine_trigger_bound(
+                            objects,
+                            mine_trigger
+                                .ok_or_else(|| unsupported("live mine trigger plan missing"))?,
+                        )?,
+                    );
+                }
+                Instruction::LiveMove => {
+                    if let Some(event) = self.move_bound(
+                        objects,
+                        id,
+                        movement.ok_or_else(|| unsupported("live movement plan missing"))?,
+                        mandatory,
+                    )? {
+                        result.events.push(event);
+                    }
+                }
+                Instruction::LiveTravel { .. } => {
+                    if let Some(event) = self.travel_bound(
+                        objects,
+                        travel_plan.ok_or_else(|| unsupported("live travel plan missing"))?,
+                        mandatory,
+                    )? {
+                        result.events.push(event);
+                    }
+                }
+                Instruction::LivePerformPrimary => {
+                    request = self.perform_primary_bound(
+                        objects,
+                        id,
+                        perform_primary
+                            .ok_or_else(|| unsupported("primary performance plan missing"))?,
+                    )?;
+                }
+                Instruction::LiveMinionRespawn => {
+                    request = self.minion_respawn_bound(
+                        objects,
+                        id,
+                        minion_respawn.ok_or_else(|| unsupported("minion respawn plan missing"))?,
+                        &mut result.events,
+                    )?;
+                }
+                Instruction::LiveSpell(_) => {
+                    request = self.spell_bound(
+                        objects,
+                        id,
+                        spell_plan.ok_or_else(|| unsupported("spell lifecycle plan missing"))?,
+                        &mut result.events,
+                    )?;
+                }
+                Instruction::LivePerformCard => {
+                    request = self.perform_card_bound(
+                        objects,
+                        id,
+                        perform_card.ok_or_else(|| unsupported("copied-card plan missing"))?,
+                    )?;
+                }
+                Instruction::LiveCardAction => {
+                    request = self.card_action_bound(
+                        objects,
+                        card_action.ok_or_else(|| unsupported("card-action plan missing"))?,
+                    )?;
+                }
+                Instruction::LiveChoosePiece => {
+                    request = self.acting_piece_bound(
+                        objects,
+                        id,
+                        acting_piece.ok_or_else(|| unsupported("acting-piece plan missing"))?,
+                    )?;
+                }
+                Instruction::LivePush => {
+                    if let Some(event) = self.push_bound(
+                        objects,
+                        push.ok_or_else(|| unsupported("live push plan missing"))?,
+                        mandatory,
+                    )? {
+                        result.events.push(event);
+                    }
+                }
+                Instruction::LiveRepeat { .. } => {
+                    request = self.repeat_bound(
+                        objects,
+                        id,
+                        repeat.ok_or_else(|| unsupported("live repeat plan missing"))?,
+                    )?;
+                }
+                Instruction::LiveCoordinates(_) => {
+                    self.coordinates_bound(
+                        objects,
+                        coordinates.ok_or_else(|| unsupported("live coordinate plan missing"))?,
+                    )?;
+                }
+                Instruction::LivePrimaryText => {
+                    self.primary_text_bound(
+                        objects,
+                        primary_text
+                            .ok_or_else(|| unsupported("live primary text plan missing"))?,
+                    )?;
+                }
+                Instruction::LiveDefenseBody { .. } => {
+                    self.defense_bound(
+                        objects,
+                        defense_body.ok_or_else(|| unsupported("live defense plan missing"))?,
+                    )?;
+                }
+                Instruction::LiveResource => {
+                    if let Some(event) = self.resource_bound(
+                        objects,
+                        resource.ok_or_else(|| unsupported("live resource plan missing"))?,
+                    )? {
+                        result.events.push(event);
+                    }
+                }
+                Instruction::LiveCreateEffect => {
+                    if let Some(event) = self.create_effect_bound(
+                        objects,
+                        effect_creation
+                            .ok_or_else(|| unsupported("live effect creation plan missing"))?,
+                    )? {
+                        result.events.push(event);
+                    }
+                }
+                Instruction::LiveMarker { .. } => {
+                    if let Some(event) = self.marker_bound(
+                        objects,
+                        marker.ok_or_else(|| unsupported("live marker plan missing"))?,
+                    )? {
+                        result.events.push(event);
+                    }
+                }
+                Instruction::LiveSwap => {
+                    if let Some(event) = self.swap_bound(
+                        objects,
+                        swap.ok_or_else(|| unsupported("live swap plan missing"))?,
+                        mandatory,
+                    )? {
+                        result.events.push(event);
+                    }
+                }
+                Instruction::LivePlace => {
+                    if let Some(event) = self.place_bound(
+                        objects,
+                        placement.ok_or_else(|| unsupported("live placement plan missing"))?,
+                        mandatory,
+                    )? {
+                        result.events.push(event);
+                    }
+                }
+                Instruction::LiveReturnMinions => {
+                    request = self.return_minions_bound(
+                        objects,
+                        id,
+                        return_plan
+                            .ok_or_else(|| unsupported("live minion-return plan missing"))?,
+                    )?;
+                }
                 Instruction::Flow(crate::turn::FlowStep::Advance) => {
                     let ids = objects.phases.effect_ids(&objects.arena, id)?;
                     self.preflight_bound_advance(objects)?;
@@ -862,6 +2294,13 @@ impl NativeSession {
                         objects,
                         actor_choice.ok_or_else(|| unsupported("actor decision missing"))?,
                     )?;
+                }
+                Instruction::Flow(crate::turn::FlowStep::Confirm(_)) => {
+                    request = self.confirm_bound(objects, id)?;
+                }
+                Instruction::Flow(crate::turn::FlowStep::Finalize(_)) => {
+                    let hero = self.finalize_bound(objects, id)?;
+                    result.events.push(NativeEvent::TurnEnded(hero));
                 }
                 Instruction::Flow(crate::turn::FlowStep::Tie(_)) => {
                     request = self.tie_bound(objects, id)?;
@@ -900,34 +2339,10 @@ impl NativeSession {
                 Instruction::FinishedEffect => {}
                 Instruction::RestoreContext { .. } => objects.restore_scope()?,
                 Instruction::RestoreAction => objects.restore_type()?,
-                Instruction::SetActor { key, save, .. } => {
-                    objects.write(
-                        *save,
-                        self.planning
-                            .actor
-                            .filter(|actor| !self.symbols.name(*actor).is_empty())
-                            .map_or(Datum::Null, Datum::Text),
-                    )?;
-                    let literal = match objects
-                        .arena
-                        .field(id, objects.scheduler.as_ref().unwrap().actor_id)
-                    {
-                        Some(ObjectValue::Atom(Datum::Text(actor))) => Some(actor),
-                        Some(ObjectValue::Atom(Datum::Null)) => None,
-                        _ => return Err(unsupported("actor literal must be text or null")),
-                    };
-                    let actor = scope_actor(literal, *key, &self.symbols, |key| {
-                        objects.symbol_from_context(key, &self.symbols)
-                    })?;
-                    if let Some(actor) = actor.filter(|actor| !self.symbols.name(*actor).is_empty())
-                    {
-                        objects
-                            .arena
-                            .set_root(objects.actor, ObjectValue::Atom(Datum::Text(actor)))
-                            .map_err(unsupported)?;
-                        self.planning.actor = Some(actor);
-                    }
-                }
+                Instruction::SetActor { .. } => self.actor_bound(
+                    objects,
+                    actor.ok_or_else(|| unsupported("actor plan missing"))?,
+                )?,
                 Instruction::ForEach { list, item, .. } => {
                     let index = match objects.arena.field(id, objects.index) {
                         Some(ObjectValue::Atom(Datum::Int(index))) => index,
@@ -975,6 +2390,7 @@ impl NativeSession {
                     let mut children = Vec::new();
                     for template in objects.template_objects(id)? {
                         let (object, instruction) = objects.copy_template(template)?;
+                        Self::validate_returned_step_bound(objects, object)?;
                         let mut child = self.steps[instruction].initial.clone();
                         child.object = Some(object);
                         child.pending = None;
@@ -997,16 +2413,17 @@ impl NativeSession {
                     continue;
                 }
                 Instruction::Log => {}
-                Instruction::Number {
-                    output,
-                    options: _,
-                    labels,
-                    prompt,
-                    auto,
-                    owner,
-                    owner_key,
-                    discard,
-                } => {
+                Instruction::Number { labels, .. } => {
+                    let output = self.passive_text_bound(objects, id, phases::Field::Output)?;
+                    let prompt = self.passive_text_bound(objects, id, phases::Field::Prompt)?;
+                    let auto = self.spatial_bool_bound(objects, id, phases::Field::Auto)?;
+                    let owner =
+                        self.spatial_text_bound(objects, id, phases::Field::OverridePlayer)?;
+                    let owner_key =
+                        self.spatial_text_bound(objects, id, phases::Field::OverridePlayerKey)?;
+                    let discard =
+                        self.spatial_text_bound(objects, id, phases::Field::DecisionPurpose)?
+                            == Some(objects.phases.k(phases::Field::DiscardPurpose));
                     let Some(ObjectValue::Object(options)) =
                         objects.arena.field(id, objects.number_options)
                     else {
@@ -1026,20 +2443,20 @@ impl NativeSession {
                         if mandatory {
                             self.abort_objects(objects)?;
                         } else {
-                            objects.arena.remove_context(*output).map_err(unsupported)?;
+                            objects.arena.remove_context(output).map_err(unsupported)?;
                         }
                         continue;
                     }
                     let selected = objects.selected(id, self.selection_key);
-                    if *auto && options.len() == 1 && mandatory {
-                        objects.write(*output, Datum::Int(options[0]))?;
+                    if auto && options.len() == 1 && mandatory {
+                        objects.write(output, Datum::Int(options[0]))?;
                         objects.clear_pending(id)?;
                         continue;
                     }
                     if matches!(selected, Some(ObjectValue::Atom(Datum::Text(text))) if text == self.skip)
                         && !mandatory
                     {
-                        objects.arena.remove_context(*output).map_err(unsupported)?;
+                        objects.arena.remove_context(output).map_err(unsupported)?;
                         objects.clear_pending(id)?;
                         continue;
                     }
@@ -1050,13 +2467,13 @@ impl NativeSession {
                         _ => None,
                     };
                     if let Some(number) = number.filter(|number| options.contains(number)) {
-                        objects.write(*output, Datum::Int(number))?;
+                        objects.write(output, Datum::Int(number))?;
                         objects.clear_pending(id)?;
                         continue;
                     }
                     let raw_owner = prompt_actor(
-                        *owner,
-                        *owner_key,
+                        owner,
+                        owner_key,
                         self.planning.actor,
                         &self.symbols,
                         |key| objects.symbol_from_context(key, &self.symbols),
@@ -1065,7 +2482,7 @@ impl NativeSession {
                         controlled: None,
                         id: RequestToken::Generated(0),
                         owner: self.normalized_owner(raw_owner.unwrap_or(self.no_actor)),
-                        prompt: *prompt,
+                        prompt,
                         movement_range: None,
                         pre_action_range: None,
                         choices: RequestChoices::Numbers {
@@ -1073,7 +2490,7 @@ impl NativeSession {
                             labels: labels.clone(),
                         },
                         can_skip: !mandatory,
-                        discard: *discard,
+                        discard,
                     });
                 }
                 _ => return Err(unsupported("unbound shared-object instruction")),
@@ -1110,8 +2527,13 @@ impl NativeSession {
             }
             if matches!(
                 self.steps[frame.instruction].instruction,
-                Instruction::FinishedEffect
-            ) {
+                Instruction::LiveSpell(crate::spells::SpellOp::Wish)
+                    | Instruction::FinishedEffect
+                    | Instruction::Flow(
+                        crate::turn::FlowStep::Confirm(_) | crate::turn::FlowStep::Finalize(_)
+                    )
+            ) || matches!(self.steps[frame.instruction].instruction, Instruction::ParkedPhase(family) if self.symbols.name(family) == "finalize_hero_turn")
+            {
                 break;
             }
             let frame = self.stack.pop().unwrap();
@@ -1370,3 +2792,31 @@ impl NativeSession {
         Ok(())
     }
 }
+
+#[cfg(test)]
+fn fixture_case(name: &str) -> Value {
+    let base = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures"));
+    let index: Value = serde_json::from_reader(std::io::BufReader::new(
+        std::fs::File::open(base.join("object-execution.json")).unwrap(),
+    ))
+    .unwrap();
+    let entry = index["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|case| case["name"] == name)
+        .unwrap();
+    serde_json::from_reader(std::io::BufReader::new(
+        std::fs::File::open(base.join(entry["path"].as_str().unwrap())).unwrap(),
+    ))
+    .unwrap()
+}
+
+#[cfg(test)]
+mod brogan_tests;
+
+#[cfg(test)]
+mod spellbook_tests;
+
+#[cfg(test)]
+mod spell_body_tests;

@@ -67,6 +67,7 @@ pub enum Mutation {
 #[derive(Clone, Debug)]
 struct PhysicalCopy {
     base: u32,
+    equality: Option<crate::codec::InstanceEquality>,
     fields: Vec<(Symbol, Option<Datum>)>,
 }
 #[derive(Clone, Debug)]
@@ -74,12 +75,20 @@ pub struct ObjectArena {
     pub(crate) symbols: Arc<Symbols>,
     objects: Vec<Object>,
     aliases: Vec<ObjectId>,
+    board_keys: Option<Vec<(crate::geometry::Hex, ObjectId)>>,
     root: ObjectValue,
     context: ObjectId,
     base_instances: usize,
+    base_equality: Arc<[Option<crate::codec::InstanceEquality>]>,
     physical_copies: Vec<PhysicalCopy>,
     physical_fields: HashMap<u32, Vec<(Symbol, Option<Datum>)>>,
 }
+#[derive(Clone, Debug)]
+pub(crate) enum ObjectSlot {
+    Field(Symbol),
+    Index(usize),
+}
+
 impl ObjectArena {
     pub fn compile(source: &StateEnvelope) -> Result<Self, String> {
         source.validate()?;
@@ -87,9 +96,15 @@ impl ObjectArena {
             symbols: Arc::new(Symbols::default()),
             objects: Vec::new(),
             aliases: Vec::new(),
+            board_keys: None,
             root: ObjectValue::Atom(Datum::Null),
             context: ObjectId(0),
             base_instances: source.instances.len(),
+            base_equality: source
+                .instances
+                .iter()
+                .map(|instance| instance.equality.clone())
+                .collect(),
             physical_copies: Vec::new(),
             physical_fields: HashMap::new(),
         };
@@ -131,7 +146,43 @@ impl ObjectArena {
         if arena.objects[arena.context.0].kind != ObjectKind::Dict {
             return Err("object arena execution context must be a dictionary".into());
         }
+        if let Some(keys) = &source.board_keys {
+            let coordinates =
+                ["q", "r", "s"].map(|name| Arc::make_mut(&mut arena.symbols).intern(name));
+            let mut bound = Vec::new();
+            for key in keys {
+                let id = if let Some(path) = &key.path {
+                    let ObjectValue::Object(id) = arena.value_at_path(path)? else {
+                        return Err("board-key alias model missing".into());
+                    };
+                    if !arena.is_shared_frozen_model(id) {
+                        return Err("board-key alias must be an immutable Hex".into());
+                    }
+                    id
+                } else {
+                    let (q, r, s) = key.hex.coordinates();
+                    let ObjectValue::Object(id) = arena.shared_frozen_model(
+                        coordinates
+                            .into_iter()
+                            .zip([q, r, s])
+                            .map(|(key, value)| {
+                                (key, ObjectValue::Atom(Datum::Int(i64::from(value))))
+                            })
+                            .collect(),
+                    )?
+                    else {
+                        unreachable!()
+                    };
+                    id
+                };
+                bound.push((key.hex, id));
+            }
+            arena.board_keys = Some(bound);
+        }
         Ok(arena)
+    }
+    pub(crate) fn board_key(&self, index: usize) -> Option<ObjectId> {
+        self.board_keys.as_ref()?.get(index).map(|(_, id)| *id)
     }
     fn import(
         &mut self,
@@ -212,14 +263,36 @@ impl ObjectArena {
         }
     }
     fn literal(&mut self, value: &Datum) -> ObjectValue {
+        self.literal_with(value, None)
+    }
+    fn literal_with(
+        &mut self,
+        value: &Datum,
+        replacement: Option<(Symbol, &Datum)>,
+    ) -> ObjectValue {
+        if let (Datum::Text(value), Some((from, to))) = (value, replacement)
+            && *value == from
+        {
+            return ObjectValue::Atom(to.clone());
+        }
         let (kind, contents) = match value {
             Datum::List(items) => (
                 ObjectKind::List,
-                Contents::List(items.iter().map(|v| self.literal(v)).collect()),
+                Contents::List(
+                    items
+                        .iter()
+                        .map(|v| self.literal_with(v, replacement))
+                        .collect(),
+                ),
             ),
             Datum::Object(fields) => (
                 ObjectKind::Dict,
-                Contents::Fields(fields.iter().map(|(k, v)| (*k, self.literal(v))).collect()),
+                Contents::Fields(
+                    fields
+                        .iter()
+                        .map(|(k, v)| (*k, self.literal_with(v, replacement)))
+                        .collect(),
+                ),
             ),
             _ => return ObjectValue::Atom(value.clone()),
         };
@@ -340,7 +413,11 @@ impl ObjectArena {
                         if object.kind == ObjectKind::Step
                             && matches!(
                                 self.symbols.name(*key),
-                                "value" | "pending_input" | "expire_effect_ids" | "tied_hero_ids"
+                                "value"
+                                    | "pending_input"
+                                    | "expire_effect_ids"
+                                    | "tied_hero_ids"
+                                    | "processed_effect_ids"
                             )
                         {
                             continue;
@@ -395,6 +472,7 @@ impl ObjectArena {
                 let mut copy = if (*id as usize) < self.base_instances {
                     PhysicalCopy {
                         base: *id,
+                        equality: self.base_equality[*id as usize].clone(),
                         fields: Vec::new(),
                     }
                 } else {
@@ -459,6 +537,28 @@ impl ObjectArena {
             fields.push((key, value));
         }
     }
+    pub(crate) fn physical_base(&self, id: u32) -> Result<u32, String> {
+        if (id as usize) < self.base_instances {
+            Ok(id)
+        } else {
+            self.physical_copies
+                .get(id as usize - self.base_instances)
+                .map(|copy| copy.base)
+                .ok_or("physical instance missing".into())
+        }
+    }
+    pub(crate) fn physical_override(&self, id: u32, key: Symbol) -> Option<Option<&Datum>> {
+        self.physical_fields
+            .get(&id)
+            .and_then(|fields| fields.iter().find(|(field, _)| *field == key))
+            .or_else(|| {
+                (id as usize >= self.base_instances)
+                    .then(|| self.physical_copies.get(id as usize - self.base_instances))
+                    .flatten()
+                    .and_then(|copy| copy.fields.iter().find(|(field, _)| *field == key))
+            })
+            .map(|(_, value)| value.as_ref())
+    }
     pub(crate) fn set_physical_field(
         &mut self,
         instance: u32,
@@ -517,6 +617,19 @@ impl ObjectArena {
         self.objects[id.0].kind = ObjectKind::FrozenModel;
         Ok(ObjectValue::Object(id))
     }
+    /// Explicitly immutable source models (Hex) return themselves from deepcopy.
+    /// Other frozen models still use ordinary per-template deepcopy identities.
+    pub(crate) fn shared_frozen_model(
+        &mut self,
+        fields: Vec<(Symbol, ObjectValue)>,
+    ) -> Result<ObjectValue, String> {
+        let value = self.frozen_model(fields)?;
+        let ObjectValue::Object(id) = value else {
+            unreachable!()
+        };
+        self.objects[id.0].deepcopy_shared = true;
+        Ok(ObjectValue::Object(id))
+    }
     pub(crate) fn list(&mut self, values: Vec<ObjectValue>) -> ObjectValue {
         let id = ObjectId(self.objects.len());
         self.objects.push(Object {
@@ -526,6 +639,53 @@ impl ObjectArena {
             contents: Contents::List(values),
         });
         ObjectValue::Object(id)
+    }
+    /// A cache payload only: authoritative identity remains in the arena graph.
+    pub(crate) fn typed_value(
+        &self,
+        value: &ObjectValue,
+        symbols: &mut Symbols,
+    ) -> Result<Datum, String> {
+        fn read(
+            arena: &ObjectArena,
+            value: &ObjectValue,
+            ancestors: &mut HashSet<ObjectId>,
+            symbols: &mut Symbols,
+        ) -> Result<Datum, String> {
+            let id = match value {
+                ObjectValue::Object(id) => id,
+                ObjectValue::Atom(value) => return Ok(value.clone()),
+                ObjectValue::Request(id) => {
+                    return Ok(Datum::Text(symbols.intern(&format!("native-request-{id}"))));
+                }
+                ObjectValue::GeneratedStep(id) => {
+                    return Ok(Datum::Text(symbols.intern(&format!("native-step-{id}"))));
+                }
+            };
+            if ancestors.len() >= 256 || !ancestors.insert(*id) {
+                return Err("typed effect payload contains an unsupported cycle/depth".into());
+            }
+            let result = if let Some(values) = arena.sequence(*id) {
+                Datum::List(
+                    values
+                        .iter()
+                        .map(|value| read(arena, value, ancestors, symbols))
+                        .collect::<Result<_, _>>()?,
+                )
+            } else if let Some(fields) = arena.fields(*id) {
+                Datum::Object(
+                    fields
+                        .iter()
+                        .map(|(key, value)| Ok((*key, read(arena, value, ancestors, symbols)?)))
+                        .collect::<Result<_, String>>()?,
+                )
+            } else {
+                return Err("typed effect object has no contents".into());
+            };
+            ancestors.remove(id);
+            Ok(result)
+        }
+        read(self, value, &mut HashSet::new(), symbols)
     }
     pub(crate) fn fields(&self, object: ObjectId) -> Option<&[(Symbol, ObjectValue)]> {
         match &self.objects.get(object.0)?.contents {
@@ -598,6 +758,10 @@ impl ObjectArena {
     pub fn is_mutable_list(&self, object: ObjectId) -> bool {
         self.objects[object.0].tracked && self.objects[object.0].kind == ObjectKind::List
     }
+    pub(crate) fn is_shared_frozen_model(&self, object: ObjectId) -> bool {
+        self.objects[object.0].kind == ObjectKind::FrozenModel
+            && self.objects[object.0].deepcopy_shared
+    }
     pub fn kind(&self, object: ObjectId) -> ObjectKind {
         self.objects[object.0].kind
     }
@@ -623,6 +787,94 @@ impl ObjectArena {
             return Err("step recipe must have fields".into());
         }
         self.objects[id.0].kind = ObjectKind::Step;
+        Ok(id)
+    }
+    pub(crate) fn step_substituting_value(
+        &mut self,
+        value: &Datum,
+        from: Symbol,
+        to: &Datum,
+    ) -> Result<ObjectId, String> {
+        let ObjectValue::Object(id) = self.literal_with(value, Some((from, to))) else {
+            return Err("step recipe must have fields".into());
+        };
+        if !matches!(self.objects[id.0].contents, Contents::Fields(_)) {
+            return Err("step recipe must have fields".into());
+        }
+        self.objects[id.0].kind = ObjectKind::Step;
+        Ok(id)
+    }
+    pub(crate) fn recipe_object(
+        &self,
+        root: ObjectId,
+        path: &[ObjectSlot],
+    ) -> Result<ObjectId, String> {
+        let mut object = root;
+        for slot in path {
+            let value = match slot {
+                ObjectSlot::Field(key) => self.field(object, *key),
+                ObjectSlot::Index(index) => self
+                    .sequence(object)
+                    .and_then(|values| values.get(*index))
+                    .cloned(),
+            }
+            .ok_or("recipe path missing")?;
+            let ObjectValue::Object(next) = value else {
+                return Err("recipe path must name an object".into());
+            };
+            object = next;
+        }
+        Ok(object)
+    }
+    pub(crate) fn alias_recipe_object(
+        &mut self,
+        root: ObjectId,
+        path: &[ObjectSlot],
+        target: ObjectId,
+    ) -> Result<(), String> {
+        let (last, parent) = path
+            .split_last()
+            .ok_or("recipe root cannot be replaced by alias")?;
+        let parent = self.recipe_object(root, parent)?;
+        match last {
+            ObjectSlot::Field(key) => self.set_field(parent, *key, ObjectValue::Object(target)),
+            ObjectSlot::Index(index) => self.set_index(parent, *index, ObjectValue::Object(target)),
+        }
+    }
+    pub(crate) fn classify_recipe_object(
+        &mut self,
+        root: ObjectId,
+        path: &[ObjectSlot],
+        kind: ObjectKind,
+    ) -> Result<ObjectId, String> {
+        let mut value = ObjectValue::Object(root);
+        for part in path {
+            let ObjectValue::Object(id) = value else {
+                return Err("recipe path is not an object".into());
+            };
+            value = match part {
+                ObjectSlot::Field(key) => self.field(id, *key),
+                ObjectSlot::Index(index) => self
+                    .sequence(id)
+                    .and_then(|values| values.get(*index))
+                    .cloned(),
+            }
+            .ok_or("recipe object path missing")?;
+        }
+        let ObjectValue::Object(id) = value else {
+            return Err("recipe model missing".into());
+        };
+        self.objects[id.0].kind = kind;
+        Ok(id)
+    }
+    /// Pydantic model_copy(deep=False): a new step retains child identities.
+    pub(crate) fn shallow_step(&mut self, original: ObjectId) -> Result<ObjectId, String> {
+        if self.kind(original) != ObjectKind::Step {
+            return Err("shallow copy requires a step".into());
+        }
+        let copy = self.objects[original.0].clone();
+        let id = ObjectId(self.objects.len());
+        self.objects.push(copy);
         Ok(id)
     }
     pub fn allocate(&mut self, value: &Datum) -> ObjectValue {
@@ -652,6 +904,12 @@ impl ObjectArena {
         }
         Ok(())
     }
+    pub(crate) fn check_append(&self, object: ObjectId, value: &ObjectValue) -> Result<(), String> {
+        if !self.is_mutable_list(object) {
+            return Err("append requires a mutable list".into());
+        }
+        self.check_input(&Input::Existing(value.clone()), object)
+    }
     pub fn append(&mut self, object: ObjectId, value: ObjectValue) -> Result<(), String> {
         self.apply(&Mutation::Append {
             target: Target::Object(object),
@@ -663,6 +921,16 @@ impl ObjectArena {
             return Err("stack binding is not a list".into());
         };
         Ok(items.pop())
+    }
+    pub(crate) fn clear_dictionary(&mut self, object: ObjectId) -> Result<(), String> {
+        if self.objects[object.0].kind != ObjectKind::Dict {
+            return Err("clear requires a dictionary".into());
+        }
+        let Contents::Fields(fields) = &mut self.objects[object.0].contents else {
+            return Err("dictionary fields missing".into());
+        };
+        fields.clear();
+        Ok(())
     }
     pub fn clear_list(&mut self, object: ObjectId) -> Result<(), String> {
         let Contents::List(items) = &mut self.objects[object.0].contents else {
@@ -894,6 +1162,7 @@ impl ObjectArena {
                     }
                 }
             }
+            instance.equality = copy.equality.clone();
             result.instances.push(instance);
         }
         for (id, fields) in &self.physical_fields {
@@ -915,8 +1184,36 @@ impl ObjectArena {
             }
         }
         result.state = self.compact_state()?;
-        result.object_bindings = self.object_bindings()?;
+        let (bindings, keys) = self.bindings_and_keys()?;
+        result.object_bindings = bindings;
+        result.board_keys = keys;
         result.validate()?;
+        Ok(result)
+    }
+    /// Sparse (binding index, arena object ID) diagnostic pairs for generated
+    /// steps. Copies retain step_id values but have different model identities.
+    pub fn generated_step_objects(
+        &self,
+        bindings: &[ObjectBinding],
+    ) -> Result<Vec<(usize, usize)>, String> {
+        let step_id = self.symbols.lookup("step_id");
+        let mut result = Vec::new();
+        for (index, binding) in bindings.iter().enumerate() {
+            if binding.kind != ObjectKind::Step {
+                continue;
+            }
+            let ObjectValue::Object(object) =
+                self.value_at_path(binding.paths.first().ok_or("step binding path missing")?)?
+            else {
+                return Err("step binding object missing".into());
+            };
+            if step_id
+                .and_then(|key| self.field(object, key))
+                .is_some_and(|value| matches!(value, ObjectValue::GeneratedStep(_)))
+            {
+                result.push((index, object.0));
+            }
+        }
         Ok(result)
     }
     pub fn object_keys(&self) -> Result<Vec<Option<Vec<String>>>, String> {
@@ -932,8 +1229,21 @@ impl ObjectArena {
             .collect()
     }
     pub fn object_bindings(&self) -> Result<Vec<ObjectBinding>, String> {
+        Ok(self.bindings_and_keys()?.0)
+    }
+    fn bindings_and_keys(
+        &self,
+    ) -> Result<(Vec<ObjectBinding>, Option<Vec<crate::codec::BoardKey>>), String> {
         let mut occurrences: Vec<Vec<Vec<ObjectPathPart>>> = vec![Vec::new(); self.objects.len()];
         self.visit(&self.root, &mut Vec::new(), &mut occurrences, 0)?;
+        let keys = self.board_keys.as_ref().map(|keys| {
+            keys.iter()
+                .map(|(hex, id)| crate::codec::BoardKey {
+                    hex: *hex,
+                    path: occurrences[id.0].first().cloned(),
+                })
+                .collect()
+        });
         // Source capture emits aliases in first-occurrence traversal order.
         let mut order = Vec::new();
         self.order(&self.root, &mut HashSet::new(), &mut order);
@@ -947,7 +1257,7 @@ impl ObjectArena {
                 });
             }
         }
-        Ok(result)
+        Ok((result, keys))
     }
 
     fn visit(
@@ -1040,4 +1350,43 @@ fn reject_literal_references(value: &Value) -> Result<(), String> {
         _ => {}
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod equality_metadata_tests {
+    use super::*;
+    #[test]
+    fn physical_deepcopy_preserves_private_equality_metadata() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/fixtures/card-equality.json");
+        let data: Value =
+            serde_json::from_reader(std::io::BufReader::new(std::fs::File::open(path).unwrap()))
+                .unwrap();
+        let case = &data["cases"][0];
+        let source: StateEnvelope = serde_json::from_value(case["envelope"].clone()).unwrap();
+        let original = case["queries"][0]["a"].as_u64().unwrap() as u32;
+        let mut arena = ObjectArena::compile(&source).unwrap();
+        let (copy, _) = arena
+            .deep_copy(&ObjectValue::Atom(Datum::Instance(original)))
+            .unwrap();
+        let ObjectValue::Atom(Datum::Instance(copied)) = copy else {
+            panic!("physical copy missing");
+        };
+        assert_ne!(original, copied);
+        let key = Arc::make_mut(&mut arena.symbols).intern("equality_copy");
+        arena.set_context(key, copy).unwrap();
+        let mut output = arena.boundary(&source).unwrap();
+        assert_eq!(
+            output.instances[original as usize].equality,
+            output.instances[copied as usize].equality
+        );
+        output.object_bindings.clear();
+        let mut symbols = Symbols::default();
+        let world = crate::world::NativeWorld::compile(&output, &mut symbols).unwrap();
+        assert!(
+            world
+                .card_model_equal(crate::cards::CardId(original), crate::cards::CardId(copied))
+                .unwrap()
+        );
+    }
 }

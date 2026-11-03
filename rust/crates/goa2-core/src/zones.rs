@@ -171,10 +171,31 @@ impl NativeWorld {
         candidates: &[Hex],
     ) -> Result<Vec<bool>, String> {
         self.ensure_fast_travel_closure()?;
+        self.fast_travel_destinations_with_card(unit, change, candidates, None)
+    }
+    pub fn fast_travel_destinations_with_card(
+        &self,
+        unit: Option<Symbol>,
+        change: bool,
+        candidates: &[Hex],
+        card: Option<crate::cards::CardId>,
+    ) -> Result<Vec<bool>, String> {
+        self.ensure_move_closure(true)?;
         let reject = || vec![false; candidates.len()];
         let Some(unit) = unit else {
             return Ok(reject());
         };
+        if !self
+            .action_legality(
+                unit,
+                crate::world::ActionKind::FastTravel,
+                card,
+                &crate::data::Registers::default(),
+            )?
+            .allowed
+        {
+            return Ok(reject());
+        }
         let Some(entity) = self.entity(unit).filter(|e| {
             matches!(
                 e.kind,
@@ -198,13 +219,17 @@ impl NativeWorld {
             return Ok(reject());
         }
         let safe = self.safe_travel_zones(team, start_zone);
-        Ok(candidates
+        candidates
             .iter()
             .map(|hex| {
-                self.zone_at(*hex)
+                Ok(self
+                    .zone_at(*hex)
                     .is_some_and(|z| safe.contains(&z) && (!change || z != start_zone))
-                    && !self.obstacle(*hex)
+                    && self.effect_connected(from, *hex, &[unit])?
+                    && !self.obstacle_for_actor(*hex, Some(unit))?
+                    && self.on_map(*hex)
+                    && self.occupant(*hex).is_none())
             })
-            .collect())
+            .collect()
     }
 }

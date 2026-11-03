@@ -2,7 +2,7 @@
 //! Unknown card aura hooks remain explicit unsupported closures.
 use crate::{
     cards::CardId,
-    data::{Datum, Registers, Symbol, Symbols},
+    data::{Datum, RegisterRead, Symbol, Symbols},
     world::{ActionKind, EntityKind, MinionKind, NativeWorld},
 };
 use serde::{Deserialize, Serialize};
@@ -110,7 +110,7 @@ impl NativeWorld {
     pub fn performing_card(
         &self,
         unit: Symbol,
-        context: &Registers,
+        context: &dyn RegisterRead,
     ) -> Result<Option<CardId>, String> {
         let Some(hero) = self.hero(unit) else {
             return Ok(None);
@@ -132,7 +132,7 @@ impl NativeWorld {
         unit: Symbol,
         stat: Stat,
         base: i64,
-        context: &Registers,
+        context: &dyn RegisterRead,
     ) -> Result<i64, String> {
         self.computed_stat_inner(unit, stat, base, None, self.performing_card(unit, context)?)
     }
@@ -146,7 +146,7 @@ impl NativeWorld {
         stat: Stat,
         base: i64,
         performing: Option<CardId>,
-        context: &Registers,
+        context: &dyn RegisterRead,
     ) -> Result<i64, String> {
         self.computed_stat_inner(
             unit,

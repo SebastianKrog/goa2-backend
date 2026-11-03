@@ -111,6 +111,17 @@ pub enum Comparison {
     Never,
 }
 impl Comparison {
+    pub fn matches_order(self, order: Ordering) -> bool {
+        match self {
+            Self::Ge => order != Ordering::Less,
+            Self::Gt => order == Ordering::Greater,
+            Self::Eq => order == Ordering::Equal,
+            Self::Le => order != Ordering::Greater,
+            Self::Lt => order == Ordering::Less,
+            Self::Ne => order != Ordering::Equal,
+            Self::Never => false,
+        }
+    }
     pub fn parse(s: &str) -> Self {
         match s {
             ">=" => Self::Ge,
@@ -148,14 +159,34 @@ impl Comparison {
             }
             _ => 0.cmp(&threshold),
         };
-        Ok(match self {
-            Self::Ge => order != Ordering::Less,
-            Self::Gt => order == Ordering::Greater,
-            Self::Eq => order == Ordering::Equal,
-            Self::Le => order != Ordering::Greater,
-            Self::Lt => order == Ordering::Less,
-            Self::Ne => order != Ordering::Equal,
-            Self::Never => false,
-        })
+        Ok(self.matches_order(order))
     }
+}
+
+/// Source topology distance is geometric distance or positive infinity. Keep
+/// infinity typed so inf == inf and comparisons against finite thresholds are
+/// faithful without introducing non-finite JSON numbers.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum TopologyDistance {
+    Finite(u32),
+    Infinite,
+}
+impl TopologyDistance {
+    pub fn threshold_order(self, value: i64) -> Ordering {
+        match self {
+            Self::Finite(n) => i64::from(n).cmp(&value),
+            Self::Infinite => Ordering::Greater,
+        }
+    }
+}
+pub fn topology_distance(
+    world: &crate::world::NativeWorld,
+    from: crate::geometry::Hex,
+    to: crate::geometry::Hex,
+) -> Result<TopologyDistance, String> {
+    Ok(if world.effect_connected(from, to, &[])? {
+        TopologyDistance::Finite(from.distance(to))
+    } else {
+        TopologyDistance::Infinite
+    })
 }

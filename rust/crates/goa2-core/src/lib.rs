@@ -1,5 +1,6 @@
 //! Native rules primitives. No Python calls or service dependencies.
 #![forbid(unsafe_code)]
+pub mod batch;
 pub mod bitset;
 pub mod cards;
 pub mod codec;
@@ -56,6 +57,7 @@ pub mod effects;
 
 pub mod effect_steps;
 
+mod effect_record;
 mod effect_rules;
 
 pub mod validation;
@@ -67,3 +69,9 @@ pub mod mines;
 mod protection;
 
 pub mod objects;
+
+pub mod equality;
+
+mod pre_action;
+
+pub mod spells;

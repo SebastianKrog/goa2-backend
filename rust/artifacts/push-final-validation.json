@@ -1,0 +1,34 @@
+{
+  "new_arena_consumer": "push_unit",
+  "source_scenes": 252,
+  "new_restore_boundaries": 1635,
+  "native_guard_identity_tests": 4,
+  "source_contracts": 9,
+  "workspace_passed": 326,
+  "workspace_filtered": 1,
+  "not_rerun": "every_shared_execution_boundary_restores_values_aliases_and_request_generations (older all-corpus restore gate)",
+  "independent_release_parity": [
+    {
+      "cases": 246,
+      "operations": 1499,
+      "corpus_sha256": "79a1df79a4451676887a1ccbb6cf6525894a824a9bd237a263ce1a59f35ec1b6",
+      "state_request_event_and_identity_parity": true
+    },
+    {
+      "cases": 6,
+      "operations": 136,
+      "corpus_sha256": "7d394a6768873424d9cb3541451d143ff0d579638953ca69097a784b760e2862",
+      "state_request_event_and_identity_parity": true
+    }
+  ],
+  "live_corpus_cases": 8977,
+  "live_corpus_operations": 44891,
+  "live_index_sha256": "0a05161bb62436186af4cb970ebe7976e58ba6b2a60880755277593a8d98addf",
+  "live_semantic_sha256": "3a3b2dc3dc226076c3c2be2a83880e4c63b4916b617d04ff9be8c95509004f76",
+  "rustfmt": true,
+  "clippy_strict": true,
+  "black_ruff": true,
+  "frozen_src_and_lock_unchanged": true,
+  "engine_complete": false,
+  "search_complete": false
+}

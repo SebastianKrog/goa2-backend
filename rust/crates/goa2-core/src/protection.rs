@@ -130,6 +130,10 @@ impl NativeWorld {
             return Ok(Vec::new());
         };
         let mut payouts = Vec::new();
+        // A source list can contain the same effect model more than once. Stage
+        // its coin budget by arena handle, while distinct equal-ID models keep
+        // independent budgets. Small sparse storage avoids a global alias scan.
+        let mut shared = Vec::<(crate::objects::ObjectId, i64)>::new();
         for (index, e) in self.effects.instances.iter().enumerate() {
             let b = &e.definition.behavior;
             if b.kind != crate::effect_rules::Kind::MinionBounty
@@ -138,11 +142,25 @@ impl NativeWorld {
             {
                 continue;
             }
+            let remaining = e
+                .arena_model
+                .and_then(|model| {
+                    shared
+                        .iter()
+                        .find(|(id, _)| *id == model)
+                        .map(|(_, value)| *value)
+                })
+                .unwrap_or_else(|| e.remaining_bounty.unwrap_or(0));
+            if remaining <= 0 {
+                continue;
+            }
             let subject = b.subject.unwrap_or(e.source);
             let Some(hero) = self.hero(subject) else {
                 continue;
             };
-            if unit.team == Some(hero.team) {
+            // Bounties use the beneficiary model's actual team. The roster
+            // binding is used for assist distribution, not this relation test.
+            if unit.team == self.entity(hero.id).and_then(|entity| entity.team) {
                 continue;
             }
             let Some(origin) = self.resolved_position(subject) else {
@@ -152,6 +170,13 @@ impl NativeWorld {
                 && i64::from(origin.distance(hex)) <= b.range
             {
                 payouts.push((index, hero.id, subject));
+                if let Some(model) = e.arena_model {
+                    if let Some((_, value)) = shared.iter_mut().find(|(id, _)| *id == model) {
+                        *value -= 1;
+                    } else {
+                        shared.push((model, remaining - 1));
+                    }
+                }
             }
         }
         let mut events = Vec::new();
@@ -161,13 +186,22 @@ impl NativeWorld {
                 .gold
                 .checked_add(1)
                 .ok_or("bounty gold outside i64")?;
-            self.effects.instances[index].remaining_bounty = self.effects.instances[index]
-                .remaining_bounty
-                .map(|n| n - 1);
+            if self.effects.instances[index].arena_model.is_none() {
+                self.effects.instances[index].remaining_bounty = self.effects.instances[index]
+                    .remaining_bounty
+                    .map(|n| n - 1);
+            }
             events.push(CombatEvent::Bounty {
                 hero: subject,
                 minion,
             });
+        }
+        for row in &mut self.effects.instances {
+            if let Some(model) = row.arena_model
+                && let Some((_, value)) = shared.iter().find(|(id, _)| *id == model)
+            {
+                row.remaining_bounty = Some(*value);
+            }
         }
         Ok(events)
     }

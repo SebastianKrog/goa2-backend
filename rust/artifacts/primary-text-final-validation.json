@@ -1,0 +1,37 @@
+{
+  "native_dispatch": "resolve_card_text",
+  "custom_primary_builders": 38,
+  "referenced_registered_empty_primary_builders": 45,
+  "ordinary_registry_methods": 596,
+  "spell_registry_methods": 22,
+  "spell_casting_complete": false,
+  "workspace_tests_passed": 315,
+  "workspace_tests_filtered": 1,
+  "not_rerun": "every_shared_execution_boundary_restores_values_aliases_and_request_generations (old full corpus restore gate)",
+  "new_restore_boundaries": 1161,
+  "source_contracts_passed": 9,
+  "release_parity": [
+    {
+      "cases": 318,
+      "operations": 982,
+      "corpus_sha256": "08a987070a4f582282952fafaba79852caa574e2b0645f66c215789c037fd9d9",
+      "state_request_event_and_identity_parity": true
+    },
+    {
+      "cases": 18,
+      "operations": 179,
+      "corpus_sha256": "f1105e567073ea6e8a0777e22090f188f66373e4360000988a2e835b274cada1",
+      "state_request_event_and_identity_parity": true
+    }
+  ],
+  "live_corpus_cases": 8626,
+  "live_corpus_operations": 42186,
+  "live_corpus_index_sha256": "cd5928e47ce863889aef0edfa81c051fb530187b55ec2380fdd708c6df409747",
+  "live_corpus_semantic_sha256": "da4ad3904351940abac1ba427fe39e811083631d7f84a70523c39307b4a8d41e",
+  "rustfmt": true,
+  "clippy_strict": true,
+  "black_ruff": true,
+  "frozen_src_lock_unchanged": true,
+  "engine_complete": false,
+  "search_complete": false
+}

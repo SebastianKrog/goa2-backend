@@ -15,6 +15,8 @@ pub struct Offer {
     pub provider: Option<Symbol>,
 }
 struct PassiveSource {
+    physical: CardId,
+    owner: Symbol,
     definition: usize,
     card: Symbol,
     effect: Symbol,
@@ -28,6 +30,18 @@ struct Config {
     optional: bool,
     prompt: Option<Symbol>,
 }
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum Predicate {
+    Default,
+    Jinx,
+    Legend,
+    BattleFury,
+    Archwizard,
+    RuneMastery,
+    BulletTime,
+    Winter,
+    DragonKnight,
+}
 #[derive(Clone, Debug)]
 pub struct PassiveRules {
     configs: Vec<(Symbol, Vec<Config>)>,
@@ -38,6 +52,7 @@ pub struct PassiveRules {
     before_action: Symbol,
     after_push: Symbol,
     victim: Symbol,
+    predicates: Vec<(Symbol, Predicate)>,
 }
 impl PassiveRules {
     pub fn compile(world: &NativeWorld, symbols: &mut Symbols) -> Result<Self, String> {
@@ -89,7 +104,30 @@ impl PassiveRules {
                     .ok_or("invalid passive trigger".into())
             })
             .collect::<Result<_, String>>()?;
+        let predicates = source["passive_offer_predicates"]
+            .as_object()
+            .ok_or("missing passive predicate metadata")?
+            .iter()
+            .map(|(effect, method)| {
+                let predicate = match method
+                    .as_str()
+                    .ok_or("invalid passive predicate metadata")?
+                {
+                    "JinxEffect.should_offer_passive" => Predicate::Jinx,
+                    "LegendOfTheSkiesEffect.should_offer_passive" => Predicate::Legend,
+                    "BattleFuryEffect.should_offer_passive" => Predicate::BattleFury,
+                    "TheArchwizardEffect.should_offer_passive" => Predicate::Archwizard,
+                    "RuneMasteryEffect.should_offer_passive" => Predicate::RuneMastery,
+                    "BulletTimeEffect.should_offer_passive" => Predicate::BulletTime,
+                    "ReignOfWinterEffect.should_offer_passive" => Predicate::Winter,
+                    "DragonKnightEffect.should_offer_passive" => Predicate::DragonKnight,
+                    _ => return Err("uncompiled passive eligibility predicate".to_owned()),
+                };
+                Ok((symbols.intern(effect), predicate))
+            })
+            .collect::<Result<Vec<_>, String>>()?;
         Ok(Self {
+            predicates,
             configs,
             prompts,
             triggers,
@@ -106,6 +144,35 @@ impl PassiveRules {
         actor: Option<Symbol>,
         hero: Option<Symbol>,
         trigger: Symbol,
+    ) -> Result<Vec<Offer>, String> {
+        self.scan_with(world, actor, hero, trigger, |_, _, effect| {
+            if effect == self.gun || effect == self.wild {
+                Ok(true)
+            } else {
+                Err("eligible passive execution not compiled".into())
+            }
+        })
+    }
+    pub(crate) fn predicate(&self, effect: Symbol) -> Predicate {
+        self.predicates
+            .iter()
+            .find_map(|(id, p)| (*id == effect).then_some(*p))
+            .unwrap_or(Predicate::Default)
+    }
+    pub(crate) fn validate_trigger(&self, trigger: Symbol) -> Result<(), String> {
+        if self.triggers.contains(&trigger) {
+            Ok(())
+        } else {
+            Err("unknown passive trigger".into())
+        }
+    }
+    pub(crate) fn scan_with(
+        &self,
+        world: &NativeWorld,
+        actor: Option<Symbol>,
+        hero: Option<Symbol>,
+        trigger: Symbol,
+        mut eligible: impl FnMut(Symbol, CardId, Symbol) -> Result<bool, String>,
     ) -> Result<Vec<Offer>, String> {
         let Some(h) = hero.or(actor).and_then(|id| world.hero(id)) else {
             return Ok(Vec::new());
@@ -137,6 +204,8 @@ impl PassiveRules {
             self.add_offers(
                 &mut offers,
                 PassiveSource {
+                    physical: *id,
+                    owner: h.id,
                     definition: c.definition,
                     card: d.printed_id,
                     effect: d.effect,
@@ -145,6 +214,7 @@ impl PassiveRules {
                 },
                 trigger,
                 hero.map(|_| h.id),
+                &mut eligible,
             )?;
         }
         for e in &world.effects.instances {
@@ -167,6 +237,8 @@ impl PassiveRules {
             self.add_offers(
                 &mut offers,
                 PassiveSource {
+                    physical: id,
+                    owner: h.id,
                     definition: world.card(id).unwrap().definition,
                     card,
                     effect: granted,
@@ -175,6 +247,7 @@ impl PassiveRules {
                 },
                 trigger,
                 hero.map(|_| h.id),
+                &mut eligible,
             )?;
         }
         Ok(offers)
@@ -185,8 +258,11 @@ impl PassiveRules {
         source: PassiveSource,
         trigger: Symbol,
         hero: Option<Symbol>,
+        eligible: &mut impl FnMut(Symbol, CardId, Symbol) -> Result<bool, String>,
     ) -> Result<(), String> {
         let PassiveSource {
+            physical,
+            owner,
             definition,
             card,
             effect,
@@ -198,8 +274,8 @@ impl PassiveRules {
                 if config.trigger != trigger || config.limit > 0 && uses >= config.limit {
                     continue;
                 }
-                if effect != self.gun && effect != self.wild {
-                    return Err("eligible passive execution not compiled".into());
+                if !eligible(owner, physical, effect)? {
+                    continue;
                 }
                 offers.push(Offer {
                     card,

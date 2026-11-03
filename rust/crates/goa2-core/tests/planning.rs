@@ -118,3 +118,19 @@ fn tie_arbitration_matches_python_prompts_state_and_delayed_coin_order() {
         );
     }
 }
+
+#[test]
+fn uncommit_removes_only_the_first_done_entry_like_the_source_list() {
+    let mut envelope: StateEnvelope =
+        serde_json::from_value(corpus()["cases"][0]["envelope"].clone()).unwrap();
+    envelope.state["planning_done"] = json!(["hero_arien", "hero_arien"]);
+    let mut symbols = Symbols::default();
+    let mut planning = Planning::compile(&envelope, &mut symbols).unwrap();
+    let mut world = goa2_core::world::NativeWorld::compile(&envelope, &mut symbols).unwrap();
+    let hero = symbols.intern("hero_arien");
+    let card = world.hero(hero).unwrap().hand[0];
+    planning.commit(&mut world, hero, card).unwrap();
+    planning.uncommit(&mut world, hero).unwrap();
+    planning.export(&mut envelope, &world, &symbols).unwrap();
+    assert_eq!(envelope.state["planning_done"], json!(["hero_arien"]));
+}

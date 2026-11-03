@@ -32,22 +32,22 @@ pub struct CardSelectSpec {
     pub hero_key: Option<Symbol>,
     pub owner: Option<Symbol>,
     pub owner_key: Option<Symbol>,
-    containers: Vec<Container>,
-    shields: bool,
-    facedown: bool,
-    actions: Option<Vec<ActionKind>>,
-    colors: Vec<Symbol>,
-    color_key: Option<Symbol>,
-    tier_key: Option<Symbol>,
-    basic: Option<bool>,
-    active: Option<bool>,
-    item: Option<bool>,
-    allowed: Option<Vec<Symbol>>,
-    exclude: Vec<Symbol>,
-    states: Option<Vec<CardLifecycle>>,
-    exclude_states: Vec<CardLifecycle>,
-    color_output: Option<Symbol>,
-    tier_output: Option<Symbol>,
+    pub(crate) containers: Vec<Container>,
+    pub(crate) shields: bool,
+    pub(crate) facedown: bool,
+    pub(crate) actions: Option<Vec<ActionKind>>,
+    pub(crate) colors: Vec<Symbol>,
+    pub(crate) color_key: Option<Symbol>,
+    pub(crate) tier_key: Option<Symbol>,
+    pub(crate) basic: Option<bool>,
+    pub(crate) active: Option<bool>,
+    pub(crate) item: Option<bool>,
+    pub(crate) allowed: Option<Vec<Symbol>>,
+    pub(crate) exclude: Vec<Symbol>,
+    pub(crate) states: Option<Vec<CardLifecycle>>,
+    pub(crate) exclude_states: Vec<CardLifecycle>,
+    pub(crate) color_output: Option<Symbol>,
+    pub(crate) tier_output: Option<Symbol>,
 }
 impl CardSelectSpec {
     pub fn compile(raw: &Value, s: &mut Symbols) -> Result<Self, String> {
@@ -125,13 +125,21 @@ impl CardSelectSpec {
         symbols: &Symbols,
         forced: Option<&ForceBinding>,
     ) -> Result<Option<Symbol>, String> {
+        self.owner_with(actor, forced, |key| text_key(ctx, symbols, key))
+    }
+    pub(crate) fn owner_with(
+        &self,
+        actor: Option<Symbol>,
+        forced: Option<&ForceBinding>,
+        get: impl Fn(Option<Symbol>) -> Result<Option<Symbol>, String>,
+    ) -> Result<Option<Symbol>, String> {
         if let Some(f) = forced {
             return Ok(Some(f.victim));
         }
         if self.owner.is_some() {
             Ok(self.owner)
         } else {
-            Ok(text_key(ctx, symbols, self.owner_key)?.or(actor))
+            Ok(get(self.owner_key)?.or(actor))
         }
     }
     pub fn choices(
@@ -142,13 +150,25 @@ impl CardSelectSpec {
         owner: Option<Symbol>,
         forced: Option<&ForceBinding>,
     ) -> Result<Vec<CardId>, String> {
+        self.choices_with(world, symbols, owner, forced, |key| {
+            text_key(ctx, symbols, key)
+        })
+    }
+    pub(crate) fn choices_with(
+        &self,
+        world: &NativeWorld,
+        symbols: &Symbols,
+        owner: Option<Symbol>,
+        forced: Option<&ForceBinding>,
+        get: impl Fn(Option<Symbol>) -> Result<Option<Symbol>, String>,
+    ) -> Result<Vec<CardId>, String> {
         let hero = if let Some(f) = forced {
             Some(f.victim)
         } else {
             if self.hero.is_some() {
                 self.hero
             } else {
-                text_key(ctx, symbols, self.hero_key)?.or(owner)
+                get(self.hero_key)?.or(owner)
             }
         };
         let Some(hero) = hero.and_then(|h| world.hero(h)) else {
@@ -176,11 +196,11 @@ impl CardSelectSpec {
             }
         }
         let mut colors = self.colors.clone();
-        if let Some(c) = text_key(ctx, symbols, self.color_key)? {
+        if let Some(c) = get(self.color_key)? {
             validate_color(symbols.name(c))?;
             colors.push(c);
         }
-        let tier = text_key(ctx, symbols, self.tier_key)?;
+        let tier = get(self.tier_key)?;
         if let Some(t) = tier
             && !matches!(symbols.name(t), "I" | "II" | "III" | "IV" | "UNTIERED")
         {
@@ -198,7 +218,7 @@ impl CardSelectSpec {
         let excluded = self
             .exclude
             .iter()
-            .map(|key| text_key(ctx, symbols, Some(*key)))
+            .map(|key| get(Some(*key)))
             .collect::<Result<Vec<_>, _>>()?;
         let mut selected = Vec::new();
         for id in cards {

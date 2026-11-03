@@ -1,0 +1,21 @@
+{
+  "rust_tests": 299,
+  "existing_source_contracts": 101,
+  "new_source_contracts": 10,
+  "release": {
+    "cases": 7063,
+    "operations": 33772,
+    "corpus_sha256": "df07817830c09e3e48ed36bcb2b3d25f0158bd2f2be5853dfa1009a245fc6322",
+    "workers": 4,
+    "state_request_event_and_identity_parity": true,
+    "seconds": 365.23
+  },
+  "source_inventory": {
+    "cases": 7063,
+    "operations": 33772,
+    "index_sha256": "df07817830c09e3e48ed36bcb2b3d25f0158bd2f2be5853dfa1009a245fc6322",
+    "semantic_sha256": "7055ec1bb625675e743a6f0b4ac96e8c090e6806cead7038a06ee5b3c09293a4"
+  },
+  "engine_complete": false,
+  "search_complete": false
+}

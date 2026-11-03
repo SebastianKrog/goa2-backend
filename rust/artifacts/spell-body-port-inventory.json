@@ -1,0 +1,46 @@
+{
+  "scope": "All 22 spell bodies implemented through native cast/copy paths; ordinary Gydion access cards and Archwizard passive remain separate work.",
+  "bodies": [
+    "shocking_grasp",
+    "magic_missile",
+    "expeditious_retreat",
+    "burning_hands",
+    "suggestion",
+    "shield",
+    "vampiric_touch",
+    "fireball",
+    "create_undead",
+    "midas_touch",
+    "disintegrate",
+    "dominate_person",
+    "find_familiar",
+    "dimension_door",
+    "banishment",
+    "sunburst",
+    "energy_drain",
+    "cloud_kill",
+    "invulnerability",
+    "power_word_kill",
+    "polymorph",
+    "wish"
+  ],
+  "namespace": "Spell shield and ordinary Brogan shield share an effect ID; native body recipes use separate spell and ordinary namespaces selected by CardDefinition.spell.",
+  "state_dependent_builders": {
+    "create_undead": "No steps if performer Hero.team is None; otherwise bind performer team to RespawnMinionAtHexStep with lane-bound spawn selection.",
+    "midas_touch": "Count owner spells OUTSIDE_SPELLBOOK whose printed ID differs from resolving spell ID; floor(count/2), no steps for zero.",
+    "dimension_door": "Exact placement distance (stats.radius or 0)+other-outside count, including dynamic prompt text.",
+    "sunburst": "Attack stats.primary_value+other-outside count; exact range (stats.range or 0)+other-outside count.",
+    "wish": "If counted-caster marker matches normalized performer Hero.id, cast any prepared non-Wish spell; otherwise queue WishSequenceStep."
+  },
+  "lifecycle_provenance": "47 frozen-source lifecycle scenes / 177 operations, including piece caster ownership and mandatory-abort Wish continuation.",
+  "ported_or_reused_primitive_and_filter_dependencies": [
+    "RespawnMinionAtHexStep",
+    "CheckUnitFiltersStep",
+    "CanBePlacedByActorFilter",
+    "CardsInContainerFilter",
+    "CountMatchFilter candidate-relative origin semantics for Fireball",
+    "FAMILIAR token placement and lifecycle"
+  ],
+  "body_validation": "304 source-derived body/primitive scenes / 6,113 operations; full optimized parity and restoration at every boundary.",
+  "validation_artifact": "rust/artifacts/spell-bodies-final-validation.json"
+}

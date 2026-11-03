@@ -1,0 +1,52 @@
+{
+  "milestone": "arena defense-text and on-block builders",
+  "engine_complete": false,
+  "search_complete": false,
+  "defense_builder_methods": 21,
+  "on_block_builder_methods": 7,
+  "primary_defense_faces": 26,
+  "cold_recipes": 56,
+  "catalog_sha256": "b7ef33065f9801a929688ba4fb0365427b9561fe3fdfe5e4a7dcb9b58de9b97d",
+  "new_live_scenes": 750,
+  "new_live_operations": 5167,
+  "combined_live_scenes": 8239,
+  "combined_live_operations": 40818,
+  "index_sha256": "72f683539a23c50ff92f3fd02fd5f91563d855d8c56c23d246221109cf1eeb7e",
+  "semantic_sha256": "15448401576dd87a275929244b2c28cc8b9e2e3c69277039fba5412b50253f33",
+  "new_source_contracts_passed": 12,
+  "new_native_regressions": 3,
+  "new_iterate_state_request_event_identity_parity": true,
+  "strict_clippy_passed": true,
+  "rustfmt_passed": true,
+  "black_ruff_passed": true,
+  "frozen_python_and_lock_unchanged": true,
+  "instruction_metadata_sha256": "73767e22f951131459ec97042705037988c5d5ad795194ebdcad21862b657d75",
+  "full_workspace_verification": {
+    "distinct_tests_verified": 308,
+    "final_run_passed": 307,
+    "final_run_filtered": 1,
+    "failures": 0,
+    "completed_unchanged_restore_test_reused": true,
+    "restore_log": "defense-bodies-workspace-attempt2.log",
+    "restore_each_live_operation": 40818,
+    "unchanged_canonical_scenes": 6592,
+    "unchanged_canonical_operations": 27145,
+    "replacement_attack_continuation_test_passed": true
+  },
+  "full_release_verification": {
+    "cases": 8239,
+    "operations": 40818,
+    "corpus_sha256": "72f683539a23c50ff92f3fd02fd5f91563d855d8c56c23d246221109cf1eeb7e",
+    "workers": 4,
+    "state_request_event_and_identity_parity": true,
+    "seconds": 580.52
+  },
+  "fresh_source_inventory": {
+    "cases": 8239,
+    "operations": 40818,
+    "index_sha256": "72f683539a23c50ff92f3fd02fd5f91563d855d8c56c23d246221109cf1eeb7e",
+    "semantic_sha256": "15448401576dd87a275929244b2c28cc8b9e2e3c69277039fba5412b50253f33"
+  },
+  "committed": false,
+  "replacement_attack_continuation_restore_regression": "passed"
+}

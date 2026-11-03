@@ -8,6 +8,16 @@ use crate::{
 };
 use serde_json::{Value, json};
 
+pub fn card_equality_batch(envelope: StateEnvelope, queries: Vec<Value>) -> Result<Value, String> {
+    let mut symbols = Symbols::default();
+    let world = NativeWorld::compile(&envelope, &mut symbols)?;
+    let results = queries
+        .iter()
+        .map(|query| world.card_model_equal(card_id(query, "a")?, card_id(query, "b")?))
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(json!({"results":results}))
+}
+
 pub fn stats_batch(envelope: StateEnvelope, queries: Vec<Value>) -> Result<Value, String> {
     let mut symbols = Symbols::default();
     let world = NativeWorld::compile(&envelope, &mut symbols)?;
@@ -574,6 +584,7 @@ pub fn hex_filter_batch(envelope: StateEnvelope, queries: Vec<Value>) -> Result<
         let mut accepted = vec![true; candidates.len()];
         filter.apply_scan(
             &crate::spatial::SpatialContext {
+                count_observer: None,
                 world: &world,
                 registers: &context,
                 symbols: &symbols,
@@ -722,6 +733,7 @@ pub fn targeting_batch(envelope: StateEnvelope, queries: Vec<Value>) -> Result<V
         };
         let filters = compile_effective_unit_filters(&query, &mut symbols, mode == "count")?;
         let context = crate::spatial::SpatialContext {
+            count_observer: None,
             world: &world,
             registers: &registers,
             symbols: &symbols,

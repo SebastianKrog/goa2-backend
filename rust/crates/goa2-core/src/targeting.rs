@@ -32,7 +32,19 @@ pub enum Relation {
 }
 #[derive(Clone, Debug)]
 pub enum UnitFilter {
+    CountMatch(CandidateCount),
+    Cards {
+        container: Symbol,
+        min: Option<i64>,
+        max: Option<i64>,
+        visible: bool,
+    },
+    HasTeam,
+    PreviousSlotCard,
+    Terrain(bool),
+    BatchRemoval(Box<crate::batch::RemovalSearch>),
     Or(Vec<UnitFilter>),
+    And(Vec<UnitFilter>),
     BehindEmpty(crate::spatial::Origin),
     Spatial(HexFilter),
     AdjacentContext(Symbol),
@@ -57,6 +69,87 @@ pub enum UnitFilter {
         color: Option<Symbol>,
     },
 }
+#[derive(Clone, Debug)]
+pub struct CandidateCount {
+    pub filters: Vec<UnitFilter>,
+    pub min: i64,
+    pub max: Option<i64>,
+    pub tokens: bool,
+    pub origin: Symbol,
+}
+impl CandidateCount {
+    pub(crate) fn accepts(
+        &self,
+        hex: crate::geometry::Hex,
+        context: &SpatialContext<'_>,
+    ) -> Result<bool, String> {
+        if let Some(observer) = context.count_observer {
+            observer.record();
+        }
+        struct Overlay<'a> {
+            base: &'a dyn crate::data::RegisterRead,
+            key: Symbol,
+            value: Datum,
+        }
+        impl crate::data::RegisterRead for Overlay<'_> {
+            fn get(&self, key: Symbol) -> Option<&Datum> {
+                if key == self.key {
+                    Some(&self.value)
+                } else {
+                    self.base.get(key)
+                }
+            }
+            fn excludes_hex(&self, key: Symbol, hex: crate::geometry::Hex) -> Option<bool> {
+                if key == self.key {
+                    None
+                } else {
+                    self.base.excludes_hex(key, hex)
+                }
+            }
+        }
+        let (q, r, s) = hex.coordinates();
+        let inputs = Overlay {
+            base: context.registers,
+            key: self.origin,
+            value: Datum::Object(
+                context
+                    .coordinates
+                    .into_iter()
+                    .zip([q, r, s])
+                    .map(|(k, v)| (k, Datum::Int(i64::from(v))))
+                    .collect(),
+            ),
+        };
+        let nested = SpatialContext {
+            registers: &inputs,
+            ..*context
+        };
+        let mut count = 0usize;
+        for (id, _) in &context.world.locations {
+            let Some(entity) = context.world.entity(*id) else {
+                continue;
+            };
+            if !matches!(
+                entity.kind,
+                EntityKind::Hero | EntityKind::Minion | EntityKind::Piece
+            ) && !(self.tokens && entity.kind == EntityKind::Token)
+            {
+                continue;
+            }
+            let mut accepted = true;
+            for filter in &self.filters {
+                if !filter.accepts(*id, &nested)? {
+                    accepted = false;
+                    break;
+                }
+            }
+            count += usize::from(accepted);
+        }
+        let count = i64::try_from(count).map_err(|_| "candidate count outside i64")?;
+        Ok(count >= self.min && self.max.is_none_or(|max| count <= max))
+    }
+}
+
 impl NativeWorld {
     fn controller(&self, id: Symbol) -> Symbol {
         self.entity(id).and_then(|e| e.owner).unwrap_or(id)
@@ -194,10 +287,81 @@ impl NativeWorld {
     }
 }
 impl UnitFilter {
-    fn accepts(&self, id: Symbol, context: &SpatialContext<'_>) -> Result<bool, String> {
+    pub(crate) fn accepts(&self, id: Symbol, context: &SpatialContext<'_>) -> Result<bool, String> {
         let world = context.world;
-        let entity = world.entity(id).ok_or("missing unit candidate")?;
+        let entity = world.entity(id);
         Ok(match self {
+            Self::CountMatch(count) => world
+                .position(id)
+                .map(|hex| count.accepts(hex, context))
+                .transpose()?
+                .unwrap_or(false),
+            Self::Cards {
+                container,
+                min,
+                max,
+                visible,
+            } => {
+                if let Some(hero) = world.hero(id) {
+                    let visible_card =
+                        |id| !*visible || world.card(id).is_some_and(|c| !c.facedown);
+                    let count = match context.symbols.name(*container) {
+                        "HAND" => Some(if *visible {
+                            hero.hand.iter().filter(|id| visible_card(**id)).count()
+                        } else {
+                            hero.hand.len()
+                        }),
+                        "DISCARD" => Some(if *visible {
+                            hero.discard.iter().filter(|id| visible_card(**id)).count()
+                        } else {
+                            hero.discard.len()
+                        }),
+                        "DECK" => Some(if *visible {
+                            hero.deck.iter().filter(|id| visible_card(**id)).count()
+                        } else {
+                            hero.deck.len()
+                        }),
+                        "PLAYED" => Some(
+                            hero.played
+                                .iter()
+                                .flatten()
+                                .filter(|id| visible_card(**id))
+                                .count(),
+                        ),
+                        _ => None,
+                    };
+                    if let Some(count) = count {
+                        let count =
+                            i64::try_from(count).map_err(|_| "card filter count outside i64")?;
+                        min.is_none_or(|v| count >= v) && max.is_none_or(|v| count <= v)
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            }
+            Self::Terrain(wanted) => *wanted,
+            Self::HasTeam => entity.is_some_and(|e| e.has_team && e.team.is_some()),
+            Self::PreviousSlotCard => world.hero(id).is_some_and(|hero| {
+                world
+                    .combat
+                    .turn
+                    .checked_sub(1)
+                    .and_then(|turn| hero.card_in_turn_slot(turn))
+                    .is_some()
+            }),
+            Self::BatchRemoval(search) => search.accepts(id, context)?,
+            Self::And(filters) => {
+                let mut found = true;
+                for filter in filters {
+                    if !filter.accepts(id, context)? {
+                        found = false;
+                        break;
+                    }
+                }
+                found
+            }
             Self::Or(filters) => {
                 let mut found = false;
                 for filter in filters {
@@ -237,18 +401,7 @@ impl UnitFilter {
                 }
             }
             Self::AdjacentContext(key) => {
-                let target = match context.registers.get(*key) {
-                    Some(Datum::Text(id)) => world.position(*id),
-                    _ => None,
-                };
-                if let Some((a, b)) = world.position(id).zip(target) {
-                    world.on_map(a)
-                        && world.on_map(b)
-                        && a.distance(b) == 1
-                        && world.effect_connected(a, b, &[])?
-                } else {
-                    false
-                }
+                HexFilter::AdjacentContext(*key).accept_unit(context, id)?
             }
             Self::EmptyNeighbor => world.position(id).is_some_and(|h| {
                 h.neighbors()
@@ -267,7 +420,7 @@ impl UnitFilter {
             }
             Self::Team(relation) => {
                 let actor = context.actor.and_then(|a| world.entity(a));
-                let team = entity.team.or_else(|| {
+                let team = entity.and_then(|e| e.team).or_else(|| {
                     world
                         .equivalent_illusion(id, context.actor)
                         .then(|| world.illusion_minion_team(context.actor))
@@ -281,7 +434,7 @@ impl UnitFilter {
                             actor.team == team
                                 && actor.id != id
                                 && !(world.acting_piece == Some(id)
-                                    && entity.owner == Some(actor.id))
+                                    && entity.is_some_and(|e| e.owner == Some(actor.id)))
                         }
                     }
                 } else {
@@ -290,9 +443,9 @@ impl UnitFilter {
             }
             Self::Kind(kind) => {
                 if *kind == EntityKind::Hero {
-                    matches!(entity.kind, EntityKind::Hero | EntityKind::Piece)
+                    entity.is_some_and(|e| matches!(e.kind, EntityKind::Hero | EntityKind::Piece))
                 } else {
-                    entity.kind == *kind
+                    entity.is_some_and(|e| e.kind == *kind)
                         || *kind == EntityKind::Minion
                             && world.equivalent_illusion(id, context.actor)
                 }
@@ -301,7 +454,7 @@ impl UnitFilter {
                 let own = *self_
                     && (context.actor == Some(id)
                         || world.acting_piece == Some(id)
-                            && entity.owner == context.actor
+                            && entity.and_then(|e| e.owner) == context.actor
                             && context.actor.is_some());
                 !own && !keys.iter().any(|key| match context.registers.get(*key) {
                     Some(Datum::Text(value)) => *value == id,
@@ -334,18 +487,17 @@ impl UnitFilter {
                 }
             }
             Self::Piece { exclude_acting } => {
-                entity.kind == EntityKind::Piece
+                entity.is_some_and(|e| e.kind == EntityKind::Piece)
                     && context
                         .actor
                         .and_then(|a| world.hero(a))
-                        .is_some_and(|a| entity.owner == Some(a.id))
+                        .is_some_and(|a| entity.is_some_and(|e| e.owner == Some(a.id)))
                     && (!exclude_acting || world.acting_piece != Some(id))
             }
-            Self::TokenType(kind) => {
-                entity.kind == EntityKind::Token
-                    && kind.is_none_or(|k| entity.token_type == Some(k))
-            }
-            Self::MinionTypes(kinds) => entity.minion_kind.map_or_else(
+            Self::TokenType(kind) => entity.is_some_and(|e| {
+                e.kind == EntityKind::Token && kind.is_none_or(|k| e.token_type == Some(k))
+            }),
+            Self::MinionTypes(kinds) => entity.and_then(|e| e.minion_kind).map_or_else(
                 || {
                     kinds.contains(&MinionKind::Melee)
                         && world.equivalent_illusion(id, context.actor)
@@ -369,6 +521,14 @@ pub fn compile_unit_filter(raw: &Value, symbols: &mut Symbols) -> Result<UnitFil
             .collect()
     };
     Ok(match raw["type"].as_str().ok_or("missing filter type")? {
+        "and_filter" => UnitFilter::And(
+            raw["filters"]
+                .as_array()
+                .ok_or("AND filters missing")?
+                .iter()
+                .map(|f| compile_unit_filter(f, symbols))
+                .collect::<Result<Vec<_>, _>>()?,
+        ),
         "or_filter" => UnitFilter::Or(
             raw["filters"]
                 .as_array()
@@ -388,7 +548,12 @@ pub fn compile_unit_filter(raw: &Value, symbols: &mut Symbols) -> Result<UnitFil
                 .map(|s| symbols.intern(s)),
             frame: false,
         }),
-        "adjacency_filter" => UnitFilter::Spatial(compile_filter(raw, symbols)?),
+        "adjacency_filter"
+        | "line_behind_target_filter"
+        | "between_hexes_filter"
+        | "relative_distance_filter"
+        | "in_straight_line_filter"
+        | "not_in_straight_line_filter" => UnitFilter::Spatial(compile_filter(raw, symbols)?),
         "adjacency_to_context_filter" => UnitFilter::AdjacentContext(
             symbols.intern(
                 raw["target_key"]
@@ -400,6 +565,24 @@ pub fn compile_unit_filter(raw: &Value, symbols: &mut Symbols) -> Result<UnitFil
         "can_be_moved_filter" => {
             UnitFilter::Displacement(crate::validation::DisplacementKind::Move)
         }
+        "count_match_filter" => UnitFilter::CountMatch(CandidateCount {
+            filters: raw["sub_filters"]
+                .as_array()
+                .ok_or("count subfilters missing")?
+                .iter()
+                .map(|f| compile_unit_filter(f, symbols))
+                .collect::<Result<Vec<_>, _>>()?,
+            min: raw["min_count"].as_i64().unwrap_or(1),
+            max: raw["max_count"].as_i64(),
+            tokens: raw["include_tokens"].as_bool().unwrap_or(false),
+            origin: symbols.intern("_cmf_origin_hex"),
+        }),
+        "cards_in_container_filter" => UnitFilter::Cards {
+            container: symbols.intern(raw["container"].as_str().unwrap_or("HAND")),
+            min: raw["min_cards"].as_i64(),
+            max: raw["max_cards"].as_i64(),
+            visible: raw["exclude_facedown"].as_bool().unwrap_or(false),
+        },
         "can_be_placed_filter" => {
             UnitFilter::Displacement(crate::validation::DisplacementKind::Place)
         }
@@ -419,6 +602,8 @@ pub fn compile_unit_filter(raw: &Value, symbols: &mut Symbols) -> Result<UnitFil
             self_: raw["exclude_self"].as_bool().unwrap_or(true),
             keys: keys("exclude_keys", symbols)?,
         },
+        "terrain_filter" => UnitFilter::Terrain(raw["is_terrain"].as_bool().unwrap_or(true)),
+        "has_previous_slot_card_filter" => UnitFilter::PreviousSlotCard,
         "played_card_filter" => {
             let action = raw
                 .get("action_type")

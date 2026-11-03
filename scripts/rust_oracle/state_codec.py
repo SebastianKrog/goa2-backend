@@ -86,10 +86,38 @@ class InstanceEncoder:
         return serialized
 
     def pack_card(self, card):
+        from enum import Enum
+        from math import isfinite
+
         from goa2.domain.models.spell import SpellCard
 
+        def json_equality(value):
+            if value is None or type(value) in (bool, int, str):
+                return True
+            if type(value) is float:
+                return isfinite(value)
+            if isinstance(value, Enum) and isinstance(value, (str, int)):
+                return value == value.value and json_equality(value.value)
+            if type(value) is list:
+                return all(json_equality(item) for item in value)
+            if type(value) is dict:
+                return all(type(key) is str and json_equality(item) for key, item in value.items())
+            return False
+
+        private = card.__pydantic_private__ or {}
+        if (
+            set(private) != {"_definition_revision"}
+            or type(private["_definition_revision"]) is not int
+        ):
+            raise ValueError("unsupported private card equality state")
         kind = "spell" if isinstance(card, SpellCard) else "card"
-        return self.pack(card, kind, card._search_dynamic_fields)
+        reference = self.pack(card, kind, card._search_dynamic_fields)
+        self.instances[reference[REFERENCE_KEY]]["equality"] = {
+            "model": f"{type(card).__module__}.{type(card).__qualname__}",
+            "definition_revision": private["_definition_revision"],
+            "json_metadata": json_equality(card.metadata),
+        }
+        return reference
 
     def pack_token(self, token):
         fixed = {"id", "name", "token_type"}
@@ -140,6 +168,18 @@ def materialize(envelope):
                 ):
                     raise ValueError("definition reference outside table")
                 definition = definitions[definition_index]
+                equality = instance.get("equality")
+                if equality is not None and (
+                    type(equality) is not dict
+                    or set(equality) != {"model", "definition_revision", "json_metadata"}
+                    or definition["kind"] == "token"
+                    or type(equality["model"]) is not str
+                    or not equality["model"]
+                    or type(equality["definition_revision"]) is not int
+                    or not -(2**63) <= equality["definition_revision"] < 2**63
+                    or type(equality["json_metadata"]) is not bool
+                ):
+                    raise ValueError("invalid physical equality metadata")
                 if definition["fields"].keys() & instance["fields"].keys():
                     raise ValueError("definition and instance fields overlap")
                 return {**definition["fields"], **instance["fields"]}

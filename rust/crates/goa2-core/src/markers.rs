@@ -71,11 +71,18 @@ impl MarkerRules {
             target,
             value,
         } = placement;
-        if ctx.get(self.skip).is_some_and(|v| v.truthy(symbols))
-            && actor.is_some_and(|a| {
-                ctx.get(self.substitution) == Some(&Datum::Text(world.hero(a).map_or(a, |h| h.id)))
-            })
-        {
+        if Self::suppressed(
+            world,
+            actor,
+            ctx.get(self.skip).is_some_and(|v| v.truthy(symbols)),
+            ctx.get(self.substitution).and_then(|value| {
+                if let Datum::Text(value) = value {
+                    Some(*value)
+                } else {
+                    None
+                }
+            }),
+        ) {
             return None;
         }
         let source = actor
@@ -110,6 +117,14 @@ impl MarkerRules {
         marker.source = None;
         marker.value = 0;
         Some(MarkerEvent::Removed { kind: key })
+    }
+    pub(crate) fn suppressed(
+        world: &NativeWorld,
+        actor: Option<Symbol>,
+        skip: bool,
+        substitution: Option<Symbol>,
+    ) -> bool {
+        skip && actor.is_some_and(|a| substitution == Some(world.hero(a).map_or(a, |h| h.id)))
     }
     fn key(&self, kind: MarkerKind) -> Symbol {
         self.keys[match kind {

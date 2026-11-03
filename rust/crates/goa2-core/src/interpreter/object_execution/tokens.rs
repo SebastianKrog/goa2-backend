@@ -10,6 +10,7 @@ struct TokenInfo {
     kind: Symbol,
     owner: Option<Symbol>,
     immune: bool,
+    persists: bool,
 }
 #[derive(Clone, Debug)]
 pub(super) struct TokenBindings {
@@ -44,6 +45,9 @@ impl TokenBindings {
                         .ok_or_else(|| unsupported("token type missing"))?,
                 ),
                 owner: raw["owner_id"].as_str().map(|id| symbols.intern(id)),
+                persists: raw["persists_end_of_round"]
+                    .as_bool()
+                    .ok_or_else(|| unsupported("token persistence missing"))?,
                 immune: raw["is_immune_to_enemy_actions"]
                     .as_bool()
                     .ok_or_else(|| unsupported("token immunity missing"))?,
@@ -106,6 +110,14 @@ impl TokenBindings {
                 _ => return Err(unsupported("token immunity override invalid")),
             };
         }
+        if let Some(key) = objects.arena.symbols.lookup("persists_end_of_round")
+            && let Some(value) = objects.arena.physical_override(physical, key)
+        {
+            row.persists = match value {
+                Some(Datum::Bool(value)) => *value,
+                _ => return Err(unsupported("token persistence override invalid")),
+            };
+        }
         Ok(Some(row))
     }
 }
@@ -146,6 +158,37 @@ impl NativeSession {
             return Ok(None);
         };
         Ok(objects.tokens.get(objects, physical)?.map(|_| physical))
+    }
+    pub(super) fn cleanup_token_supply_bound(
+        &self,
+        objects: &BoundObjects,
+    ) -> Result<Vec<(Symbol, bool)>> {
+        let pool = objects.phases.root(&objects.arena, Field::TokenPool)?;
+        let mut result = Vec::new();
+        for (_, value) in objects
+            .arena
+            .fields(pool)
+            .ok_or_else(|| unsupported("token pool must be a mapping"))?
+        {
+            let ObjectValue::Object(list) = value else {
+                return Err(unsupported("token supply list missing"));
+            };
+            for token in objects
+                .arena
+                .sequence(*list)
+                .ok_or_else(|| unsupported("token supply must be a list"))?
+            {
+                let ObjectValue::Atom(Datum::Instance(id)) = token else {
+                    return Err(unsupported("pool token physical instance missing"));
+                };
+                let row = objects
+                    .tokens
+                    .get(objects, *id)?
+                    .ok_or_else(|| unsupported("pool token metadata missing"))?;
+                result.push((row.id, row.persists));
+            }
+        }
+        Ok(result)
     }
     pub(super) fn token_effective_bound(
         &self,

@@ -43,6 +43,44 @@ def freeze_steps(steps):
     return rows
 
 
+def raw_binding_paths(bound, raw):
+    """Record only differences observed between both real source APIs.
+
+    Runtime can undo attribution without duplicating instructions or guessing
+    which nested fields the source's generic binder visits. Physical model
+    topology must be identical, including aliases, for this patch to be valid.
+    """
+    assert len(bound) == len(raw), "raw primary root shape changed"
+    result = []
+    for ordinary, unbound in zip(bound, raw, strict=True):
+        assert ordinary["objects"] == unbound["objects"], "raw primary aliases changed"
+        paths = []
+
+        def compare(left, right, path, paths=paths):
+            if left == right:
+                return
+            if isinstance(left, dict) and isinstance(right, dict):
+                assert left.keys() == right.keys(), "raw primary fields changed"
+                for key in left:
+                    compare(left[key], right[key], [*path, key])
+            elif isinstance(left, list) and isinstance(right, list):
+                assert len(left) == len(right), "raw primary list shape changed"
+                for index, (a, b) in enumerate(zip(left, right, strict=True)):
+                    compare(a, b, [*path, index])
+            else:
+                assert path[-1] == "source_card_id" and left == CARD and right is None, (
+                    "raw primary difference needs an explicit native port",
+                    path,
+                    left,
+                    right,
+                )
+                paths.append(path)
+
+        compare(ordinary["fields"], unbound["fields"], [])
+        result.append(paths)
+    return result
+
+
 def catalog():
     from model_traces import setup
 
@@ -51,7 +89,7 @@ def catalog():
     from goa2.engine.stats import CardStats
 
     state = setup()
-    recipes, ranged_steps, radius_fallbacks = {}, {}, {}
+    recipes, ranged_steps, radius_fallbacks, raw_bindings = {}, {}, {}, {}
     from primary_radius import bind_radius_fallbacks
 
     methods = {
@@ -69,6 +107,9 @@ def catalog():
         stats = CardStats(primary_value=PRIMARY, range=RANGE, radius=RADIUS)
         impl = CardEffectRegistry.get(effect)
         recipes[effect] = freeze_steps(impl.get_steps_with_stats(state, hero, card, stats))
+        raw_bindings[effect] = raw_binding_paths(
+            recipes[effect], freeze_steps(impl.build_steps(state, hero, card, stats))
+        )
         variants = []
         for radius in (None, 0):
             variant = freeze_steps(
@@ -114,13 +155,24 @@ def catalog():
     from min_builders import stateful_recipes as min_stateful_recipes
     from misa_builders import stateful_recipes
 
+    stateful = {**stateful_recipes(state), **min_stateful_recipes(state)}
+    raw_stateful = {
+        **stateful_recipes(state, raw=True),
+        **min_stateful_recipes(state, raw=True),
+    }
+    for effect, body in stateful.items():
+        body["raw_card_bindings"] = {
+            name: raw_binding_paths(rows, raw_stateful[effect]["variants"][name])
+            for name, rows in body["variants"].items()
+        }
     source = {
         "schema_version": 3,
         "source_sha256": verify_sources()["source_sha256"],
         "methods": methods,
         "spell_effects": sorted(CardEffectRegistry._spell_effects),
         "recipes": recipes,
-        "stateful_recipes": {**stateful_recipes(state), **min_stateful_recipes(state)},
+        "stateful_recipes": stateful,
+        "raw_card_bindings": raw_bindings,
         "ranged_steps": ranged_steps,
         "radius_fallbacks": radius_fallbacks,
         "fallback": fallback,

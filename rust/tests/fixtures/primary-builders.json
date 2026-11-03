@@ -31612,6 +31612,22 @@
             ]
           }
         ]
+      },
+      "raw_card_bindings": {
+        "without_ultimate": [
+          [],
+          [],
+          [],
+          []
+        ],
+        "with_ultimate": [
+          [],
+          [],
+          [],
+          [],
+          [],
+          []
+        ]
       }
     },
     "watch_how_i_soar": {
@@ -32992,6 +33008,34 @@
             ]
           }
         ]
+      },
+      "raw_card_bindings": {
+        "without_ultimate": [
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          []
+        ],
+        "with_ultimate": [
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+          []
+        ]
       }
     },
     "perfect_self": {
@@ -33489,8 +33533,763 @@
             ]
           }
         ]
+      },
+      "raw_card_bindings": {
+        "without_retired_tier_two": [
+          [
+            [
+              "source_card_id"
+            ]
+          ]
+        ],
+        "with_retired_tier_two": [
+          [],
+          [],
+          [
+            [
+              "source_card_id"
+            ]
+          ],
+          [],
+          [],
+          []
+        ]
       }
     }
+  },
+  "raw_card_bindings": {
+    "bullrush": [
+      [],
+      [],
+      []
+    ],
+    "furious_charge": [
+      [],
+      [],
+      []
+    ],
+    "throwing_axe": [
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      []
+    ],
+    "throwing_spear": [
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      []
+    ],
+    "shield": [
+      [
+        [
+          "source_card_id"
+        ]
+      ]
+    ],
+    "bolster": [
+      [
+        [
+          "source_card_id"
+        ]
+      ]
+    ],
+    "fortify": [
+      [
+        [
+          "source_card_id"
+        ]
+      ]
+    ],
+    "war_drummer": [
+      [],
+      [],
+      [],
+      []
+    ],
+    "master_skald": [
+      [],
+      [],
+      [],
+      []
+    ],
+    "bulwark": [
+      [],
+      [],
+      [
+        [
+          "source_card_id"
+        ]
+      ],
+      [
+        [
+          "source_card_id"
+        ]
+      ]
+    ],
+    "one_man_army": [],
+    "backstab": [
+      [],
+      [],
+      [],
+      [],
+      []
+    ],
+    "backstab_with_a_ballista": [
+      [],
+      [],
+      [],
+      [],
+      [],
+      []
+    ],
+    "combat_reflexes": [
+      [],
+      [],
+      [],
+      [],
+      []
+    ],
+    "light_fingered": [
+      [],
+      [],
+      [],
+      [],
+      [],
+      []
+    ],
+    "pick_pocket": [
+      [],
+      [],
+      [],
+      [],
+      [],
+      []
+    ],
+    "master_thief": [
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      []
+    ],
+    "blend_into_shadows": [
+      [],
+      [],
+      [],
+      [],
+      [
+        [
+          "source_card_id"
+        ]
+      ]
+    ],
+    "mind_grip": [
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      []
+    ],
+    "spell_break": [
+      [
+        [
+          "source_card_id"
+        ]
+      ]
+    ],
+    "ebb_and_flow": [
+      [],
+      [],
+      [],
+      []
+    ],
+    "dangerous_current": [
+      [],
+      [],
+      [],
+      []
+    ],
+    "raging_stream": [
+      [],
+      [],
+      [],
+      []
+    ],
+    "violent_torrent": [
+      [],
+      [],
+      [],
+      [],
+      []
+    ],
+    "slippery_ground": [
+      [
+        [
+          "source_card_id"
+        ]
+      ],
+      []
+    ],
+    "deluge": [
+      [
+        [
+          "source_card_id"
+        ]
+      ],
+      []
+    ],
+    "noble_blade": [
+      [],
+      [],
+      [],
+      [],
+      []
+    ],
+    "arcane_whirlpool": [
+      [],
+      []
+    ],
+    "liquid_leap": [
+      [],
+      []
+    ],
+    "magical_current": [
+      [],
+      []
+    ],
+    "stranger_tide": [
+      [],
+      []
+    ],
+    "onslaught": [
+      [],
+      [],
+      [],
+      []
+    ],
+    "hit_and_run": [
+      [],
+      [],
+      []
+    ],
+    "leaping_strike": [
+      [],
+      [],
+      [],
+      [],
+      []
+    ],
+    "poisoned_dagger": [
+      [],
+      []
+    ],
+    "poisoned_dart": [
+      [],
+      []
+    ],
+    "rogue_wave": [
+      [],
+      [],
+      [],
+      []
+    ],
+    "tidal_blast": [
+      [],
+      [],
+      [],
+      []
+    ],
+    "blink_strike": [
+      [],
+      [],
+      [],
+      []
+    ],
+    "mad_dash": [
+      [],
+      [],
+      []
+    ],
+    "brutal_jab": [
+      [],
+      [],
+      [],
+      [],
+      []
+    ],
+    "mighty_punch": [
+      [],
+      [],
+      [],
+      [],
+      []
+    ],
+    "savage_kick": [
+      [],
+      [],
+      [],
+      [],
+      []
+    ],
+    "point_blank_shot": [
+      [],
+      [],
+      []
+    ],
+    "back_to_back": [
+      [],
+      []
+    ],
+    "listen_up": [
+      [],
+      [],
+      []
+    ],
+    "roger_roger": [
+      [],
+      [],
+      []
+    ],
+    "ready_and_waiting": [
+      [],
+      [],
+      []
+    ],
+    "troop_movement": [
+      [],
+      [],
+      [],
+      []
+    ],
+    "marching_orders": [
+      [],
+      [],
+      [],
+      []
+    ],
+    "path_to_victory": [
+      [],
+      [],
+      [],
+      []
+    ],
+    "close_support": [
+      [],
+      []
+    ],
+    "covering_fire": [
+      [],
+      []
+    ],
+    "shootout": [
+      [],
+      [],
+      [],
+      [],
+      []
+    ],
+    "bullet_hell": [
+      [],
+      [],
+      [],
+      [],
+      []
+    ],
+    "quickdraw": [
+      [],
+      [],
+      [],
+      [],
+      []
+    ],
+    "gunslinger": [
+      [],
+      [],
+      [],
+      [],
+      []
+    ],
+    "dead_shot": [
+      [],
+      [],
+      [],
+      [],
+      []
+    ],
+    "shield_bash": [
+      [],
+      []
+    ],
+    "counterattack": [
+      [],
+      []
+    ],
+    "steady_advance": [
+      [],
+      [],
+      [],
+      [],
+      []
+    ],
+    "unwavering_resolve": [
+      [],
+      [],
+      [],
+      [],
+      []
+    ],
+    "prepare_spells": [
+      [],
+      []
+    ],
+    "cantrip": [
+      []
+    ],
+    "elementary_evocation": [
+      []
+    ],
+    "lesser_evocation": [
+      []
+    ],
+    "greater_evocation": [
+      []
+    ],
+    "elementary_abjuration": [
+      []
+    ],
+    "lesser_abjuration": [
+      []
+    ],
+    "greater_abjuration": [
+      []
+    ],
+    "elementary_enchantment": [
+      []
+    ],
+    "lesser_enchantment": [
+      []
+    ],
+    "greater_enchantment": [
+      []
+    ],
+    "lesser_necromancy": [
+      []
+    ],
+    "greater_necromancy": [
+      []
+    ],
+    "lesser_conjuration": [
+      []
+    ],
+    "greater_conjuration": [
+      []
+    ],
+    "lesser_transmutation": [
+      []
+    ],
+    "greater_transmutation": [
+      []
+    ],
+    "challenge_accepted": [
+      [],
+      [
+        [
+          "source_card_id"
+        ]
+      ]
+    ],
+    "matter_of_honor": [
+      [],
+      [
+        [
+          "source_card_id"
+        ]
+      ]
+    ],
+    "worthy_opponent": [
+      [],
+      [
+        [
+          "source_card_id"
+        ]
+      ]
+    ],
+    "power_shot": [
+      [],
+      [],
+      [],
+      []
+    ],
+    "thunder_shot": [
+      [],
+      [],
+      [],
+      []
+    ],
+    "dash_and_slash": [
+      [],
+      [],
+      [],
+      [],
+      []
+    ],
+    "death_from_above": [
+      [],
+      [],
+      [],
+      [],
+      []
+    ],
+    "sudden_breeze": [
+      [],
+      [],
+      [],
+      [],
+      [],
+      []
+    ],
+    "gust_of_wind": [
+      [],
+      [],
+      [],
+      [],
+      [],
+      []
+    ],
+    "crushing_squall": [
+      [],
+      [],
+      [],
+      [],
+      [],
+      []
+    ],
+    "living_tornado": [
+      [],
+      [],
+      []
+    ],
+    "storm_spirit": [
+      [],
+      [],
+      []
+    ],
+    "focus": [
+      [
+        [
+          "source_card_id"
+        ]
+      ]
+    ],
+    "discipline": [
+      [
+        [
+          "source_card_id"
+        ]
+      ]
+    ],
+    "mastery": [
+      [
+        [
+          "source_card_id"
+        ]
+      ]
+    ],
+    "power_overwhelming": [],
+    "magnetic_dagger": [
+      [],
+      [
+        [
+          "source_card_id"
+        ]
+      ]
+    ],
+    "charged_boomerang": [
+      []
+    ],
+    "shock": [
+      [],
+      [],
+      []
+    ],
+    "electrocute": [
+      [],
+      [],
+      []
+    ],
+    "telekinesis": [
+      [],
+      [],
+      []
+    ],
+    "mass_telekinesis": [
+      [],
+      [],
+      [],
+      []
+    ],
+    "electroblast": [
+      [],
+      [],
+      []
+    ],
+    "thunder_boomerang": [
+      [],
+      [],
+      [],
+      []
+    ],
+    "lift_up": [
+      [],
+      [],
+      [],
+      []
+    ],
+    "control_gravity": [
+      [],
+      [],
+      [],
+      []
+    ],
+    "center_of_mass": [
+      [],
+      [],
+      [],
+      []
+    ],
+    "kinetic_repulse": [
+      [],
+      []
+    ],
+    "kinetic_blast": [
+      [],
+      [],
+      []
+    ],
+    "static_barrier": [
+      [
+        [
+          "source_card_id"
+        ]
+      ]
+    ],
+    "trip_mine": [
+      [],
+      [],
+      [],
+      []
+    ],
+    "cluster_mine": [
+      [],
+      [],
+      [],
+      [],
+      [],
+      []
+    ],
+    "minefield": [
+      [],
+      [],
+      [],
+      [],
+      [],
+      []
+    ],
+    "smoke_bomb": [
+      [],
+      [],
+      []
+    ],
+    "crane_stance": [
+      [],
+      [],
+      [],
+      []
+    ],
+    "tiger_stance": [
+      [],
+      [],
+      [],
+      [],
+      [],
+      []
+    ],
+    "dragon_stance": [
+      [],
+      [],
+      [],
+      [],
+      [],
+      []
+    ],
+    "viper_stance": [
+      [],
+      [],
+      []
+    ],
+    "cobra_stance": [
+      [],
+      [],
+      [],
+      [],
+      []
+    ],
+    "fast_as_lightning": [
+      [],
+      []
+    ],
+    "death_grenade": [
+      [],
+      [],
+      [
+        [
+          "source_card_id"
+        ]
+      ]
+    ],
+    "holy_death_grenade": [
+      [],
+      [],
+      [
+        [
+          "source_card_id"
+        ]
+      ]
+    ],
+    "inner_strength": [
+      [
+        [
+          "source_card_id"
+        ]
+      ]
+    ],
+    "devoted_followers": [
+      [],
+      [],
+      [],
+      []
+    ],
+    "fresh_converts": [
+      [],
+      [],
+      [],
+      []
+    ]
   },
   "ranged_steps": {
     "bullrush": [],
@@ -33752,5 +34551,5 @@
     "radius": 1234567893
   },
   "default_method": "CardEffect.build_steps",
-  "catalog_sha256": "e17b34f37db5de0cdbddfb0f2c2ed8cc59a189c39772240eeaecef5c3aba3231"
+  "catalog_sha256": "5dba402652a4884ce9e73b4d4988d4b6cd3fdba47bfca1a8281c4dcec7df8aec"
 }

@@ -2,7 +2,7 @@
   "schema_version": 2,
   "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
   "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
-  "semantic_sha256": "8fbe84455f71e11ce012a37c5784b70a47085b86ce808a67b0ef3d7da359fd41",
+  "semantic_sha256": "7a09d90d00100ba88888f4b9cff4962bfa0639a2245147bb23070c00ee78af20",
   "cases": [
     {
       "name": "object-execution-shared-pending-step",
@@ -71278,7 +71278,2697 @@
       "name": "object-execution-min-primary-perfect_self-reperform-after-convert",
       "path": "object-execution/5be818e2119c2b6f021acaf7414e7ef7d603b337d56538e5f40eddb68e3943a8.json",
       "case_sha256": "5be818e2119c2b6f021acaf7414e7ef7d603b337d56538e5f40eddb68e3943a8"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-crane_stance-ordinary",
+      "path": "object-execution/8495d5457d54bb984e3cb2c2b5e8ebd4f3d684f8ed2565eeed49a29c3e205095.json",
+      "case_sha256": "8495d5457d54bb984e3cb2c2b5e8ebd4f3d684f8ed2565eeed49a29c3e205095"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-crane_stance-facedown",
+      "path": "object-execution/a4960d49603d4c1073bad25c23228f9afb3fd5b98b0d55f4bfe1b62bf64e7959.json",
+      "case_sha256": "a4960d49603d4c1073bad25c23228f9afb3fd5b98b0d55f4bfe1b62bf64e7959"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-crane_stance-registry-override",
+      "path": "object-execution/d1198374238d146681da686802d82a515bb42f509076ea389e76abc38c13807b.json",
+      "case_sha256": "d1198374238d146681da686802d82a515bb42f509076ea389e76abc38c13807b"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-crane_stance-no-target",
+      "path": "object-execution/48d46ef6a6604ca6833893067b0d24895f2538c0d1e01a15a6aab948bb57b62c.json",
+      "case_sha256": "48d46ef6a6604ca6833893067b0d24895f2538c0d1e01a15a6aab948bb57b62c"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-crane_stance-complete",
+      "path": "object-execution/0287a7aeb1aefbc399c57e51bb3bbdaa6d412f8275b8e611c977caacfc87a885.json",
+      "case_sha256": "0287a7aeb1aefbc399c57e51bb3bbdaa6d412f8275b8e611c977caacfc87a885"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-crane_stance-complete-skip",
+      "path": "object-execution/5e7e5555a90dcece1ab287754bb6e9582e2f5eaf5341a5691fb4c6695ac6f376.json",
+      "case_sha256": "5e7e5555a90dcece1ab287754bb6e9582e2f5eaf5341a5691fb4c6695ac6f376"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-crane_stance-skill",
+      "path": "object-execution/ccaaf2f84f9f5da9e96b93f4ad320a5f029a4ae375da69d596f8ac1ec5d322c4.json",
+      "case_sha256": "ccaaf2f84f9f5da9e96b93f4ad320a5f029a4ae375da69d596f8ac1ec5d322c4"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-crane_stance-negative-attack",
+      "path": "object-execution/e91cb24c30224ebcaaa3b6a519b0350c8dd5f27adf521439c2a910c4f79a23bf.json",
+      "case_sha256": "e91cb24c30224ebcaaa3b6a519b0350c8dd5f27adf521439c2a910c4f79a23bf"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-crane_stance-played",
+      "path": "object-execution/a7464d6990e0ae9f62f9144fc6a3eaf8631f9ce9e068ceeb119a67f37cbd5c41.json",
+      "case_sha256": "a7464d6990e0ae9f62f9144fc6a3eaf8631f9ce9e068ceeb119a67f37cbd5c41"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-crane_stance-discard",
+      "path": "object-execution/9a6f6c670a245f3cbf2295e920ec5af350252e8de2f3cd8f4bb39e2404dbc8bb.json",
+      "case_sha256": "9a6f6c670a245f3cbf2295e920ec5af350252e8de2f3cd8f4bb39e2404dbc8bb"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-crane_stance-victim-fallback",
+      "path": "object-execution/eecbde1e06ef02e5ae7a498cfdbdc7f0d0cd6a86e6e8fc2c0d524e48108a0ba6.json",
+      "case_sha256": "eecbde1e06ef02e5ae7a498cfdbdc7f0d0cd6a86e6e8fc2c0d524e48108a0ba6"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-crane_stance-already-repeat",
+      "path": "object-execution/76162e35df3cfa23b61704451fa36b5eca83c38d42227eba24a1d48d81074b15.json",
+      "case_sha256": "76162e35df3cfa23b61704451fa36b5eca83c38d42227eba24a1d48d81074b15"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-dragon_stance-ordinary",
+      "path": "object-execution/c7dedf2e6386fcf87d0383409716e036f607d6411bdbbe63aaea1a3dc356cd85.json",
+      "case_sha256": "c7dedf2e6386fcf87d0383409716e036f607d6411bdbbe63aaea1a3dc356cd85"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-dragon_stance-facedown",
+      "path": "object-execution/6dd55f379f3451776c7455c4e98707cb3a084c833fa1ed2a39d12e2493bd5e65.json",
+      "case_sha256": "6dd55f379f3451776c7455c4e98707cb3a084c833fa1ed2a39d12e2493bd5e65"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-dragon_stance-registry-override",
+      "path": "object-execution/55b662e8d5172b239a3f9f9828cf82370e765758fa33a0a5a8ad4b814febb631.json",
+      "case_sha256": "55b662e8d5172b239a3f9f9828cf82370e765758fa33a0a5a8ad4b814febb631"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-dragon_stance-no-target",
+      "path": "object-execution/b4a12c19a4075ceda050ecb3086e85ef54cd681523e542a3294e15497810e0eb.json",
+      "case_sha256": "b4a12c19a4075ceda050ecb3086e85ef54cd681523e542a3294e15497810e0eb"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-war_drummer-ordinary",
+      "path": "object-execution/b4fb13ddc6d97552d6082e7edba4b3a9b7f5fdcbfd69bd2c8d5c84305625ec9a.json",
+      "case_sha256": "b4fb13ddc6d97552d6082e7edba4b3a9b7f5fdcbfd69bd2c8d5c84305625ec9a"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-war_drummer-facedown",
+      "path": "object-execution/27a8f4ac276df05f63d40991abdfbcda9bd015c49f583355b8cac5cdaf63ef80.json",
+      "case_sha256": "27a8f4ac276df05f63d40991abdfbcda9bd015c49f583355b8cac5cdaf63ef80"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-war_drummer-registry-override",
+      "path": "object-execution/038b260cb60f45102ec831d8657f5fe953a86a17647db311a762d32921265ac3.json",
+      "case_sha256": "038b260cb60f45102ec831d8657f5fe953a86a17647db311a762d32921265ac3"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-war_drummer-no-target",
+      "path": "object-execution/c4a80178f66ecec2d22c6987171698432bcd0b65566dc4fef89b55820f04183b.json",
+      "case_sha256": "c4a80178f66ecec2d22c6987171698432bcd0b65566dc4fef89b55820f04183b"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-inner_strength-ordinary",
+      "path": "object-execution/a7c21065cf8214145fc295e5c62441ca009d4c5b7f1d115d2a918efbe0b3ba13.json",
+      "case_sha256": "a7c21065cf8214145fc295e5c62441ca009d4c5b7f1d115d2a918efbe0b3ba13"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-inner_strength-facedown",
+      "path": "object-execution/ee430f3487b0f4c9e915c0e0c396151fd1dcc4fb18a50e4d1656a3df31ec4334.json",
+      "case_sha256": "ee430f3487b0f4c9e915c0e0c396151fd1dcc4fb18a50e4d1656a3df31ec4334"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-inner_strength-registry-override",
+      "path": "object-execution/db15f5baaf17fca3e275b053e929617a5618f67920aaed729c0dca9eee2cec63.json",
+      "case_sha256": "db15f5baaf17fca3e275b053e929617a5618f67920aaed729c0dca9eee2cec63"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-inner_strength-no-target",
+      "path": "object-execution/8188c1cd82409256f2ba4d41badc33faedf4eddbfc7815f1514fb99ed51af4b5.json",
+      "case_sha256": "8188c1cd82409256f2ba4d41badc33faedf4eddbfc7815f1514fb99ed51af4b5"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-inner_strength-complete",
+      "path": "object-execution/4de0ddcafbcf7000f1b48a000d4d74f738acefe22879fe6e3cafa1b0c8183248.json",
+      "case_sha256": "4de0ddcafbcf7000f1b48a000d4d74f738acefe22879fe6e3cafa1b0c8183248"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-inner_strength-complete-skip",
+      "path": "object-execution/7fbf1db80437bff21883e494b4fc15b3122a143072ca980c8fbcf085da4ea35d.json",
+      "case_sha256": "7fbf1db80437bff21883e494b4fc15b3122a143072ca980c8fbcf085da4ea35d"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-inner_strength-skill",
+      "path": "object-execution/f804d73abfccf27d7599c83548eeb2bc4877f71f292046871f8fa90ee3ea1349.json",
+      "case_sha256": "f804d73abfccf27d7599c83548eeb2bc4877f71f292046871f8fa90ee3ea1349"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-inner_strength-negative-attack",
+      "path": "object-execution/f7b79ea522e0fe3c9318dc185b6011772f14cbdb4c4f8f4f7b53ad607f240688.json",
+      "case_sha256": "f7b79ea522e0fe3c9318dc185b6011772f14cbdb4c4f8f4f7b53ad607f240688"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-inner_strength-played",
+      "path": "object-execution/4484baef8a73ca9fd200f651f32632d0c506bb5595c4a059e880fd91211eb426.json",
+      "case_sha256": "4484baef8a73ca9fd200f651f32632d0c506bb5595c4a059e880fd91211eb426"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-inner_strength-discard",
+      "path": "object-execution/bc49d16b80dd919f4e1ea20f9baab2faed025703ebe9f978a198da5532908be6.json",
+      "case_sha256": "bc49d16b80dd919f4e1ea20f9baab2faed025703ebe9f978a198da5532908be6"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-inner_strength-victim-fallback",
+      "path": "object-execution/ca863d0bfdc222e5a56ad1cffcb664f00c2b1ad9ca881b87db11821f68651bb8.json",
+      "case_sha256": "ca863d0bfdc222e5a56ad1cffcb664f00c2b1ad9ca881b87db11821f68651bb8"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-inner_strength-already-repeat",
+      "path": "object-execution/91a7e54e861d1eeb78bb39098488954973328a379313289b56571500a9eb16d1.json",
+      "case_sha256": "91a7e54e861d1eeb78bb39098488954973328a379313289b56571500a9eb16d1"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-death_grenade-ordinary",
+      "path": "object-execution/9cfe87e8003f344bfb84cc8cc470a9941cfafb3949ee5f2081160ec500bdcac6.json",
+      "case_sha256": "9cfe87e8003f344bfb84cc8cc470a9941cfafb3949ee5f2081160ec500bdcac6"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-death_grenade-facedown",
+      "path": "object-execution/05182620d4ab40d60b067e49ea685a2d5343b1ff22acbeda34a416111ca22740.json",
+      "case_sha256": "05182620d4ab40d60b067e49ea685a2d5343b1ff22acbeda34a416111ca22740"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-death_grenade-registry-override",
+      "path": "object-execution/b83830cd9ada7afa75f58bf1c1de1c05bb1b1e840acf44f4747221cb9614ce49.json",
+      "case_sha256": "b83830cd9ada7afa75f58bf1c1de1c05bb1b1e840acf44f4747221cb9614ce49"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-death_grenade-no-target",
+      "path": "object-execution/a7106a2993b3f64e706f9e93d7eef4468e5f3e4ab7b298b355c616ea824d6964.json",
+      "case_sha256": "a7106a2993b3f64e706f9e93d7eef4468e5f3e4ab7b298b355c616ea824d6964"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-magnetic_dagger-ordinary",
+      "path": "object-execution/f2294c1ae0970aeb3d4c570f6b78e5ede2cca200037044baff2e5affc639cd3e.json",
+      "case_sha256": "f2294c1ae0970aeb3d4c570f6b78e5ede2cca200037044baff2e5affc639cd3e"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-magnetic_dagger-facedown",
+      "path": "object-execution/e8bd7f8940627729a2d6a4381ed1606d1aadaea83d9e0066c53cc2761ac604e6.json",
+      "case_sha256": "e8bd7f8940627729a2d6a4381ed1606d1aadaea83d9e0066c53cc2761ac604e6"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-magnetic_dagger-registry-override",
+      "path": "object-execution/848d6e8abea7f3ce7061dec45d8885547ce9d3735b7cea584bbe33837bda1abe.json",
+      "case_sha256": "848d6e8abea7f3ce7061dec45d8885547ce9d3735b7cea584bbe33837bda1abe"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-magnetic_dagger-no-target",
+      "path": "object-execution/a2307bd9d1923e77d15ac1ffbb8166c39cf415c1b78a238779bba3cda9104b59.json",
+      "case_sha256": "a2307bd9d1923e77d15ac1ffbb8166c39cf415c1b78a238779bba3cda9104b59"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-thunder_boomerang-ordinary",
+      "path": "object-execution/57dabad7c9a25b04fe2f6e8fd464c533387e57153f47787356043ba8f6a56a6a.json",
+      "case_sha256": "57dabad7c9a25b04fe2f6e8fd464c533387e57153f47787356043ba8f6a56a6a"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-thunder_boomerang-facedown",
+      "path": "object-execution/08ec4ceba3b3feba4974bdb80927d38d347840733b8cde9c95308e82c9bffb17.json",
+      "case_sha256": "08ec4ceba3b3feba4974bdb80927d38d347840733b8cde9c95308e82c9bffb17"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-thunder_boomerang-registry-override",
+      "path": "object-execution/7e08529e238e6f0fed513238a2c9bbe8539223d2cd95f2c8f97f17949de71556.json",
+      "case_sha256": "7e08529e238e6f0fed513238a2c9bbe8539223d2cd95f2c8f97f17949de71556"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-thunder_boomerang-no-target",
+      "path": "object-execution/166d884ea93bf22579dee2e4e304397c7bf05c3c02f11469a64ed3389f66a8c4.json",
+      "case_sha256": "166d884ea93bf22579dee2e4e304397c7bf05c3c02f11469a64ed3389f66a8c4"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-electrocute-ordinary",
+      "path": "object-execution/9dc96430e6bc0522c14d158070d9a2d95156b82567b24466676d63ccad1f5ba6.json",
+      "case_sha256": "9dc96430e6bc0522c14d158070d9a2d95156b82567b24466676d63ccad1f5ba6"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-electrocute-facedown",
+      "path": "object-execution/3f2433224e34618a00ad23c254201bf26050f0f88903d7fe9aa93fb820efd63d.json",
+      "case_sha256": "3f2433224e34618a00ad23c254201bf26050f0f88903d7fe9aa93fb820efd63d"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-electrocute-registry-override",
+      "path": "object-execution/f29ec80e9351339218aed53d9dbd00178dd274784d5ba36502be9431c36ee182.json",
+      "case_sha256": "f29ec80e9351339218aed53d9dbd00178dd274784d5ba36502be9431c36ee182"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-electrocute-no-target",
+      "path": "object-execution/83f069388ffb77b17cdf9f7db7eb4dcdcc6adc0dd47f6c1d0b88f69d715beb6a.json",
+      "case_sha256": "83f069388ffb77b17cdf9f7db7eb4dcdcc6adc0dd47f6c1d0b88f69d715beb6a"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-electrocute-complete",
+      "path": "object-execution/e8abf0a409545216bd85f03da3752dbf87b2ad76d2b6a58f1d9c6344079aa4e9.json",
+      "case_sha256": "e8abf0a409545216bd85f03da3752dbf87b2ad76d2b6a58f1d9c6344079aa4e9"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-electrocute-complete-skip",
+      "path": "object-execution/637689e89b6f627ce9e58ac60870b3f65c481440c66873d8c2880cea0fdf2b82.json",
+      "case_sha256": "637689e89b6f627ce9e58ac60870b3f65c481440c66873d8c2880cea0fdf2b82"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-electrocute-skill",
+      "path": "object-execution/3a5758d7502399d175abc74e3466f7f275b8611a4cde3d97753239b6d46eef2f.json",
+      "case_sha256": "3a5758d7502399d175abc74e3466f7f275b8611a4cde3d97753239b6d46eef2f"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-electrocute-negative-attack",
+      "path": "object-execution/cd54cfd8656b6014b2acee2cae39abe3f392e669b88b6d422f58cdcaf99662f1.json",
+      "case_sha256": "cd54cfd8656b6014b2acee2cae39abe3f392e669b88b6d422f58cdcaf99662f1"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-electrocute-played",
+      "path": "object-execution/7265312e5a61fc69becdac1e49d3c70628af86992b2060cf47e565740a247041.json",
+      "case_sha256": "7265312e5a61fc69becdac1e49d3c70628af86992b2060cf47e565740a247041"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-electrocute-discard",
+      "path": "object-execution/f8aa3dacc17fcc435232b63179482bcbacde64d1ce6916e9b503aa163bfc665f.json",
+      "case_sha256": "f8aa3dacc17fcc435232b63179482bcbacde64d1ce6916e9b503aa163bfc665f"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-electrocute-victim-fallback",
+      "path": "object-execution/bb6b7f507ed5e779882db1b91add1cee3799981ab4afcdc0b51a5ff44bf89f37.json",
+      "case_sha256": "bb6b7f507ed5e779882db1b91add1cee3799981ab4afcdc0b51a5ff44bf89f37"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-electrocute-already-repeat",
+      "path": "object-execution/8a2824e69e11efa291866ec66e5d4587b9eab68c5bfc9e9adc2e64647db3bbec.json",
+      "case_sha256": "8a2824e69e11efa291866ec66e5d4587b9eab68c5bfc9e9adc2e64647db3bbec"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-slippery_ground-ordinary",
+      "path": "object-execution/b8b42170e1dda91171ec6486d6ea9b758900e66e8a8e545623be4bf30d36e7cc.json",
+      "case_sha256": "b8b42170e1dda91171ec6486d6ea9b758900e66e8a8e545623be4bf30d36e7cc"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-slippery_ground-facedown",
+      "path": "object-execution/bdd1b47f2129be48a2460edceabf6332541f885abb31e0a0193679826978f90c.json",
+      "case_sha256": "bdd1b47f2129be48a2460edceabf6332541f885abb31e0a0193679826978f90c"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-slippery_ground-registry-override",
+      "path": "object-execution/f75ca769eb1102712ff3fa6cf8239ec02504112b0f0c136e18c5351ea3ba0f56.json",
+      "case_sha256": "f75ca769eb1102712ff3fa6cf8239ec02504112b0f0c136e18c5351ea3ba0f56"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-slippery_ground-no-target",
+      "path": "object-execution/2fa2d5884d34295af555141e823e6fb826b9ddcb8b9e2901582fa4344d73bea4.json",
+      "case_sha256": "2fa2d5884d34295af555141e823e6fb826b9ddcb8b9e2901582fa4344d73bea4"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-slippery_ground-complete",
+      "path": "object-execution/3a674cd8acd23a8d4790f356ed478d5fd1526cd3204ff33c8946c0ac49123df9.json",
+      "case_sha256": "3a674cd8acd23a8d4790f356ed478d5fd1526cd3204ff33c8946c0ac49123df9"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-slippery_ground-complete-skip",
+      "path": "object-execution/643de08bd1e0cd6f95d589b3518d79774312c5c870a6882954b736a7c66771ac.json",
+      "case_sha256": "643de08bd1e0cd6f95d589b3518d79774312c5c870a6882954b736a7c66771ac"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-slippery_ground-skill",
+      "path": "object-execution/d76ac4347c23f17865e76b4baea5319665233cdd65a2e42bb8f190b7932a14df.json",
+      "case_sha256": "d76ac4347c23f17865e76b4baea5319665233cdd65a2e42bb8f190b7932a14df"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-slippery_ground-negative-attack",
+      "path": "object-execution/1f42c32b4c92acaeb81ce5a11d44b496c3d69571020c85d14f85305a3b9ec7d6.json",
+      "case_sha256": "1f42c32b4c92acaeb81ce5a11d44b496c3d69571020c85d14f85305a3b9ec7d6"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-slippery_ground-played",
+      "path": "object-execution/88c6a68e79f48ccbe1ee0501892df90c70b07cab28c8791927ac8f259e4544f8.json",
+      "case_sha256": "88c6a68e79f48ccbe1ee0501892df90c70b07cab28c8791927ac8f259e4544f8"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-slippery_ground-discard",
+      "path": "object-execution/c127ef1ba54fa11f9a6c8e98d7d6138dce945bc71400db4f10ca933d480ae581.json",
+      "case_sha256": "c127ef1ba54fa11f9a6c8e98d7d6138dce945bc71400db4f10ca933d480ae581"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-slippery_ground-victim-fallback",
+      "path": "object-execution/6ecddcfa7f73f909681d9e7d78da3c6c17f44fa6c97a50bef579c0b65fda5ae4.json",
+      "case_sha256": "6ecddcfa7f73f909681d9e7d78da3c6c17f44fa6c97a50bef579c0b65fda5ae4"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-slippery_ground-already-repeat",
+      "path": "object-execution/889c6a1113cbb470a33e1f535f13f5a7fc929331cfecbebcb9d831e385fe5e8d.json",
+      "case_sha256": "889c6a1113cbb470a33e1f535f13f5a7fc929331cfecbebcb9d831e385fe5e8d"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-master_thief-ordinary",
+      "path": "object-execution/8e6a8671dead29cf25e1efe359c7c631be34e5a9714119fc138958c3c1ea011b.json",
+      "case_sha256": "8e6a8671dead29cf25e1efe359c7c631be34e5a9714119fc138958c3c1ea011b"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-master_thief-facedown",
+      "path": "object-execution/015cf2b7686cae8bf56e8539f7de263752f928c456ed33fbf78947f1dc62bcdd.json",
+      "case_sha256": "015cf2b7686cae8bf56e8539f7de263752f928c456ed33fbf78947f1dc62bcdd"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-master_thief-registry-override",
+      "path": "object-execution/0714fe59cae18dbe8148b93bbf31be9a9289d55ddf478e933d24d6c344479ec3.json",
+      "case_sha256": "0714fe59cae18dbe8148b93bbf31be9a9289d55ddf478e933d24d6c344479ec3"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-master_thief-no-target",
+      "path": "object-execution/b192487b128c2daebb79193c437f92508dfefef0435ef97fcc27ce019a117242.json",
+      "case_sha256": "b192487b128c2daebb79193c437f92508dfefef0435ef97fcc27ce019a117242"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-swoop_in-ordinary",
+      "path": "object-execution/a14a98e289af3231d199f070c8b6c3656478c4e6c29a7e2927ea328de486f83b.json",
+      "case_sha256": "a14a98e289af3231d199f070c8b6c3656478c4e6c29a7e2927ea328de486f83b"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-swoop_in-facedown",
+      "path": "object-execution/e388cfc3b37e7030ae1d8dfeb49f30602d110a163090841b932691eac8892759.json",
+      "case_sha256": "e388cfc3b37e7030ae1d8dfeb49f30602d110a163090841b932691eac8892759"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-swoop_in-registry-override",
+      "path": "object-execution/5f2e97eb3f2cfa4376389538176948e2c95c5a37a215679ae124d0b7a35e5b46.json",
+      "case_sha256": "5f2e97eb3f2cfa4376389538176948e2c95c5a37a215679ae124d0b7a35e5b46"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-swoop_in-no-target",
+      "path": "object-execution/2186798da20ec2617eeac4622c44af04e4c13c49b1ce86af4f48aa3f87d62657.json",
+      "case_sha256": "2186798da20ec2617eeac4622c44af04e4c13c49b1ce86af4f48aa3f87d62657"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-watch_how_i_soar-ordinary",
+      "path": "object-execution/64ae1d25300272a32ac3b2f2592245a0d9e8ab9351ffb3dd15bd60932dad1712.json",
+      "case_sha256": "64ae1d25300272a32ac3b2f2592245a0d9e8ab9351ffb3dd15bd60932dad1712"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-watch_how_i_soar-facedown",
+      "path": "object-execution/b579b785ec954ae4ee3571e591c20de813251e30ddeca8c5937f74a86f119008.json",
+      "case_sha256": "b579b785ec954ae4ee3571e591c20de813251e30ddeca8c5937f74a86f119008"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-watch_how_i_soar-registry-override",
+      "path": "object-execution/c12ce2930caba718f3b1dd0e0433cef77887a46da877969d13fcd6a225161d48.json",
+      "case_sha256": "c12ce2930caba718f3b1dd0e0433cef77887a46da877969d13fcd6a225161d48"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-watch_how_i_soar-no-target",
+      "path": "object-execution/c5898575aec030c18a67cb9c3081a5b79a099be6dfb04f39d19af2486b1a5407.json",
+      "case_sha256": "c5898575aec030c18a67cb9c3081a5b79a099be6dfb04f39d19af2486b1a5407"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-perfect_self-ordinary",
+      "path": "object-execution/ca8781e042f337d8b8e69388eca1be184fee3050cd9403f2d390d5ed2dc56797.json",
+      "case_sha256": "ca8781e042f337d8b8e69388eca1be184fee3050cd9403f2d390d5ed2dc56797"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-perfect_self-facedown",
+      "path": "object-execution/81f6b811802d977688b0081df144cdd62f81851924f4534621605f90632389f6.json",
+      "case_sha256": "81f6b811802d977688b0081df144cdd62f81851924f4534621605f90632389f6"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-perfect_self-registry-override",
+      "path": "object-execution/c345454a0e73b5763ba779770b8eaeb70bf8b3672f9ecad37dc2150749ea4e08.json",
+      "case_sha256": "c345454a0e73b5763ba779770b8eaeb70bf8b3672f9ecad37dc2150749ea4e08"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-perfect_self-no-target",
+      "path": "object-execution/ce32bc3596f6bc9716f0fa58aa3b9c773288b9a7f2084f68c91943ebbb8dffeb.json",
+      "case_sha256": "ce32bc3596f6bc9716f0fa58aa3b9c773288b9a7f2084f68c91943ebbb8dffeb"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-cantrip-ordinary",
+      "path": "object-execution/aaec138176bc8703c769b1800264dcbea813924609020a17cd44c087dcdd97af.json",
+      "case_sha256": "aaec138176bc8703c769b1800264dcbea813924609020a17cd44c087dcdd97af"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-cantrip-facedown",
+      "path": "object-execution/8f6f5401ccbee099be60a16aa488823cd2ef2196e424291817a6c76568eff035.json",
+      "case_sha256": "8f6f5401ccbee099be60a16aa488823cd2ef2196e424291817a6c76568eff035"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-cantrip-registry-override",
+      "path": "object-execution/0bd6c20381b4e9ff5356411a730283bd397b018f4f5a4c9d0b368eaec7e4c753.json",
+      "case_sha256": "0bd6c20381b4e9ff5356411a730283bd397b018f4f5a4c9d0b368eaec7e4c753"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-cantrip-no-target",
+      "path": "object-execution/37d650cfbb873c12398328d78d3eb4e41b1c3b24ab45f3b20f251d43a4e09b46.json",
+      "case_sha256": "37d650cfbb873c12398328d78d3eb4e41b1c3b24ab45f3b20f251d43a4e09b46"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-trip_mine-ordinary",
+      "path": "object-execution/ccd90f2e4b4bdeeab34d48ef9242321c23ecf1f1399971791b26c387ac72f8f7.json",
+      "case_sha256": "ccd90f2e4b4bdeeab34d48ef9242321c23ecf1f1399971791b26c387ac72f8f7"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-trip_mine-facedown",
+      "path": "object-execution/60a10f10e2f66451d959d3a8cdde1d058337f2a2c63e9e1d3e320035ae82ce3e.json",
+      "case_sha256": "60a10f10e2f66451d959d3a8cdde1d058337f2a2c63e9e1d3e320035ae82ce3e"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-trip_mine-registry-override",
+      "path": "object-execution/4ad53df704eee912c7c559aef95cc35c0f785aa1f831fff3ffe5857d633d6b6c.json",
+      "case_sha256": "4ad53df704eee912c7c559aef95cc35c0f785aa1f831fff3ffe5857d633d6b6c"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-trip_mine-no-target",
+      "path": "object-execution/c0048c605feee9b48873449a784f9cecca33aebfeee9f9c5a3385233a36d3087.json",
+      "case_sha256": "c0048c605feee9b48873449a784f9cecca33aebfeee9f9c5a3385233a36d3087"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-fast_as_lightning-ordinary",
+      "path": "object-execution/324cff0000df6c271a5fe9f5290e0f001481aa53d8f4a223b5dfac8eab16290b.json",
+      "case_sha256": "324cff0000df6c271a5fe9f5290e0f001481aa53d8f4a223b5dfac8eab16290b"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-fast_as_lightning-facedown",
+      "path": "object-execution/bfde83d4d27ed5fcda13dc5e6787a1b4f6f0ad6a74b104c41658a84b51096fbf.json",
+      "case_sha256": "bfde83d4d27ed5fcda13dc5e6787a1b4f6f0ad6a74b104c41658a84b51096fbf"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-fast_as_lightning-registry-override",
+      "path": "object-execution/0bfcb12782004c364f8b2bf8c593b16a92b61f8024d8cb8ecc604740279fc752.json",
+      "case_sha256": "0bfcb12782004c364f8b2bf8c593b16a92b61f8024d8cb8ecc604740279fc752"
+    },
+    {
+      "name": "object-execution-dynamic-passive-flurry_of_blows-fast_as_lightning-no-target",
+      "path": "object-execution/05457abdcaa80d7a99ed9abf9babef73fd8f0c78e7d2f957cadb2c8987936513.json",
+      "case_sha256": "05457abdcaa80d7a99ed9abf9babef73fd8f0c78e7d2f957cadb2c8987936513"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-crane_stance-ordinary",
+      "path": "object-execution/2e137cf1f9022cfc5506fb33aad89450826b1c7dec9d2b7eab2c74a14aa2a474.json",
+      "case_sha256": "2e137cf1f9022cfc5506fb33aad89450826b1c7dec9d2b7eab2c74a14aa2a474"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-crane_stance-facedown",
+      "path": "object-execution/69f70f3723a3103b7132ee4ac2b4b375fe05c7b2533a0b3945b0568469f39e9e.json",
+      "case_sha256": "69f70f3723a3103b7132ee4ac2b4b375fe05c7b2533a0b3945b0568469f39e9e"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-crane_stance-registry-override",
+      "path": "object-execution/8fdbf1d9b54cb2d55810734400ac5b5dc34f55b699558e0c96288d5cbb2add7d.json",
+      "case_sha256": "8fdbf1d9b54cb2d55810734400ac5b5dc34f55b699558e0c96288d5cbb2add7d"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-crane_stance-no-target",
+      "path": "object-execution/df98c2e183d25c8ec6d0b6b76be0b14969e8cdc040b3e73d7b0f99b77ae6f4f8.json",
+      "case_sha256": "df98c2e183d25c8ec6d0b6b76be0b14969e8cdc040b3e73d7b0f99b77ae6f4f8"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-crane_stance-complete",
+      "path": "object-execution/a58cc3033a563ba7a462ca9f4e129fab70d95fd3b2e03aad47af2f03bca61ec0.json",
+      "case_sha256": "a58cc3033a563ba7a462ca9f4e129fab70d95fd3b2e03aad47af2f03bca61ec0"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-crane_stance-complete-skip",
+      "path": "object-execution/f442d00482a278621212402b522ec50f360b255239b3343b4ef0e2fd98632812.json",
+      "case_sha256": "f442d00482a278621212402b522ec50f360b255239b3343b4ef0e2fd98632812"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-crane_stance-skill",
+      "path": "object-execution/99782bdfb312aaf1aeeda4d4d7294ba92963d8954261fb95ea32c4bdac1d92df.json",
+      "case_sha256": "99782bdfb312aaf1aeeda4d4d7294ba92963d8954261fb95ea32c4bdac1d92df"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-crane_stance-negative-attack",
+      "path": "object-execution/c47b6c03ccd40cc38fad29393223d9445f60cee0133e8c4027fe8b840ca61c1c.json",
+      "case_sha256": "c47b6c03ccd40cc38fad29393223d9445f60cee0133e8c4027fe8b840ca61c1c"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-dragon_stance-ordinary",
+      "path": "object-execution/76f449a0a1eca45d9de4d5824bf41f67fc9b3dcd019e50f129b0bf52d2d00640.json",
+      "case_sha256": "76f449a0a1eca45d9de4d5824bf41f67fc9b3dcd019e50f129b0bf52d2d00640"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-dragon_stance-facedown",
+      "path": "object-execution/0be7b1a823dac3e51f64bb66945f13772b5096ac4e6cc9d4776094894635f939.json",
+      "case_sha256": "0be7b1a823dac3e51f64bb66945f13772b5096ac4e6cc9d4776094894635f939"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-dragon_stance-registry-override",
+      "path": "object-execution/3b4d32bcb41372a4a116cb805182df48353c9fe2a8f6e318e41555ebde4dcda0.json",
+      "case_sha256": "3b4d32bcb41372a4a116cb805182df48353c9fe2a8f6e318e41555ebde4dcda0"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-dragon_stance-no-target",
+      "path": "object-execution/835f9784340d90c0467c35ff6be391935d0fd8557c6740ebb8c92946e5fb1e40.json",
+      "case_sha256": "835f9784340d90c0467c35ff6be391935d0fd8557c6740ebb8c92946e5fb1e40"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-war_drummer-ordinary",
+      "path": "object-execution/a4172f0becf2dbb562219d7ef5d307c12bb49fe368a5d3355379813b8c60e794.json",
+      "case_sha256": "a4172f0becf2dbb562219d7ef5d307c12bb49fe368a5d3355379813b8c60e794"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-war_drummer-facedown",
+      "path": "object-execution/87d53371b3f9718d302c6d25fdce05bff8be121e0c6dd47f7847f717ea6c296f.json",
+      "case_sha256": "87d53371b3f9718d302c6d25fdce05bff8be121e0c6dd47f7847f717ea6c296f"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-war_drummer-registry-override",
+      "path": "object-execution/6610d8542abe162e7e11415ccfbe6532cb5308b75d3851a19debd8d51e187c73.json",
+      "case_sha256": "6610d8542abe162e7e11415ccfbe6532cb5308b75d3851a19debd8d51e187c73"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-war_drummer-no-target",
+      "path": "object-execution/efdb28df48e70268213b2e666488b42e1de276233fd01a73b20170a01a2fed68.json",
+      "case_sha256": "efdb28df48e70268213b2e666488b42e1de276233fd01a73b20170a01a2fed68"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-inner_strength-ordinary",
+      "path": "object-execution/858d2f3c70eb58a59125e7b9174ce16b18e6eab61da5f939f7f6abce20bd16f9.json",
+      "case_sha256": "858d2f3c70eb58a59125e7b9174ce16b18e6eab61da5f939f7f6abce20bd16f9"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-inner_strength-facedown",
+      "path": "object-execution/bed66743ae639d0aeaf018f2d67301644fd9903ba975028656f2353231ccb2fc.json",
+      "case_sha256": "bed66743ae639d0aeaf018f2d67301644fd9903ba975028656f2353231ccb2fc"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-inner_strength-registry-override",
+      "path": "object-execution/59e4e4110f61187058e4f8a09ab1a51fa3957e4a910ee85343c5a364172c68c3.json",
+      "case_sha256": "59e4e4110f61187058e4f8a09ab1a51fa3957e4a910ee85343c5a364172c68c3"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-inner_strength-no-target",
+      "path": "object-execution/1370a41622cb3bd227a20056ebe4beac340fb22b66e6e829ce248ca0e993881a.json",
+      "case_sha256": "1370a41622cb3bd227a20056ebe4beac340fb22b66e6e829ce248ca0e993881a"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-inner_strength-complete",
+      "path": "object-execution/3a6dc2dc828c7b2d0026301d3f2431fdc5fc3176466123662d79e9301d47e43c.json",
+      "case_sha256": "3a6dc2dc828c7b2d0026301d3f2431fdc5fc3176466123662d79e9301d47e43c"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-inner_strength-complete-skip",
+      "path": "object-execution/d60fb6482038e307c20f67698242c10a9db2b77631350d5863bb8c975333d7a4.json",
+      "case_sha256": "d60fb6482038e307c20f67698242c10a9db2b77631350d5863bb8c975333d7a4"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-inner_strength-skill",
+      "path": "object-execution/3cd50f704cf51ff2aa83b32020c5e51d4c119004cef701bdf35f87adc9320298.json",
+      "case_sha256": "3cd50f704cf51ff2aa83b32020c5e51d4c119004cef701bdf35f87adc9320298"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-inner_strength-negative-attack",
+      "path": "object-execution/327db41a3efbaed9dd884454e459488f820d11b6bd0201365dd65f25709f13bd.json",
+      "case_sha256": "327db41a3efbaed9dd884454e459488f820d11b6bd0201365dd65f25709f13bd"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-death_grenade-ordinary",
+      "path": "object-execution/f483d2959aa705e3ef0b4375bd59d647a4cc79d1f3f2ecde8828a973596ba7d5.json",
+      "case_sha256": "f483d2959aa705e3ef0b4375bd59d647a4cc79d1f3f2ecde8828a973596ba7d5"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-death_grenade-facedown",
+      "path": "object-execution/e7975a3ad76750aecb9630699eb51a24679577201d32dc0f844fba32bf31ccd7.json",
+      "case_sha256": "e7975a3ad76750aecb9630699eb51a24679577201d32dc0f844fba32bf31ccd7"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-death_grenade-registry-override",
+      "path": "object-execution/7f8eb8efe4e43ebce079f425b6478f1f6b70ea64a23796c5f033534923b10f2e.json",
+      "case_sha256": "7f8eb8efe4e43ebce079f425b6478f1f6b70ea64a23796c5f033534923b10f2e"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-death_grenade-no-target",
+      "path": "object-execution/ec718e731121d818b864e5e840dc778f89fdb0507d920050789354deacb5f5c9.json",
+      "case_sha256": "ec718e731121d818b864e5e840dc778f89fdb0507d920050789354deacb5f5c9"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-magnetic_dagger-ordinary",
+      "path": "object-execution/1d729e71dbba65d6e53f116bbc865dbb2e09483ed8e1e674142a5e916b864005.json",
+      "case_sha256": "1d729e71dbba65d6e53f116bbc865dbb2e09483ed8e1e674142a5e916b864005"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-magnetic_dagger-facedown",
+      "path": "object-execution/ea3805a390191f6a1cdf0b1c55def9318a82b9dbd82e097c4084af11e149e17a.json",
+      "case_sha256": "ea3805a390191f6a1cdf0b1c55def9318a82b9dbd82e097c4084af11e149e17a"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-magnetic_dagger-registry-override",
+      "path": "object-execution/5fc0f221adabb1fc23674d42fe0c88115941a97d7c23a9da627cc315b2daf578.json",
+      "case_sha256": "5fc0f221adabb1fc23674d42fe0c88115941a97d7c23a9da627cc315b2daf578"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-magnetic_dagger-no-target",
+      "path": "object-execution/f6e362f13290bddd18a9cf5908400180c25d94f9974904814ba9050863bf39d1.json",
+      "case_sha256": "f6e362f13290bddd18a9cf5908400180c25d94f9974904814ba9050863bf39d1"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-thunder_boomerang-ordinary",
+      "path": "object-execution/beb2abfe180bc1b940c19ffb12e61446c2d0554c0690558fa00fc49746fc0e5e.json",
+      "case_sha256": "beb2abfe180bc1b940c19ffb12e61446c2d0554c0690558fa00fc49746fc0e5e"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-thunder_boomerang-facedown",
+      "path": "object-execution/4a35130e39c912d45998b64e5a00c8355bc157cce2f223e3c1b52bb7ecade60a.json",
+      "case_sha256": "4a35130e39c912d45998b64e5a00c8355bc157cce2f223e3c1b52bb7ecade60a"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-thunder_boomerang-registry-override",
+      "path": "object-execution/d84b22654a51aab055a6c4614c185cca27400c3544816191acb0b04389f51997.json",
+      "case_sha256": "d84b22654a51aab055a6c4614c185cca27400c3544816191acb0b04389f51997"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-thunder_boomerang-no-target",
+      "path": "object-execution/e30d3ebf2fa364f3ccbc885bd47eb5f344e747ec14afa35ae389df029f30fe8c.json",
+      "case_sha256": "e30d3ebf2fa364f3ccbc885bd47eb5f344e747ec14afa35ae389df029f30fe8c"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-electrocute-ordinary",
+      "path": "object-execution/1b35dbdc072355b8c595ecd9eb47b62d4474067bb6c02454521b1b76d17c156c.json",
+      "case_sha256": "1b35dbdc072355b8c595ecd9eb47b62d4474067bb6c02454521b1b76d17c156c"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-electrocute-facedown",
+      "path": "object-execution/8739bf26a7f56f1657c6c7099157e74d0f1e2dae8273d2012abbebc76691439d.json",
+      "case_sha256": "8739bf26a7f56f1657c6c7099157e74d0f1e2dae8273d2012abbebc76691439d"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-electrocute-registry-override",
+      "path": "object-execution/c5144ab44c444289f2d336b29bc87499b378826078eb6bbec6dd79534e6b8eb1.json",
+      "case_sha256": "c5144ab44c444289f2d336b29bc87499b378826078eb6bbec6dd79534e6b8eb1"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-electrocute-no-target",
+      "path": "object-execution/f2713aeae02f558765f30c34ff8fb41c1ca31bd30b81f41625e776aed8989d15.json",
+      "case_sha256": "f2713aeae02f558765f30c34ff8fb41c1ca31bd30b81f41625e776aed8989d15"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-electrocute-complete",
+      "path": "object-execution/3b0839f696ebeda167c4875c75417f4d6100e6854d73d4ecc60475e82fa9e64b.json",
+      "case_sha256": "3b0839f696ebeda167c4875c75417f4d6100e6854d73d4ecc60475e82fa9e64b"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-electrocute-complete-skip",
+      "path": "object-execution/1bfad30d4f487b4cbcc5018073b4721073caa21d7ef6a6194f20faac110e45d3.json",
+      "case_sha256": "1bfad30d4f487b4cbcc5018073b4721073caa21d7ef6a6194f20faac110e45d3"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-electrocute-skill",
+      "path": "object-execution/6e9bdbdb2e34265139a5431d57c8506fa5fbab0e7cc55fe297202852079ffd93.json",
+      "case_sha256": "6e9bdbdb2e34265139a5431d57c8506fa5fbab0e7cc55fe297202852079ffd93"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-electrocute-negative-attack",
+      "path": "object-execution/4f07a6e8392b1cc23f76dd8abccb002ec91db10573a48f58d98dfff8b01aed54.json",
+      "case_sha256": "4f07a6e8392b1cc23f76dd8abccb002ec91db10573a48f58d98dfff8b01aed54"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-slippery_ground-ordinary",
+      "path": "object-execution/f49d04063f3d7756f0344f1720b7d554338409da18331b73e28ef08340b6d97b.json",
+      "case_sha256": "f49d04063f3d7756f0344f1720b7d554338409da18331b73e28ef08340b6d97b"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-slippery_ground-facedown",
+      "path": "object-execution/5ef0bbc3ca56ae2c9d8a7b8f32c15ac14a78afbe7ec5c08c83a0f80831579f70.json",
+      "case_sha256": "5ef0bbc3ca56ae2c9d8a7b8f32c15ac14a78afbe7ec5c08c83a0f80831579f70"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-slippery_ground-registry-override",
+      "path": "object-execution/9739f77ce1fc778f19cf83b7eacb442e305e5b08aab0490b3e7642e42b0a4888.json",
+      "case_sha256": "9739f77ce1fc778f19cf83b7eacb442e305e5b08aab0490b3e7642e42b0a4888"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-slippery_ground-no-target",
+      "path": "object-execution/3995015ecda0e7ed091325eae9077d6bece90b5f5adb92055eeb1e8090ef9d58.json",
+      "case_sha256": "3995015ecda0e7ed091325eae9077d6bece90b5f5adb92055eeb1e8090ef9d58"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-slippery_ground-complete",
+      "path": "object-execution/d4e7844f79978350687b8e52dbe330996b7848bad1993df54442994cdceb0e7e.json",
+      "case_sha256": "d4e7844f79978350687b8e52dbe330996b7848bad1993df54442994cdceb0e7e"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-slippery_ground-complete-skip",
+      "path": "object-execution/ae7f0f2949a45c8733b360d19e5e2bac0c6e860227276b02cf1fbff09cef87d7.json",
+      "case_sha256": "ae7f0f2949a45c8733b360d19e5e2bac0c6e860227276b02cf1fbff09cef87d7"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-slippery_ground-skill",
+      "path": "object-execution/bbd0bdc1bffd48a479d5687bf88aeae04f3cc528e7bf323fff55215fb50444c1.json",
+      "case_sha256": "bbd0bdc1bffd48a479d5687bf88aeae04f3cc528e7bf323fff55215fb50444c1"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-slippery_ground-negative-attack",
+      "path": "object-execution/2c925072b73833b722ad38952c3dac0a869dbab34ed39ec1c4360fe37c92ca72.json",
+      "case_sha256": "2c925072b73833b722ad38952c3dac0a869dbab34ed39ec1c4360fe37c92ca72"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-master_thief-ordinary",
+      "path": "object-execution/b9eefe69483d210b8e9ee22ac8935111bdc032277980dfe05244118d4476a6d2.json",
+      "case_sha256": "b9eefe69483d210b8e9ee22ac8935111bdc032277980dfe05244118d4476a6d2"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-master_thief-facedown",
+      "path": "object-execution/3ebedae2ecf112c7d40a56b8540d0121b8ea4f8e65aaa1aa36ff6dc221afe56e.json",
+      "case_sha256": "3ebedae2ecf112c7d40a56b8540d0121b8ea4f8e65aaa1aa36ff6dc221afe56e"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-master_thief-registry-override",
+      "path": "object-execution/352c3a1730d4a1509e437ad998e859a0e8d61ce490ceb9c3cb7074d9cb7fdc0a.json",
+      "case_sha256": "352c3a1730d4a1509e437ad998e859a0e8d61ce490ceb9c3cb7074d9cb7fdc0a"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-master_thief-no-target",
+      "path": "object-execution/0d94a01e2e90b9afa995714c9187b7d529bba3f3d5d9347713b835361c096514.json",
+      "case_sha256": "0d94a01e2e90b9afa995714c9187b7d529bba3f3d5d9347713b835361c096514"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-swoop_in-ordinary",
+      "path": "object-execution/767a0278593305a4d0805c3dab4e5a6b5fb36e0644557ead9bcba8f1dd8fe133.json",
+      "case_sha256": "767a0278593305a4d0805c3dab4e5a6b5fb36e0644557ead9bcba8f1dd8fe133"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-swoop_in-facedown",
+      "path": "object-execution/e5bfa53f6613cc0db461457ce09b38a0c8f8c64db2ba1d697fad32a3b1b91f65.json",
+      "case_sha256": "e5bfa53f6613cc0db461457ce09b38a0c8f8c64db2ba1d697fad32a3b1b91f65"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-swoop_in-registry-override",
+      "path": "object-execution/55a505dce70b77ecbd85e5b9e6cf786b82c8e63ec013ff6b269e5ddd8f6ce6b5.json",
+      "case_sha256": "55a505dce70b77ecbd85e5b9e6cf786b82c8e63ec013ff6b269e5ddd8f6ce6b5"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-swoop_in-no-target",
+      "path": "object-execution/dbbed3f9d3b79e71112699fce4439f3dc146ae44b42acd7f9021b0795e3b0952.json",
+      "case_sha256": "dbbed3f9d3b79e71112699fce4439f3dc146ae44b42acd7f9021b0795e3b0952"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-watch_how_i_soar-ordinary",
+      "path": "object-execution/c940ed5be69a0a349b21e177f6d3099dfe4a7f9b4e58eb0354973382292a9e83.json",
+      "case_sha256": "c940ed5be69a0a349b21e177f6d3099dfe4a7f9b4e58eb0354973382292a9e83"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-watch_how_i_soar-facedown",
+      "path": "object-execution/adc68b36d41c99bc69009fe8773b556dfbcb2936ce49188c8e7f7c0c7a488925.json",
+      "case_sha256": "adc68b36d41c99bc69009fe8773b556dfbcb2936ce49188c8e7f7c0c7a488925"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-watch_how_i_soar-registry-override",
+      "path": "object-execution/c65912856a298792ec04c51e7c623bf61771a5db4071f29e0c2414d8bce04c55.json",
+      "case_sha256": "c65912856a298792ec04c51e7c623bf61771a5db4071f29e0c2414d8bce04c55"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-watch_how_i_soar-no-target",
+      "path": "object-execution/d3e7dcfbd51d3cdac5285fec27bf8c87f79d5612715d3addab1ca80ea69cde73.json",
+      "case_sha256": "d3e7dcfbd51d3cdac5285fec27bf8c87f79d5612715d3addab1ca80ea69cde73"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-perfect_self-ordinary",
+      "path": "object-execution/c2b662826b9a3cbc7f817d849b4685f4d64a31188a67ee178255f2e2fce7e588.json",
+      "case_sha256": "c2b662826b9a3cbc7f817d849b4685f4d64a31188a67ee178255f2e2fce7e588"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-perfect_self-facedown",
+      "path": "object-execution/911bbd23aeb04044de2ad3cec31974ae423edbf93048b3be93cad241e9c5905c.json",
+      "case_sha256": "911bbd23aeb04044de2ad3cec31974ae423edbf93048b3be93cad241e9c5905c"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-perfect_self-registry-override",
+      "path": "object-execution/dfad63a85ab2819be15ac2ea6c3c018230566bd14dc275cae0d640c4ae7841f7.json",
+      "case_sha256": "dfad63a85ab2819be15ac2ea6c3c018230566bd14dc275cae0d640c4ae7841f7"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-perfect_self-no-target",
+      "path": "object-execution/623e782abf460c1c56b303ea5101b533ed17e21ad53e2b1e97111743a8dc1efb.json",
+      "case_sha256": "623e782abf460c1c56b303ea5101b533ed17e21ad53e2b1e97111743a8dc1efb"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-cantrip-ordinary",
+      "path": "object-execution/c0bd3805683e01b2551b96a71c4d98db3f692e63b7b5157b7a3c903f197dc7f6.json",
+      "case_sha256": "c0bd3805683e01b2551b96a71c4d98db3f692e63b7b5157b7a3c903f197dc7f6"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-cantrip-facedown",
+      "path": "object-execution/9cfbbafd5fd08c1a6128e2aca2140c6de6ece7dfe7677a6d8ff24cf1cc143466.json",
+      "case_sha256": "9cfbbafd5fd08c1a6128e2aca2140c6de6ece7dfe7677a6d8ff24cf1cc143466"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-cantrip-registry-override",
+      "path": "object-execution/1b74b7efda8c5c59369f9c3795d49740e807a37a13bdfdfd50091f5913b01131.json",
+      "case_sha256": "1b74b7efda8c5c59369f9c3795d49740e807a37a13bdfdfd50091f5913b01131"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-cantrip-no-target",
+      "path": "object-execution/4da945fda6aca9ddae9c43c1e32e3d3a6f61f8462ee2ddaca31a0f19cdccc599.json",
+      "case_sha256": "4da945fda6aca9ddae9c43c1e32e3d3a6f61f8462ee2ddaca31a0f19cdccc599"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-trip_mine-ordinary",
+      "path": "object-execution/dfb95e27ea1a8b90f88059db0fae9d19fe88e6d25fef430c75195996ff5755a7.json",
+      "case_sha256": "dfb95e27ea1a8b90f88059db0fae9d19fe88e6d25fef430c75195996ff5755a7"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-trip_mine-facedown",
+      "path": "object-execution/3bea2c5ebaae1242b3fa9fe9ac656343c26d1be5175ebd2905d1e304322c4b42.json",
+      "case_sha256": "3bea2c5ebaae1242b3fa9fe9ac656343c26d1be5175ebd2905d1e304322c4b42"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-trip_mine-registry-override",
+      "path": "object-execution/ce3027afcf6d2f990720d1803a5e1a646db739895c22ff2b9e0e428837482cc8.json",
+      "case_sha256": "ce3027afcf6d2f990720d1803a5e1a646db739895c22ff2b9e0e428837482cc8"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-trip_mine-no-target",
+      "path": "object-execution/18d3c38cfd32d4e37d78f09d1a154c76ce401bba138a74b21df1bf2167d93cec.json",
+      "case_sha256": "18d3c38cfd32d4e37d78f09d1a154c76ce401bba138a74b21df1bf2167d93cec"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-fast_as_lightning-ordinary",
+      "path": "object-execution/6c171eda116a2e4bddf6e09033b8138fba797eb20ce9a167bb9d55263d46acc7.json",
+      "case_sha256": "6c171eda116a2e4bddf6e09033b8138fba797eb20ce9a167bb9d55263d46acc7"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-fast_as_lightning-facedown",
+      "path": "object-execution/5f83eae8dd4a58be5036c8ebd3293ad7b822fd2c09b2f1807f7b205940edb81d.json",
+      "case_sha256": "5f83eae8dd4a58be5036c8ebd3293ad7b822fd2c09b2f1807f7b205940edb81d"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-fast_as_lightning-registry-override",
+      "path": "object-execution/aa5e36f964f941238af30d54ea353d9f8602c261d979bac9f1bd4968ba771cdf.json",
+      "case_sha256": "aa5e36f964f941238af30d54ea353d9f8602c261d979bac9f1bd4968ba771cdf"
+    },
+    {
+      "name": "object-execution-dynamic-passive-cloak_and_daggers-fast_as_lightning-no-target",
+      "path": "object-execution/70acfa1b0143a2bd7300c333a62b19c82cb4597b7798d8835ce1a1acd5007818.json",
+      "case_sha256": "70acfa1b0143a2bd7300c333a62b19c82cb4597b7798d8835ce1a1acd5007818"
+    },
+    {
+      "name": "object-execution-live-battle-empty-first",
+      "path": "object-execution/2089ff927e4edbae2b76924828323bcf542e48cafdb3550c31a339cd23183d6f.json",
+      "case_sha256": "2089ff927e4edbae2b76924828323bcf542e48cafdb3550c31a339cd23183d6f"
+    },
+    {
+      "name": "object-execution-live-battle-empty-last",
+      "path": "object-execution/920de1437dd3e8b013f61274d32bb259cc2dfe6407e81ab27b8c447612525a0f.json",
+      "case_sha256": "920de1437dd3e8b013f61274d32bb259cc2dfe6407e81ab27b8c447612525a0f"
+    },
+    {
+      "name": "object-execution-live-battle-empty-invalid",
+      "path": "object-execution/423654dde473670f8d07ee7cd46cd14329417462506f412889fa2cd3129ff88d.json",
+      "case_sha256": "423654dde473670f8d07ee7cd46cd14329417462506f412889fa2cd3129ff88d"
+    },
+    {
+      "name": "object-execution-live-battle-tied-first",
+      "path": "object-execution/64356e0e2546ccef59c593e85b969da5c2bf8cf1bdcbc97e0b6562a5ebf7bbaf.json",
+      "case_sha256": "64356e0e2546ccef59c593e85b969da5c2bf8cf1bdcbc97e0b6562a5ebf7bbaf"
+    },
+    {
+      "name": "object-execution-live-battle-tied-last",
+      "path": "object-execution/3ee2ad3fd88219c240660f6c9f2958c796cb684071921cee6af039716b10247b.json",
+      "case_sha256": "3ee2ad3fd88219c240660f6c9f2958c796cb684071921cee6af039716b10247b"
+    },
+    {
+      "name": "object-execution-live-battle-tied-invalid",
+      "path": "object-execution/c51b1214b9dc152a56eead9ee8257f59bc2fbbb4092d17a98f7dc23a8e5b2747.json",
+      "case_sha256": "c51b1214b9dc152a56eead9ee8257f59bc2fbbb4092d17a98f7dc23a8e5b2747"
+    },
+    {
+      "name": "object-execution-live-battle-red-push-first",
+      "path": "object-execution/464731989705d755d8997a2ba21c7d9b9a6cf70c96664810540844cd18edeaf3.json",
+      "case_sha256": "464731989705d755d8997a2ba21c7d9b9a6cf70c96664810540844cd18edeaf3"
+    },
+    {
+      "name": "object-execution-live-battle-red-push-last",
+      "path": "object-execution/7815785d38a91576304e44cc86e352091b0df76b60183da05f9ff8ed5595327a.json",
+      "case_sha256": "7815785d38a91576304e44cc86e352091b0df76b60183da05f9ff8ed5595327a"
+    },
+    {
+      "name": "object-execution-live-battle-red-push-invalid",
+      "path": "object-execution/c76ed8560137f994fa6bff651bf0864d27884c36e17ff8342e01cc3f9a062a42.json",
+      "case_sha256": "c76ed8560137f994fa6bff651bf0864d27884c36e17ff8342e01cc3f9a062a42"
+    },
+    {
+      "name": "object-execution-live-battle-blue-push-first",
+      "path": "object-execution/8d4d408a3065452d7c41280b412c7fa311ebd4e7cdc5099312491695f05dbeba.json",
+      "case_sha256": "8d4d408a3065452d7c41280b412c7fa311ebd4e7cdc5099312491695f05dbeba"
+    },
+    {
+      "name": "object-execution-live-battle-blue-push-last",
+      "path": "object-execution/5b6c1832c4e47f603c5854a2a4dab4a1653b1bf59f18bf85136dd3d2c9b8dbe0.json",
+      "case_sha256": "5b6c1832c4e47f603c5854a2a4dab4a1653b1bf59f18bf85136dd3d2c9b8dbe0"
+    },
+    {
+      "name": "object-execution-live-battle-blue-push-invalid",
+      "path": "object-execution/ef570372ba2453c3c3aeb00309b8ab23ecb6226e69d6702ead4fbb62165509a5.json",
+      "case_sha256": "ef570372ba2453c3c3aeb00309b8ab23ecb6226e69d6702ead4fbb62165509a5"
+    },
+    {
+      "name": "object-execution-live-battle-direct-victory-RED-1-first",
+      "path": "object-execution/9bedcefb155661ed338de92cba7ebdf378f1c597505f21c15f2a62bfcfb0631c.json",
+      "case_sha256": "9bedcefb155661ed338de92cba7ebdf378f1c597505f21c15f2a62bfcfb0631c"
+    },
+    {
+      "name": "object-execution-live-battle-direct-victory-RED-1-last",
+      "path": "object-execution/7dd64fa244f4b558d875d7d9bd9d2a81f63209a248102b178bc9e75364551f28.json",
+      "case_sha256": "7dd64fa244f4b558d875d7d9bd9d2a81f63209a248102b178bc9e75364551f28"
+    },
+    {
+      "name": "object-execution-live-battle-direct-victory-RED-1-invalid",
+      "path": "object-execution/c20c36cf72428b6fdc02584bfb9432c7b550d9c9aeb659ec419629c5451fa298.json",
+      "case_sha256": "c20c36cf72428b6fdc02584bfb9432c7b550d9c9aeb659ec419629c5451fa298"
+    },
+    {
+      "name": "object-execution-live-battle-direct-victory-RED-0-first",
+      "path": "object-execution/a233c1672b080ad0b3c114ee5f73de67b51d801ba8ae5418f1193454e0551c80.json",
+      "case_sha256": "a233c1672b080ad0b3c114ee5f73de67b51d801ba8ae5418f1193454e0551c80"
+    },
+    {
+      "name": "object-execution-live-battle-direct-victory-RED-0-last",
+      "path": "object-execution/1cbbae249a0617ac4240e700a5dcd0f0df0456a23e58324fdefbf58955dae65b.json",
+      "case_sha256": "1cbbae249a0617ac4240e700a5dcd0f0df0456a23e58324fdefbf58955dae65b"
+    },
+    {
+      "name": "object-execution-live-battle-direct-victory-RED-0-invalid",
+      "path": "object-execution/db0907755c65eee8647db82e3e5f1b30cd2ef5e86ab373ed341c9415e499cf70.json",
+      "case_sha256": "db0907755c65eee8647db82e3e5f1b30cd2ef5e86ab373ed341c9415e499cf70"
+    },
+    {
+      "name": "object-execution-live-battle-direct-victory-RED--2-first",
+      "path": "object-execution/adf759d37c65317344ba85af461e4fd5baebc4df123b7f0e40bd8c1e415c7801.json",
+      "case_sha256": "adf759d37c65317344ba85af461e4fd5baebc4df123b7f0e40bd8c1e415c7801"
+    },
+    {
+      "name": "object-execution-live-battle-direct-victory-RED--2-last",
+      "path": "object-execution/5e21bed8318b427611eeb6f561dccba602f597507099ea34d6fe8016f1cc2a72.json",
+      "case_sha256": "5e21bed8318b427611eeb6f561dccba602f597507099ea34d6fe8016f1cc2a72"
+    },
+    {
+      "name": "object-execution-live-battle-direct-victory-RED--2-invalid",
+      "path": "object-execution/723f77fe5f743dc61fdebe4e24e8d60d9ad364f76bb2c52e89ccff2ec60aeb47.json",
+      "case_sha256": "723f77fe5f743dc61fdebe4e24e8d60d9ad364f76bb2c52e89ccff2ec60aeb47"
+    },
+    {
+      "name": "object-execution-live-battle-direct-victory-RED-4-first",
+      "path": "object-execution/23bf1241658fc7cb97d3a9df1a19a7d7f02f4c1f21d35ffd570619de49540fe3.json",
+      "case_sha256": "23bf1241658fc7cb97d3a9df1a19a7d7f02f4c1f21d35ffd570619de49540fe3"
+    },
+    {
+      "name": "object-execution-live-battle-direct-victory-RED-4-last",
+      "path": "object-execution/6e64a850b1b049277ce66465e09ad6794050fb78e0f8b7de9bcc52ce9b246095.json",
+      "case_sha256": "6e64a850b1b049277ce66465e09ad6794050fb78e0f8b7de9bcc52ce9b246095"
+    },
+    {
+      "name": "object-execution-live-battle-direct-victory-RED-4-invalid",
+      "path": "object-execution/ff0ae5c894f94e7666334ef79447daadbecd45e304d44b2010c2ce8ab2369f46.json",
+      "case_sha256": "ff0ae5c894f94e7666334ef79447daadbecd45e304d44b2010c2ce8ab2369f46"
+    },
+    {
+      "name": "object-execution-live-battle-direct-victory-BLUE-1-first",
+      "path": "object-execution/b4e025be6f2096f11b985776aaddf0ff5b3ebfb957f18dc081c8866b95deeeeb.json",
+      "case_sha256": "b4e025be6f2096f11b985776aaddf0ff5b3ebfb957f18dc081c8866b95deeeeb"
+    },
+    {
+      "name": "object-execution-live-battle-direct-victory-BLUE-1-last",
+      "path": "object-execution/20e3e9b393c324f8d1a981f249497203483cd82c6d952fcc4379e2fb423d1b73.json",
+      "case_sha256": "20e3e9b393c324f8d1a981f249497203483cd82c6d952fcc4379e2fb423d1b73"
+    },
+    {
+      "name": "object-execution-live-battle-direct-victory-BLUE-1-invalid",
+      "path": "object-execution/18df2b263a8d070eafa401b0d3dfef4833a46255a9c4f9fba319e6c45f7f3857.json",
+      "case_sha256": "18df2b263a8d070eafa401b0d3dfef4833a46255a9c4f9fba319e6c45f7f3857"
+    },
+    {
+      "name": "object-execution-live-battle-direct-victory-BLUE-0-first",
+      "path": "object-execution/54884ba2a4e3f4edc4286cf0c5f2f649b6c4a7e493016a6c05b0c293184ec8ce.json",
+      "case_sha256": "54884ba2a4e3f4edc4286cf0c5f2f649b6c4a7e493016a6c05b0c293184ec8ce"
+    },
+    {
+      "name": "object-execution-live-battle-direct-victory-BLUE-0-last",
+      "path": "object-execution/f99deced6692a8e33ca09adb778a1e7dd49f1eb576252ec7aa706fd5f8991f1e.json",
+      "case_sha256": "f99deced6692a8e33ca09adb778a1e7dd49f1eb576252ec7aa706fd5f8991f1e"
+    },
+    {
+      "name": "object-execution-live-battle-direct-victory-BLUE-0-invalid",
+      "path": "object-execution/54553b64e5abdf08da4799947630cc3515f75836bf06e71013b922d56bcbc0d4.json",
+      "case_sha256": "54553b64e5abdf08da4799947630cc3515f75836bf06e71013b922d56bcbc0d4"
+    },
+    {
+      "name": "object-execution-live-battle-direct-victory-BLUE--2-first",
+      "path": "object-execution/66ceb31b1ef8d951f5e4d3362c21ec1679738381887914e8fe1e7ee964577978.json",
+      "case_sha256": "66ceb31b1ef8d951f5e4d3362c21ec1679738381887914e8fe1e7ee964577978"
+    },
+    {
+      "name": "object-execution-live-battle-direct-victory-BLUE--2-last",
+      "path": "object-execution/16099ff72a78ab33658a94a842bf2351321e8697a8cc1e53295d30aab1017dd1.json",
+      "case_sha256": "16099ff72a78ab33658a94a842bf2351321e8697a8cc1e53295d30aab1017dd1"
+    },
+    {
+      "name": "object-execution-live-battle-direct-victory-BLUE--2-invalid",
+      "path": "object-execution/991203af9859b619edb2102300e1b04fdd5d467987e56c9749eb3ecdf3cad244.json",
+      "case_sha256": "991203af9859b619edb2102300e1b04fdd5d467987e56c9749eb3ecdf3cad244"
+    },
+    {
+      "name": "object-execution-live-battle-direct-victory-BLUE-4-first",
+      "path": "object-execution/d71a20159fcd081d08223e1602535aa6639564b021062a59ab824b213430ebb6.json",
+      "case_sha256": "d71a20159fcd081d08223e1602535aa6639564b021062a59ab824b213430ebb6"
+    },
+    {
+      "name": "object-execution-live-battle-direct-victory-BLUE-4-last",
+      "path": "object-execution/ca35d8f967c8a764ed50f4a06b5a8755db963b1980e38548cba064cfcee37610.json",
+      "case_sha256": "ca35d8f967c8a764ed50f4a06b5a8755db963b1980e38548cba064cfcee37610"
+    },
+    {
+      "name": "object-execution-live-battle-direct-victory-BLUE-4-invalid",
+      "path": "object-execution/4d81404cf0bd2f377048fcf8f2a1747e4f8d93d0672d86f4a2de203e39bf41de.json",
+      "case_sha256": "4d81404cf0bd2f377048fcf8f2a1747e4f8d93d0672d86f4a2de203e39bf41de"
+    },
+    {
+      "name": "object-execution-live-battle-direct-skip-first",
+      "path": "object-execution/2dce1674d220faaf1ab33e832d874e705ffc42442cd89fe06288e375a384ee10.json",
+      "case_sha256": "2dce1674d220faaf1ab33e832d874e705ffc42442cd89fe06288e375a384ee10"
+    },
+    {
+      "name": "object-execution-live-battle-direct-skip-last",
+      "path": "object-execution/ec0226bab6253238e77591c5815370cef01a486c8f90136ba262d83f1bd01ee2.json",
+      "case_sha256": "ec0226bab6253238e77591c5815370cef01a486c8f90136ba262d83f1bd01ee2"
+    },
+    {
+      "name": "object-execution-live-battle-direct-skip-invalid",
+      "path": "object-execution/7886f64960cda6669e6418a3986c61f5a08186cb3d0383926f5faf0aa2167ce5.json",
+      "case_sha256": "7886f64960cda6669e6418a3986c61f5a08186cb3d0383926f5faf0aa2167ce5"
+    },
+    {
+      "name": "object-execution-live-battle-direct-explicit-first",
+      "path": "object-execution/cd11273cefe663215a51c652f401d5b6028a1444da8dc8f3399ae14bb844c1ef.json",
+      "case_sha256": "cd11273cefe663215a51c652f401d5b6028a1444da8dc8f3399ae14bb844c1ef"
+    },
+    {
+      "name": "object-execution-live-battle-direct-explicit-last",
+      "path": "object-execution/d92c734fc2e4beed89932a324c3343ad7a6ecaae6cfa776f6ccc980095518425.json",
+      "case_sha256": "d92c734fc2e4beed89932a324c3343ad7a6ecaae6cfa776f6ccc980095518425"
+    },
+    {
+      "name": "object-execution-live-battle-direct-explicit-invalid",
+      "path": "object-execution/e8d7f6cc5b7a72c44503d542166692cb3c4f971fc1f9e744feee01ad7956dc0e.json",
+      "case_sha256": "e8d7f6cc5b7a72c44503d542166692cb3c4f971fc1f9e744feee01ad7956dc0e"
+    },
+    {
+      "name": "object-execution-live-battle-direct-empty-target-first",
+      "path": "object-execution/f6610b15574d5f54700231b35f01d3527569aa393d5255187f7e900f542827ee.json",
+      "case_sha256": "f6610b15574d5f54700231b35f01d3527569aa393d5255187f7e900f542827ee"
+    },
+    {
+      "name": "object-execution-live-battle-direct-empty-target-last",
+      "path": "object-execution/829d20ab4ff3f99367fb4607dccb9ad972ede5d8bc083e7a48547213950c2d1d.json",
+      "case_sha256": "829d20ab4ff3f99367fb4607dccb9ad972ede5d8bc083e7a48547213950c2d1d"
+    },
+    {
+      "name": "object-execution-live-battle-direct-empty-target-invalid",
+      "path": "object-execution/28b97b700ed8c8e4ed9bd155a2f71a26ee358dcb9863d366c429b675d0757558.json",
+      "case_sha256": "28b97b700ed8c8e4ed9bd155a2f71a26ee358dcb9863d366c429b675d0757558"
+    },
+    {
+      "name": "object-execution-live-battle-direct-unknown-target-first",
+      "path": "object-execution/1fd50edcd1da6c2bff4fea621d417829bb9bb1c936b6d6faad26e41985a534e5.json",
+      "case_sha256": "1fd50edcd1da6c2bff4fea621d417829bb9bb1c936b6d6faad26e41985a534e5"
+    },
+    {
+      "name": "object-execution-live-battle-direct-unknown-target-last",
+      "path": "object-execution/f9f247bebbd0112872fd637e7f315878991438d627e86252397ab63fde94f0e0.json",
+      "case_sha256": "f9f247bebbd0112872fd637e7f315878991438d627e86252397ab63fde94f0e0"
+    },
+    {
+      "name": "object-execution-live-battle-direct-unknown-target-invalid",
+      "path": "object-execution/2d8d2144ec4c6065015d014fc5a1a12b61046d141d88472bcd8403d7e3a2aeb4.json",
+      "case_sha256": "2d8d2144ec4c6065015d014fc5a1a12b61046d141d88472bcd8403d7e3a2aeb4"
+    },
+    {
+      "name": "object-execution-live-battle-direct-missing-lane-first",
+      "path": "object-execution/c9fae84341de303444a599b3667082b2c8f2b9bd88bb57145bd1f8b088f92de7.json",
+      "case_sha256": "c9fae84341de303444a599b3667082b2c8f2b9bd88bb57145bd1f8b088f92de7"
+    },
+    {
+      "name": "object-execution-live-battle-direct-missing-lane-last",
+      "path": "object-execution/e7fa689fc15e969fade8210ee807467d5c837c7ad13964fc04d018c2f1d3e1d1.json",
+      "case_sha256": "e7fa689fc15e969fade8210ee807467d5c837c7ad13964fc04d018c2f1d3e1d1"
+    },
+    {
+      "name": "object-execution-live-battle-direct-missing-lane-invalid",
+      "path": "object-execution/fb75bb27d884f535c0d7772ac15d4982208cab2417d103aecef93fd2a356a1e7.json",
+      "case_sha256": "fb75bb27d884f535c0d7772ac15d4982208cab2417d103aecef93fd2a356a1e7"
+    },
+    {
+      "name": "object-execution-live-battle-direct-missing-old-first",
+      "path": "object-execution/115badab70559070bf514e4900f449ad01451f0b3d64384ac45cc71b6508fdb5.json",
+      "case_sha256": "115badab70559070bf514e4900f449ad01451f0b3d64384ac45cc71b6508fdb5"
+    },
+    {
+      "name": "object-execution-live-battle-direct-missing-old-last",
+      "path": "object-execution/73d84aa2e861348fcf17418ce7754945688570a7c83f2f95e8c3ad77c3877307.json",
+      "case_sha256": "73d84aa2e861348fcf17418ce7754945688570a7c83f2f95e8c3ad77c3877307"
+    },
+    {
+      "name": "object-execution-live-battle-direct-missing-old-invalid",
+      "path": "object-execution/e0003e60a7a793345b809a087852da67e2fe499d2913153b19cd59110ef34382.json",
+      "case_sha256": "e0003e60a7a793345b809a087852da67e2fe499d2913153b19cd59110ef34382"
+    },
+    {
+      "name": "object-execution-live-battle-direct-missing-path-first",
+      "path": "object-execution/3bcecb5a1686a92db911b33a9d25638403d464d441c5f6edd2b4a8c6724f9801.json",
+      "case_sha256": "3bcecb5a1686a92db911b33a9d25638403d464d441c5f6edd2b4a8c6724f9801"
+    },
+    {
+      "name": "object-execution-live-battle-direct-missing-path-last",
+      "path": "object-execution/ab3f8ef9e1151c1fc371cf445adbb5d8e26e9f1ab4e17dcdaaf05337baddb647.json",
+      "case_sha256": "ab3f8ef9e1151c1fc371cf445adbb5d8e26e9f1ab4e17dcdaaf05337baddb647"
+    },
+    {
+      "name": "object-execution-live-battle-direct-missing-path-invalid",
+      "path": "object-execution/9a15032d61373f1bf1ff398f29eeebb3d648f642e5c8b358ecb20a773b07c707.json",
+      "case_sha256": "9a15032d61373f1bf1ff398f29eeebb3d648f642e5c8b358ecb20a773b07c707"
+    },
+    {
+      "name": "object-execution-live-battle-direct-empty-path-first",
+      "path": "object-execution/aa1b5e5ab36677bc3ec68a8f9c567529d22b89d16562b8d4f1ccf1a88aa50881.json",
+      "case_sha256": "aa1b5e5ab36677bc3ec68a8f9c567529d22b89d16562b8d4f1ccf1a88aa50881"
+    },
+    {
+      "name": "object-execution-live-battle-direct-empty-path-last",
+      "path": "object-execution/1f68f5dd679552b378145c04c76fcee84170c2bc933230beb698a8e798590db8.json",
+      "case_sha256": "1f68f5dd679552b378145c04c76fcee84170c2bc933230beb698a8e798590db8"
+    },
+    {
+      "name": "object-execution-live-battle-direct-empty-path-invalid",
+      "path": "object-execution/a49fa23b8c514309a7a0783ef297af211390387ecbf22228e914cd157d70fb46.json",
+      "case_sha256": "a49fa23b8c514309a7a0783ef297af211390387ecbf22228e914cd157d70fb46"
+    },
+    {
+      "name": "object-execution-live-battle-multi-same-direction-first",
+      "path": "object-execution/0dcdadd2290ae016c37ebca338acc4c033c96a4b06a77b0a4276d920bb3c265a.json",
+      "case_sha256": "0dcdadd2290ae016c37ebca338acc4c033c96a4b06a77b0a4276d920bb3c265a"
+    },
+    {
+      "name": "object-execution-live-battle-multi-same-direction-last",
+      "path": "object-execution/00ae8d5dd733c68d6e04b8df8664e8e4feb8422aab9a742858b6575a58cae590.json",
+      "case_sha256": "00ae8d5dd733c68d6e04b8df8664e8e4feb8422aab9a742858b6575a58cae590"
+    },
+    {
+      "name": "object-execution-live-battle-multi-same-direction-invalid",
+      "path": "object-execution/3b8cd3e2a617c3dac74184bfbc227b79eabb95c52b66576f7b00a045247757c9.json",
+      "case_sha256": "3b8cd3e2a617c3dac74184bfbc227b79eabb95c52b66576f7b00a045247757c9"
+    },
+    {
+      "name": "object-execution-live-battle-multi-opposite-first",
+      "path": "object-execution/daefa2346dd392f2fbbbc71ba058e2d753bed3442d0392f2479dc9c72edfdeb7.json",
+      "case_sha256": "daefa2346dd392f2fbbbc71ba058e2d753bed3442d0392f2479dc9c72edfdeb7"
+    },
+    {
+      "name": "object-execution-live-battle-multi-opposite-last",
+      "path": "object-execution/a04baa339b232a7fb6725d67b1fdf5b64a0144ab1adfdc5b43a9cd89b08d4900.json",
+      "case_sha256": "a04baa339b232a7fb6725d67b1fdf5b64a0144ab1adfdc5b43a9cd89b08d4900"
+    },
+    {
+      "name": "object-execution-live-battle-multi-opposite-invalid",
+      "path": "object-execution/c1746ef779ac650a1cbaf789b5182e98c0cb6f7bc16bcc7b4e8f1be5e091e4bc.json",
+      "case_sha256": "c1746ef779ac650a1cbaf789b5182e98c0cb6f7bc16bcc7b4e8f1be5e091e4bc"
+    },
+    {
+      "name": "object-execution-live-battle-multi-last-red-first",
+      "path": "object-execution/0759dc158976cc8d9ec272294745c04b5bb19efa9272c83b3cb401309a0f16b3.json",
+      "case_sha256": "0759dc158976cc8d9ec272294745c04b5bb19efa9272c83b3cb401309a0f16b3"
+    },
+    {
+      "name": "object-execution-live-battle-multi-last-red-last",
+      "path": "object-execution/6c3e827c88e14b928d1890ae74a32bed43904eedbca0cbb513df1c0fa223181d.json",
+      "case_sha256": "6c3e827c88e14b928d1890ae74a32bed43904eedbca0cbb513df1c0fa223181d"
+    },
+    {
+      "name": "object-execution-live-battle-multi-last-red-invalid",
+      "path": "object-execution/72833b8b64dbf598da2f0552f2a9a8b3b414be4ed83c670e4496ff5d108ff407.json",
+      "case_sha256": "72833b8b64dbf598da2f0552f2a9a8b3b414be4ed83c670e4496ff5d108ff407"
+    },
+    {
+      "name": "object-execution-live-battle-multi-last-blue-first",
+      "path": "object-execution/a4761e357bdc3f5b82bfb1fb75f1583899e5636471671cef9b22aff683651ab9.json",
+      "case_sha256": "a4761e357bdc3f5b82bfb1fb75f1583899e5636471671cef9b22aff683651ab9"
+    },
+    {
+      "name": "object-execution-live-battle-multi-last-blue-last",
+      "path": "object-execution/4c8e00ebd631d04a2dde3ecf88c946992433f77337cd77d70dfab95bfa8df990.json",
+      "case_sha256": "4c8e00ebd631d04a2dde3ecf88c946992433f77337cd77d70dfab95bfa8df990"
+    },
+    {
+      "name": "object-execution-live-battle-multi-last-blue-invalid",
+      "path": "object-execution/23b7705e874a96439862fd8795f5ab6b59a8751dc3c7e82925a257cd86a93979.json",
+      "case_sha256": "23b7705e874a96439862fd8795f5ab6b59a8751dc3c7e82925a257cd86a93979"
+    },
+    {
+      "name": "object-execution-live-battle-multi-last-tie-first",
+      "path": "object-execution/74b9ffbbb6fed4b78552a86f745604ccd6642b9fe007e6de2bee7f5d11e8f2ba.json",
+      "case_sha256": "74b9ffbbb6fed4b78552a86f745604ccd6642b9fe007e6de2bee7f5d11e8f2ba"
+    },
+    {
+      "name": "object-execution-live-battle-multi-last-tie-last",
+      "path": "object-execution/3d969dff9cb2fc07d010887bef2dd053c5be01010c6ad6fb02c05441bdd6e969.json",
+      "case_sha256": "3d969dff9cb2fc07d010887bef2dd053c5be01010c6ad6fb02c05441bdd6e969"
+    },
+    {
+      "name": "object-execution-live-battle-multi-last-tie-invalid",
+      "path": "object-execution/a4d5c43b9a56b7e670ab1ee57eb0f23ffec068eaf57413c43e2abd91823810ed.json",
+      "case_sha256": "a4d5c43b9a56b7e670ab1ee57eb0f23ffec068eaf57413c43e2abd91823810ed"
+    },
+    {
+      "name": "object-execution-live-battle-multi-throne-red-first",
+      "path": "object-execution/a6ba7e1d42bb2819e3db4b91ac4673ba2a5c487d472dac12d9ef1f51e0252046.json",
+      "case_sha256": "a6ba7e1d42bb2819e3db4b91ac4673ba2a5c487d472dac12d9ef1f51e0252046"
+    },
+    {
+      "name": "object-execution-live-battle-multi-throne-red-last",
+      "path": "object-execution/d3b609ffed944e53941b7fac94ce04526c4520de613773078626e1dba0318c11.json",
+      "case_sha256": "d3b609ffed944e53941b7fac94ce04526c4520de613773078626e1dba0318c11"
+    },
+    {
+      "name": "object-execution-live-battle-multi-throne-red-invalid",
+      "path": "object-execution/c719c75dc6f861701ea9de4eb2d6ddd0dbf4270808983405568e3674881e4ecc.json",
+      "case_sha256": "c719c75dc6f861701ea9de4eb2d6ddd0dbf4270808983405568e3674881e4ecc"
+    },
+    {
+      "name": "object-execution-live-battle-multi-throne-blue-first",
+      "path": "object-execution/21b0ce251e9ccb30fd75107e5764ce59d6215f7c1e6fd4bf3bb251406714f33a.json",
+      "case_sha256": "21b0ce251e9ccb30fd75107e5764ce59d6215f7c1e6fd4bf3bb251406714f33a"
+    },
+    {
+      "name": "object-execution-live-battle-multi-throne-blue-last",
+      "path": "object-execution/acb0fd9942c8ab0b4be1d456c0ddf33029df232d603076cf68d7576f47770c0e.json",
+      "case_sha256": "acb0fd9942c8ab0b4be1d456c0ddf33029df232d603076cf68d7576f47770c0e"
+    },
+    {
+      "name": "object-execution-live-battle-multi-throne-blue-invalid",
+      "path": "object-execution/b8aae05d3f7362bc2c9ffd30a9cca390176da7ca12e8cbdd50ea7ac8c6caf5ca.json",
+      "case_sha256": "b8aae05d3f7362bc2c9ffd30a9cca390176da7ca12e8cbdd50ea7ac8c6caf5ca"
+    },
+    {
+      "name": "object-execution-live-battle-multi-both-thrones-first",
+      "path": "object-execution/f215b47771f599ace39ee0266de0186b3543e81df29a124bc905d240b5939a34.json",
+      "case_sha256": "f215b47771f599ace39ee0266de0186b3543e81df29a124bc905d240b5939a34"
+    },
+    {
+      "name": "object-execution-live-battle-multi-both-thrones-last",
+      "path": "object-execution/877880f12db11caeca43a5245a1150791e724bd0506ce20fce4f65a95aaa1134.json",
+      "case_sha256": "877880f12db11caeca43a5245a1150791e724bd0506ce20fce4f65a95aaa1134"
+    },
+    {
+      "name": "object-execution-live-battle-multi-both-thrones-invalid",
+      "path": "object-execution/2822bb460cdb6d5f98da6299148d6d100ae14ece851e327a84a7178d110190a4.json",
+      "case_sha256": "2822bb460cdb6d5f98da6299148d6d100ae14ece851e327a84a7178d110190a4"
+    },
+    {
+      "name": "object-execution-live-battle-multi-both-thrones-same-hex-respawn-first",
+      "path": "object-execution/8f83789fcbfa676f88c3dce003d7e65c9c45b2f380cee167bb26a0698a174f7a.json",
+      "case_sha256": "8f83789fcbfa676f88c3dce003d7e65c9c45b2f380cee167bb26a0698a174f7a"
+    },
+    {
+      "name": "object-execution-live-battle-multi-both-thrones-same-hex-respawn-last",
+      "path": "object-execution/19d29bbb9034573fdedee351f415b6c053cd395579d211cbfd8627acf9a47964.json",
+      "case_sha256": "19d29bbb9034573fdedee351f415b6c053cd395579d211cbfd8627acf9a47964"
+    },
+    {
+      "name": "object-execution-live-battle-multi-both-thrones-same-hex-respawn-invalid",
+      "path": "object-execution/50ef94069c56fce168a28920d19479ebf6c57eac721ce7d0fdfd9e8ce284d91c.json",
+      "case_sha256": "50ef94069c56fce168a28920d19479ebf6c57eac721ce7d0fdfd9e8ce284d91c"
+    },
+    {
+      "name": "object-execution-live-battle-multi-one-lane-first",
+      "path": "object-execution/5a82cfedf43663bea629ef3299e61281b2d2cde8dc6807bf605fcc87bdcec78c.json",
+      "case_sha256": "5a82cfedf43663bea629ef3299e61281b2d2cde8dc6807bf605fcc87bdcec78c"
+    },
+    {
+      "name": "object-execution-live-battle-multi-one-lane-last",
+      "path": "object-execution/ceac2ee568346d96d6274e14c107c988103948c21f487e6be3d9936e1385ecab.json",
+      "case_sha256": "ceac2ee568346d96d6274e14c107c988103948c21f487e6be3d9936e1385ecab"
+    },
+    {
+      "name": "object-execution-live-battle-multi-one-lane-invalid",
+      "path": "object-execution/956ba6f4e827812f7dc95a8cbdfa183a3adff8564591ee49acc4d3c64b71e2d8.json",
+      "case_sha256": "956ba6f4e827812f7dc95a8cbdfa183a3adff8564591ee49acc4d3c64b71e2d8"
+    },
+    {
+      "name": "object-execution-live-battle-multi-already-zero-first",
+      "path": "object-execution/2f88b4d1cfaf9e381921844831ea5b1625e632643aea533f1dd22dc3e4ae29d0.json",
+      "case_sha256": "2f88b4d1cfaf9e381921844831ea5b1625e632643aea533f1dd22dc3e4ae29d0"
+    },
+    {
+      "name": "object-execution-live-battle-multi-already-zero-last",
+      "path": "object-execution/65561fbfff01b5b13c72cc78844c8dedef755279588181b214e5444dd9e7b7ee.json",
+      "case_sha256": "65561fbfff01b5b13c72cc78844c8dedef755279588181b214e5444dd9e7b7ee"
+    },
+    {
+      "name": "object-execution-live-battle-multi-already-zero-invalid",
+      "path": "object-execution/315403259089900068956792d241d42fd2972d1bce3b28c44e2ce5899cf3f842.json",
+      "case_sha256": "315403259089900068956792d241d42fd2972d1bce3b28c44e2ce5899cf3f842"
+    },
+    {
+      "name": "object-execution-live-battle-multi-missing-target-first",
+      "path": "object-execution/551dc7f9ad744ed720ce273b3a31cbe30892b77b03ccbba7ade2328b95085c2f.json",
+      "case_sha256": "551dc7f9ad744ed720ce273b3a31cbe30892b77b03ccbba7ade2328b95085c2f"
+    },
+    {
+      "name": "object-execution-live-battle-multi-missing-target-last",
+      "path": "object-execution/03473a1c54d114e23a661cf2be749ff06322bd72df59628fd1cf1ed151b410ce.json",
+      "case_sha256": "03473a1c54d114e23a661cf2be749ff06322bd72df59628fd1cf1ed151b410ce"
+    },
+    {
+      "name": "object-execution-live-battle-multi-missing-target-invalid",
+      "path": "object-execution/19372a310f53fa324a61a1748c349d14be2fa241ce41b055f20b0b2881bb1da9.json",
+      "case_sha256": "19372a310f53fa324a61a1748c349d14be2fa241ce41b055f20b0b2881bb1da9"
+    },
+    {
+      "name": "object-execution-live-battle-spawn-blocked-one-first",
+      "path": "object-execution/f9c579808cb567e2c6e4cfb80a5257c4839be2d3e6425ed4caf2b50f3b90bb6d.json",
+      "case_sha256": "f9c579808cb567e2c6e4cfb80a5257c4839be2d3e6425ed4caf2b50f3b90bb6d"
+    },
+    {
+      "name": "object-execution-live-battle-spawn-blocked-one-last",
+      "path": "object-execution/b672b60cef4ce65772defa03bbe33ef8b5b098aa56c4d6718445491a2716a44c.json",
+      "case_sha256": "b672b60cef4ce65772defa03bbe33ef8b5b098aa56c4d6718445491a2716a44c"
+    },
+    {
+      "name": "object-execution-live-battle-spawn-blocked-one-invalid",
+      "path": "object-execution/0ecfd6e8f44f3928d88a66f0d15bb33d8944e41a9d1bc747389d3a6a6c179094.json",
+      "case_sha256": "0ecfd6e8f44f3928d88a66f0d15bb33d8944e41a9d1bc747389d3a6a6c179094"
+    },
+    {
+      "name": "object-execution-live-battle-spawn-blocked-one-non-minion-prefix-first",
+      "path": "object-execution/f5d063350622bca462c57f0397916f1c82e9b2e92c69e25584e5bb9073f99a44.json",
+      "case_sha256": "f5d063350622bca462c57f0397916f1c82e9b2e92c69e25584e5bb9073f99a44"
+    },
+    {
+      "name": "object-execution-live-battle-spawn-blocked-one-non-minion-prefix-last",
+      "path": "object-execution/4c436010a714806c2fc4e185494ac5b54f4926ab5ffc6882a76680370adc2439.json",
+      "case_sha256": "4c436010a714806c2fc4e185494ac5b54f4926ab5ffc6882a76680370adc2439"
+    },
+    {
+      "name": "object-execution-live-battle-spawn-blocked-one-non-minion-prefix-invalid",
+      "path": "object-execution/c1f2e215766f9fe20c3a251aa0d3e8d54468dffc4676385f42ed42a355f20e86.json",
+      "case_sha256": "c1f2e215766f9fe20c3a251aa0d3e8d54468dffc4676385f42ed42a355f20e86"
+    },
+    {
+      "name": "object-execution-live-battle-spawn-blocked-two-first",
+      "path": "object-execution/41df14e4535b2a42d3877d744ba0c2a51de78185b4cb118f73f73847ff67d38f.json",
+      "case_sha256": "41df14e4535b2a42d3877d744ba0c2a51de78185b4cb118f73f73847ff67d38f"
+    },
+    {
+      "name": "object-execution-live-battle-spawn-blocked-two-last",
+      "path": "object-execution/c55be53e112259cb8479bb94d3a1178651d6ffbc036878aa03fe5668b42df939.json",
+      "case_sha256": "c55be53e112259cb8479bb94d3a1178651d6ffbc036878aa03fe5668b42df939"
+    },
+    {
+      "name": "object-execution-live-battle-spawn-blocked-two-invalid",
+      "path": "object-execution/d56dc232d91855490756898e93156837623f14c476f0e466dbd17154c73645f7.json",
+      "case_sha256": "d56dc232d91855490756898e93156837623f14c476f0e466dbd17154c73645f7"
+    },
+    {
+      "name": "object-execution-live-battle-spawn-blocked-token-first",
+      "path": "object-execution/3d5141e9dab13a0a15b771f56487e296f5d047666c4797fd5cda344a4200aa84.json",
+      "case_sha256": "3d5141e9dab13a0a15b771f56487e296f5d047666c4797fd5cda344a4200aa84"
+    },
+    {
+      "name": "object-execution-live-battle-spawn-blocked-token-last",
+      "path": "object-execution/f83eea6dc57a7018069a95266d50cff963953487ded1ea6b328518e754adaaa6.json",
+      "case_sha256": "f83eea6dc57a7018069a95266d50cff963953487ded1ea6b328518e754adaaa6"
+    },
+    {
+      "name": "object-execution-live-battle-spawn-blocked-token-invalid",
+      "path": "object-execution/67296157631bfe8cfec9657158b4d1ed3cda377bba4599d4fc04dd46e0119ff7.json",
+      "case_sha256": "67296157631bfe8cfec9657158b4d1ed3cda377bba4599d4fc04dd46e0119ff7"
+    },
+    {
+      "name": "object-execution-live-battle-spawn-blocked-token-linked-effects-first",
+      "path": "object-execution/bfa5c71976d92b14a0ba1d3bce428e5e8fcd0dfbfa065aa5302407d5fbaf6b50.json",
+      "case_sha256": "bfa5c71976d92b14a0ba1d3bce428e5e8fcd0dfbfa065aa5302407d5fbaf6b50"
+    },
+    {
+      "name": "object-execution-live-battle-spawn-blocked-token-linked-effects-last",
+      "path": "object-execution/e939e86afad8132f298529c8aad321824646e6ab2883569b68a8dbf53f9ba021.json",
+      "case_sha256": "e939e86afad8132f298529c8aad321824646e6ab2883569b68a8dbf53f9ba021"
+    },
+    {
+      "name": "object-execution-live-battle-spawn-blocked-token-linked-effects-invalid",
+      "path": "object-execution/389de62fc3cfc8b01daaf1f45fcf9d1408642d77a840eeff5152119566adb7ed.json",
+      "case_sha256": "389de62fc3cfc8b01daaf1f45fcf9d1408642d77a840eeff5152119566adb7ed"
+    },
+    {
+      "name": "object-execution-live-battle-spawn-terrain-spawn-first",
+      "path": "object-execution/0b853d0baf925680639eec2fffff88fa304484358209e87b5e67ca400a0dd4a1.json",
+      "case_sha256": "0b853d0baf925680639eec2fffff88fa304484358209e87b5e67ca400a0dd4a1"
+    },
+    {
+      "name": "object-execution-live-battle-spawn-terrain-spawn-last",
+      "path": "object-execution/9ac96e9d4eff40acc182cdca66448eb08d0cd9fe51f412f9b559ffc7220ab1a2.json",
+      "case_sha256": "9ac96e9d4eff40acc182cdca66448eb08d0cd9fe51f412f9b559ffc7220ab1a2"
+    },
+    {
+      "name": "object-execution-live-battle-spawn-terrain-spawn-invalid",
+      "path": "object-execution/d516520130a499554ca3ad10986cc2b8d7517f4cd47af20d24de96bfbfd6f7c5.json",
+      "case_sha256": "d516520130a499554ca3ad10986cc2b8d7517f4cd47af20d24de96bfbfd6f7c5"
+    },
+    {
+      "name": "object-execution-live-battle-spawn-supply-short-first",
+      "path": "object-execution/9e9f48558ec316ac1028a025e078f8652d21d4066a51a33390ddd5143ed0c930.json",
+      "case_sha256": "9e9f48558ec316ac1028a025e078f8652d21d4066a51a33390ddd5143ed0c930"
+    },
+    {
+      "name": "object-execution-live-battle-spawn-supply-short-last",
+      "path": "object-execution/049ad176fcf23cfed565372a5ea1d9f38187bafb8fb3c0bdf2ea79a02d13a19e.json",
+      "case_sha256": "049ad176fcf23cfed565372a5ea1d9f38187bafb8fb3c0bdf2ea79a02d13a19e"
+    },
+    {
+      "name": "object-execution-live-battle-spawn-supply-short-invalid",
+      "path": "object-execution/21aed1001231bd7f12b497d3e12403d97a8c0d145b7aaf5aa595b80a163ae735.json",
+      "case_sha256": "21aed1001231bd7f12b497d3e12403d97a8c0d145b7aaf5aa595b80a163ae735"
+    },
+    {
+      "name": "object-execution-live-battle-spawn-wrong-lane-first",
+      "path": "object-execution/164c9b11972e00b9f444474df537c4860ae111af4539ffeabfebdc1b6ad054ef.json",
+      "case_sha256": "164c9b11972e00b9f444474df537c4860ae111af4539ffeabfebdc1b6ad054ef"
+    },
+    {
+      "name": "object-execution-live-battle-spawn-wrong-lane-last",
+      "path": "object-execution/f2d26369ca93c3e3115d351b45a03df956cee233fd8d4c15c8028a415735bae1.json",
+      "case_sha256": "f2d26369ca93c3e3115d351b45a03df956cee233fd8d4c15c8028a415735bae1"
+    },
+    {
+      "name": "object-execution-live-battle-spawn-wrong-lane-invalid",
+      "path": "object-execution/3099002f4e7f0ab76d85f196dd1e25f55c33d3f7b61ce3c153285ad466bbf9c0.json",
+      "case_sha256": "3099002f4e7f0ab76d85f196dd1e25f55c33d3f7b61ce3c153285ad466bbf9c0"
+    },
+    {
+      "name": "object-execution-live-battle-displace-empty-first",
+      "path": "object-execution/eff752fa643c1ac71bde8652ca1f5e608785f51a77981ad44f6b383fe2f243b0.json",
+      "case_sha256": "eff752fa643c1ac71bde8652ca1f5e608785f51a77981ad44f6b383fe2f243b0"
+    },
+    {
+      "name": "object-execution-live-battle-displace-empty-last",
+      "path": "object-execution/eb11456ec835a2a54537190eccfadd64bcdb05ab86e1fedb01f65c5949c0451c.json",
+      "case_sha256": "eb11456ec835a2a54537190eccfadd64bcdb05ab86e1fedb01f65c5949c0451c"
+    },
+    {
+      "name": "object-execution-live-battle-displace-empty-invalid",
+      "path": "object-execution/ce3b323cc13ff569c2d377f96e46a68a034d7695b530042e42c538fa35c3335e.json",
+      "case_sha256": "ce3b323cc13ff569c2d377f96e46a68a034d7695b530042e42c538fa35c3335e"
+    },
+    {
+      "name": "object-execution-live-battle-displace-one-choice-first",
+      "path": "object-execution/78d3096e0320398a11f99514ef939228636ede3985ce9330e04a4c951816d046.json",
+      "case_sha256": "78d3096e0320398a11f99514ef939228636ede3985ce9330e04a4c951816d046"
+    },
+    {
+      "name": "object-execution-live-battle-displace-one-choice-last",
+      "path": "object-execution/f42d017889b9b66740dd42b7486c25b30bf78d4d27bbbb27b830e94f43f2c06f.json",
+      "case_sha256": "f42d017889b9b66740dd42b7486c25b30bf78d4d27bbbb27b830e94f43f2c06f"
+    },
+    {
+      "name": "object-execution-live-battle-displace-one-choice-invalid",
+      "path": "object-execution/42743d864d597d29285dc210f729e6c807e2431c97804df33084beb59880d838.json",
+      "case_sha256": "42743d864d597d29285dc210f729e6c807e2431c97804df33084beb59880d838"
+    },
+    {
+      "name": "object-execution-live-battle-displace-one-choice-pending-invalid-first",
+      "path": "object-execution/d2625b11d53b350a31241a799c0f8b4f68b761795972aac710397aff4bebf19e.json",
+      "case_sha256": "d2625b11d53b350a31241a799c0f8b4f68b761795972aac710397aff4bebf19e"
+    },
+    {
+      "name": "object-execution-live-battle-displace-one-choice-pending-invalid-last",
+      "path": "object-execution/0b0f80e1551e1badb6ebc220a9a47c7cb5581b4a768550c0c8ef1607e4bdd80a.json",
+      "case_sha256": "0b0f80e1551e1badb6ebc220a9a47c7cb5581b4a768550c0c8ef1607e4bdd80a"
+    },
+    {
+      "name": "object-execution-live-battle-displace-one-choice-pending-invalid-invalid",
+      "path": "object-execution/5c8fbd5dcd15285fd457c38be780f2b02a1077d33af7959e8d5a9e5be3bcd31a.json",
+      "case_sha256": "5c8fbd5dcd15285fd457c38be780f2b02a1077d33af7959e8d5a9e5be3bcd31a"
+    },
+    {
+      "name": "object-execution-live-battle-displace-one-choice-pending-hex-first",
+      "path": "object-execution/35c75cfb2e7c56002bda88c98219bce5cd6e0429e4546740c6defa45f9b52341.json",
+      "case_sha256": "35c75cfb2e7c56002bda88c98219bce5cd6e0429e4546740c6defa45f9b52341"
+    },
+    {
+      "name": "object-execution-live-battle-displace-one-choice-pending-hex-last",
+      "path": "object-execution/8524c46665522cd040783659ad176fa07219b6f249bd79866669ecb83aa80c30.json",
+      "case_sha256": "8524c46665522cd040783659ad176fa07219b6f249bd79866669ecb83aa80c30"
+    },
+    {
+      "name": "object-execution-live-battle-displace-one-choice-pending-hex-invalid",
+      "path": "object-execution/da21f5c7352fbd838ca0d43272bba4eb5a42394c1ecd35e94c1c0bf67489471b.json",
+      "case_sha256": "da21f5c7352fbd838ca0d43272bba4eb5a42394c1ecd35e94c1c0bf67489471b"
+    },
+    {
+      "name": "object-execution-live-battle-displace-two-red-first",
+      "path": "object-execution/23dce8a9cfaa135648d9dc91c5d1fd5a8c559c9430f8a70fee904f889739e2ee.json",
+      "case_sha256": "23dce8a9cfaa135648d9dc91c5d1fd5a8c559c9430f8a70fee904f889739e2ee"
+    },
+    {
+      "name": "object-execution-live-battle-displace-two-red-last",
+      "path": "object-execution/099fbbcab0e037b2d217546e8903c9e46164f5bcaaa43cdeb25c1bc8b0e1bdf1.json",
+      "case_sha256": "099fbbcab0e037b2d217546e8903c9e46164f5bcaaa43cdeb25c1bc8b0e1bdf1"
+    },
+    {
+      "name": "object-execution-live-battle-displace-two-red-invalid",
+      "path": "object-execution/f01a2923c02a122387fc7ac682e2f20b4dabc2728d7a8b2f8af0513770a6a8fa.json",
+      "case_sha256": "f01a2923c02a122387fc7ac682e2f20b4dabc2728d7a8b2f8af0513770a6a8fa"
+    },
+    {
+      "name": "object-execution-live-battle-displace-two-red-pending-origin-first",
+      "path": "object-execution/194ae5fc934ddc5a1746cd7e9c9027487a55fdc060342728f683e1606488ab9f.json",
+      "case_sha256": "194ae5fc934ddc5a1746cd7e9c9027487a55fdc060342728f683e1606488ab9f"
+    },
+    {
+      "name": "object-execution-live-battle-displace-two-red-pending-origin-last",
+      "path": "object-execution/a2a9a2e66376ed7e21ab3dcf5c7bf7b33261e507ff61b2bd63aeeb723a173e24.json",
+      "case_sha256": "a2a9a2e66376ed7e21ab3dcf5c7bf7b33261e507ff61b2bd63aeeb723a173e24"
+    },
+    {
+      "name": "object-execution-live-battle-displace-two-red-pending-origin-invalid",
+      "path": "object-execution/ad7ed0fc852e49341d8c0a9bf1d4d0b51382664522dadd0b80315e76957fe4d0.json",
+      "case_sha256": "ad7ed0fc852e49341d8c0a9bf1d4d0b51382664522dadd0b80315e76957fe4d0"
+    },
+    {
+      "name": "object-execution-live-battle-displace-two-red-duplicate-unit-first",
+      "path": "object-execution/b54ae4d1e1ab495886a19c803b7a810c4b448040a34b7a86eaf6b58b625321fd.json",
+      "case_sha256": "b54ae4d1e1ab495886a19c803b7a810c4b448040a34b7a86eaf6b58b625321fd"
+    },
+    {
+      "name": "object-execution-live-battle-displace-two-red-duplicate-unit-last",
+      "path": "object-execution/16904540eb1ebd92847411c6e2266cdb75f2eb51a5534ffe60fdcb056a61d096.json",
+      "case_sha256": "16904540eb1ebd92847411c6e2266cdb75f2eb51a5534ffe60fdcb056a61d096"
+    },
+    {
+      "name": "object-execution-live-battle-displace-two-red-duplicate-unit-invalid",
+      "path": "object-execution/647cf6971e5b2577468ec8189813a9dfc1470fe4e2e7cf379a4e1fda7796e4ca.json",
+      "case_sha256": "647cf6971e5b2577468ec8189813a9dfc1470fe4e2e7cf379a4e1fda7796e4ca"
+    },
+    {
+      "name": "object-execution-live-battle-displace-two-teams-first",
+      "path": "object-execution/89e40b5ad026718d4e977609cedef64e5b914b6c47fb89844d05da32e0554cb2.json",
+      "case_sha256": "89e40b5ad026718d4e977609cedef64e5b914b6c47fb89844d05da32e0554cb2"
+    },
+    {
+      "name": "object-execution-live-battle-displace-two-teams-last",
+      "path": "object-execution/4ee1f140f9ea73544ee1fc3f45da687f1b53b1f5934baf989334db39835c2d5a.json",
+      "case_sha256": "4ee1f140f9ea73544ee1fc3f45da687f1b53b1f5934baf989334db39835c2d5a"
+    },
+    {
+      "name": "object-execution-live-battle-displace-two-teams-invalid",
+      "path": "object-execution/5bd65998e4a3d3d062ae5330b6ec7d1ec4e4928d1858f0bab5c4afdb6591d348.json",
+      "case_sha256": "5bd65998e4a3d3d062ae5330b6ec7d1ec4e4928d1858f0bab5c4afdb6591d348"
+    },
+    {
+      "name": "object-execution-live-battle-displace-two-teams-null-coin-first",
+      "path": "object-execution/3489f6bff6b4ae290bf53fa2ee022adcf51399359b13aa8c629f8d491e5e830d.json",
+      "case_sha256": "3489f6bff6b4ae290bf53fa2ee022adcf51399359b13aa8c629f8d491e5e830d"
+    },
+    {
+      "name": "object-execution-live-battle-displace-two-teams-null-coin-last",
+      "path": "object-execution/da6b14fd23e5a207cf37fc4e4a0feb7460592d32d148c0d34bffd47b515445a5.json",
+      "case_sha256": "da6b14fd23e5a207cf37fc4e4a0feb7460592d32d148c0d34bffd47b515445a5"
+    },
+    {
+      "name": "object-execution-live-battle-displace-two-teams-null-coin-invalid",
+      "path": "object-execution/3f162c0b64086c32e830cf25fdfdc99c3f69b6ae8ce9aa357b2ebca8ed520431.json",
+      "case_sha256": "3f162c0b64086c32e830cf25fdfdc99c3f69b6ae8ce9aa357b2ebca8ed520431"
+    },
+    {
+      "name": "object-execution-live-battle-displace-two-teams-hero-default-lane-first",
+      "path": "object-execution/294338e0db11a3ff9038debcf774ba5261a889114f6052b245629307f288e19d.json",
+      "case_sha256": "294338e0db11a3ff9038debcf774ba5261a889114f6052b245629307f288e19d"
+    },
+    {
+      "name": "object-execution-live-battle-displace-two-teams-hero-default-lane-last",
+      "path": "object-execution/41c1d0dab95d87535211e25b22bb468bc7e946930e754f4acedec867daa616db.json",
+      "case_sha256": "41c1d0dab95d87535211e25b22bb468bc7e946930e754f4acedec867daa616db"
+    },
+    {
+      "name": "object-execution-live-battle-displace-two-teams-hero-default-lane-invalid",
+      "path": "object-execution/3f90d4b57f613c0243a9ff6372872587e010f42f9ce688eadc7cec0f583036fb.json",
+      "case_sha256": "3f90d4b57f613c0243a9ff6372872587e010f42f9ce688eadc7cec0f583036fb"
+    },
+    {
+      "name": "object-execution-live-battle-displace-blue-first-first",
+      "path": "object-execution/e1ea74beef68a7eb439dbb5f85ee10d2e257d468578db96dd04c23473bae9ad9.json",
+      "case_sha256": "e1ea74beef68a7eb439dbb5f85ee10d2e257d468578db96dd04c23473bae9ad9"
+    },
+    {
+      "name": "object-execution-live-battle-displace-blue-first-last",
+      "path": "object-execution/981d4d337474961001d08bb3cdb8063323390a60448f418c9081765d8464d0a2.json",
+      "case_sha256": "981d4d337474961001d08bb3cdb8063323390a60448f418c9081765d8464d0a2"
+    },
+    {
+      "name": "object-execution-live-battle-displace-blue-first-invalid",
+      "path": "object-execution/f57b76665a1155d2db3f55085133f47a8176ab15049d03a718b7db491cb86245.json",
+      "case_sha256": "f57b76665a1155d2db3f55085133f47a8176ab15049d03a718b7db491cb86245"
+    },
+    {
+      "name": "object-execution-live-battle-displace-same-origin-first",
+      "path": "object-execution/27cf64a01ceed09c2557b6b2874e988f1b18d9617dd55d9e36dacefe2ee55081.json",
+      "case_sha256": "27cf64a01ceed09c2557b6b2874e988f1b18d9617dd55d9e36dacefe2ee55081"
+    },
+    {
+      "name": "object-execution-live-battle-displace-same-origin-last",
+      "path": "object-execution/912fb0e1a637aa134ebf933efd7d7941d815620bc36e5f94249ddd7e73a2f792.json",
+      "case_sha256": "912fb0e1a637aa134ebf933efd7d7941d815620bc36e5f94249ddd7e73a2f792"
+    },
+    {
+      "name": "object-execution-live-battle-displace-same-origin-invalid",
+      "path": "object-execution/9996d8dcb41424490504410393a048c827e995827f044b5466f25e914d7c0608.json",
+      "case_sha256": "9996d8dcb41424490504410393a048c827e995827f044b5466f25e914d7c0608"
+    },
+    {
+      "name": "object-execution-live-battle-displace-unknown-first",
+      "path": "object-execution/23418af5bdea9ff69b482030e026d6e6605f36be9ffed91738cb3fbf355e533b.json",
+      "case_sha256": "23418af5bdea9ff69b482030e026d6e6605f36be9ffed91738cb3fbf355e533b"
+    },
+    {
+      "name": "object-execution-live-battle-displace-unknown-last",
+      "path": "object-execution/03e6370ce80c3174457cdd9448e81b8ffea47c8ba91bc93f95d7e95055f199d8.json",
+      "case_sha256": "03e6370ce80c3174457cdd9448e81b8ffea47c8ba91bc93f95d7e95055f199d8"
+    },
+    {
+      "name": "object-execution-live-battle-displace-unknown-invalid",
+      "path": "object-execution/d9ebf2e395dcd1cdfaa500f4f4db772609dc12dd7f2f13e0f06c2086cbc89be6.json",
+      "case_sha256": "d9ebf2e395dcd1cdfaa500f4f4db772609dc12dd7f2f13e0f06c2086cbc89be6"
+    },
+    {
+      "name": "object-execution-live-battle-displace-missing-zone-first",
+      "path": "object-execution/a6eefc8945f8020e0ef07c83751bffffc66f960403d5cb390fa1e69b795d805d.json",
+      "case_sha256": "a6eefc8945f8020e0ef07c83751bffffc66f960403d5cb390fa1e69b795d805d"
+    },
+    {
+      "name": "object-execution-live-battle-displace-missing-zone-last",
+      "path": "object-execution/e740ca635ef6b955821a982eaa94f3f937db7468f8bf04e12aecdb472196a0e3.json",
+      "case_sha256": "e740ca635ef6b955821a982eaa94f3f937db7468f8bf04e12aecdb472196a0e3"
+    },
+    {
+      "name": "object-execution-live-battle-displace-missing-zone-invalid",
+      "path": "object-execution/1b7ea8a961faa594855a8b22d8fc79c7189d7599da4c569aa149894d0a6feb68.json",
+      "case_sha256": "1b7ea8a961faa594855a8b22d8fc79c7189d7599da4c569aa149894d0a6feb68"
+    },
+    {
+      "name": "object-execution-live-battle-displace-missing-lane-first",
+      "path": "object-execution/2a08149a1eb42362905954ac8e2cc16719076a20da22ef402fc14a3576e84469.json",
+      "case_sha256": "2a08149a1eb42362905954ac8e2cc16719076a20da22ef402fc14a3576e84469"
+    },
+    {
+      "name": "object-execution-live-battle-displace-missing-lane-last",
+      "path": "object-execution/31ac133a4a14d299d11e67a4863e63464be59ba66d44875791bad03768db07df.json",
+      "case_sha256": "31ac133a4a14d299d11e67a4863e63464be59ba66d44875791bad03768db07df"
+    },
+    {
+      "name": "object-execution-live-battle-displace-missing-lane-invalid",
+      "path": "object-execution/b6c8a8cf268707eadb616d342f229847725a5c3058d2207e6b3e822812997c46.json",
+      "case_sha256": "b6c8a8cf268707eadb616d342f229847725a5c3058d2207e6b3e822812997c46"
+    },
+    {
+      "name": "object-execution-live-battle-displace-no-space-first",
+      "path": "object-execution/7c3133de901c63d94bfb6468ec86f96a9d281c18267747ad23f1905d6696415a.json",
+      "case_sha256": "7c3133de901c63d94bfb6468ec86f96a9d281c18267747ad23f1905d6696415a"
+    },
+    {
+      "name": "object-execution-live-battle-displace-no-space-last",
+      "path": "object-execution/4fdbd17814232d1ed4429a15318c2d4bb67bd1a967a3bd370368d23fc1942d08.json",
+      "case_sha256": "4fdbd17814232d1ed4429a15318c2d4bb67bd1a967a3bd370368d23fc1942d08"
+    },
+    {
+      "name": "object-execution-live-battle-displace-no-space-invalid",
+      "path": "object-execution/4eb2ade45e8e6668a0272746ac3790510991037f5703f52006cb1a814dff81f9.json",
+      "case_sha256": "4eb2ade45e8e6668a0272746ac3790510991037f5703f52006cb1a814dff81f9"
+    },
+    {
+      "name": "object-execution-live-battle-displace-origin-empty-first",
+      "path": "object-execution/0d7c63f5de18abb187bc0d285f098b54b4d645ed554637123add2888f623ddc1.json",
+      "case_sha256": "0d7c63f5de18abb187bc0d285f098b54b4d645ed554637123add2888f623ddc1"
+    },
+    {
+      "name": "object-execution-live-battle-displace-origin-empty-last",
+      "path": "object-execution/1647ce7029cb7ccb5db95bbb5ced2ddf80b632dad9e635bd525fce9365b89247.json",
+      "case_sha256": "1647ce7029cb7ccb5db95bbb5ced2ddf80b632dad9e635bd525fce9365b89247"
+    },
+    {
+      "name": "object-execution-live-battle-displace-origin-empty-invalid",
+      "path": "object-execution/c6b987b5f2d44e1ba9bbfdbdf563f2e0d92f9acd2ef59a0f5f459c2fff6bbecc.json",
+      "case_sha256": "c6b987b5f2d44e1ba9bbfdbdf563f2e0d92f9acd2ef59a0f5f459c2fff6bbecc"
+    },
+    {
+      "name": "object-execution-live-battle-casualties-choice-first",
+      "path": "object-execution/c030a207a306ba17eae8732920042760e8897612cebe78668b592bf0a25af9cd.json",
+      "case_sha256": "c030a207a306ba17eae8732920042760e8897612cebe78668b592bf0a25af9cd"
+    },
+    {
+      "name": "object-execution-live-battle-casualties-choice-last",
+      "path": "object-execution/396e59d984fb602710fc41539d254a80ae91a6edda1a3cf4f6c25c9d5e4b034d.json",
+      "case_sha256": "396e59d984fb602710fc41539d254a80ae91a6edda1a3cf4f6c25c9d5e4b034d"
+    },
+    {
+      "name": "object-execution-live-battle-casualties-choice-invalid",
+      "path": "object-execution/aa43d8e5cc0c581c96334e9caa7911ddf46633db05a09425ce92d30328ddc85e.json",
+      "case_sha256": "aa43d8e5cc0c581c96334e9caa7911ddf46633db05a09425ce92d30328ddc85e"
+    },
+    {
+      "name": "object-execution-live-battle-casualties-choice-pending-valid-first",
+      "path": "object-execution/b988ebbbfbd4c49ab97eb9579f3b42b66cf8a8ba37b4c5b8385eeffccf5d106a.json",
+      "case_sha256": "b988ebbbfbd4c49ab97eb9579f3b42b66cf8a8ba37b4c5b8385eeffccf5d106a"
+    },
+    {
+      "name": "object-execution-live-battle-casualties-choice-pending-valid-last",
+      "path": "object-execution/2fde1b28e6bd824f03c3ab5336b2502222f9cae355c95f78777c130e981e9560.json",
+      "case_sha256": "2fde1b28e6bd824f03c3ab5336b2502222f9cae355c95f78777c130e981e9560"
+    },
+    {
+      "name": "object-execution-live-battle-casualties-choice-pending-valid-invalid",
+      "path": "object-execution/a34b243202824c7dbc7e2862d11e7b256a61e6edbc87ebd19f5cfe3438fc7198.json",
+      "case_sha256": "a34b243202824c7dbc7e2862d11e7b256a61e6edbc87ebd19f5cfe3438fc7198"
+    },
+    {
+      "name": "object-execution-live-battle-casualties-choice-numeric-id-first",
+      "path": "object-execution/190f3d97886522b32bae0206d06d5c0a16705fff1692e70a30da96e58126ffd1.json",
+      "case_sha256": "190f3d97886522b32bae0206d06d5c0a16705fff1692e70a30da96e58126ffd1"
+    },
+    {
+      "name": "object-execution-live-battle-casualties-choice-numeric-id-last",
+      "path": "object-execution/0b359b49a403743645c8852866ba4fc3330c68de28fd6b5d9c77a790f6614b90.json",
+      "case_sha256": "0b359b49a403743645c8852866ba4fc3330c68de28fd6b5d9c77a790f6614b90"
+    },
+    {
+      "name": "object-execution-live-battle-casualties-choice-numeric-id-invalid",
+      "path": "object-execution/935919f2ef4cb7460c609b00e733692720d214056e7e09a781f433e17ec1b631.json",
+      "case_sha256": "935919f2ef4cb7460c609b00e733692720d214056e7e09a781f433e17ec1b631"
+    },
+    {
+      "name": "object-execution-live-battle-casualties-invalid-heavy-first",
+      "path": "object-execution/80f1a2cc481566c4558b2bbc7a6397eb5fbe4e36dd2b1babd033720ad63566d4.json",
+      "case_sha256": "80f1a2cc481566c4558b2bbc7a6397eb5fbe4e36dd2b1babd033720ad63566d4"
+    },
+    {
+      "name": "object-execution-live-battle-casualties-invalid-heavy-last",
+      "path": "object-execution/1d3657a0e0fb086df92408559ff34ce1ec0ea520441aca81245e2aebcb32b2ca.json",
+      "case_sha256": "1d3657a0e0fb086df92408559ff34ce1ec0ea520441aca81245e2aebcb32b2ca"
+    },
+    {
+      "name": "object-execution-live-battle-casualties-invalid-heavy-invalid",
+      "path": "object-execution/5339fbdeeba9c212ec5892de31fef8666f43ddbb02bc6d64fc25941c3b612145.json",
+      "case_sha256": "5339fbdeeba9c212ec5892de31fef8666f43ddbb02bc6d64fc25941c3b612145"
+    },
+    {
+      "name": "object-execution-live-battle-casualties-force-all-first",
+      "path": "object-execution/0ebdf998d7e1601c6cf3e1fb979298b3c714290779ff47348f670874149e528e.json",
+      "case_sha256": "0ebdf998d7e1601c6cf3e1fb979298b3c714290779ff47348f670874149e528e"
+    },
+    {
+      "name": "object-execution-live-battle-casualties-force-all-last",
+      "path": "object-execution/2e7d4bba4d5f8535b69a6d9f6fd3d7846ed9450ab4d4c7b238863d3912d43b56.json",
+      "case_sha256": "2e7d4bba4d5f8535b69a6d9f6fd3d7846ed9450ab4d4c7b238863d3912d43b56"
+    },
+    {
+      "name": "object-execution-live-battle-casualties-force-all-invalid",
+      "path": "object-execution/032f9f38c9fb2dfe07e067eb14f247df558040271957a3953ff76fd85624529e.json",
+      "case_sha256": "032f9f38c9fb2dfe07e067eb14f247df558040271957a3953ff76fd85624529e"
+    },
+    {
+      "name": "object-execution-live-battle-casualties-force-over-first",
+      "path": "object-execution/e0c538504ff9474c5c45e98100139253df9548daa1f47f1db620f4e76193a63e.json",
+      "case_sha256": "e0c538504ff9474c5c45e98100139253df9548daa1f47f1db620f4e76193a63e"
+    },
+    {
+      "name": "object-execution-live-battle-casualties-force-over-last",
+      "path": "object-execution/1327c9e47a58978398e0118630159b50748659b34279bc3a5686a8087ecfc0ab.json",
+      "case_sha256": "1327c9e47a58978398e0118630159b50748659b34279bc3a5686a8087ecfc0ab"
+    },
+    {
+      "name": "object-execution-live-battle-casualties-force-over-invalid",
+      "path": "object-execution/ffe914ce96638ce361cfa5865cd69b6cac1a5a23dd832a1babcb05a8dfa1f588.json",
+      "case_sha256": "ffe914ce96638ce361cfa5865cd69b6cac1a5a23dd832a1babcb05a8dfa1f588"
+    },
+    {
+      "name": "object-execution-live-battle-casualties-force-over-pending-forced-first",
+      "path": "object-execution/586d563f246fae2383848ebd73084c40a6213fe6af03d4b4d50ec662d11da40a.json",
+      "case_sha256": "586d563f246fae2383848ebd73084c40a6213fe6af03d4b4d50ec662d11da40a"
+    },
+    {
+      "name": "object-execution-live-battle-casualties-force-over-pending-forced-last",
+      "path": "object-execution/812eed4168bc7066d5e7fec6b8a7195e85a00856b1a27c026f9f9b006237b15f.json",
+      "case_sha256": "812eed4168bc7066d5e7fec6b8a7195e85a00856b1a27c026f9f9b006237b15f"
+    },
+    {
+      "name": "object-execution-live-battle-casualties-force-over-pending-forced-invalid",
+      "path": "object-execution/1f05bf6851933dde98d2588fa686c42787e4ba1d51a94424845b8297f39d63f6.json",
+      "case_sha256": "1f05bf6851933dde98d2588fa686c42787e4ba1d51a94424845b8297f39d63f6"
+    },
+    {
+      "name": "object-execution-live-battle-casualties-zero-first",
+      "path": "object-execution/56b1f05863229e56bedaf4451788e05db23f013efcd7a2aeeaa43f2bac1271cf.json",
+      "case_sha256": "56b1f05863229e56bedaf4451788e05db23f013efcd7a2aeeaa43f2bac1271cf"
+    },
+    {
+      "name": "object-execution-live-battle-casualties-zero-last",
+      "path": "object-execution/7ca32b413dcd394375df83f9750ba701ed58a469ccc9e0309b279a63fa23f4ac.json",
+      "case_sha256": "7ca32b413dcd394375df83f9750ba701ed58a469ccc9e0309b279a63fa23f4ac"
+    },
+    {
+      "name": "object-execution-live-battle-casualties-zero-invalid",
+      "path": "object-execution/34b926490aff66dbdb8df878f44d9d6cf8e2f99c27c0d3408375bfca67f9be96.json",
+      "case_sha256": "34b926490aff66dbdb8df878f44d9d6cf8e2f99c27c0d3408375bfca67f9be96"
+    },
+    {
+      "name": "object-execution-live-battle-casualties-negative-first",
+      "path": "object-execution/0763631292cb5006d835515330d0b139480cc055a264f765fd3d1a29e2d20538.json",
+      "case_sha256": "0763631292cb5006d835515330d0b139480cc055a264f765fd3d1a29e2d20538"
+    },
+    {
+      "name": "object-execution-live-battle-casualties-negative-last",
+      "path": "object-execution/8ecc85c5f5cdd642aa4942a29e5a8ceb46d38e02856de8f2a983df812147d037.json",
+      "case_sha256": "8ecc85c5f5cdd642aa4942a29e5a8ceb46d38e02856de8f2a983df812147d037"
+    },
+    {
+      "name": "object-execution-live-battle-casualties-negative-invalid",
+      "path": "object-execution/1aec37d72177f1eaa63ac7ad8b9d7ab66a3a7e7cb40431ee73ef350713c3f0fd.json",
+      "case_sha256": "1aec37d72177f1eaa63ac7ad8b9d7ab66a3a7e7cb40431ee73ef350713c3f0fd"
+    },
+    {
+      "name": "object-execution-live-battle-casualties-missing-zone-first",
+      "path": "object-execution/a3826c963a87c9cd703661301c086171e26ae28b375441305e16a57a96f6b023.json",
+      "case_sha256": "a3826c963a87c9cd703661301c086171e26ae28b375441305e16a57a96f6b023"
+    },
+    {
+      "name": "object-execution-live-battle-casualties-missing-zone-last",
+      "path": "object-execution/aae43ea906ded9c1474dae874094b5e3c8a2046478c51f901d715aed410f8731.json",
+      "case_sha256": "aae43ea906ded9c1474dae874094b5e3c8a2046478c51f901d715aed410f8731"
+    },
+    {
+      "name": "object-execution-live-battle-casualties-missing-zone-invalid",
+      "path": "object-execution/69851b3fccfb79b31b2a90b5826983df22d2abed2bc8c90236c18b825e2d2cef.json",
+      "case_sha256": "69851b3fccfb79b31b2a90b5826983df22d2abed2bc8c90236c18b825e2d2cef"
+    },
+    {
+      "name": "object-execution-live-battle-casualties-missing-team-first",
+      "path": "object-execution/e3d682f6efca4b6550cab7d1ad0f6eeed881e1d6bc8f93da55926e84c7658c68.json",
+      "case_sha256": "e3d682f6efca4b6550cab7d1ad0f6eeed881e1d6bc8f93da55926e84c7658c68"
+    },
+    {
+      "name": "object-execution-live-battle-casualties-missing-team-last",
+      "path": "object-execution/b3d6916d27c85f54deed0895b8a72c3783b605a4dfac8818f2db75b1a68cedb2.json",
+      "case_sha256": "b3d6916d27c85f54deed0895b8a72c3783b605a4dfac8818f2db75b1a68cedb2"
+    },
+    {
+      "name": "object-execution-live-battle-casualties-missing-team-invalid",
+      "path": "object-execution/47552db3972dc7723ad733130e74957920173d2a2512afd13235e4f533467eda.json",
+      "case_sha256": "47552db3972dc7723ad733130e74957920173d2a2512afd13235e4f533467eda"
+    },
+    {
+      "name": "object-execution-live-battle-casualties-heavies-first",
+      "path": "object-execution/a2f3152c3ff7817f76c8a100a27c6edb22855f90ac4c46d2a3a0271fb1132ad5.json",
+      "case_sha256": "a2f3152c3ff7817f76c8a100a27c6edb22855f90ac4c46d2a3a0271fb1132ad5"
+    },
+    {
+      "name": "object-execution-live-battle-casualties-heavies-last",
+      "path": "object-execution/a1c297d489b9586741b4b044e33864267662f852655799324da4385661148ff9.json",
+      "case_sha256": "a1c297d489b9586741b4b044e33864267662f852655799324da4385661148ff9"
+    },
+    {
+      "name": "object-execution-live-battle-casualties-heavies-invalid",
+      "path": "object-execution/408836ac277546d3e281958ca3a9d65db46e43871e8e02600e345629b90e3460.json",
+      "case_sha256": "408836ac277546d3e281958ca3a9d65db46e43871e8e02600e345629b90e3460"
+    },
+    {
+      "name": "object-execution-live-battle-casualties-reverse-order-first",
+      "path": "object-execution/ec01eef21914a027a2f22a6c77ad73685bdb2c705b3c9e06c87167e19019d6d8.json",
+      "case_sha256": "ec01eef21914a027a2f22a6c77ad73685bdb2c705b3c9e06c87167e19019d6d8"
+    },
+    {
+      "name": "object-execution-live-battle-casualties-reverse-order-last",
+      "path": "object-execution/50007f2f970516094211c0a7b9c8e22af8c6c53b7b38d20e1e27c564f85c5cc6.json",
+      "case_sha256": "50007f2f970516094211c0a7b9c8e22af8c6c53b7b38d20e1e27c564f85c5cc6"
+    },
+    {
+      "name": "object-execution-live-battle-casualties-reverse-order-invalid",
+      "path": "object-execution/38f10eaef090a0916ff7abd74d04a503ccd7ad3ac5e961374dd72e5e96087d93.json",
+      "case_sha256": "38f10eaef090a0916ff7abd74d04a503ccd7ad3ac5e961374dd72e5e96087d93"
+    },
+    {
+      "name": "object-execution-live-battle-minions-tie-first",
+      "path": "object-execution/817c718a30b057d63d3295058f0bea772d9a021ef3abe629ba435dd87eac1587.json",
+      "case_sha256": "817c718a30b057d63d3295058f0bea772d9a021ef3abe629ba435dd87eac1587"
+    },
+    {
+      "name": "object-execution-live-battle-minions-tie-last",
+      "path": "object-execution/501ae96a08c1c4c79c0bd1665aa321f4555f52a7b259d7060b608924b723688f.json",
+      "case_sha256": "501ae96a08c1c4c79c0bd1665aa321f4555f52a7b259d7060b608924b723688f"
+    },
+    {
+      "name": "object-execution-live-battle-minions-tie-invalid",
+      "path": "object-execution/32b4d19a8b57816a2866e9f0c8c15885c0fc8731ddb53e37de01d1cfadedb532.json",
+      "case_sha256": "32b4d19a8b57816a2866e9f0c8c15885c0fc8731ddb53e37de01d1cfadedb532"
+    },
+    {
+      "name": "object-execution-live-battle-minions-tie-battle-exclusion-first",
+      "path": "object-execution/cd1b34874cc0ccafc03da1f576fc5820a5c2bf56559b9705572286219e4080cd.json",
+      "case_sha256": "cd1b34874cc0ccafc03da1f576fc5820a5c2bf56559b9705572286219e4080cd"
+    },
+    {
+      "name": "object-execution-live-battle-minions-tie-battle-exclusion-last",
+      "path": "object-execution/9f74456267978bf70cf98df5b5b49780679335a070973b5a881ff4902f2b34af.json",
+      "case_sha256": "9f74456267978bf70cf98df5b5b49780679335a070973b5a881ff4902f2b34af"
+    },
+    {
+      "name": "object-execution-live-battle-minions-tie-battle-exclusion-invalid",
+      "path": "object-execution/3894b8426bc409d32794af1334bb31fa6c57a5eafe61c834e00b146416946d4c.json",
+      "case_sha256": "3894b8426bc409d32794af1334bb31fa6c57a5eafe61c834e00b146416946d4c"
+    },
+    {
+      "name": "object-execution-live-battle-minions-red-loses-first",
+      "path": "object-execution/879973489c6223cd94e710d29ae4fb873cd961deed713f4f5f42e71ce4164a6c.json",
+      "case_sha256": "879973489c6223cd94e710d29ae4fb873cd961deed713f4f5f42e71ce4164a6c"
+    },
+    {
+      "name": "object-execution-live-battle-minions-red-loses-last",
+      "path": "object-execution/cc329fa280cb99b3686afa145ac50b5116c7a9790fa5ee9d93f89e983bafc5a7.json",
+      "case_sha256": "cc329fa280cb99b3686afa145ac50b5116c7a9790fa5ee9d93f89e983bafc5a7"
+    },
+    {
+      "name": "object-execution-live-battle-minions-red-loses-invalid",
+      "path": "object-execution/d0366129b8121715e4b8addd2d5e3d424f1e63fd1b46f9072e76927110dd6348.json",
+      "case_sha256": "d0366129b8121715e4b8addd2d5e3d424f1e63fd1b46f9072e76927110dd6348"
+    },
+    {
+      "name": "object-execution-live-battle-minions-blue-loses-first",
+      "path": "object-execution/aa1e83efefc216e21ee9d75ff020ced90d403648df53df570e6736f5eefb1ab3.json",
+      "case_sha256": "aa1e83efefc216e21ee9d75ff020ced90d403648df53df570e6736f5eefb1ab3"
+    },
+    {
+      "name": "object-execution-live-battle-minions-blue-loses-last",
+      "path": "object-execution/b4ee773d596f2adc60b235c0627d9c5a536844c7c6763b80e8db86052a0594fc.json",
+      "case_sha256": "b4ee773d596f2adc60b235c0627d9c5a536844c7c6763b80e8db86052a0594fc"
+    },
+    {
+      "name": "object-execution-live-battle-minions-blue-loses-invalid",
+      "path": "object-execution/9ba02956695517520579493d2455f3dc410d8245be79276ee28a1bee9ca241dc.json",
+      "case_sha256": "9ba02956695517520579493d2455f3dc410d8245be79276ee28a1bee9ca241dc"
+    },
+    {
+      "name": "object-execution-live-battle-minions-only-red-first",
+      "path": "object-execution/f4664e572554dcf0664933264e8508748b9d4f6f325e9bea73514451868e6609.json",
+      "case_sha256": "f4664e572554dcf0664933264e8508748b9d4f6f325e9bea73514451868e6609"
+    },
+    {
+      "name": "object-execution-live-battle-minions-only-red-last",
+      "path": "object-execution/e280983db6d436cdb4d16729f27cea4552a17dd4b9b42b73ae73fa76a77bfc05.json",
+      "case_sha256": "e280983db6d436cdb4d16729f27cea4552a17dd4b9b42b73ae73fa76a77bfc05"
+    },
+    {
+      "name": "object-execution-live-battle-minions-only-red-invalid",
+      "path": "object-execution/1e1ebf70b6d8e9c38bb372109201f6544cd1cc928a1068e232a60120973aa6bc.json",
+      "case_sha256": "1e1ebf70b6d8e9c38bb372109201f6544cd1cc928a1068e232a60120973aa6bc"
+    },
+    {
+      "name": "object-execution-live-battle-minions-specific-lane-first",
+      "path": "object-execution/bef74ffef7307d13ed583ff9508e741383d1fb33c11965d7db5ccbcd4c0142ae.json",
+      "case_sha256": "bef74ffef7307d13ed583ff9508e741383d1fb33c11965d7db5ccbcd4c0142ae"
+    },
+    {
+      "name": "object-execution-live-battle-minions-specific-lane-last",
+      "path": "object-execution/20155c653553c38f117e23de00c4af0672b3c2f432d179314ed5d80bd8c69724.json",
+      "case_sha256": "20155c653553c38f117e23de00c4af0672b3c2f432d179314ed5d80bd8c69724"
+    },
+    {
+      "name": "object-execution-live-battle-minions-specific-lane-invalid",
+      "path": "object-execution/b5f19c6dbc25d071902290ac8da08a8259931d9310a895a73a741e96debe28b8.json",
+      "case_sha256": "b5f19c6dbc25d071902290ac8da08a8259931d9310a895a73a741e96debe28b8"
+    },
+    {
+      "name": "object-execution-live-battle-minions-all-lanes-first",
+      "path": "object-execution/cf34313d32037c71056386536605968f1b4c4f47c6353d10d0ca2775d4be012d.json",
+      "case_sha256": "cf34313d32037c71056386536605968f1b4c4f47c6353d10d0ca2775d4be012d"
+    },
+    {
+      "name": "object-execution-live-battle-minions-all-lanes-last",
+      "path": "object-execution/8674ee482918d48c26f4c6a0df50277bb8cc8a3fac213052c68578c173c2c413.json",
+      "case_sha256": "8674ee482918d48c26f4c6a0df50277bb8cc8a3fac213052c68578c173c2c413"
+    },
+    {
+      "name": "object-execution-live-battle-minions-all-lanes-invalid",
+      "path": "object-execution/6ad04a1973403a1e8184ae3760acffc34d7bff9a7f9c402c275d89edbeb90a83.json",
+      "case_sha256": "6ad04a1973403a1e8184ae3760acffc34d7bff9a7f9c402c275d89edbeb90a83"
+    },
+    {
+      "name": "object-execution-live-battle-minions-army-first",
+      "path": "object-execution/34445a160d3288e6091e3745eb27b6f52329b86f957f5db686b4b8054f5f1e90.json",
+      "case_sha256": "34445a160d3288e6091e3745eb27b6f52329b86f957f5db686b4b8054f5f1e90"
+    },
+    {
+      "name": "object-execution-live-battle-minions-army-last",
+      "path": "object-execution/bea40920356f2e5bcacbc729e6b5dbeb638799d7aeb522445fed349802e73885.json",
+      "case_sha256": "bea40920356f2e5bcacbc729e6b5dbeb638799d7aeb522445fed349802e73885"
+    },
+    {
+      "name": "object-execution-live-battle-minions-army-invalid",
+      "path": "object-execution/7fadb4c57724e8187be7508cd35b9212b707b83f50d6dd9412ff9114dcdf2d85.json",
+      "case_sha256": "7fadb4c57724e8187be7508cd35b9212b707b83f50d6dd9412ff9114dcdf2d85"
+    },
+    {
+      "name": "object-execution-live-battle-minions-army-offboard-first",
+      "path": "object-execution/dd54d8ff57e4452088361c239217738f6cdf3c496ba67309d4a0ddfe2f702284.json",
+      "case_sha256": "dd54d8ff57e4452088361c239217738f6cdf3c496ba67309d4a0ddfe2f702284"
+    },
+    {
+      "name": "object-execution-live-battle-minions-army-offboard-last",
+      "path": "object-execution/b03635ba78276b0b52517bc745822cccab9621b07b0c797f1f8c5932e73e191f.json",
+      "case_sha256": "b03635ba78276b0b52517bc745822cccab9621b07b0c797f1f8c5932e73e191f"
+    },
+    {
+      "name": "object-execution-live-battle-minions-army-offboard-invalid",
+      "path": "object-execution/49ddab3d0b05fd381e3a6c6bcc32375d6c69c8bebe2b23556742e9208cbaf81d.json",
+      "case_sha256": "49ddab3d0b05fd381e3a6c6bcc32375d6c69c8bebe2b23556742e9208cbaf81d"
+    },
+    {
+      "name": "object-execution-live-battle-minions-army-level7-first",
+      "path": "object-execution/199a234d6dc2d1645e1b3048b97271aade6aabb09f3242e88c9f7c1799ad6a52.json",
+      "case_sha256": "199a234d6dc2d1645e1b3048b97271aade6aabb09f3242e88c9f7c1799ad6a52"
+    },
+    {
+      "name": "object-execution-live-battle-minions-army-level7-last",
+      "path": "object-execution/fc72692c9b0f18722a436412e1980780c48b350ee1f2cf18722aac4b2a4bd0a0.json",
+      "case_sha256": "fc72692c9b0f18722a436412e1980780c48b350ee1f2cf18722aac4b2a4bd0a0"
+    },
+    {
+      "name": "object-execution-live-battle-minions-army-level7-invalid",
+      "path": "object-execution/bdf8422e4f429402ddf754f30e9cf891ee595ae8212f863a2e45ec803aa39c29.json",
+      "case_sha256": "bdf8422e4f429402ddf754f30e9cf891ee595ae8212f863a2e45ec803aa39c29"
+    },
+    {
+      "name": "object-execution-live-battle-minions-team-mismatch-first",
+      "path": "object-execution/df64f6b75a9d7f01fc8417a866298ca61d0aba172ac57334ea56a02b70aac279.json",
+      "case_sha256": "df64f6b75a9d7f01fc8417a866298ca61d0aba172ac57334ea56a02b70aac279"
+    },
+    {
+      "name": "object-execution-live-battle-minions-team-mismatch-last",
+      "path": "object-execution/58cfda909ea352f1aa4d214fb18e8fcb97c776184734c5dd939e2848dfc8f788.json",
+      "case_sha256": "58cfda909ea352f1aa4d214fb18e8fcb97c776184734c5dd939e2848dfc8f788"
+    },
+    {
+      "name": "object-execution-live-battle-minions-team-mismatch-invalid",
+      "path": "object-execution/09c556ab183150b57c6b350f34b92fd1b7f01e498a40551349e1a4bef41de205.json",
+      "case_sha256": "09c556ab183150b57c6b350f34b92fd1b7f01e498a40551349e1a4bef41de205"
+    },
+    {
+      "name": "object-execution-live-battle-empty-current-push-first",
+      "path": "object-execution/d0dd7643d428a24cee25f758334d1800b6feae56ab2f96d2f95f3e5cc16cc898.json",
+      "case_sha256": "d0dd7643d428a24cee25f758334d1800b6feae56ab2f96d2f95f3e5cc16cc898"
+    },
+    {
+      "name": "object-execution-live-battle-empty-current-push-last",
+      "path": "object-execution/34326c560b2d512ceb5e11207a60857cd3e0dab5e7d398d290629262ed508ed6.json",
+      "case_sha256": "34326c560b2d512ceb5e11207a60857cd3e0dab5e7d398d290629262ed508ed6"
+    },
+    {
+      "name": "object-execution-live-battle-empty-current-push-invalid",
+      "path": "object-execution/a56f89f99e4f00f388eee4f39e84cc004cdcce0c34c8ff18ad41508273d33d6a.json",
+      "case_sha256": "a56f89f99e4f00f388eee4f39e84cc004cdcce0c34c8ff18ad41508273d33d6a"
+    },
+    {
+      "name": "object-execution-live-battle-empty-current-return-first",
+      "path": "object-execution/13c6657270598b9093dff52834eaeb026eef8270f68537a6312287d4cc17a838.json",
+      "case_sha256": "13c6657270598b9093dff52834eaeb026eef8270f68537a6312287d4cc17a838"
+    },
+    {
+      "name": "object-execution-live-battle-empty-current-return-last",
+      "path": "object-execution/2c53102ebdcd4fe86340e5597c25483497560edbd99581246a7ceb8f21b2de77.json",
+      "case_sha256": "2c53102ebdcd4fe86340e5597c25483497560edbd99581246a7ceb8f21b2de77"
+    },
+    {
+      "name": "object-execution-live-battle-empty-current-return-invalid",
+      "path": "object-execution/7d0a21dcc32622661ed14f5b65c406670a4c6401837797ca096adbbd593d8a91.json",
+      "case_sha256": "7d0a21dcc32622661ed14f5b65c406670a4c6401837797ca096adbbd593d8a91"
+    },
+    {
+      "name": "object-execution-live-battle-map-push-across_the_river-first",
+      "path": "object-execution/296d5fbd61a92ed223ed7934f1abd40f8bb7d6c3a9f796198bc7d79cd4654f42.json",
+      "case_sha256": "296d5fbd61a92ed223ed7934f1abd40f8bb7d6c3a9f796198bc7d79cd4654f42"
+    },
+    {
+      "name": "object-execution-live-battle-map-push-across_the_river-last",
+      "path": "object-execution/cec30f1deb4e83a226a57718217b2eb60e41d577540440e514a68d90150f2669.json",
+      "case_sha256": "cec30f1deb4e83a226a57718217b2eb60e41d577540440e514a68d90150f2669"
+    },
+    {
+      "name": "object-execution-live-battle-map-push-across_the_river-invalid",
+      "path": "object-execution/e7dfab0e9c8580f1fad666d80730baad147573d40c62355fa845d5d2f330736b.json",
+      "case_sha256": "e7dfab0e9c8580f1fad666d80730baad147573d40c62355fa845d5d2f330736b"
+    },
+    {
+      "name": "object-execution-live-battle-map-push-forgotten_island-first",
+      "path": "object-execution/319084e1d3c6ac42c40accc60d4141e1129ac53d4ae26ed250bf5310d39427f2.json",
+      "case_sha256": "319084e1d3c6ac42c40accc60d4141e1129ac53d4ae26ed250bf5310d39427f2"
+    },
+    {
+      "name": "object-execution-live-battle-map-push-forgotten_island-last",
+      "path": "object-execution/0375abbebc0b846e39ac1c26647471b9f9f3361d2a5ae87e002df6dd5a5b213f.json",
+      "case_sha256": "0375abbebc0b846e39ac1c26647471b9f9f3361d2a5ae87e002df6dd5a5b213f"
+    },
+    {
+      "name": "object-execution-live-battle-map-push-forgotten_island-invalid",
+      "path": "object-execution/a8920ddaef9ffd857ad80bdd75908e3be468ae6519cebfcffca53bff2c0567e6.json",
+      "case_sha256": "a8920ddaef9ffd857ad80bdd75908e3be468ae6519cebfcffca53bff2c0567e6"
+    },
+    {
+      "name": "object-execution-live-battle-map-push-magma_and_ice-first",
+      "path": "object-execution/a573d5db7bd2143d47e3167e7db48e972e0fdd2da7f9c139c2668caad3f512af.json",
+      "case_sha256": "a573d5db7bd2143d47e3167e7db48e972e0fdd2da7f9c139c2668caad3f512af"
+    },
+    {
+      "name": "object-execution-live-battle-map-push-magma_and_ice-last",
+      "path": "object-execution/9238f48b0f54b25dde06dc7f892b3a64a28baf90611e4fc0adbb7c9b505e970f.json",
+      "case_sha256": "9238f48b0f54b25dde06dc7f892b3a64a28baf90611e4fc0adbb7c9b505e970f"
+    },
+    {
+      "name": "object-execution-live-battle-map-push-magma_and_ice-invalid",
+      "path": "object-execution/150cdda2213d9cc9e2a464eee8d1d29e6820024caf553104cf02b6ac2f4c1b3b.json",
+      "case_sha256": "150cdda2213d9cc9e2a464eee8d1d29e6820024caf553104cf02b6ac2f4c1b3b"
+    },
+    {
+      "name": "object-execution-live-battle-map-push-narrow_passages-first",
+      "path": "object-execution/2312805a58d9ce35b701f3da7703f1557a09d7c800858e12fdfc55aae670f59b.json",
+      "case_sha256": "2312805a58d9ce35b701f3da7703f1557a09d7c800858e12fdfc55aae670f59b"
+    },
+    {
+      "name": "object-execution-live-battle-map-push-narrow_passages-last",
+      "path": "object-execution/76bf424a218dabe5e8f9343cfedc89618f0dc47af3f1ba1340bac8e6207be163.json",
+      "case_sha256": "76bf424a218dabe5e8f9343cfedc89618f0dc47af3f1ba1340bac8e6207be163"
+    },
+    {
+      "name": "object-execution-live-battle-map-push-narrow_passages-invalid",
+      "path": "object-execution/b6a00daf75ec9bbc8a970ed1f236d0c3f77b91cd58a4aabd67c39e158cec570c.json",
+      "case_sha256": "b6a00daf75ec9bbc8a970ed1f236d0c3f77b91cd58a4aabd67c39e158cec570c"
+    },
+    {
+      "name": "object-execution-live-battle-map-push-vexing_cliffs-first",
+      "path": "object-execution/5086342e9a98dc1302d391404c0e86dc448a0e25d334638204aed03c653e63e3.json",
+      "case_sha256": "5086342e9a98dc1302d391404c0e86dc448a0e25d334638204aed03c653e63e3"
+    },
+    {
+      "name": "object-execution-live-battle-map-push-vexing_cliffs-last",
+      "path": "object-execution/abaab36aaee3a460c941c0ef3d65a688c29aca23a63103ed176f843b9e788397.json",
+      "case_sha256": "abaab36aaee3a460c941c0ef3d65a688c29aca23a63103ed176f843b9e788397"
+    },
+    {
+      "name": "object-execution-live-battle-map-push-vexing_cliffs-invalid",
+      "path": "object-execution/c0078b45fb618a3d90761df2b355547b379a0d67b9908deb48d689b93be10aa8.json",
+      "case_sha256": "c0078b45fb618a3d90761df2b355547b379a0d67b9908deb48d689b93be10aa8"
+    },
+    {
+      "name": "object-execution-live-battle-map-push-vexing_cliffs_v2-first",
+      "path": "object-execution/fe129225b38bbc5b716d01b2a6384640dd011cc50b29f9af35cfb920d7a12a3e.json",
+      "case_sha256": "fe129225b38bbc5b716d01b2a6384640dd011cc50b29f9af35cfb920d7a12a3e"
+    },
+    {
+      "name": "object-execution-live-battle-map-push-vexing_cliffs_v2-last",
+      "path": "object-execution/21b99fc1569bfc4ba70172211ed01ad9413da6500811c4f587b21c7ddbb9cfe4.json",
+      "case_sha256": "21b99fc1569bfc4ba70172211ed01ad9413da6500811c4f587b21c7ddbb9cfe4"
+    },
+    {
+      "name": "object-execution-live-battle-map-push-vexing_cliffs_v2-invalid",
+      "path": "object-execution/a20d4cee2ce622e3a22184ea901d356f93702f0c6efd5c32e2870a588e5b0fea.json",
+      "case_sha256": "a20d4cee2ce622e3a22184ea901d356f93702f0c6efd5c32e2870a588e5b0fea"
+    },
+    {
+      "name": "object-execution-cleanup-live-THIS_TURN-False-None",
+      "path": "object-execution/f1726ad9550faa1fdde07e64707883c52b335ac0e83148a1edc624e5c2b6c06f.json",
+      "case_sha256": "f1726ad9550faa1fdde07e64707883c52b335ac0e83148a1edc624e5c2b6c06f"
+    },
+    {
+      "name": "object-execution-cleanup-live-THIS_TURN-False-",
+      "path": "object-execution/d22f4666f689c122419352bb6c068e6e123bec2c10601d4a67f546b2493961ff.json",
+      "case_sha256": "d22f4666f689c122419352bb6c068e6e123bec2c10601d4a67f546b2493961ff"
+    },
+    {
+      "name": "object-execution-cleanup-live-THIS_TURN-False-played",
+      "path": "object-execution/76f49e51bd43a75f3d6c7d81927c5dad65b9512ad0104eb424f40628d382bb88.json",
+      "case_sha256": "76f49e51bd43a75f3d6c7d81927c5dad65b9512ad0104eb424f40628d382bb88"
+    },
+    {
+      "name": "object-execution-cleanup-live-THIS_TURN-False-current",
+      "path": "object-execution/10bf3c3ea7ed9df9ed4a18c5830d9ad8ec08e806aa6ba983e9df19b85f64b2bc.json",
+      "case_sha256": "10bf3c3ea7ed9df9ed4a18c5830d9ad8ec08e806aa6ba983e9df19b85f64b2bc"
+    },
+    {
+      "name": "object-execution-cleanup-live-THIS_TURN-False-discard",
+      "path": "object-execution/455c0a2bea4fb1f47618101f6837cdb988bfa6279b7ec6894386cdad2ed349e6.json",
+      "case_sha256": "455c0a2bea4fb1f47618101f6837cdb988bfa6279b7ec6894386cdad2ed349e6"
+    },
+    {
+      "name": "object-execution-cleanup-live-THIS_TURN-False-hand",
+      "path": "object-execution/03150df4967a1f26b167c26e3658799801d26903ffc274c379a681842a3b5907.json",
+      "case_sha256": "03150df4967a1f26b167c26e3658799801d26903ffc274c379a681842a3b5907"
+    },
+    {
+      "name": "object-execution-cleanup-live-THIS_TURN-False-deck",
+      "path": "object-execution/65c19b01c274f4b8e3a2a3b5950e44ad86b4f45bac76deff5aa5a8a97fe3c507.json",
+      "case_sha256": "65c19b01c274f4b8e3a2a3b5950e44ad86b4f45bac76deff5aa5a8a97fe3c507"
+    },
+    {
+      "name": "object-execution-cleanup-live-THIS_TURN-False-ultimate",
+      "path": "object-execution/e7fee5c476938fe917e89c16e8ef97192c2379127e8e254ee236b07e1984a34f.json",
+      "case_sha256": "e7fee5c476938fe917e89c16e8ef97192c2379127e8e254ee236b07e1984a34f"
+    },
+    {
+      "name": "object-execution-cleanup-live-THIS_TURN-True-None",
+      "path": "object-execution/053d7531e01d07ea2b9862a1597ea398f7f9150412e52e9aa0f77b8cde09de3b.json",
+      "case_sha256": "053d7531e01d07ea2b9862a1597ea398f7f9150412e52e9aa0f77b8cde09de3b"
+    },
+    {
+      "name": "object-execution-cleanup-live-THIS_TURN-True-",
+      "path": "object-execution/43b9a68c1bb297d7370b55b5abb5470e589882a35d6945dfa60e2339c6410fe5.json",
+      "case_sha256": "43b9a68c1bb297d7370b55b5abb5470e589882a35d6945dfa60e2339c6410fe5"
+    },
+    {
+      "name": "object-execution-cleanup-live-THIS_TURN-True-played",
+      "path": "object-execution/256c6ce84cffda422e952968627f8849772009c818ed337d494913d6db1563e3.json",
+      "case_sha256": "256c6ce84cffda422e952968627f8849772009c818ed337d494913d6db1563e3"
+    },
+    {
+      "name": "object-execution-cleanup-live-THIS_TURN-True-current",
+      "path": "object-execution/5030084aee29fffb41287cb75c3832f54d74c1d8e58e2966a7d5ed7a50a5f5bb.json",
+      "case_sha256": "5030084aee29fffb41287cb75c3832f54d74c1d8e58e2966a7d5ed7a50a5f5bb"
+    },
+    {
+      "name": "object-execution-cleanup-live-THIS_TURN-True-discard",
+      "path": "object-execution/c505d6c1a4c54f872f74e96de1a1041b1a8834d4a3c1028037dedf64e80c6c63.json",
+      "case_sha256": "c505d6c1a4c54f872f74e96de1a1041b1a8834d4a3c1028037dedf64e80c6c63"
+    },
+    {
+      "name": "object-execution-cleanup-live-THIS_TURN-True-hand",
+      "path": "object-execution/c4e681d6c0f37b37f85711ffa3c4683f38d0ed9f6c1087cf82590112422109b6.json",
+      "case_sha256": "c4e681d6c0f37b37f85711ffa3c4683f38d0ed9f6c1087cf82590112422109b6"
+    },
+    {
+      "name": "object-execution-cleanup-live-THIS_TURN-True-deck",
+      "path": "object-execution/0918b7d07f7e0dd8d1871285a0da59027749966d4585b76b44b49aa4da2a1afe.json",
+      "case_sha256": "0918b7d07f7e0dd8d1871285a0da59027749966d4585b76b44b49aa4da2a1afe"
+    },
+    {
+      "name": "object-execution-cleanup-live-THIS_TURN-True-ultimate",
+      "path": "object-execution/efac94ff7e1f3b0d1cdf157fe38a71bf5d1be666882caead3f5c9dba8574975c.json",
+      "case_sha256": "efac94ff7e1f3b0d1cdf157fe38a71bf5d1be666882caead3f5c9dba8574975c"
+    },
+    {
+      "name": "object-execution-cleanup-live-NEXT_TURN-False-None",
+      "path": "object-execution/56198a832f3a3f32b60fc48b31e802bc7b84a1d74b0bca5b823e1a777ad17724.json",
+      "case_sha256": "56198a832f3a3f32b60fc48b31e802bc7b84a1d74b0bca5b823e1a777ad17724"
+    },
+    {
+      "name": "object-execution-cleanup-live-NEXT_TURN-False-",
+      "path": "object-execution/fd711a4f9e97ed76d4a1d2e9de592f63b14332bf255dbaa672046a3db79357d5.json",
+      "case_sha256": "fd711a4f9e97ed76d4a1d2e9de592f63b14332bf255dbaa672046a3db79357d5"
+    },
+    {
+      "name": "object-execution-cleanup-live-NEXT_TURN-False-played",
+      "path": "object-execution/f8179a322f91971dca48d27aaab3336066678cb563c4188584f2a374734d411e.json",
+      "case_sha256": "f8179a322f91971dca48d27aaab3336066678cb563c4188584f2a374734d411e"
+    },
+    {
+      "name": "object-execution-cleanup-live-NEXT_TURN-False-current",
+      "path": "object-execution/369bd7f1c06211f8ce170730fcfd76b839c0b2c20d4f1878e1e3ab43aabc1e85.json",
+      "case_sha256": "369bd7f1c06211f8ce170730fcfd76b839c0b2c20d4f1878e1e3ab43aabc1e85"
+    },
+    {
+      "name": "object-execution-cleanup-live-NEXT_TURN-False-discard",
+      "path": "object-execution/817b8162de7992ab825cb82f74719469318325a131352f2085fbb545f58d01ea.json",
+      "case_sha256": "817b8162de7992ab825cb82f74719469318325a131352f2085fbb545f58d01ea"
+    },
+    {
+      "name": "object-execution-cleanup-live-NEXT_TURN-False-hand",
+      "path": "object-execution/ad73502db4a55a59ed6f4f86338bb474ed6525326dc213da658bc4f6d24185b1.json",
+      "case_sha256": "ad73502db4a55a59ed6f4f86338bb474ed6525326dc213da658bc4f6d24185b1"
+    },
+    {
+      "name": "object-execution-cleanup-live-NEXT_TURN-False-deck",
+      "path": "object-execution/e0fe30952908369f2b7c92331f4651968602ce3b0671b0b43d91923470ee0a12.json",
+      "case_sha256": "e0fe30952908369f2b7c92331f4651968602ce3b0671b0b43d91923470ee0a12"
+    },
+    {
+      "name": "object-execution-cleanup-live-NEXT_TURN-False-ultimate",
+      "path": "object-execution/b2f15ba338fedc0a709d8cf2f0fb0ec6fec22a3d6033c2cfeae11701c49ce5d8.json",
+      "case_sha256": "b2f15ba338fedc0a709d8cf2f0fb0ec6fec22a3d6033c2cfeae11701c49ce5d8"
+    },
+    {
+      "name": "object-execution-cleanup-live-NEXT_TURN-True-None",
+      "path": "object-execution/7857caceafaef7fcad79d337dbc666f04b4ad42323afa9ae488f3e570772e6c0.json",
+      "case_sha256": "7857caceafaef7fcad79d337dbc666f04b4ad42323afa9ae488f3e570772e6c0"
+    },
+    {
+      "name": "object-execution-cleanup-live-NEXT_TURN-True-",
+      "path": "object-execution/6ee3c41b2de24ef70d38e37cd81baa3696fde1433da1d6bc8fb15082f74839ca.json",
+      "case_sha256": "6ee3c41b2de24ef70d38e37cd81baa3696fde1433da1d6bc8fb15082f74839ca"
+    },
+    {
+      "name": "object-execution-cleanup-live-NEXT_TURN-True-played",
+      "path": "object-execution/d73ddef6d9733ca8ef38aa89ace93210673c95af2aae00bdc651d24daf168fc3.json",
+      "case_sha256": "d73ddef6d9733ca8ef38aa89ace93210673c95af2aae00bdc651d24daf168fc3"
+    },
+    {
+      "name": "object-execution-cleanup-live-NEXT_TURN-True-current",
+      "path": "object-execution/5eb7a9591c79a9adbbb5e9abb7d9a05f8d1156664ca2a3ac0bcb2c6870441986.json",
+      "case_sha256": "5eb7a9591c79a9adbbb5e9abb7d9a05f8d1156664ca2a3ac0bcb2c6870441986"
+    },
+    {
+      "name": "object-execution-cleanup-live-NEXT_TURN-True-discard",
+      "path": "object-execution/d07a6abf7fa49b45a4d60a61f55809754881f641e6f43bce84a4affb7b52b187.json",
+      "case_sha256": "d07a6abf7fa49b45a4d60a61f55809754881f641e6f43bce84a4affb7b52b187"
+    },
+    {
+      "name": "object-execution-cleanup-live-NEXT_TURN-True-hand",
+      "path": "object-execution/f47aba356bbdf3e79bd8c195baab8804b87e149a9226b4011a751bae80de22fb.json",
+      "case_sha256": "f47aba356bbdf3e79bd8c195baab8804b87e149a9226b4011a751bae80de22fb"
+    },
+    {
+      "name": "object-execution-cleanup-live-NEXT_TURN-True-deck",
+      "path": "object-execution/5024a3fa2a93042b462f1715d823f36821f48d1138ff39c584f53b120f4b2582.json",
+      "case_sha256": "5024a3fa2a93042b462f1715d823f36821f48d1138ff39c584f53b120f4b2582"
+    },
+    {
+      "name": "object-execution-cleanup-live-NEXT_TURN-True-ultimate",
+      "path": "object-execution/313d9bec5674930e1d58cd6dd88878ab64f917f07de44405eacc11aa11d7ce34.json",
+      "case_sha256": "313d9bec5674930e1d58cd6dd88878ab64f917f07de44405eacc11aa11d7ce34"
+    },
+    {
+      "name": "object-execution-cleanup-live-THIS_ROUND-False-None",
+      "path": "object-execution/5410557fd2742bcd3a9a170106b77747fcd247e4ede6956d2bac87bd45940022.json",
+      "case_sha256": "5410557fd2742bcd3a9a170106b77747fcd247e4ede6956d2bac87bd45940022"
+    },
+    {
+      "name": "object-execution-cleanup-live-THIS_ROUND-False-",
+      "path": "object-execution/488ee053dc3187075f1d50530aa53f74201be479934196f8bc28d22e60498994.json",
+      "case_sha256": "488ee053dc3187075f1d50530aa53f74201be479934196f8bc28d22e60498994"
+    },
+    {
+      "name": "object-execution-cleanup-live-THIS_ROUND-False-played",
+      "path": "object-execution/0a163cb0dfd0aec7584b38b9c83e3a32d062ba347556eaa4972a22411342bc2a.json",
+      "case_sha256": "0a163cb0dfd0aec7584b38b9c83e3a32d062ba347556eaa4972a22411342bc2a"
+    },
+    {
+      "name": "object-execution-cleanup-live-THIS_ROUND-False-current",
+      "path": "object-execution/d46f6a620f96479abb8391ad8a0fc65d9fdc416cb7de379952889753273f8f77.json",
+      "case_sha256": "d46f6a620f96479abb8391ad8a0fc65d9fdc416cb7de379952889753273f8f77"
+    },
+    {
+      "name": "object-execution-cleanup-live-THIS_ROUND-False-discard",
+      "path": "object-execution/83a1841fb1502345131485a9e5b912ee17059dee27d015498dbe19508a98cc40.json",
+      "case_sha256": "83a1841fb1502345131485a9e5b912ee17059dee27d015498dbe19508a98cc40"
+    },
+    {
+      "name": "object-execution-cleanup-live-THIS_ROUND-False-hand",
+      "path": "object-execution/028a605fc6cc60fb80c94656117298416393ca45da5367817e7c4d603b553767.json",
+      "case_sha256": "028a605fc6cc60fb80c94656117298416393ca45da5367817e7c4d603b553767"
+    },
+    {
+      "name": "object-execution-cleanup-live-THIS_ROUND-False-deck",
+      "path": "object-execution/3e55a94ed746517b2f8138d909dbf5d74cdc7ff04ca588a92d4f9ed29d481270.json",
+      "case_sha256": "3e55a94ed746517b2f8138d909dbf5d74cdc7ff04ca588a92d4f9ed29d481270"
+    },
+    {
+      "name": "object-execution-cleanup-live-THIS_ROUND-False-ultimate",
+      "path": "object-execution/a3a3b03705499f6bf0cdee2ff7cd3fbe13586f65a8f69a1bda01560ee992b250.json",
+      "case_sha256": "a3a3b03705499f6bf0cdee2ff7cd3fbe13586f65a8f69a1bda01560ee992b250"
+    },
+    {
+      "name": "object-execution-cleanup-live-THIS_ROUND-True-None",
+      "path": "object-execution/6b674a2dc4b7b59303d4cac4d5d69cec11e6d9480f844f3a3c7a3e9ca38a51b1.json",
+      "case_sha256": "6b674a2dc4b7b59303d4cac4d5d69cec11e6d9480f844f3a3c7a3e9ca38a51b1"
+    },
+    {
+      "name": "object-execution-cleanup-live-THIS_ROUND-True-",
+      "path": "object-execution/6222d3436050a0504b2c1223f54c8d3f71e0394c6e6c309b6c204ac0adc97fe9.json",
+      "case_sha256": "6222d3436050a0504b2c1223f54c8d3f71e0394c6e6c309b6c204ac0adc97fe9"
+    },
+    {
+      "name": "object-execution-cleanup-live-THIS_ROUND-True-played",
+      "path": "object-execution/124d8fd6f876cc82ebf6767ef045624f643391f57848c8a7decad250746d8dc8.json",
+      "case_sha256": "124d8fd6f876cc82ebf6767ef045624f643391f57848c8a7decad250746d8dc8"
+    },
+    {
+      "name": "object-execution-cleanup-live-THIS_ROUND-True-current",
+      "path": "object-execution/79d2303c5730d078a36c87a71737e4e1b10ff1dbe8e98a7feadbdb2b1f6a5138.json",
+      "case_sha256": "79d2303c5730d078a36c87a71737e4e1b10ff1dbe8e98a7feadbdb2b1f6a5138"
+    },
+    {
+      "name": "object-execution-cleanup-live-THIS_ROUND-True-discard",
+      "path": "object-execution/af34f2d0ce942dedbfb9e0e493f4e93f36aa3cf9f3d7b3a4d83163ebd767fdff.json",
+      "case_sha256": "af34f2d0ce942dedbfb9e0e493f4e93f36aa3cf9f3d7b3a4d83163ebd767fdff"
+    },
+    {
+      "name": "object-execution-cleanup-live-THIS_ROUND-True-hand",
+      "path": "object-execution/cb0012a8471e1af3c6ebc5ec92449ae69e8875c4ecfea384f69ad31eeb7d35a7.json",
+      "case_sha256": "cb0012a8471e1af3c6ebc5ec92449ae69e8875c4ecfea384f69ad31eeb7d35a7"
+    },
+    {
+      "name": "object-execution-cleanup-live-THIS_ROUND-True-deck",
+      "path": "object-execution/0583d1959072ec6d1ac445c1130b4310a736d8a56aac98d881473b01bdfde24a.json",
+      "case_sha256": "0583d1959072ec6d1ac445c1130b4310a736d8a56aac98d881473b01bdfde24a"
+    },
+    {
+      "name": "object-execution-cleanup-live-THIS_ROUND-True-ultimate",
+      "path": "object-execution/80a389c8f3e960591db48942a31322f7440ad36c362c56bd62ac1c8450aaee06.json",
+      "case_sha256": "80a389c8f3e960591db48942a31322f7440ad36c362c56bd62ac1c8450aaee06"
+    },
+    {
+      "name": "object-execution-cleanup-live-PASSIVE-False-None",
+      "path": "object-execution/b5ff890d7035ef891b0de2c773adc444f9a46bd4cb99fb8e7f457afc352b632a.json",
+      "case_sha256": "b5ff890d7035ef891b0de2c773adc444f9a46bd4cb99fb8e7f457afc352b632a"
+    },
+    {
+      "name": "object-execution-cleanup-live-PASSIVE-False-",
+      "path": "object-execution/357af05c0d2422f30d3236d8490ea71c03533f341e150f421d8f48f495d25408.json",
+      "case_sha256": "357af05c0d2422f30d3236d8490ea71c03533f341e150f421d8f48f495d25408"
+    },
+    {
+      "name": "object-execution-cleanup-live-PASSIVE-False-played",
+      "path": "object-execution/23c5fbb14ff2977d16b1ef4a394d3123761f8aae38ddea7c2aee359496fdc9fc.json",
+      "case_sha256": "23c5fbb14ff2977d16b1ef4a394d3123761f8aae38ddea7c2aee359496fdc9fc"
+    },
+    {
+      "name": "object-execution-cleanup-live-PASSIVE-False-current",
+      "path": "object-execution/b051876f15f7d0d43ba708d61ea9cb97d0099fe456ababac4bd8f993602a6c86.json",
+      "case_sha256": "b051876f15f7d0d43ba708d61ea9cb97d0099fe456ababac4bd8f993602a6c86"
+    },
+    {
+      "name": "object-execution-cleanup-live-PASSIVE-False-discard",
+      "path": "object-execution/2cdd93d408c5f58d4fcb859fc9d98a7060f83ec3c346cab35ff67038197a5d13.json",
+      "case_sha256": "2cdd93d408c5f58d4fcb859fc9d98a7060f83ec3c346cab35ff67038197a5d13"
+    },
+    {
+      "name": "object-execution-cleanup-live-PASSIVE-False-hand",
+      "path": "object-execution/003be4f174b753b60ffbf467cf3101113440e2469362c25b8e5390925c2beeff.json",
+      "case_sha256": "003be4f174b753b60ffbf467cf3101113440e2469362c25b8e5390925c2beeff"
+    },
+    {
+      "name": "object-execution-cleanup-live-PASSIVE-False-deck",
+      "path": "object-execution/5ac878a070a75251d4928b83d975d4d2ebf23ba2c95fb72a34679bf2437542db.json",
+      "case_sha256": "5ac878a070a75251d4928b83d975d4d2ebf23ba2c95fb72a34679bf2437542db"
+    },
+    {
+      "name": "object-execution-cleanup-live-PASSIVE-False-ultimate",
+      "path": "object-execution/8c4801cd8a7bc41846dec9c9fdb483c0adfd30ed8ce7162d4d6f44475de0902f.json",
+      "case_sha256": "8c4801cd8a7bc41846dec9c9fdb483c0adfd30ed8ce7162d4d6f44475de0902f"
+    },
+    {
+      "name": "object-execution-cleanup-live-PASSIVE-True-None",
+      "path": "object-execution/c86aab98affc70de95a9890781e0ea67e5a6b939f9b18d8af008f33aef487ac4.json",
+      "case_sha256": "c86aab98affc70de95a9890781e0ea67e5a6b939f9b18d8af008f33aef487ac4"
+    },
+    {
+      "name": "object-execution-cleanup-live-PASSIVE-True-",
+      "path": "object-execution/1072c4f670263fbae90da8dc195bca22726cb335fbfe663f2d0f939389643d55.json",
+      "case_sha256": "1072c4f670263fbae90da8dc195bca22726cb335fbfe663f2d0f939389643d55"
+    },
+    {
+      "name": "object-execution-cleanup-live-PASSIVE-True-played",
+      "path": "object-execution/31616b383a6227925d60c8f5d54b9ca076bd5a2d2eca762f853439d530706c3c.json",
+      "case_sha256": "31616b383a6227925d60c8f5d54b9ca076bd5a2d2eca762f853439d530706c3c"
+    },
+    {
+      "name": "object-execution-cleanup-live-PASSIVE-True-current",
+      "path": "object-execution/f7d78b05993a559de080dc08d074d0d941831eb14e81fd88125825598bd8d1ad.json",
+      "case_sha256": "f7d78b05993a559de080dc08d074d0d941831eb14e81fd88125825598bd8d1ad"
+    },
+    {
+      "name": "object-execution-cleanup-live-PASSIVE-True-discard",
+      "path": "object-execution/2a27dddfcb1d00f04ebca0974e6ee538563abc7fb662b2abc63f026697e19d12.json",
+      "case_sha256": "2a27dddfcb1d00f04ebca0974e6ee538563abc7fb662b2abc63f026697e19d12"
+    },
+    {
+      "name": "object-execution-cleanup-live-PASSIVE-True-hand",
+      "path": "object-execution/19737f960c68498fe0810001960c154af93efac1757826381dcdcec95bda3f93.json",
+      "case_sha256": "19737f960c68498fe0810001960c154af93efac1757826381dcdcec95bda3f93"
+    },
+    {
+      "name": "object-execution-cleanup-live-PASSIVE-True-deck",
+      "path": "object-execution/2560f85e9a5b3213e9a72bc3e31c4fd51bc6125fed7c6cf49e23e0d20fb2c794.json",
+      "case_sha256": "2560f85e9a5b3213e9a72bc3e31c4fd51bc6125fed7c6cf49e23e0d20fb2c794"
+    },
+    {
+      "name": "object-execution-cleanup-live-PASSIVE-True-ultimate",
+      "path": "object-execution/0e824d8471e20042e4eda8a974c18a9240770317d1e2087bf3772b48b0fc8a47.json",
+      "case_sha256": "0e824d8471e20042e4eda8a974c18a9240770317d1e2087bf3772b48b0fc8a47"
+    },
+    {
+      "name": "object-execution-cleanup-live-temporary-token",
+      "path": "object-execution/2b2adb406f679105e2353ddb7d4d1b04af3a0c591415a1c960660ad457f54a5f.json",
+      "case_sha256": "2b2adb406f679105e2353ddb7d4d1b04af3a0c591415a1c960660ad457f54a5f"
+    },
+    {
+      "name": "object-execution-cleanup-live-persistent-token",
+      "path": "object-execution/7aabfabe9042bddb04432676fe75a8e5ad0ef4393658f35848524674c9af99e0.json",
+      "case_sha256": "7aabfabe9042bddb04432676fe75a8e5ad0ef4393658f35848524674c9af99e0"
+    },
+    {
+      "name": "object-execution-cleanup-live-unpooled-token",
+      "path": "object-execution/1c8d0a33e647539f3017594052987839c33eb6ddd7608380c47f6739296eb6ea.json",
+      "case_sha256": "1c8d0a33e647539f3017594052987839c33eb6ddd7608380c47f6739296eb6ea"
+    },
+    {
+      "name": "object-execution-cleanup-live-unplaced-token",
+      "path": "object-execution/0aacc1ddc323c8a2cf3cdd384c5cc4316cb84d24927ce695ddbc550af70b450c.json",
+      "case_sha256": "0aacc1ddc323c8a2cf3cdd384c5cc4316cb84d24927ce695ddbc550af70b450c"
+    },
+    {
+      "name": "object-execution-cleanup-live-duplicate-token-pool",
+      "path": "object-execution/2ef9b423634d1300d292ede04a190c69792f2caafc6845cc81e522cd9958addf.json",
+      "case_sha256": "2ef9b423634d1300d292ede04a190c69792f2caafc6845cc81e522cd9958addf"
+    },
+    {
+      "name": "object-execution-cleanup-live-empty-token-binding",
+      "path": "object-execution/5b14c5639c907bc6e4a927f6cafb33f8c82e0accfc253e7c4b0b469283d786ec.json",
+      "case_sha256": "5b14c5639c907bc6e4a927f6cafb33f8c82e0accfc253e7c4b0b469283d786ec"
+    },
+    {
+      "name": "object-execution-cleanup-live-token-played-card",
+      "path": "object-execution/d09b6876ca54be6c511df1d6425439ba0a5d98b2170d4264742d1668b948a9df.json",
+      "case_sha256": "d09b6876ca54be6c511df1d6425439ba0a5d98b2170d4264742d1668b948a9df"
+    },
+    {
+      "name": "object-execution-cleanup-live-scope-token",
+      "path": "object-execution/091e4084b4a6b7f0ccd70e83fe238f3e2a7c6ece13414b1ba55789defc08279f.json",
+      "case_sha256": "091e4084b4a6b7f0ccd70e83fe238f3e2a7c6ece13414b1ba55789defc08279f"
+    },
+    {
+      "name": "object-execution-cleanup-live-source-token",
+      "path": "object-execution/6c08e0adeb8c2d58e1a38857ebfe0d21ce15e61d0ca3f1615a7905d872254462.json",
+      "case_sha256": "6c08e0adeb8c2d58e1a38857ebfe0d21ce15e61d0ca3f1615a7905d872254462"
+    },
+    {
+      "name": "object-execution-cleanup-live-duplicate-id",
+      "path": "object-execution/7e37b8c8d4008181f2fb1144058b18d9a2afa98201c0b1239c9f3e3210b14355.json",
+      "case_sha256": "7e37b8c8d4008181f2fb1144058b18d9a2afa98201c0b1239c9f3e3210b14355"
+    },
+    {
+      "name": "object-execution-cleanup-live-round-finishing-ignored",
+      "path": "object-execution/36158c619194c97b4783af973a7f89a86895e236febea0f1f4f565cd1f50eb2f.json",
+      "case_sha256": "36158c619194c97b4783af973a7f89a86895e236febea0f1f4f565cd1f50eb2f"
+    },
+    {
+      "name": "object-execution-cleanup-live-turn-finishing-retained",
+      "path": "object-execution/d728ea7026f045af15148840615665fcc10e2e09f284dddaf343f042d2bd7b6f.json",
+      "case_sha256": "d728ea7026f045af15148840615665fcc10e2e09f284dddaf343f042d2bd7b6f"
+    },
+    {
+      "name": "object-execution-cleanup-live-after-cards-round",
+      "path": "object-execution/6a3e002ad96dee817031ee6db040eb5682e0596f527f49a8682889fa197c6cd0.json",
+      "case_sha256": "6a3e002ad96dee817031ee6db040eb5682e0596f527f49a8682889fa197c6cd0"
+    },
+    {
+      "name": "object-execution-cleanup-live-two-tokens-ordered",
+      "path": "object-execution/c6bbb0c4b7839d73352a4e2f6102e2c343b6c8b50c976862779c2def7caa4ddf.json",
+      "case_sha256": "c6bbb0c4b7839d73352a4e2f6102e2c343b6c8b50c976862779c2def7caa4ddf"
+    },
+    {
+      "name": "object-execution-cleanup-live-level-gold--2",
+      "path": "object-execution/bfd972d2060416810eb83d05322f1fad3ea93e5e4a7672cc85d8e394562b7422.json",
+      "case_sha256": "bfd972d2060416810eb83d05322f1fad3ea93e5e4a7672cc85d8e394562b7422"
+    },
+    {
+      "name": "object-execution-cleanup-live-level-gold-0",
+      "path": "object-execution/73f12deb01028e4b61dbd14154a4fc11579e9749f1d06781e717d92dd096dffd.json",
+      "case_sha256": "73f12deb01028e4b61dbd14154a4fc11579e9749f1d06781e717d92dd096dffd"
+    },
+    {
+      "name": "object-execution-cleanup-live-level-gold-1",
+      "path": "object-execution/bd343b137c35710ad70ac3eaea5b102705483f6e45ed76ef62628a7758e2f5af.json",
+      "case_sha256": "bd343b137c35710ad70ac3eaea5b102705483f6e45ed76ef62628a7758e2f5af"
+    },
+    {
+      "name": "object-execution-cleanup-live-level-gold-3",
+      "path": "object-execution/6fa17c682d7f656926241b07f2824a78e40ef6960c22c8015a64b8bafed9110c.json",
+      "case_sha256": "6fa17c682d7f656926241b07f2824a78e40ef6960c22c8015a64b8bafed9110c"
+    },
+    {
+      "name": "object-execution-cleanup-live-level-gold-6",
+      "path": "object-execution/2033f58783ea7131f777d27b390c9ffbb8aa1f4c6723468e53229ac487fd11c2.json",
+      "case_sha256": "2033f58783ea7131f777d27b390c9ffbb8aa1f4c6723468e53229ac487fd11c2"
+    },
+    {
+      "name": "object-execution-cleanup-live-level-gold-28",
+      "path": "object-execution/78346c56afd265e1aff697c4885b9f0f6da4ae54b6c5199f1da382b15798c9ba.json",
+      "case_sha256": "78346c56afd265e1aff697c4885b9f0f6da4ae54b6c5199f1da382b15798c9ba"
+    },
+    {
+      "name": "object-execution-cleanup-live-level-gold-100",
+      "path": "object-execution/670e19115d8f2c3de3b0e3c3dcd370e6f720c1c67a852b6994f31a96178bc820.json",
+      "case_sha256": "670e19115d8f2c3de3b0e3c3dcd370e6f720c1c67a852b6994f31a96178bc820"
+    },
+    {
+      "name": "object-execution-cleanup-live-physical-flags",
+      "path": "object-execution/6e6814a4506bf7dee32ffb855f89ac0bebcc6c4dc543509bc1526a438f602aad.json",
+      "case_sha256": "6e6814a4506bf7dee32ffb855f89ac0bebcc6c4dc543509bc1526a438f602aad"
+    },
+    {
+      "name": "object-execution-cleanup-live-hand-flags",
+      "path": "object-execution/43db0f7952de2316ab1b4aeca70d8a4d830e1e8d8c464601b6ff2636060f1eaf.json",
+      "case_sha256": "43db0f7952de2316ab1b4aeca70d8a4d830e1e8d8c464601b6ff2636060f1eaf"
+    },
+    {
+      "name": "object-execution-cleanup-live-markers",
+      "path": "object-execution/167c9334977a4fb37d5e04d047e2aad9715cbec6d0a3c6f65d726d73bb27dc47.json",
+      "case_sha256": "167c9334977a4fb37d5e04d047e2aad9715cbec6d0a3c6f65d726d73bb27dc47"
+    },
+    {
+      "name": "object-execution-cleanup-live-post-round-commit",
+      "path": "object-execution/c81e0e66be2135c9880378ec644520dc6e2b274274f28ff9af2a95b9f1e40f9f.json",
+      "case_sha256": "c81e0e66be2135c9880378ec644520dc6e2b274274f28ff9af2a95b9f1e40f9f"
+    },
+    {
+      "name": "object-execution-cleanup-live-Takahide-ultimate",
+      "path": "object-execution/eccd308ef1d9421bac602093a97d8549894a54237cc03fb10d61a4f8b4fec58f.json",
+      "case_sha256": "eccd308ef1d9421bac602093a97d8549894a54237cc03fb10d61a4f8b4fec58f"
+    },
+    {
+      "name": "object-execution-cleanup-live-Takahide-ultimate-with-upgrades",
+      "path": "object-execution/5741da7ec8f1b32f7f7d5ae5ef26d359f90b08f345e4fd146b6d1636ca90aa9e.json",
+      "case_sha256": "5741da7ec8f1b32f7f7d5ae5ef26d359f90b08f345e4fd146b6d1636ca90aa9e"
+    },
+    {
+      "name": "object-execution-cleanup-live-Takahide-max-level",
+      "path": "object-execution/2280be7b4eebe2572839e833e50ebbacf190f3414855760b04274751a9694670.json",
+      "case_sha256": "2280be7b4eebe2572839e833e50ebbacf190f3414855760b04274751a9694670"
+    },
+    {
+      "name": "object-execution-cleanup-live-Ursafar-ultimate",
+      "path": "object-execution/97c5b3e96d4aa7317a71365354589d364a95aa0176a673f8a46e619be5a25e61.json",
+      "case_sha256": "97c5b3e96d4aa7317a71365354589d364a95aa0176a673f8a46e619be5a25e61"
+    },
+    {
+      "name": "object-execution-cleanup-live-Ursafar-ultimate-with-upgrades",
+      "path": "object-execution/c9cba67d5abfbdb1e12158f56ca8a2ba1fd7ea30789d23dd6f96462d9d1f645a.json",
+      "case_sha256": "c9cba67d5abfbdb1e12158f56ca8a2ba1fd7ea30789d23dd6f96462d9d1f645a"
+    },
+    {
+      "name": "object-execution-cleanup-live-Ursafar-max-level",
+      "path": "object-execution/917da793dcfae352e66be7bdcb91ca696140c78e060fd83a0744341ef62eb502.json",
+      "case_sha256": "917da793dcfae352e66be7bdcb91ca696140c78e060fd83a0744341ef62eb502"
     }
   ],
-  "corpus_sha256": "a604573266b132c2ddf8d1bd8d2217941b3d75735dd9190e1ede241b3e167153"
+  "corpus_sha256": "ca313f63072c7b2b5b72ce7fa65dc806e3ad9eabd56bb36e1ce98156cfe9be7a"
 }

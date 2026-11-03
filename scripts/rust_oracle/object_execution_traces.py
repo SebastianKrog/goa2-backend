@@ -384,9 +384,18 @@ def scenes():
     yield from min_primary_scenes()
     yield from min_item_scenes()
     yield from min_after_scenes()
+    from live_dynamic_passive_traces import scenes as dynamic_passive_scenes
+
+    yield from dynamic_passive_scenes()
+    from live_battle_traces import scenes as live_battle_scenes
+
+    yield from live_battle_scenes()
+    from live_cleanup_traces import scenes as live_cleanup_scenes
+
+    yield from live_cleanup_scenes()
 
 
-def live_choice_operations(state, mode="first", stop_types=("offer_passive",)):
+def live_choice_operations(state, mode="first", stop_types=("offer_passive",), *, max_steps=80):
     """Drive real one-step boundaries up to the next unbound consumer."""
     from goa2.domain.input import InputResponse, selection_value
     from goa2.engine.handler import process_stack, submit_input
@@ -394,7 +403,7 @@ def live_choice_operations(state, mode="first", stop_types=("offer_passive",)):
     probe = copy.deepcopy(state)
     result = []
     bad = False
-    for _ in range(80):
+    for _ in range(max_steps):
         if not probe.execution_stack or probe.execution_stack[-1].type.value in stop_types:
             return result
         remaining = 1

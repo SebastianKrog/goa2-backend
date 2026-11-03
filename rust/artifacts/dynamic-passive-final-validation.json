@@ -1,0 +1,48 @@
+{
+  "implemented_passives": [
+    "flurry_of_blows",
+    "cloak_and_daggers"
+  ],
+  "reviewed_raw_pure_builders": 124,
+  "reviewed_raw_stateful_builders": 3,
+  "reviewed_primary_faces": 172,
+  "total_primary_faces": 596,
+  "spell_bodies": 22,
+  "total_spell_bodies": 22,
+  "source_cases": 176,
+  "source_operations": 652,
+  "independent_release_parity": {
+    "cases": 176,
+    "operations": 652,
+    "corpus_sha256": "f8a394611ec98fbfe3fbb8cc5e8409297c11ebac4af4f891e19468be9c147413",
+    "workers": 4,
+    "state_request_event_and_identity_parity": true,
+    "seconds": 5.31
+  },
+  "new_source_contracts": 7,
+  "affected_source_contracts_passed": 60,
+  "core_tests_passed": 277,
+  "bounded_restore_tests_passed": 1,
+  "bounded_restore_cases": 176,
+  "bounded_restore_operations": 652,
+  "cli_tests_passed": 3,
+  "verification_scope": "All core unit tests, the new bounded restoration gate, full canonical/live CLI replay, affected source contracts. Other pre-existing integration suites and the older exhaustive all-corpus restoration gate were not rerun in this increment.",
+  "live_cases": 14431,
+  "live_operations": 116010,
+  "live_index_sha256": "005b80784c98a531af05a13a30c9b78fb1ce3873fb50548ddee57d352960f5c3",
+  "live_semantic_sha256": "20b85b2049bf4b616b43169025db77c556e18eb31e92eb3f6c30864b7592ac2e",
+  "canonical_cases": 6592,
+  "canonical_operations": 27145,
+  "frozen_checks": {
+    "primary_catalog_reproducible": true,
+    "frozen_source_and_lock_unchanged": true,
+    "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43"
+  },
+  "strict_clippy": true,
+  "rustfmt": true,
+  "black_ruff_files": 7,
+  "arena_lane_check_scope": "Live null lane operand and empty authoritative battle-zone mapping; other cases remain guarded before pop.",
+  "actual_arena_lane_pushes_complete": false,
+  "engine_complete": false,
+  "search_complete": false
+}

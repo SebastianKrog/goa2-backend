@@ -3521,3 +3521,18 @@ fn min_bodies_items_and_deferred_text_restore_each_boundary_with_private_models(
         7873,
     );
 }
+
+#[test]
+fn dynamic_passive_bodies_restore_each_boundary_with_private_cards_filters_and_effects() {
+    primary_family_restores_each_boundary(&["object-execution-dynamic-passive-"], 176, 652);
+}
+
+#[test]
+fn live_battles_restore_each_boundary_with_private_maps_spawns_effects_and_pending_steps() {
+    primary_family_restores_each_boundary(&["object-execution-live-battle-"], 267, 1446);
+}
+
+#[test]
+fn live_cleanup_restores_each_boundary_with_private_cards_lists_effects_and_level_up_snapshots() {
+    primary_family_restores_each_boundary(&["object-execution-cleanup-live-"], 95, 192);
+}

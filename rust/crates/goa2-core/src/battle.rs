@@ -69,6 +69,29 @@ pub enum BattleOp {
     Place(Symbol, Hex),
     GameOver(GameOutcome),
 }
+/// Ordered direct writes and source-origin bindings, distinct from generated
+/// GameStep continuations. Arena execution preserves each write's source
+/// container and identity semantics.
+#[derive(Clone, Debug)]
+pub enum BattleMutation {
+    ClearPending,
+    Wave(Symbol, i64),
+    Zone(Symbol, Symbol),
+    Remove(Symbol),
+    RemoveToken(Symbol),
+    Spawn {
+        unit: Symbol,
+        zone: Symbol,
+        source_index: usize,
+        hex: Hex,
+    },
+    BlockedSpawn {
+        unit: Symbol,
+        zone: Symbol,
+        source_index: usize,
+        hex: Hex,
+    },
+}
 #[derive(Clone, Debug)]
 pub enum Choices {
     Units(Vec<Symbol>),
@@ -215,7 +238,12 @@ impl BattleRules {
             (Some(zones[index + 1]), false)
         }
     }
-    fn flip(world: &mut NativeWorld, lane: Symbol, clamp: bool) -> Result<i64> {
+    fn flip(
+        world: &mut NativeWorld,
+        lane: Symbol,
+        clamp: bool,
+        writes: &mut Vec<BattleMutation>,
+    ) -> Result<i64> {
         let index = world.waves.iter().position(|(l, _)| *l == lane);
         let count = index
             .map_or(0, |i| world.waves[i].1)
@@ -227,6 +255,7 @@ impl BattleRules {
         } else {
             world.waves.push((lane, count));
         }
+        writes.push(BattleMutation::Wave(lane, count));
         Ok(count)
     }
     fn victory(&self, loser: Symbol, condition: Symbol) -> BattleOp {
@@ -248,15 +277,35 @@ impl BattleRules {
         selected: Option<&Datum>,
         favored: Symbol,
     ) -> Result<Resolution> {
-        match step {
-            BattleStep::Check(lane) => self.check(world, lane),
-            BattleStep::Push(spec) => self.push(world, spec),
-            BattleStep::Minions(lane) => self.battle(world, lane),
-            BattleStep::Casualties(spec) => self.casualties(world, spec, selected),
-            BattleStep::Displace(items) => self.displace(world, s, items, selected, favored),
-        }
+        self.resolve_traced(world, s, step, selected, favored)
+            .map(|(result, _)| result)
     }
-    fn check(&self, world: &mut NativeWorld, lane: Option<Symbol>) -> Result<Resolution> {
+    pub fn resolve_traced(
+        &self,
+        world: &mut NativeWorld,
+        s: &Symbols,
+        step: BattleStep,
+        selected: Option<&Datum>,
+        favored: Symbol,
+    ) -> Result<(Resolution, Vec<BattleMutation>)> {
+        let mut writes = Vec::new();
+        let result = match step {
+            BattleStep::Check(lane) => self.check(world, lane, &mut writes),
+            BattleStep::Push(spec) => self.push(world, spec, &mut writes),
+            BattleStep::Minions(lane) => self.battle(world, lane),
+            BattleStep::Casualties(spec) => self.casualties(world, s, spec, selected, &mut writes),
+            BattleStep::Displace(items) => {
+                self.displace(world, s, items, selected, favored, &mut writes)
+            }
+        }?;
+        Ok((result, writes))
+    }
+    fn check(
+        &self,
+        world: &mut NativeWorld,
+        lane: Option<Symbol>,
+        writes: &mut Vec<BattleMutation>,
+    ) -> Result<Resolution> {
         let mut triggered = Vec::new();
         for lane in Self::lanes(world, lane) {
             let Some(zid) = Self::zone(world, lane) else {
@@ -319,7 +368,7 @@ impl BattleRules {
             })
             .collect::<Vec<_>>();
         for (lane, _, _, _) in &outcomes {
-            Self::flip(world, *lane, true)?;
+            Self::flip(world, *lane, true, writes)?;
         }
         let red = outcomes
             .iter()
@@ -369,8 +418,8 @@ impl BattleRules {
             let mut pending = Vec::new();
             for (lane, _, _, _) in outcomes {
                 if let Some(zone) = Self::zone(world, lane) {
-                    Self::wipe(world, zone)?;
-                    pending.extend(Self::spawn(world, lane, zone)?);
+                    Self::wipe(world, zone, writes)?;
+                    pending.extend(Self::spawn(world, lane, zone, writes)?);
                 }
             }
             return Ok(Resolution::Done(if pending.is_empty() {
@@ -395,8 +444,13 @@ impl BattleRules {
                 .collect(),
         ))
     }
-    fn push(&self, world: &mut NativeWorld, p: PushSpec) -> Result<Resolution> {
-        if !p.skip_wave && Self::flip(world, p.lane, false)? <= 0 {
+    fn push(
+        &self,
+        world: &mut NativeWorld,
+        p: PushSpec,
+        writes: &mut Vec<BattleMutation>,
+    ) -> Result<Resolution> {
+        if !p.skip_wave && Self::flip(world, p.lane, false, writes)? <= 0 {
             return Ok(Resolution::Done(vec![
                 self.victory(p.loser, self.last_push),
             ]));
@@ -418,21 +472,22 @@ impl BattleRules {
         let Some(current) = Self::zone(world, p.lane) else {
             return Ok(Resolution::Done(vec![]));
         };
-        Self::wipe(world, current)?;
+        Self::wipe(world, current, writes)?;
         world
             .battle_zones
             .iter_mut()
             .find(|(l, _)| *l == p.lane)
             .unwrap()
             .1 = target;
-        let pending = Self::spawn(world, p.lane, target)?;
+        writes.push(BattleMutation::Zone(p.lane, target));
+        let pending = Self::spawn(world, p.lane, target, writes)?;
         Ok(Resolution::Done(if pending.is_empty() {
             vec![]
         } else {
             vec![BattleOp::Step(BattleStep::Displace(pending))]
         }))
     }
-    fn wipe(world: &mut NativeWorld, zone: Symbol) -> Result<()> {
+    fn wipe(world: &mut NativeWorld, zone: Symbol, writes: &mut Vec<BattleMutation>) -> Result<()> {
         let Some(z) = world.definitions.zones.zones.iter().find(|z| z.id == zone) else {
             return Ok(());
         };
@@ -449,6 +504,7 @@ impl BattleRules {
             .collect::<Vec<_>>();
         for id in ids {
             world.remove_entity(id).map_err(BattleError::Rule)?;
+            writes.push(BattleMutation::Remove(id));
         }
         Ok(())
     }
@@ -472,7 +528,12 @@ impl BattleRules {
             })
             .map(|e| e.id)
     }
-    fn spawn(world: &mut NativeWorld, lane: Symbol, zone: Symbol) -> Result<Vec<(Symbol, Hex)>> {
+    fn spawn(
+        world: &mut NativeWorld,
+        lane: Symbol,
+        zone: Symbol,
+        writes: &mut Vec<BattleMutation>,
+    ) -> Result<Vec<(Symbol, Hex)>> {
         let Some(z) = world.definitions.zones.zones.iter().find(|z| z.id == zone) else {
             return Ok(vec![]);
         };
@@ -496,8 +557,15 @@ impl BattleRules {
                             .is_some()
                     {
                         world.remove_token_effects(token);
+                        writes.push(BattleMutation::RemoveToken(token));
                     }
                     world.place_entity(id, sp.hex).map_err(BattleError::Rule)?;
+                    writes.push(BattleMutation::Spawn {
+                        unit: id,
+                        zone,
+                        source_index: sp.source_index,
+                        hex: sp.hex,
+                    });
                 }
             } else {
                 blocked.push(sp);
@@ -507,6 +575,12 @@ impl BattleRules {
             if let Some(id) = Self::candidate(world, lane, &sp, &reserved) {
                 reserved.insert(id);
                 pending.push((id, sp.hex));
+                writes.push(BattleMutation::BlockedSpawn {
+                    unit: id,
+                    zone,
+                    source_index: sp.source_index,
+                    hex: sp.hex,
+                });
             }
         }
         Ok(pending)
@@ -625,8 +699,10 @@ impl BattleRules {
     fn casualties(
         &self,
         world: &NativeWorld,
+        symbols: &Symbols,
         p: RemovalSpec,
         selected: Option<&Datum>,
+        writes: &mut Vec<BattleMutation>,
     ) -> Result<Resolution> {
         if p.remaining <= 0 {
             return Ok(Resolution::Done(vec![]));
@@ -678,11 +754,14 @@ impl BattleRules {
             }
             return Ok(Resolution::Done(ops));
         }
-        if let Some(Datum::Text(id)) = selected
-            && valid.contains(id)
-        {
+        writes.push(BattleMutation::ClearPending);
+        let selected_id = selected
+            .filter(|value| value.truthy(symbols))
+            .and_then(|value| value.python_scalar_text(symbols))
+            .and_then(|text| valid.iter().copied().find(|id| symbols.name(*id) == text));
+        if let Some(id) = selected_id {
             return Ok(Resolution::Done(vec![
-                BattleOp::Remove(*id),
+                BattleOp::Remove(id),
                 BattleOp::Step(BattleStep::Casualties(RemovalSpec {
                     remaining: p.remaining - 1,
                     ..p
@@ -707,6 +786,7 @@ impl BattleRules {
         items: Vec<(Symbol, Hex)>,
         selected: Option<&Datum>,
         favored: Symbol,
+        writes: &mut Vec<BattleMutation>,
     ) -> Result<Resolution> {
         let mut groups = [Vec::new(), Vec::new()];
         for (id, h) in items {
@@ -783,7 +863,13 @@ impl BattleRules {
         let rest = groups[1 - team].clone();
         let Some(zone) = world
             .entity(unit)
-            .and_then(|e| e.lane)
+            .and_then(|e| {
+                e.lane.or_else(|| {
+                    matches!(e.kind, EntityKind::Hero | EntityKind::Piece)
+                        .then(|| s.lookup("lane_1"))
+                        .flatten()
+                })
+            })
             .and_then(|l| Self::zone(world, l))
         else {
             return Ok(Resolution::Done(vec![]));
@@ -797,9 +883,12 @@ impl BattleRules {
             .map(|z| Self::displacement_destinations(world, origin, &z.hexes))
             .transpose()?
             .unwrap_or_default();
-        let destination = selected_hex
-            .filter(|h| candidates.contains(h))
-            .or_else(|| (candidates.len() == 1).then(|| candidates[0]));
+        let selected_destination = selected_hex.filter(|h| candidates.contains(h));
+        if !candidates.is_empty() && selected_destination.is_none() {
+            writes.push(BattleMutation::ClearPending);
+        }
+        let destination =
+            selected_destination.or_else(|| (candidates.len() == 1).then(|| candidates[0]));
         if candidates.is_empty() || destination.is_some() {
             let mut ops = Vec::new();
             if let Some(hex) = destination {

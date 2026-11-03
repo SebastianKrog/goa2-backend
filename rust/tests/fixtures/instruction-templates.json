@@ -2331,6 +2331,133 @@
           ]
         }
       ],
+      "flurry_of_blows": [
+        {
+          "fields": {
+            "type": "check_lane_push",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "lane_id": null
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            }
+          ]
+        },
+        {
+          "fields": {
+            "type": "set_context_flag",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "key": "last_flurry_target",
+            "value": null
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            }
+          ]
+        },
+        {
+          "fields": {
+            "type": "set_context_flag",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "key": "is_flurry_repeat",
+            "value": true
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            }
+          ]
+        },
+        {
+          "fields": {
+            "type": "set_context_flag",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "key": "victim_id",
+            "value": null
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            }
+          ]
+        },
+        {
+          "fields": {
+            "type": "set_context_flag",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "key": "defender_id",
+            "value": null
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            }
+          ]
+        },
+        {
+          "fields": {
+            "type": "set_context_flag",
+            "step_id": "template",
+            "pending_input": null,
+            "pending_request_id": null,
+            "is_mandatory": true,
+            "active_if_key": null,
+            "skip_if_key": null,
+            "key": "is_flurry_repeat",
+            "value": null
+          },
+          "objects": [
+            {
+              "kind": "step",
+              "paths": [
+                []
+              ]
+            }
+          ]
+        }
+      ],
       "cloak_and_daggers/ATTACK": [
         {
           "fields": {

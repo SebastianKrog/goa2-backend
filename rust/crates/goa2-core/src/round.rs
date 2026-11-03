@@ -106,6 +106,9 @@ impl RoundRules {
             prompt: s.intern("Mandatory Upgrade Phase"),
         })
     }
+    pub(crate) fn has_unlock_hook(&self, effect: Symbol) -> bool {
+        self.hooks.contains(&effect)
+    }
     pub fn options(&self, world: &NativeWorld, hero: Symbol) -> Vec<UpgradeOption> {
         let Some(h) = world.hero(hero) else {
             return vec![];

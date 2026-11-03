@@ -5,7 +5,7 @@ from __future__ import annotations
 from state_codec import export_state
 
 
-def cases(advance, answer, *, effect_factory=None):
+def cases(advance, answer, *, effect_factory=None, live_sink=None):
     import copy
 
     from model_traces import setup
@@ -127,15 +127,18 @@ def cases(advance, answer, *, effect_factory=None):
             assert str(work.winner) == winner, (name, work.winner)
         if condition is not None:
             assert work.victory_condition == condition, (name, work.victory_condition)
-        expected = reference_trace(state, operations)
-        result.append(
-            {
-                "name": f"battle-{name}",
-                "envelope": initial,
-                "operations": operations,
-                "expected": expected,
-            }
-        )
+        if live_sink is not None:
+            live_sink(name, state, operations)
+        else:
+            expected = reference_trace(state, operations)
+            result.append(
+                {
+                    "name": f"battle-{name}",
+                    "envelope": initial,
+                    "operations": operations,
+                    "expected": expected,
+                }
+            )
         return work
 
     for name, red, blue in [

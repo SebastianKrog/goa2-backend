@@ -1,0 +1,63 @@
+{
+  "implemented_arena_steps": [
+    "end_phase_cleanup"
+  ],
+  "cleanup_transaction": "private mutable session/arena clone; immutable programs shared; no copy-on-write or make/unmake claim",
+  "source_cases": 95,
+  "source_operations": 192,
+  "independent_release_parity": {
+    "cases": 95,
+    "operations": 192,
+    "corpus_sha256": "6d10401ff2ccc70d63619339af129d6874aa6501ff77e63ce00ddda870a06d5a",
+    "workers": 4,
+    "state_request_event_and_identity_parity": true,
+    "seconds": 12.21
+  },
+  "new_native_regression_tests": 4,
+  "core_tests_passed": 285,
+  "bounded_restore_tests_passed": 1,
+  "bounded_restore_cases": 95,
+  "bounded_restore_operations": 192,
+  "cli_tests_passed": 3,
+  "new_source_contracts": 9,
+  "affected_source_contracts_passed": 27,
+  "verification_scope": "All core unit tests, the cleanup restoration gate, full canonical/live CLI replays, and cleanup/battle/dynamic-passive source contracts. Other existing integration suites and the older exhaustive all-corpus restoration gate were not rerun for this increment.",
+  "cli_verification_interruption": "Initial invocation ended without a test result during a WSL interruption; complete CLI rerun passed.",
+  "live_cases": 14793,
+  "live_operations": 117648,
+  "live_corpus_sha256": "ca313f63072c7b2b5b72ce7fa65dc806e3ad9eabd56bb36e1ce98156cfe9be7a",
+  "live_index_file_sha256": "eeccfc9c93ccc5b110aee8c7c0cb7f1a568e63d9a40f48420037678ef0407669",
+  "live_semantic_sha256": "7a09d90d00100ba88888f4b9cff4962bfa0639a2245147bb23070c00ee78af20",
+  "canonical_cases": 6592,
+  "canonical_operations": 27145,
+  "frozen_checks": {
+    "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+    "frozen_source_and_lock_unchanged": true,
+    "rustfmt": true,
+    "whitespace": true
+  },
+  "strict_clippy": true,
+  "rustfmt": true,
+  "python_format_checks": {
+    "files": [
+      "scripts/rust_oracle/live_cleanup_traces.py",
+      "scripts/rust_oracle/object_execution_traces.py",
+      "tests/rust_oracle/test_live_cleanup.py"
+    ],
+    "black": true,
+    "ruff": true,
+    "black_line_length": 100
+  },
+  "primary_faces_reviewed": 172,
+  "total_primary_faces": 596,
+  "spell_bodies": 22,
+  "total_spell_bodies": 22,
+  "remaining_phase_work": [
+    "resolve_upgrades",
+    "round_reset",
+    "remaining phase consumers"
+  ],
+  "raw_partial_exception_fidelity_complete": false,
+  "engine_complete": false,
+  "search_complete": false
+}

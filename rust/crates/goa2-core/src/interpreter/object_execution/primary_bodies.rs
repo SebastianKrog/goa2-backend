@@ -2,7 +2,7 @@
 use super::passive_bodies::Recipe;
 use super::phases::Field;
 use super::*;
-use crate::world::ActionKind;
+use crate::{objects::ObjectSlot, world::ActionKind};
 use std::sync::OnceLock;
 
 #[derive(Clone, Debug)]
@@ -24,6 +24,7 @@ enum PrimaryMode {
     Ordinary,
     Copied,
     AfterAttack,
+    Passive { effect: Symbol, raw: bool },
 }
 #[derive(Clone, Debug)]
 enum StatefulPrimary {
@@ -49,6 +50,47 @@ fn catalog() -> Result<&'static Value> {
     })
     .as_ref()
     .map_err(|error| unsupported(error.clone()))
+}
+fn attach_raw_bindings(recipe: &mut Recipe, paths: &Value, symbols: &mut Symbols) -> Result<()> {
+    for path in paths
+        .as_array()
+        .ok_or_else(|| unsupported("raw primary bindings missing"))?
+    {
+        let path = path
+            .as_array()
+            .ok_or_else(|| unsupported("raw primary path missing"))?;
+        let mut slots = Vec::new();
+        for part in path {
+            slots.push(if let Some(key) = part.as_str() {
+                ObjectSlot::Field(symbols.intern(key))
+            } else {
+                ObjectSlot::Index(
+                    part.as_u64()
+                        .and_then(|v| usize::try_from(v).ok())
+                        .ok_or_else(|| unsupported("raw primary path invalid"))?,
+                )
+            });
+        }
+        recipe.raw_card_bindings.push(slots);
+    }
+    Ok(())
+}
+fn clear_raw_card_bindings(recipe: &mut Recipe) -> Result<()> {
+    for path in &recipe.raw_card_bindings {
+        let mut value = &mut recipe.step.fields;
+        for slot in path {
+            value = match (value, slot) {
+                (Datum::Object(fields), ObjectSlot::Field(key)) => {
+                    fields.iter_mut().find(|(k, _)| k == key).map(|(_, v)| v)
+                }
+                (Datum::List(values), ObjectSlot::Index(index)) => values.get_mut(*index),
+                _ => None,
+            }
+            .ok_or_else(|| unsupported("raw primary binding path drift"))?;
+        }
+        *value = Datum::Null;
+    }
+    Ok(())
 }
 impl PrimaryRules {
     pub(super) fn registered(&self, effect: Symbol, spell: bool) -> bool {
@@ -96,7 +138,16 @@ impl PrimaryRules {
                 rows.as_array()
                     .ok_or_else(|| unsupported("primary recipe rows missing"))?
                     .iter()
-                    .map(|row| Recipe::compile(row, steps, symbols))
+                    .enumerate()
+                    .map(|(index, row)| {
+                        let mut recipe = Recipe::compile(row, steps, symbols)?;
+                        attach_raw_bindings(
+                            &mut recipe,
+                            &data["raw_card_bindings"][effect][index],
+                            symbols,
+                        )?;
+                        Ok(recipe)
+                    })
                     .collect::<Result<Vec<_>>>()?,
             );
         }
@@ -110,7 +161,16 @@ impl PrimaryRules {
                         .as_array()
                         .ok_or_else(|| unsupported("stateful primary variant missing"))?
                         .iter()
-                        .map(|row| Recipe::compile(row, steps, symbols))
+                        .enumerate()
+                        .map(|(index, row)| {
+                            let mut recipe = Recipe::compile(row, steps, symbols)?;
+                            attach_raw_bindings(
+                                &mut recipe,
+                                &body["raw_card_bindings"][name][index],
+                                symbols,
+                            )?;
+                            Ok(recipe)
+                        })
                         .collect::<Result<Vec<_>>>()
                 };
                 let kind = match body["predicate"].as_str() {
@@ -258,6 +318,23 @@ impl NativeSession {
             PrimaryMode::AfterAttack,
         )
     }
+    pub(super) fn prepare_passive_primary_bound(
+        &mut self,
+        objects: &BoundObjects,
+        hero: Symbol,
+        card: crate::cards::CardId,
+        effect: Symbol,
+        raw: bool,
+    ) -> Result<PrimaryPlan> {
+        let stats = self.world.card_stats(hero, card).map_err(unsupported)?;
+        self.prepare_primary_body_kind_bound(
+            objects,
+            hero,
+            card,
+            Some(stats),
+            PrimaryMode::Passive { effect, raw },
+        )
+    }
     fn prepare_primary_body_kind_bound(
         &mut self,
         objects: &BoundObjects,
@@ -272,15 +349,21 @@ impl NativeSession {
             .world
             .card(card)
             .ok_or_else(|| unsupported("primary current card missing"))?;
-        let definition = self.world.definitions.cards[instance.definition].clone();
+        let mut definition = self.world.definitions.cards[instance.definition].clone();
+        let physical_effect = definition.effect;
+        let passive = matches!(mode, PrimaryMode::Passive { .. });
+        if let PrimaryMode::Passive { effect, .. } = mode {
+            definition.effect = effect;
+        }
         let owner = self.world.hero(hero).unwrap().id;
         plan.owner = Some(owner);
         plan.card = Some(definition.printed_id);
-        if instance.facedown || (definition.effect_absent && !copied) {
+        if !passive && (instance.facedown || (definition.effect_absent && !copied)) {
             return Ok(plan);
         }
         let rules = objects.scheduler.as_ref().unwrap().primary_bodies.clone();
-        let spell = mode != PrimaryMode::AfterAttack
+        let spell = !passive
+            && mode != PrimaryMode::AfterAttack
             && definition.spell
             && rules.spells.contains(&definition.effect);
         let registered = if spell {
@@ -419,6 +502,42 @@ impl NativeSession {
                 _ => Vec::new(),
             }
         };
+        // The shared source dispatcher reads the physical card's effect ID,
+        // even when a passive explicitly invokes a different registry entry.
+        if passive
+            && registered
+                .is_some_and(|method| self.symbols.name(*method) == "SpellAccessEffect.build_steps")
+        {
+            let physical = physical_effect;
+            let key = self.symbols.lookup("allowed_spell_ids").unwrap();
+            let allowed = if rules.methods.get(&physical) == registered {
+                rules
+                    .recipes
+                    .get(&physical)
+                    .and_then(|rows| rows.first())
+                    .and_then(|row| {
+                        if let Datum::Object(fields) = &row.step.fields {
+                            fields
+                                .iter()
+                                .find(|(field, _)| *field == key)
+                                .map(|(_, value)| value.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .ok_or_else(|| unsupported("physical spell access recipe missing"))?
+            } else {
+                Datum::List(Vec::new())
+            };
+            let Datum::Object(fields) = &mut plan.recipes[0].step.fields else {
+                unreachable!()
+            };
+            fields
+                .iter_mut()
+                .find(|(field, _)| *field == key)
+                .unwrap()
+                .1 = allowed;
+        }
         let log = logs.map(|(key, text)| (key, Arc::make_mut(&mut self.symbols).intern(&text)));
         fn bind(
             value: &mut Datum,
@@ -463,6 +582,9 @@ impl NativeSession {
             }
         }
         for (index, recipe) in plan.recipes.iter_mut().enumerate() {
+            if matches!(mode, PrimaryMode::Passive { raw: true, .. }) {
+                clear_raw_card_bindings(recipe)?;
+            }
             bind(
                 &mut recipe.step.fields,
                 &rules,
@@ -499,7 +621,7 @@ impl NativeSession {
             .flat_map(|recipe| &recipe.objects)
             .filter(|(_, kind)| *kind == ObjectKind::Step)
             .count();
-        if mode != PrimaryMode::AfterAttack && count != 0 {
+        if !passive && mode != PrimaryMode::AfterAttack && count != 0 {
             self.phase_generation_check(
                 0,
                 u64::try_from(count)

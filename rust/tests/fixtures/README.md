@@ -2670,3 +2670,112 @@ older all-corpus exhaustive restoration gate was excluded. Both complete CLI
 corpora and independent release parity pass, as do strict Clippy, Rustfmt,
 Black/Ruff and frozen-source/lock checks.
 [Validation record](../../artifacts/min-primary-final-validation.json).
+
+
+### Dynamic Flurry/Cloak rebuilding (2026-11-03)
+
+The primary builder catalog records raw card-attribution paths observed by
+comparing the actual source `build_steps` and `get_steps_with_stats` APIs for
+all 124 pure and three stateful builders. The audit rejects any other field,
+shape or model-alias difference. Native execution clears only those proven
+paths for Flurry; Cloak uses the attributed API. Explicit registry selection
+remains separate from the physical card used for computed stats and spell-school
+access. Facedown cards are rebuilt exactly as these passive methods do.
+
+The increment covers 176 cases / 652 operations: root-only target restrictions,
+mandatory attack flags, original defender/victim fallback, played/discard search,
+registry overrides, negative attacks, skill branches and complete repeat flows.
+Flurry's repeat flag prevents recursion and is cleared by the trailing source
+wrapper. Passive-created exclusion filters retain `exclude_self=True`, which
+differs from re-performance exclusions. The outer action's card is preserved.
+A bounded restoration gate checks every new boundary with private worker models.
+
+An arena lane check with a live null lane and an empty battle-zone mapping now
+completes without generating steps. At that milestone, nonempty zones and explicit lanes still failed before pop;
+the following arena battle increment extends execution to those consumers.
+Primary-face and spell coverage remain 172/596 and 22/22. General rules and
+search completion remain unproven.
+
+Validation: all 277 core unit tests, the new bounded restoration gate and all
+three CLI replay tests pass. Full replay covers 14,431 live cases / 116,010
+operations and the unchanged canonical corpus. The 60 affected Python source
+contracts and independent release parity pass. Other existing integration suites
+were not rerun in this increment. Strict Clippy, Rustfmt, Black/Ruff, reproducible
+catalog and frozen-source/lock checks pass.
+[Validation record](../../artifacts/dynamic-passive-final-validation.json).
+Live index SHA-256 `005b80784c98a531af05a13a30c9b78fb1ce3873fb50548ddee57d352960f5c3`;
+semantic SHA-256 `20b85b2049bf4b616b43169025db77c556e18eb31e92eb3f6c30864b7592ac2e`.
+
+
+### Authoritative arena battles and lane pushes (2026-11-03)
+
+All supplied-map battle scenarios now run with retained step, pending-input,
+battle-zone, wave, location, effect-list and spawn-Hex aliases. The increment
+contains 267 cases / 1,446 operations: first/last/invalid choices, simultaneous
+multi-lane pushes, throne/last-wave precedence, tie remedies, forced and selected
+casualties, heavy-minion ordering, blocked spawns, token unlinking and displacement.
+Targeted cases cover equal-coordinate respawns with new location identity,
+non-minion spawn prefixes, duplicate unit/origin entries, submitted immutable Hex
+objects, live null coins, hero default lanes, numeric casualty IDs and active
+battle exclusions. Eleven source contracts assert these details explicitly.
+
+Native rules return typed ordered direct writes separately from generated steps.
+The arena preserves in-place wave/zone/location maps, source replacement of the
+active-effect list on token removal, and the original spawn-point Hex objects.
+Direct spawn/wipe operations emit no events; generated removal and placement
+steps retain their ordinary event semantics. Generation/request guards run before
+popping the source step or applying any writes. The dedicated restoration gate
+checks all 1,446 boundaries and private root state.
+
+The live corpus contains 14,698 cases / 117,456 operations. Canonical dense
+coverage remains 6,592 / 27,145. Reviewed primary faces remain 172/596 and spells
+22/22. Cleanup, upgrades/reset, remaining card/passive/filter bodies, raw exception
+fidelity and general engine/search completion remain required.
+
+Validation: all 281 core unit tests, the new 267-case restoration gate and all
+three full CLI replay tests pass. Eighteen affected Python source contracts and
+independent release parity pass. Other existing integration suites were not
+rerun for this increment. Strict Clippy, Rustfmt, Black/Ruff and frozen-source/
+lock checks pass. [Validation record](../../artifacts/arena-battle-final-validation.json).
+Live index SHA-256 `67e5c56ba993774183710efb259d874bb029b48676909b923cc11b3267d01162`;
+semantic SHA-256 `8f1fc9f63a99f760661b5a294a147d7a77ef17360a1be297011d051724c585cb`.
+
+
+### Authoritative arena round cleanup (2026-11-03)
+
+The increment contains 95 cases / 192 operations. The source duration/card-location
+matrix retains aliases to effects, physical card containers, markers, locations,
+position snapshots, pending upgrades and item reveals. Additional cases cover
+negative gold, multi-level purchases, sparse signed items, max-level pity gold,
+Ready for War and Unbound Fury, untouched hand flags, retrieved-card initiative
+reset and a next-round commit/uncommit. Nine focused source contracts assert the
+ordering and identity rules.
+
+Cleanup expires THIS_ROUND effects without running the returned finishing payload,
+returns markers in place, replaces the stale-effect list, then expires played/
+current-card effects before retrieving physical cards. Discard-linked passive
+effects and their active flags follow the source's distinct behavior. Played lists
+clear in place; existing hand cards retain their flags. Only transient pooled tokens
+are removed, with source event ordering. Item reveals and planning position maps
+are new shallow copies; their referenced immutable Hex objects remain shared.
+
+A private session/arena transaction preserves existing object IDs and commits only
+after successful cleanup and continuation-capacity checks. This currently clones mutable
+arena/session storage and shares immutable programs; it does not establish
+make/unmake or search throughput.
+Level-up snapshots are admitted at import and remain restorable. ResolveUpgrades
+and RoundReset still fail before popping their unsupported source step. The next
+round's planning methods can commit and uncommit after retrieving the old card.
+
+The live corpus contains 14,793 cases / 117,648 operations; canonical dense coverage
+remains 6,592 / 27,145. Primary-face and spell coverage stay 172/596 and 22/22.
+General card/passive/filter coverage, remaining phase consumers, raw exception
+fidelity, dense bridge retirement and the full search/performance gates remain open.
+Validation: all 285 core tests, the 95-case / 192-operation cleanup restoration
+gate and three full CLI replay tests pass. Independent release parity and all 27
+affected Python source contracts pass. Strict Clippy, Rustfmt, Black/Ruff,
+whitespace and frozen-source/lock checks pass. Other existing integration suites
+were not rerun for this increment.
+[Validation record](../../artifacts/arena-cleanup-final-validation.json).
+Live corpus SHA-256 `ca313f63072c7b2b5b72ce7fa65dc806e3ad9eabd56bb36e1ce98156cfe9be7a`;
+semantic SHA-256 `7a09d90d00100ba88888f4b9cff4962bfa0639a2245147bb23070c00ee78af20`.

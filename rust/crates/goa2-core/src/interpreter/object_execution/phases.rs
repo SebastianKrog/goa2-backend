@@ -993,9 +993,11 @@ impl NativeSession {
     ) -> Result<()> {
         use crate::turn::FlowStep;
         match instruction {
-            Instruction::Battle(_) | Instruction::Flow(FlowStep::Cleanup) => Err(unsupported(
-                "arena round battle/cleanup consumers not yet bound",
-            )),
+            Instruction::Battle(_) => Ok(()),
+            Instruction::Flow(FlowStep::Cleanup) => Ok(()),
+            Instruction::Flow(FlowStep::Upgrades | FlowStep::Reset) => {
+                Err(unsupported("arena upgrade/reset consumer not yet bound"))
+            }
             Instruction::ParkedPhase(family) => Err(unsupported(format!(
                 "arena {} consumer not yet bound",
                 self.symbols.name(*family)

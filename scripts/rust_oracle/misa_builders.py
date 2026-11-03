@@ -4,7 +4,7 @@ from primary_builders import CARD, OWNER, freeze_steps
 from primary_templates import MISA_STATEFUL_EFFECTS, PRIMARY, RADIUS, RANGE
 
 
-def stateful_recipes(state):
+def stateful_recipes(state, *, raw=False):
     from primary_radius import bind_radius_fallbacks
 
     from goa2.data.heroes.registry import HeroRegistry
@@ -26,7 +26,7 @@ def stateful_recipes(state):
 
             def build(radius, impl=impl, hero=hero, card=card):
                 return freeze_steps(
-                    impl.get_steps_with_stats(
+                    (impl.build_steps if raw else impl.get_steps_with_stats)(
                         state,
                         hero,
                         card,

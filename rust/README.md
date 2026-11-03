@@ -15,10 +15,30 @@ Misa’s 18 primary bodies also pass independent Python parity across 691 scenes
 Wasp adds 14 primary bodies and two conditional query steps, verified across
 572 scenes / 8,455 operations; see the [Wasp validation record](artifacts/wasp-primary-final-validation.json).
 Min adds 14 primary bodies, permanent item conversion and deferred red-card text,
-verified across 507 scenes / 8,357 operations. The current workspace passes
+verified across 507 scenes / 8,357 operations. That milestone passed
 425 Rust tests and 103 Python source contracts, with one older all-corpus
-exhaustive restoration gate excluded. Both full CLI corpora pass.
+exhaustive restoration gate excluded. Both full CLI corpora passed.
 See the [Min validation record](artifacts/min-primary-final-validation.json).
+Flurry of Blows and Cloak and Daggers now rebuild reviewed ordinary bodies using
+source-specific raw/attributed APIs, explicit registry overrides and root-only
+target restrictions. Differential coverage includes 176 cases / 652 operations,
+including actual repeated attacks, negative damage and live collection lookup.
+Unsupported card bodies remain explicit guards.
+See the [dynamic passive validation record](artifacts/dynamic-passive-final-validation.json).
+The authoritative arena now executes lane checks/pushes, minion battle,
+casualty choices and spawn displacement through typed ordered mutations.
+Coverage includes 267 source cases / 1,446 operations across all supplied maps,
+preserving mapping aliases, spawn Hex identity and pending-input behavior.
+Upgrades/reset and general game/search closure remain unfinished.
+See the [arena battle validation record](artifacts/arena-battle-final-validation.json).
+Round cleanup now stages an identity-preserving arena transaction: duration and
+card expiry, retrieval, markers, token persistence, mandatory leveling and both
+ultimate unlock hooks. Coverage includes 95 cases / 192 operations and a new
+round's commit/uncommit. Level-up snapshots restore; upgrade/reset execution is
+still guarded before pop. Transaction and search performance gates remain open.
+All 285 core tests, the cleanup restoration gate and three full CLI replay tests pass;
+27 affected Python source contracts and independent release parity also pass.
+See the [cleanup validation record](artifacts/arena-cleanup-final-validation.json).
 
 ## Build and test in WSL
 

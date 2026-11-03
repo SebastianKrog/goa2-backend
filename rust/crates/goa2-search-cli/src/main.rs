@@ -558,7 +558,7 @@ mod trace_tests {
     }
     #[test]
     fn live_shared_steps_and_context_match_python_values_requests_and_identity() {
-        verify_index("object-execution.json", Some(14255));
+        verify_index("object-execution.json", Some(14793));
     }
     #[test]
     fn every_native_transition_matches_python_full_state_request_and_event_order() {

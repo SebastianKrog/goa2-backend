@@ -16,6 +16,7 @@ pub struct Zone {
 }
 #[derive(Clone, Debug)]
 pub struct Spawn {
+    pub source_index: usize,
     pub hex: Hex,
     pub team: Symbol,
     pub kind: crate::world::MinionKind,
@@ -56,9 +57,11 @@ impl ZoneGraph {
                     .as_array()
                     .ok_or("zone spawn points missing")?
                     .iter()
-                    .filter(|sp| sp["type"] == "MINION")
-                    .map(|sp| {
+                    .enumerate()
+                    .filter(|(_, sp)| sp["type"] == "MINION")
+                    .map(|(source_index, sp)| {
                         Ok(Spawn {
+                            source_index,
                             hex: serde_json::from_value(sp["location"].clone())
                                 .map_err(|e| format!("spawn hex: {e}"))?,
                             team: symbols.intern(sp["team"].as_str().ok_or("spawn team missing")?),

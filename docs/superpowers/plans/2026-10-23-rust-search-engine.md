@@ -5569,3 +5569,146 @@ Independent release parity matches all 507 Min cases / 8,357 operations. Strict
 Clippy, Rustfmt, Black/Ruff and frozen-source/lock checks pass. See the
 [validation record](../../../rust/artifacts/min-primary-final-validation.json).
 Live services and the preserved Windows checkout remain unchanged.
+
+
+### Dynamic passive rebuilding and raw primary attribution (2026-11-03)
+
+Flurry of Blows now calls the native equivalent of raw `build_steps` for an
+explicitly selected ordinary registry entry, using the actual current, played
+or discarded physical card and current computed stats. Cold metadata is derived
+by comparing both real source APIs for all 127 reviewed builders and refusing
+any difference beyond proven card-attribution paths with identical model/alias
+topology. This avoids duplicating entire instruction catalogs or guessing which
+fields the source binder visits. Flurry preserves the source's root-only attack
+exclusion, mandatory flag, defender-or-victim fallback and recursion wrapper.
+
+Cloak and Daggers rebuilds attributed primary attack/skill text from the current
+card, honors repeat prevention and adds exclusions only to the root types the
+source changes. The shared spell-access dispatcher continues to read the
+physical card's effect ID even under an explicit registry override. Both methods
+retain the outer action context, facedown behavior and unclamped negative attacks.
+Generation limits are checked before popping the accepted offer; restoration
+and cloned-worker isolation remain required.
+
+An empty-zone arena lane check is now a no-op when its live lane operand is null.
+Actual lane pushes, nonempty-zone checks and round battle/cleanup remain guarded
+before pop. Differential coverage for this increment is 176 cases / 652 operations,
+including full repeated combat. Primary-face coverage remains 172/596; spells
+remain 22/22. Other passive/defense/filter bodies, world closure, exception fidelity,
+dense bridge retirement, make/unmake, hashing/evaluation, team-aware iterative
+search, hidden/simultaneous planning, parallel search, strength/integration and
+1,000 complete two-game-turn simulations/sec remain required. Engine/search
+completion stays false. No live services or frozen Python sources were changed.
+
+Validation: 277 core unit tests, the new bounded restoration gate and all three
+full CLI replay tests pass. The live corpus is 14,431 cases / 116,010 operations;
+the canonical corpus stays 6,592 / 27,145. All 60 affected source contracts pass.
+The final release matches all 176 incremental cases / 652 operations. Other
+existing integration suites were not rerun for this increment. Strict Clippy,
+Rustfmt, Black/Ruff, reproducible catalog and frozen-source/lock checks pass.
+See the [validation record](../../../rust/artifacts/dynamic-passive-final-validation.json).
+Changes remain uncommitted. Next world-closure work must bridge actual lane
+checks/pushes and battle/cleanup into the authoritative arena without weakening
+alias, event or restoration fidelity. The full engine/search goal remains active.
+
+
+### Authoritative arena battle and lane-push execution (2026-11-03)
+
+The existing native battle rules now expose ordered typed mutations, including
+wave flips, zone changes, raw minion removal/spawn, token unlinking and pending
+consumption. The arena adapter reads live step operands, wave/zone dictionaries
+and tie priority, previews rule resolution on a private native world, validates
+continuation capacity, then applies writes in source order. It does not rebuild
+mutable containers from a final state: even a same-hex respawn must replace its
+location Hex with the original spawn-point Hex. Source spawn indices include
+skipped non-minion points. Token removal replaces only the active-effect list,
+retaining the previous list and models through external aliases.
+
+Five step families execute through this path: CheckLanePush, LanePush,
+MinionBattle, ChooseMinionRemoval and ResolveDisplacement. Generated child steps
+use frozen source templates; raw wipe/spawn helpers emit no placement/removal
+events. Multi-lane simultaneous flips, victory precedence and tie remedies reuse
+the source-verified native battle rules. Forced casualties retain pending input;
+unforced choices consume it. Displacement preserves valid submitted Hex objects
+and occurrence-specific equal origins, respects live coin priority and uses the
+default lane for heroes/pieces without a lane field. Numeric casualty selections
+follow the source truthiness and scalar-string conversion.
+
+Coverage: 267 source cases / 1,446 operations, including every supplied map and
+retained aliases at each boundary. Four native regressions cover pre-pop generation
+failure, generation-free no-ops, live wave reads and live forced casualty counts.
+The bounded restore gate checks every new operation against a freshly restored
+session while preserving the private root. The main corpus is 14,698 cases /
+117,456 operations; the canonical dense corpus is unchanged at 6,592 / 27,145.
+
+Next phase boundary: EndPhaseCleanup must preserve source ordering for the second
+THIS_ROUND expiry sweep, marker returns, stale-effect cleanup, card retrieval and
+card flags, transient token removal, mandatory level purchases and ultimate unlock
+hooks, pity gold, pending upgrade/item reveals and planning position snapshots.
+Then close upgrades/reset and remaining phase consumers. General card/passive/
+defense/filter coverage, raw exception fidelity, dense bridge retirement,
+make/unmake, hashing/evaluation, team-aware iterative search, hidden/simultaneous
+planning, parallel search, strength/integration and 1,000 complete two-game-turn
+simulations/sec remain required. Primary-face coverage stays 172/596; spells stay
+22/22. Frozen Python and live services are unchanged. Engine/search completion
+remains false; this work remains uncommitted.
+
+Validation: all 281 core unit tests, the new 267-case / 1,446-boundary restoration
+gate and all three complete CLI replays pass. All 18 battle/dynamic-passive source
+contracts pass. Independent final-release parity matches all 267 incremental
+cases, including every supplied map. Other existing integration suites were not
+rerun for this increment. Strict Clippy, Rustfmt, Black/Ruff and unchanged frozen
+source/lock checks pass. See the
+[validation record](../../../rust/artifacts/arena-battle-final-validation.json).
+Live index SHA-256 `67e5c56ba993774183710efb259d874bb029b48676909b923cc11b3267d01162`;
+semantic SHA-256 `8f1fc9f63a99f760661b5a294a147d7a77ef17360a1be297011d051724c585cb`.
+
+
+### Authoritative end-of-round cleanup transaction (2026-11-03)
+
+EndPhaseCleanup now executes against a private identity-preserving native session/
+arena transaction. The source step is staged as popped, then cleanup applies its
+real ordering: discard the second THIS_ROUND sweep's finishing payloads, return
+markers in place, replace stale effects, expire links for played/current cards,
+retrieve physical cards, clear transient pooled tokens, purchase mandatory levels
+and run the two frozen unlock hooks. A successful candidate commits its arena and
+world together; generation failure cannot leak card, effect, gold or stack writes.
+No source model graph is reconstructed from a final-state diff.
+
+Retrieval retains list objects, handles physical model equality and state-assignment
+initiative clearing, and leaves untouched hand-card flags alone. Active/passive
+discard-linked effects follow the source behavior. Token supply order and the live
+physical persistence flag control removals. Ready for War emits its silver swap
+before gold retrieval events; Unbound Fury sets physical override flags. Pending
+and reveal maps update in place, while individual item reveals and the planning
+position snapshot are shallow copies. A new planning round can commit and uncommit
+after retrieving the previous current card.
+
+Level-up snapshots now import through the authoritative arena and round-rule
+metadata is available for their hooks. ResolveUpgrades/ RoundReset consumers remain
+explicit pre-pop guards until their arena implementations are ported. The cleanup
+transaction currently clones mutable session/arena storage while sharing immutable
+programs; optimize it as part of make/unmake and throughput work rather than
+treating this as a performance milestone.
+
+Coverage is 95 source cases / 192 operations, including the full duration/card-link
+matrix, live token flags, negative gold, multi-level purchases, sparse items and
+both unlock hooks. Four native regressions cover transaction atomicity, ignored
+finishing payloads at generation exhaustion, live persistence overrides and the
+restorable upgrade guard. The main corpus is 14,793 / 117,648; canonical coverage
+stays 6,592 / 27,145. Nine cleanup source contracts specify identity and ordering.
+Primary coverage stays 172/596 and spell bodies 22/22. Next: implement upgrade
+choices/validation and round reset with retained card/list/item aliases, then
+remaining phase closure. All other card/passive/defense/filter, exception-fidelity,
+dense bridge retirement, make/unmake, hashing/evaluation, iterative team-aware
+search, hidden/simultaneous planning, parallel search, strength/integration and
+1,000 complete two-game-turn simulations/sec requirements remain active.
+Frozen Python and live services are unchanged; engine/search completion remains
+false.
+
+Final verification: 285 core tests, the cleanup restoration gate (95 cases /
+192 operations), three full CLI replay tests, 27 affected source contracts and
+independent optimized parity pass. Strict Clippy, formatting, whitespace and
+frozen-source/lock checks pass. Other existing integration suites were not rerun.
+The interrupted initial CLI invocation was rerun in full and passed. See
+`rust/artifacts/arena-cleanup-final-validation.json` for scope and corpus hashes.

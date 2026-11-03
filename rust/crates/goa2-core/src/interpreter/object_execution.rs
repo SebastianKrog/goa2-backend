@@ -6,8 +6,12 @@ mod actor;
 #[cfg(test)]
 mod arien_tests;
 mod attack_sequence;
+#[cfg(test)]
+mod battle_tests;
+mod battles;
 mod card_actions;
 mod card_selection;
+mod cleanup;
 mod combat_resolution;
 mod coordinates;
 mod defeat;
@@ -54,6 +58,8 @@ mod rune_choice;
 mod spell_bodies;
 mod spells;
 mod step_isolation;
+#[cfg(test)]
+mod test_support;
 #[cfg(test)]
 mod tigerclaw_tests;
 mod token_batch;
@@ -131,7 +137,7 @@ impl BoundObjects {
         }
         if !matches!(
             source.validate().map_err(unsupported)?.phase,
-            Phase::Planning | Phase::Resolution | Phase::Cleanup | Phase::GameOver
+            Phase::Planning | Phase::Resolution | Phase::Cleanup | Phase::LevelUp | Phase::GameOver
         ) {
             return Err(unsupported("shared-object phase flow not yet bound"));
         }
@@ -232,8 +238,13 @@ impl BoundObjects {
                 | "find_next_actor"
                 | "end_phase"
                 | "minion_battle"
+                | "lane_push"
+                | "choose_minion_removal"
+                | "resolve_displacement"
                 | "check_lane_push"
                 | "end_phase_cleanup"
+                | "resolve_upgrades"
+                | "round_reset"
                 | "return_minion_to_zone"
                 | "mine_path_choice"
                 | "trigger_mine"
@@ -662,8 +673,14 @@ impl BoundObjects {
                 "end_phase",
                 "find_actor",
                 "minion_battle",
+                "lane_push",
+                "minion_removal",
+                "displacement",
+                "place_unit",
                 "check_lane_push",
                 "end_cleanup",
+                "upgrades",
+                "round_reset",
                 "retrieve_unresolved",
                 "tie",
                 "resolve_card",
@@ -1573,6 +1590,25 @@ impl NativeSession {
             } else {
                 None
             };
+            let cleanup_plan = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::Flow(crate::turn::FlowStep::Cleanup)
+                ) {
+                Some(self.preflight_cleanup_bound(objects, top_object.unwrap())?)
+            } else {
+                None
+            };
+            let battle_plan = if !skipped {
+                if let Instruction::Battle(family) = self.steps[top_instruction].instruction.clone()
+                {
+                    Some(self.preflight_battle_bound(objects, top_object.unwrap(), family)?)
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
             let spell_plan = if !skipped {
                 if let Instruction::LiveSpell(op) = self.steps[top_instruction].instruction {
                     Some(self.preflight_spell_bound(objects, top_object.unwrap(), op)?)
@@ -2317,6 +2353,19 @@ impl NativeSession {
                         return_plan
                             .ok_or_else(|| unsupported("live minion-return plan missing"))?,
                     )?;
+                }
+                Instruction::Battle(_) => {
+                    request = self.battle_bound(
+                        objects,
+                        id,
+                        battle_plan.ok_or_else(|| unsupported("arena battle plan missing"))?,
+                    )?;
+                }
+                Instruction::Flow(crate::turn::FlowStep::Cleanup) => {
+                    result.events.extend(self.cleanup_bound(
+                        objects,
+                        cleanup_plan.ok_or_else(|| unsupported("cleanup transaction missing"))?,
+                    ));
                 }
                 Instruction::Flow(crate::turn::FlowStep::Advance) => {
                     let ids = objects.phases.effect_ids(&objects.arena, id)?;

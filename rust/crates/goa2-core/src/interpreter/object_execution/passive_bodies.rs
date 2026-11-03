@@ -58,6 +58,7 @@ fn method_kind(method: &str) -> Result<Kind> {
 pub(super) struct Recipe {
     pub(super) step: StepRecipe,
     pub(super) objects: Vec<(Vec<ObjectSlot>, ObjectKind)>,
+    pub(super) raw_card_bindings: Vec<Vec<ObjectSlot>>,
     range: Option<Vec<ObjectSlot>>,
     aliases: Vec<(Vec<ObjectSlot>, Vec<ObjectSlot>)>,
     programs: Vec<(Vec<ObjectSlot>, usize)>,
@@ -117,6 +118,7 @@ impl Recipe {
                 fields: Datum::from_json(wire, symbols).map_err(unsupported)?,
             },
             objects,
+            raw_card_bindings: Vec::new(),
             range,
             aliases,
             programs,
@@ -211,6 +213,9 @@ pub(super) struct BodyPlan {
     printed: Symbol,
     provider: Option<Symbol>,
     patches: Vec<Patch>,
+    dynamic: Option<super::primary_bodies::PrimaryPlan>,
+    last_flurry: Option<ObjectValue>,
+    exclude_cloak: bool,
 }
 impl NativeSession {
     fn body_context_text(&self, objects: &BoundObjects, field: Field) -> Result<Option<Symbol>> {
@@ -241,14 +246,14 @@ impl NativeSession {
         }
     }
     pub(super) fn passive_body_plan(
-        &self,
+        &mut self,
         objects: &BoundObjects,
         owner: Symbol,
         card: CardId,
         effect: Symbol,
         offer: crate::passives::Offer,
     ) -> Result<Option<BodyPlan>> {
-        let program = objects.scheduler.as_ref().unwrap();
+        let program = objects.scheduler.as_ref().unwrap().clone();
         let Some(mut kind) = program.passive_bodies.kind(effect) else {
             return Ok(None);
         };
@@ -257,6 +262,9 @@ impl NativeSession {
             .world
             .hero(owner)
             .ok_or_else(|| unsupported("passive owner missing"))?;
+        let mut dynamic = None;
+        let mut last_flurry = None;
+        let mut exclude_cloak = false;
         let mut patches = Vec::new();
         let mut scalar = |step, range, field, value| {
             patches.push(Patch {
@@ -417,23 +425,32 @@ impl NativeSession {
                 let Some(printed) = self.body_context_text(objects, Field::AttackCard)? else {
                     return Ok(None);
                 };
-                if !hero
+                let source = hero
                     .current
                     .into_iter()
                     .chain(hero.played.iter().flatten().copied())
                     .chain(hero.discard.iter().copied())
-                    .any(|id| {
-                        self.world.definitions.cards[self.world.card(id).unwrap().definition]
+                    .find(|id| {
+                        self.world.definitions.cards[self.world.card(*id).unwrap().definition]
                             .printed_id
                             == printed
-                    })
-                    || !self.reaction_rules.registered_effect(effect)
-                {
+                    });
+                let Some(source) = source else {
+                    return Ok(None);
+                };
+                if !self.reaction_rules.registered_effect(effect) {
                     return Ok(None);
                 }
-                return Err(unsupported(
-                    "Flurry dynamic card-body rebuilding is not bound",
-                ));
+                dynamic =
+                    Some(self.prepare_passive_primary_bound(objects, owner, source, effect, true)?);
+                last_flurry = Some(
+                    objects
+                        .arena
+                        .context_value(p.k(Field::DefenderId))
+                        .filter(|v| objects.arena.truthy(v))
+                        .or_else(|| objects.arena.context_value(p.k(Field::Victim)))
+                        .unwrap_or(ObjectValue::Atom(Datum::Null)),
+                );
             }
             Kind::Cloak => {
                 if !self
@@ -466,41 +483,57 @@ impl NativeSession {
                     && self.reaction_rules.registered_effect(effect)
                     && hero.current.is_some()
                 {
-                    return Err(unsupported(
-                        "Cloak dynamic card-body rebuilding is not bound",
-                    ));
+                    let source = hero.current.unwrap();
+                    dynamic = Some(
+                        self.prepare_passive_primary_bound(objects, owner, source, effect, false)?,
+                    );
+                    exclude_cloak = action == p.k(Field::AttackKind);
+                    kind = Kind::CloakAttack;
                 }
-                if action == p.k(Field::SkillKind) {
-                    return Ok(None);
-                }
-                let value = self.body_integer(objects, Field::BasicActionValue, None)?;
-                kind = if action == p.k(Field::AttackKind) {
-                    Kind::CloakAttack
+                if dynamic.is_some() {
+                    // The source primary supplies its own stats and restrictions.
                 } else {
-                    Kind::CloakMove
-                };
-                scalar(
-                    1,
-                    false,
-                    if kind == Kind::CloakAttack {
-                        Field::Damage
+                    if action == p.k(Field::SkillKind) {
+                        return Ok(None);
+                    }
+                    let value = self.body_integer(objects, Field::BasicActionValue, None)?;
+                    kind = if action == p.k(Field::AttackKind) {
+                        Kind::CloakAttack
                     } else {
-                        Field::Range
-                    },
-                    Datum::Int(value),
-                );
-                if kind == Kind::CloakAttack {
+                        Kind::CloakMove
+                    };
                     scalar(
                         1,
                         false,
-                        Field::Range,
-                        Datum::Int(self.body_integer(objects, Field::BasicActionRange, Some(1))?),
+                        if kind == Kind::CloakAttack {
+                            Field::Damage
+                        } else {
+                            Field::Range
+                        },
+                        Datum::Int(value),
                     );
+                    if kind == Kind::CloakAttack {
+                        scalar(
+                            1,
+                            false,
+                            Field::Range,
+                            Datum::Int(self.body_integer(
+                                objects,
+                                Field::BasicActionRange,
+                                Some(1),
+                            )?),
+                        );
+                    }
                 }
             }
             _ => {}
         }
         let recipes = program.passive_bodies.recipe(kind)?;
+        let recipes = if dynamic.is_some() && kind != Kind::Flurry {
+            &recipes[..1]
+        } else {
+            recipes
+        };
         for patch in &patches {
             let recipe = recipes
                 .get(patch.step)
@@ -518,13 +551,23 @@ impl NativeSession {
                     .count() as u64
             })
             .sum::<u64>();
-        self.phase_generation_check(0, count + 1)?;
+        let dynamic_count = dynamic.as_ref().map_or(0, |plan| {
+            plan.recipes
+                .iter()
+                .flat_map(|r| &r.objects)
+                .filter(|(_, k)| *k == ObjectKind::Step)
+                .count() as u64
+        });
+        self.phase_generation_check(0, count + dynamic_count + 1)?;
         Ok(Some(BodyPlan {
             kind,
             owner,
             printed: offer.card,
             provider: offer.provider,
             patches,
+            dynamic,
+            last_flurry,
+            exclude_cloak,
         }))
     }
     pub(super) fn queue_passive_body_bound(
@@ -534,6 +577,11 @@ impl NativeSession {
     ) -> Result<()> {
         let program = objects.scheduler.as_ref().unwrap().clone();
         let recipes = program.passive_bodies.recipe(plan.kind)?;
+        let recipes = if plan.dynamic.is_some() && plan.kind != Kind::Flurry {
+            &recipes[..1]
+        } else {
+            recipes
+        };
         let mut queued = Vec::new();
         for recipe in recipes {
             let step =
@@ -572,6 +620,115 @@ impl NativeSession {
                             .map_err(unsupported)?;
                     }
                 }
+            }
+        }
+        if let Some(dynamic) = plan.dynamic {
+            if let Some(target) = &plan.last_flurry {
+                objects
+                    .arena
+                    .set_field(queued[1], objects.phases.k(Field::Value), target.clone())
+                    .map_err(unsupported)?;
+            }
+            let suffix = if plan.kind == Kind::Flurry {
+                queued.pop()
+            } else {
+                None
+            };
+            for recipe in &dynamic.recipes {
+                let child =
+                    self.allocate_source_recipe_bound(objects, recipe, &Datum::Text(plan.owner))?;
+                let kind = match objects
+                    .arena
+                    .field(child, objects.phases.k(Field::FilterType))
+                {
+                    Some(ObjectValue::Atom(Datum::Text(kind))) => self.symbols.name(kind),
+                    _ => return Err(unsupported("dynamic passive step type missing")),
+                };
+                let exclusion = if plan.kind == Kind::Flurry {
+                    if kind == "attack_sequence"
+                        && plan
+                            .last_flurry
+                            .as_ref()
+                            .is_some_and(|v| objects.arena.truthy(v))
+                    {
+                        objects
+                            .arena
+                            .set_field(
+                                child,
+                                objects.phases.k(Field::Mandatory),
+                                ObjectValue::Atom(Datum::Bool(true)),
+                            )
+                            .map_err(unsupported)?;
+                        Some((
+                            Field::TargetFilters,
+                            self.symbols.lookup("last_flurry_target").unwrap(),
+                        ))
+                    } else {
+                        None
+                    }
+                } else if plan.exclude_cloak
+                    && kind == "attack_sequence"
+                    && (!objects
+                        .arena
+                        .field(child, objects.phases.k(Field::AttackTargetKey))
+                        .is_some_and(|v| objects.arena.truthy(&v))
+                        || objects
+                            .arena
+                            .field(child, objects.phases.k(Field::AttackOutputKey))
+                            .is_some_and(|v| objects.arena.truthy(&v)))
+                {
+                    Some((
+                        Field::TargetFilters,
+                        objects.phases.k(Field::LastCombatTarget),
+                    ))
+                } else if plan.exclude_cloak
+                    && kind == "select_step"
+                    && matches!(objects.arena.field(child, objects.phases.k(Field::TargetType)),
+                    Some(ObjectValue::Atom(Datum::Text(value))) if self.symbols.name(value) == "UNIT")
+                {
+                    Some((Field::Filters, objects.phases.k(Field::LastCombatTarget)))
+                } else {
+                    None
+                };
+                if let Some((field, key)) = exclusion {
+                    let Some(ObjectValue::Object(filters)) =
+                        objects.arena.field(child, objects.phases.k(field))
+                    else {
+                        return Err(unsupported("dynamic passive filter list missing"));
+                    };
+                    let ObjectValue::Object(filter) =
+                        objects.arena.allocate(&program.action_bodies.exclusion)
+                    else {
+                        unreachable!()
+                    };
+                    objects
+                        .arena
+                        .classify_recipe_object(filter, &[], ObjectKind::Model)
+                        .map_err(unsupported)?;
+                    objects
+                        .arena
+                        .set_field(
+                            filter,
+                            self.symbols.lookup("exclude_self").unwrap(),
+                            ObjectValue::Atom(Datum::Bool(true)),
+                        )
+                        .map_err(unsupported)?;
+                    let keys = objects
+                        .arena
+                        .list(vec![ObjectValue::Atom(Datum::Text(key))]);
+                    objects
+                        .arena
+                        .set_field(filter, objects.phases.k(Field::ExcludeKeys), keys)
+                        .map_err(unsupported)?;
+                    objects
+                        .arena
+                        .append(filters, ObjectValue::Object(filter))
+                        .map_err(unsupported)?;
+                }
+                queued.push(child);
+            }
+            if let Some(suffix) = suffix {
+                queued.push(suffix);
             }
         }
         let mark = self.phase_step(objects, "mark_passive")?;
@@ -682,7 +839,53 @@ mod tests {
         NativeSession::compile(serde_json::from_value(case["envelope"].clone()).unwrap()).unwrap()
     }
     #[test]
-    fn dynamic_rebuild_guards_leave_offer_and_arena_unchanged_across_restore() {
+    fn empty_zone_lane_checks_use_live_operands_without_generation_or_shared_root_mutation() {
+        let mut root =
+            session("object-execution-dynamic-passive-flurry_of_blows-crane_stance-ordinary");
+        root.advance_prefix(1).unwrap();
+        let before = root.export_envelope().unwrap();
+        let mut worker = root.clone();
+        worker.next_step = u64::MAX;
+        worker.advance_prefix(1).unwrap();
+        assert_eq!(root.export_envelope().unwrap().state, before.state);
+        for nonempty in [false, true] {
+            let mut worker = root.clone();
+            worker
+                .with_live_objects(|session, objects| {
+                    if nonempty {
+                        let zones = objects.arena.allocate(&Datum::Object(vec![(
+                            objects.phases.k(Field::Red),
+                            Datum::Null,
+                        )]));
+                        objects
+                            .arena
+                            .set_root(objects.phases.k(Field::RepeatZones), zones)
+                            .map_err(unsupported)?;
+                    } else {
+                        let step = objects
+                            .steps_in_list(objects.stack)?
+                            .last()
+                            .copied()
+                            .unwrap();
+                        let lane = session.symbols.lookup("lane_id").unwrap();
+                        objects
+                            .arena
+                            .set_field(
+                                step,
+                                lane,
+                                ObjectValue::Atom(Datum::Text(objects.phases.k(Field::Red))),
+                            )
+                            .map_err(unsupported)?;
+                    }
+                    Ok(())
+                })
+                .unwrap();
+            worker.advance_prefix(1).unwrap();
+            assert_eq!(root.export_envelope().unwrap().state, before.state);
+        }
+    }
+    #[test]
+    fn dynamic_rebuild_generation_guards_leave_offer_and_arena_unchanged_across_restore() {
         for (name, flurry) in [
             (
                 "object-execution-passive-body-flurry_of_blows-after_attack-accepted",
@@ -740,13 +943,15 @@ mod tests {
                 .unwrap();
             let before = session.export_envelope().unwrap();
             let mut restored = NativeSession::compile(before.clone()).unwrap();
+            session.next_step = u64::MAX;
+            restored.next_step = u64::MAX;
             for worker in [&mut session, &mut restored] {
                 assert!(
                     worker
                         .advance_prefix(1)
                         .unwrap_err()
                         .to_string()
-                        .contains("dynamic card-body rebuilding")
+                        .contains("step generation counter exhausted")
                 );
                 assert_eq!(worker.export_envelope().unwrap().state, before.state);
                 assert_eq!(

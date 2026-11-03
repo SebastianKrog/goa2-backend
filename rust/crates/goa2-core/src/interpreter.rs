@@ -962,6 +962,10 @@ impl NativeSession {
         let team = match raw["tie_breaker_team"].as_str() {
             Some("RED") => Team::Red,
             Some("BLUE") => Team::Blue,
+            // An unset live value remains null in the authoritative arena.
+            // Source priority checks use RED equality and otherwise favor BLUE;
+            // flipping that unset coin also follows the BLUE -> RED branch.
+            None if raw["tie_breaker_team"].is_null() && objects.is_some() => Team::Blue,
             _ => return Err(unsupported("invalid tie-breaker team")),
         };
         let combat_rules = CombatRules::compile(&mut symbols);
@@ -1041,7 +1045,7 @@ impl NativeSession {
             crate::turn::Boundary::compile(&source, &mut symbols).map_err(unsupported)?;
         let round =
             crate::round::RoundState::compile(&source, &mut symbols).map_err(unsupported)?;
-        let round_rules = if has_flow {
+        let round_rules = if has_flow || objects.is_some() {
             Some(Arc::new(
                 crate::round::RoundRules::compile(&mut symbols).map_err(unsupported)?,
             ))

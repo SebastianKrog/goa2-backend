@@ -153,6 +153,19 @@ def passive_continuations():
             if not steps:
                 raise ValueError(f"passive continuation fixture is empty: {original.effect_id}")
             freeze(original.effect_id, steps, str(hero.id))
+    state, hero = build("Min")
+    hero.current_turn_card = hero.ultimate_card
+    freeze(
+        "flurry_of_blows",
+        CardEffectRegistry.get("flurry_of_blows").get_passive_steps(
+            state,
+            hero,
+            hero.ultimate_card,
+            "after_attack",
+            {"attack_effect_id": "flurry_of_blows", "attack_card_id": hero.ultimate_card.id},
+        ),
+        str(hero.id),
+    )
     state, hero = build("Takahide")
     effect = CardEffectRegistry.get("cloak_and_daggers")
     from goa2.domain.models import ActionType, PassiveTrigger

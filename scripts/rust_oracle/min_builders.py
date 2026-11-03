@@ -6,7 +6,7 @@ from primary_templates import PRIMARY, RADIUS, RANGE
 RETIRED_CARD = "template-retired-tier-two"
 
 
-def stateful_recipes(state):
+def stateful_recipes(state, *, raw=False):
     from goa2.data.heroes.registry import HeroRegistry
     from goa2.domain.models import CardState, CardTier
     from goa2.engine.effects import CardEffectRegistry
@@ -27,14 +27,16 @@ def stateful_recipes(state):
         )
         impl = CardEffectRegistry.get("perfect_self")
         stats = CardStats(primary_value=PRIMARY, range=RANGE, radius=RADIUS)
-        rows = freeze_steps(impl.get_steps_with_stats(state, hero, card, stats))
+        rows = freeze_steps(
+            (impl.build_steps if raw else impl.get_steps_with_stats)(state, hero, card, stats)
+        )
         assert len(rows) == (6 if enabled else 1)
         if enabled:
             assert rows[4]["fields"]["allowed_card_ids"] == [RETIRED_CARD]
         for radius in (None, 0):
             assert (
                 freeze_steps(
-                    impl.get_steps_with_stats(
+                    (impl.build_steps if raw else impl.get_steps_with_stats)(
                         state,
                         hero,
                         card,

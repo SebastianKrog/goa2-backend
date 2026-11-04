@@ -323,6 +323,47 @@ impl NativeSession {
             }
         }
     }
+    pub(super) fn laugh_bound(
+        &mut self,
+        objects: &mut BoundObjects,
+        step: ObjectId,
+        events: &mut Vec<NativeEvent>,
+    ) -> Result<Option<NativeRequest>> {
+        let Some(actor) = self.planning.actor else {
+            return Ok(None);
+        };
+        if objects.arena.field(step, objects.pending)
+            .is_some_and(|value| objects.arena.truthy(&value))
+        {
+            if matches!(objects.selected(step, self.selection_key),
+                        Some(ObjectValue::Atom(Datum::Text(choice))) if choice == self.yes)
+            {
+                let output = self.passive_text_bound(objects, step, Field::Output)?;
+                let passive = self.phase_step(objects, "passive")?;
+                objects.arena.set_field(
+                    passive, objects.phases.k(Field::Trigger),
+                    ObjectValue::Atom(Datum::Text(objects.phases.k(Field::AfterLaugh))),
+                ).map_err(unsupported)?;
+                objects.arena.set_context(output, ObjectValue::Atom(Datum::Bool(true)))
+                    .map_err(unsupported)?;
+                events.push(NativeEvent::HeroLaughed(actor));
+                self.push_live_steps_bound(objects, &[passive])?;
+            }
+            return Ok(None);
+        }
+        Ok(Some(NativeRequest {
+            controlled: None,
+            id: RequestToken::Generated(0),
+            owner: actor,
+            prompt: self.passive_text_bound(objects, step, Field::Prompt)?,
+            movement_range: None,
+            pre_action_range: None,
+            choices: RequestChoices::Laugh,
+            can_skip: false,
+            discard: false,
+        }))
+    }
+
     pub(super) fn preflight_passive_bound(
         &mut self,
         objects: &BoundObjects,

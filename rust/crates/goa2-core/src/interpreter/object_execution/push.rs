@@ -383,3 +383,186 @@ mod tests {
         }
     }
 }
+
+impl NativeSession {
+    pub(super) fn mirror_push_bound(
+        &mut self,
+        objects: &mut BoundObjects,
+        step: ObjectId,
+        mandatory: bool,
+    ) -> Result<Option<NativeRequest>> {
+        let owner = self.passive_text_bound(objects, step, Field::HeroId)?;
+        let actor = self.planning.actor.unwrap_or(owner);
+        let piece = self.world.resolved_actor(owner);
+        let Some(origin) = self.world.position(piece) else {
+            if mandatory {
+                self.abort_objects(objects)?;
+            }
+            return Ok(None);
+        };
+        let field = |name| self.symbols.lookup(name).expect("mirror push field compiled");
+        let selected_field = field("selected_target_id");
+        let mut target = self.truthy_symbol_bound(objects, objects.arena.field(step, selected_field))?;
+        let mut answer = objects.selected(step, self.selection_key);
+        if answer.is_some() {
+            objects.arena.set_field(step, objects.pending, ObjectValue::Atom(Datum::Null))
+                .map_err(unsupported)?;
+        }
+        let request = |prompt, choices| Some(NativeRequest {
+            controlled: None, id: RequestToken::Generated(0), owner, prompt,
+            movement_range: None, pre_action_range: None, choices, can_skip: false, discard: false,
+        });
+        let target_prompt = field("Select an adjacent unit to push");
+        let distance_prompt = field("Choose push distance");
+        let max_field = field("max_distance");
+        let mirror_key = field("razzle_mirror_dest");
+        let move_range = field("range_val");
+        let is_action = field("is_movement_action");
+        if target.is_none() {
+            let mut targets = Vec::new();
+            let inputs = self.spatial_inputs_bound(objects, []);
+            let context = crate::spatial::SpatialContext {
+                world: &self.world, registers: &inputs, symbols: &self.symbols,
+                actor: self.planning.actor, frame: None, coordinates: self.coordinates,
+                count_observer: Some(&self.count_observer),
+                range_override: None, through_override: None,
+            };
+            for &(id, hex) in &self.world.locations {
+                if id != piece && origin.distance(hex) == 1
+                    && self.world.entity(id).is_some_and(|entity|
+                        matches!(entity.kind, EntityKind::Hero | EntityKind::Piece | EntityKind::Minion))
+                    && self.world.effect_connected(origin, hex, &[]).map_err(unsupported)?
+                    && self.world.can_target(Some(actor), Some(id)).map_err(unsupported)?.allowed
+                    && self.world.can_displace(id, Some(actor), DisplacementKind::Push, None)
+                        .map_err(unsupported)?.allowed
+                    && self.world.immune_filter(id, &context).map_err(unsupported)?
+                {
+                    targets.push(id);
+                }
+            }
+            if targets.is_empty() {
+                if mandatory {
+                    self.abort_objects(objects)?;
+                }
+                return Ok(None);
+            }
+            if let Some(ObjectValue::Atom(Datum::Text(id))) = answer.take()
+                && targets.contains(&id)
+            {
+                target = Some(id);
+                objects.arena.set_field(step, selected_field, ObjectValue::Atom(Datum::Text(id)))
+                    .map_err(unsupported)?;
+            } else {
+                return Ok(request(target_prompt, RequestChoices::Units {
+                    tokens: false, values: targets.into_iter().map(|id| (id, None)).collect(),
+                }));
+            }
+        }
+        let target = target.unwrap();
+        let Some(target_hex) = self.world.position(target).filter(|hex| *hex != origin && origin.straight(*hex)) else {
+            if mandatory {
+                self.abort_objects(objects)?;
+            }
+            return Ok(None);
+        };
+        let Some(ObjectValue::Atom(Datum::Int(max))) = objects.arena.field(step, max_field) else {
+            return Err(unsupported("mirror push maximum missing"));
+        };
+        let (q, r, s) = origin.coordinates();
+        let (tq, tr, ts) = target_hex.coordinates();
+        let length = i64::from(origin.distance(target_hex));
+        let direction = ((i64::from(tq) - i64::from(q)) / length,
+                         (i64::from(tr) - i64::from(r)) / length,
+                         (i64::from(ts) - i64::from(s)) / length);
+
+        let mut legal = Vec::new();
+        let mut path = vec![target_hex];
+        for distance in 0..=max {
+            if distance > 0 && path.len() as i64 == distance {
+                let previous = *path.last().unwrap();
+                let next = crate::displacement::offset(previous, direction, 1).map_err(unsupported)?;
+                if self.world.on_map(next)
+                    && self.world.effect_connected(previous, next, &[target]).map_err(unsupported)?
+                    && (!self.world.obstacle_for_actor(next, Some(actor)).map_err(unsupported)?
+                        || self.world.passable_token(next, &[]))
+                {
+                    path.push(next);
+                }
+            }
+            let actual = path.iter().rposition(|&hex| !self.world.passable_token(hex, &[]))
+                .unwrap_or(0) as i64;
+            if actual == 0 {
+                legal.push((distance, actual, None));
+                continue;
+            }
+            if !self.world.can_displace(piece, Some(actor), DisplacementKind::Move, None)
+                .map_err(unsupported)?.allowed
+                || !self.world.movement_legality(piece, actual, false, None, &Registers::default())
+                    .map_err(unsupported)?.allowed
+            {
+                continue;
+            }
+            let mut previous = origin;
+            for offset in 1..=actual {
+                let next = crate::displacement::offset(origin, direction, -offset).map_err(unsupported)?;
+                if !self.world.on_map(next)
+                    || !self.world.effect_connected(previous, next, &[piece]).map_err(unsupported)?
+                    || self.world.obstacle_for_actor(next, Some(actor)).map_err(unsupported)?
+                {
+                    break;
+                }
+                previous = next;
+                if offset == actual {
+                    legal.push((distance, actual, Some(next)));
+                }
+            }
+        }
+        if legal.is_empty() {
+            if mandatory {
+                self.abort_objects(objects)?;
+            }
+            return Ok(None);
+        }
+        let choice = if let Some(value) = answer {
+            objects.arena.typed_value(&value, Arc::make_mut(&mut self.symbols))
+                .ok().and_then(|value| value.to_integer(&self.symbols).ok().flatten())
+        } else {
+            None
+        };
+        if let Some(&(distance, actual, destination)) = legal.iter().find(|row| Some(row.0) == choice) {
+            self.phase_generation_check(0, u64::from(distance > 0) + u64::from(destination.is_some()))?;
+            let mut steps = Vec::new();
+            if distance > 0 {
+                let push = self.phase_step(objects, "mirror_push")?;
+                for (key, value) in [(Field::TargetId, Datum::Text(target)), (Field::PushDistance, Datum::Int(distance))] {
+                    objects.arena.set_field(push, objects.phases.k(key), ObjectValue::Atom(value))
+                        .map_err(unsupported)?;
+                }
+                steps.push(push);
+            }
+            if let Some(destination) = destination {
+                let Datum::Object(fields) = native_hex(destination, self.coordinates) else { unreachable!() };
+                let hex = objects.arena.shared_frozen_model(
+                    fields.into_iter().map(|(key, value)| (key, ObjectValue::Atom(value))).collect(),
+                ).map_err(unsupported)?;
+                objects.arena.set_context(mirror_key, hex).map_err(unsupported)?;
+                let movement = self.phase_step(objects, "move_unit")?;
+                for (key, value) in [
+                    (objects.phases.k(Field::UnitId), Datum::Text(piece)),
+                    (objects.phases.k(Field::DestinationKey), Datum::Text(mirror_key)),
+                    (move_range, Datum::Int(actual)),
+                    (is_action, Datum::Bool(false)),
+                ] {
+                    objects.arena.set_field(movement, key, ObjectValue::Atom(value))
+                        .map_err(unsupported)?;
+                }
+                steps.push(movement);
+            }
+            self.push_live_steps_bound(objects, &steps)?;
+            return Ok(None);
+        }
+        Ok(request(distance_prompt, RequestChoices::MirrorDistances(
+            legal.into_iter().map(|(distance, actual, _)| (distance, actual)).collect(),
+        )))
+    }
+}

@@ -111,6 +111,11 @@ impl NativeSession {
                     comparison: crate::queries::Comparison::parse(op),
                 }
             }
+            "adjacent_to_terrain_filter" => HexFilter::AdjacentTerrain(self.spatial_bool_bound(
+                objects,
+                object,
+                Field::IsAdjacent,
+            )?),
             "terrain_filter" => {
                 HexFilter::Terrain(self.spatial_bool_bound(objects, object, Field::IsTerrain)?)
             }
@@ -208,6 +213,38 @@ impl NativeSession {
                     Field::OriginKey,
                 )?,
                 invert: self.symbols.name(kind) == "not_in_straight_line_filter",
+            },
+            "same_direction_from_origin_filter" => HexFilter::SameDirection {
+                origin: self.filter_origin_bound(
+                    objects,
+                    object,
+                    Field::OriginId,
+                    Field::OriginKey,
+                )?,
+                origin_hex: self.spatial_text_bound(objects, object, Field::OriginHexKey)?,
+                reference: self.passive_text_bound(objects, object, Field::ReferenceKey)?,
+            },
+            "clear_line_of_sight_filter" => HexFilter::LineOfSight {
+                origin: self.filter_origin_bound(
+                    objects,
+                    object,
+                    Field::OriginId,
+                    Field::OriginKey,
+                )?,
+                units: self.spatial_bool_bound(objects, object, Field::BlockedByUnits)?,
+                terrain: self.spatial_bool_bound(objects, object, Field::BlockedByTerrain)?,
+                obstacles: self.spatial_bool_bound(objects, object, Field::BlockedByObstacles)?,
+            },
+            "max_empty_spaces_in_line_filter" => HexFilter::MaxEmptySpacesInLine {
+                origin: self.filter_origin_bound(
+                    objects,
+                    object,
+                    Field::OriginId,
+                    Field::OriginKey,
+                )?,
+                max_empty: self
+                    .spatial_int_bound(objects, object, Field::MaxEmpty)?
+                    .unwrap_or(1),
             },
             "straight_line_path_filter" => HexFilter::ClearLine {
                 origin: self.filter_origin_bound(
@@ -438,7 +475,18 @@ impl NativeSession {
             }
             | HexFilter::Movement { origin, .. }
             | HexFilter::Straight { origin, .. }
-            | HexFilter::ClearLine { origin, .. } => keys.extend(origin.key),
+            | HexFilter::MaxEmptySpacesInLine { origin, .. }
+            | HexFilter::ClearLine { origin, .. }
+            | HexFilter::LineOfSight { origin, .. } => keys.extend(origin.key),
+            HexFilter::SameDirection {
+                origin,
+                origin_hex,
+                reference,
+            } => {
+                keys.extend(origin.key);
+                keys.extend(*origin_hex);
+                keys.push(*reference);
+            }
             HexFilter::FastTravel { origin, .. } => {
                 keys.extend(origin.key);
                 keys.extend(self.symbols.lookup("card"));

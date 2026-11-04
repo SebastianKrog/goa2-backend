@@ -8,7 +8,125 @@ pub(super) struct ForcedDiscardPlan {
     shields: bool,
     allowed: Option<Vec<Symbol>>,
 }
+pub(super) struct ColorDiscardPlan {
+    victim: Symbol,
+    victim_key: Symbol,
+    color: Symbol,
+    output: Symbol,
+}
+
 impl NativeSession {
+    pub(super) fn preflight_color_discard_bound(
+        &mut self,
+        objects: &BoundObjects,
+        step: ObjectId,
+    ) -> Result<Option<ColorDiscardPlan>> {
+        let victim_key = self.passive_text_bound(objects, step, Field::VictimKey)?;
+        let Some(victim) =
+            self.truthy_symbol_bound(objects, objects.arena.context_value(victim_key))?
+        else {
+            return Ok(None);
+        };
+        self.sync_card_collections_bound(objects)?;
+        let Some(hero) = self.world.hero(victim) else {
+            return Ok(None);
+        };
+        let read = |name| {
+            self.symbols
+                .lookup(name)
+                .and_then(|key| objects.arena.field(step, key))
+        };
+        let color = if let Some(color) = self.truthy_symbol_bound(objects, read("color"))? {
+            Some(color)
+        } else if let Some(key) = self.truthy_symbol_bound(objects, read("color_key"))? {
+            self.truthy_symbol_bound(objects, objects.arena.context_value(key))?
+        } else {
+            None
+        };
+        let Some(color) = color else {
+            return Ok(None);
+        };
+        if !matches!(
+            self.symbols.name(color),
+            "RED" | "BLUE" | "GREEN" | "GOLD" | "SILVER" | "PURPLE"
+        ) {
+            return Err(EngineError::Rule("invalid forced discard color".into()));
+        }
+        if !hero.hand.iter().any(|id| {
+            self.world.card(*id).is_some_and(|row| {
+                self.world.definitions.cards[row.definition].color == Some(color)
+            })
+        }) {
+            return Ok(None);
+        }
+        let output = self.passive_text_bound(objects, step, Field::Output)?;
+        self.phase_generation_check(0, 2)?;
+        Ok(Some(ColorDiscardPlan {
+            victim,
+            victim_key,
+            color,
+            output,
+        }))
+    }
+
+    pub(super) fn color_discard_bound(
+        &mut self,
+        objects: &mut BoundObjects,
+        plan: Option<ColorDiscardPlan>,
+    ) -> Result<()> {
+        let Some(plan) = plan else {
+            return Ok(());
+        };
+        let prompt = format!(
+            "{}, select a {} card to discard.",
+            self.symbols.name(plan.victim),
+            self.symbols.name(plan.color)
+        );
+        let prompt = Arc::make_mut(&mut self.symbols).intern(&prompt);
+        objects.arena.symbols = self.symbols.clone();
+        let select = self.phase_step(objects, "select_card")?;
+        let discard = self.phase_step(objects, "discard_card")?;
+        let p = &objects.phases;
+        for (field, value) in [
+            (Field::Prompt, prompt),
+            (Field::Output, plan.output),
+            (Field::ContextHeroKey, plan.victim_key),
+            (Field::OverridePlayerKey, plan.victim_key),
+            (Field::DecisionPurpose, p.k(Field::DiscardPurpose)),
+            (Field::Container, p.k(Field::HandState)),
+        ] {
+            objects
+                .arena
+                .set_field(select, p.k(field), ObjectValue::Atom(Datum::Text(value)))
+                .map_err(unsupported)?;
+        }
+        objects
+            .arena
+            .set_field(
+                select,
+                p.k(Field::Mandatory),
+                ObjectValue::Atom(Datum::Bool(true)),
+            )
+            .map_err(unsupported)?;
+        let colors = objects
+            .arena
+            .list(vec![ObjectValue::Atom(Datum::Text(plan.color))]);
+        objects
+            .arena
+            .set_field(select, p.k(Field::CardColors), colors)
+            .map_err(unsupported)?;
+        for (field, value) in [
+            (Field::HeroKey, plan.victim_key),
+            (Field::CardKey, plan.output),
+        ] {
+            objects
+                .arena
+                .set_field(discard, p.k(field), ObjectValue::Atom(Datum::Text(value)))
+                .map_err(unsupported)?;
+        }
+        self.push_live_steps_bound(objects, &[select, discard])
+    }
+
     pub(super) fn preflight_forced_discard_bound(
         &mut self,
         objects: &BoundObjects,

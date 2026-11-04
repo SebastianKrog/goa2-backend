@@ -2,6 +2,7 @@
 //! Other world-changing instructions stay guarded until their dense slots bind.
 use super::*;
 mod acting_piece;
+mod action_control;
 mod actor;
 #[cfg(test)]
 mod arien_tests;
@@ -10,13 +11,16 @@ mod attack_sequence;
 mod battle_tests;
 mod battles;
 mod card_actions;
+mod card_guess;
 mod card_selection;
+mod card_swap;
 mod cleanup;
 mod co_movement;
 mod combat_resolution;
 mod coordinates;
 mod defeat;
 mod defense_bodies;
+mod directional_move;
 mod discard;
 mod effect_creation;
 mod forced_discard;
@@ -24,6 +28,8 @@ mod forced_discard;
 mod gydion_tests;
 mod hero_respawn;
 mod hex_selection;
+mod initiative;
+mod journey;
 mod markers;
 mod min_cards;
 #[cfg(test)]
@@ -49,6 +55,10 @@ mod placement;
 mod planning_commands;
 mod pre_action;
 mod primary_bodies;
+
+pub(super) fn primary_operand_catalog() -> Result<&'static Value> {
+    primary_bodies::catalog()
+}
 mod push;
 mod queries;
 mod reaction_window;
@@ -106,12 +116,13 @@ struct FinishingProgram {
     defense_bodies: Arc<defense_bodies::DefenseRules>,
     primary_bodies: Arc<primary_bodies::PrimaryRules>,
     action_bodies: Arc<card_actions::ActionBindings>,
+    journey_finishing: Vec<passive_bodies::Recipe>,
 }
 #[derive(Clone, Debug)]
 pub(super) struct BoundObjects {
     pub arena: ObjectArena,
     stack: ObjectId,
-    readonly: Arc<HashSet<ObjectId>>,
+    readonly: std::sync::OnceLock<Arc<crate::objects::ProtectedObjects>>,
     pending: Symbol,
     request: Symbol,
     value: Symbol,
@@ -120,6 +131,7 @@ pub(super) struct BoundObjects {
     programs: Arc<HashMap<ObjectId, usize>>,
     copied_programs: HashMap<ObjectId, usize>,
     copied_readonly: HashSet<ObjectId>,
+    copied_binding_undo: CopiedBindingJournal,
     action_keys: [Symbol; 8],
     action_stack: Symbol,
     present: Symbol,
@@ -135,7 +147,33 @@ pub(super) struct BoundObjects {
     tokens: tokens::TokenBindings,
     effect_creation: Arc<effect_creation::EffectBindings>,
 }
+
+#[derive(Clone, Copy, Debug)]
+enum CopiedBinding {
+    Program(ObjectId, Option<usize>),
+    Protection(ObjectId),
+}
+
+#[derive(Debug, Default)]
+struct CopiedBindingJournal(Vec<CopiedBinding>);
+
+impl Clone for CopiedBindingJournal {
+    fn clone(&self) -> Self {
+        Self::default()
+    }
+}
+
 impl BoundObjects {
+    fn staged_clone(&self) -> Self {
+        let mut candidate = self.clone();
+        candidate.arena.inherit_staged_journal(&self.arena);
+        candidate
+            .copied_binding_undo
+            .0
+            .clone_from(&self.copied_binding_undo.0);
+        candidate
+    }
+
     pub fn compile(source: &StateEnvelope) -> Result<Option<Self>> {
         if source.object_bindings.is_empty() {
             return Ok(None);
@@ -157,6 +195,31 @@ impl BoundObjects {
             }
         }
         let mut arena = ObjectArena::compile(source).map_err(unsupported)?;
+        for key in [
+            "attempts",
+            "attempt",
+            "victim_id",
+            "card_id",
+            "guessed_color",
+            "actual_color",
+            "correct",
+            "victim_key",
+            "card_key",
+            "guess_key",
+            "correct_output_key",
+            "wrong_output_key",
+            "rollback_reanchor_pending",
+            "output_key",
+            "selection_announced",
+            "BLUE",
+            "GOLD",
+            "GREEN",
+            "RED",
+            "SILVER",
+            "Guess the card's color",
+        ] {
+            Arc::make_mut(&mut arena.symbols).intern(key);
+        }
         let pending = Arc::make_mut(&mut arena.symbols).intern("pending_input");
         let request = Arc::make_mut(&mut arena.symbols).intern("pending_request_id");
         let value = Arc::make_mut(&mut arena.symbols).intern("value");
@@ -203,7 +266,7 @@ impl BoundObjects {
         Ok(Some(Self {
             arena,
             stack,
-            readonly,
+            readonly: std::sync::OnceLock::from(readonly),
             pending,
             request,
             value,
@@ -212,6 +275,7 @@ impl BoundObjects {
             programs: Arc::new(HashMap::new()),
             copied_programs: HashMap::new(),
             copied_readonly: HashSet::new(),
+            copied_binding_undo: CopiedBindingJournal::default(),
             action_keys,
             action_stack,
             present,
@@ -260,11 +324,18 @@ impl BoundObjects {
                 | "offer_passive"
                 | "mark_passive_used"
                 | "move_sequence"
+                | "force_defense_card_movement"
                 | "push_unit"
                 | "record_hex"
                 | "compute_hex"
+                | "compute_distance"
+                | "resolve_turn_start_hex"
                 | "check_adjacency"
                 | "may_repeat_once"
+                | "razzle_mirrored_push"
+                | "remove_hero_piece"
+                | "spawn_hero_piece"
+                | "set_acting_piece"
                 | "choose_acting_piece"
                 | "fast_travel_sequence"
                 | "fast_travel_unit"
@@ -278,19 +349,33 @@ impl BoundObjects {
                 | "collect_units"
                 | "count"
                 | "check_context_condition"
+                | "check_solo_win"
+                | "check_zone_change"
+                | "count_adjacent_enemies"
                 | "count_cards"
                 | "check_hero_defeated_this_round"
                 | "check_unit_filters"
                 | "check_distance"
                 | "check_unit_type"
+                | "check_unit_on_board"
                 | "combine_boolean_context"
                 | "convert_card_to_item"
                 | "apply_after_attack_card_text"
                 | "respawn_minion_at_hex"
                 | "force_discard_or_defeat"
                 | "choose_rune"
+                | "laugh"
+                | "reveal_hand_card"
+                | "guess_card_color"
+                | "reveal_and_resolve_guess"
+                | "place_runes"
                 | "choose_card_color"
+                | "directional_move_units"
                 | "force_discard_by_color"
+                | "swap_resolved_cards"
+                | "swap_card"
+                | "swap_item_card"
+                | "swap_with_deck_card"
                 | "defeat_unit"
                 | "resolve_combat"
                 | "snapshot_adjacent_heroes"
@@ -311,15 +396,21 @@ impl BoundObjects {
                 | "resolve_card_text"
                 | "resolve_defense_text"
                 | "gain_coins"
+                | "gain_item"
                 | "lose_coins"
                 | "steal_coins"
                 | "restore_spent_life_counter"
+                | "spend_additional_life_counter"
                 | "resolve_on_block_effect"
                 | "resolve_pre_action_movement"
                 | "resolve_pre_action_discard"
                 | "move_unit"
                 | "move_token"
+                | "move_toward_target"
                 | "co_directional_drag"
+                | "set_card_initiative"
+                | "schedule_action_control"
+                | "schedule_journey_return"
                 | "place_unit"
                 | "swap_units"
                 | "create_effect"
@@ -351,7 +442,11 @@ impl BoundObjects {
                     "resolve_card"
                         | "move_unit"
                         | "move_token"
+                        | "move_toward_target"
                         | "co_directional_drag"
+                        | "set_card_initiative"
+                        | "schedule_action_control"
+                        | "schedule_journey_return"
                         | "place_unit"
                         | "swap_units"
                         | "create_effect"
@@ -366,11 +461,18 @@ impl BoundObjects {
                         | "offer_passive"
                         | "mark_passive_used"
                         | "move_sequence"
+                        | "force_defense_card_movement"
                         | "push_unit"
                         | "record_hex"
                         | "compute_hex"
+                        | "compute_distance"
+                        | "resolve_turn_start_hex"
                         | "check_adjacency"
                         | "may_repeat_once"
+                        | "razzle_mirrored_push"
+                        | "remove_hero_piece"
+                        | "spawn_hero_piece"
+                        | "set_acting_piece"
                         | "choose_acting_piece"
                         | "fast_travel_sequence"
                         | "fast_travel_unit"
@@ -384,19 +486,33 @@ impl BoundObjects {
                         | "collect_units"
                         | "count"
                         | "check_context_condition"
+                        | "check_solo_win"
+                        | "check_zone_change"
+                        | "count_adjacent_enemies"
                         | "count_cards"
                         | "check_hero_defeated_this_round"
                         | "check_unit_filters"
                         | "check_distance"
                         | "check_unit_type"
+                        | "check_unit_on_board"
                         | "combine_boolean_context"
                         | "convert_card_to_item"
                         | "apply_after_attack_card_text"
                         | "respawn_minion_at_hex"
                         | "force_discard_or_defeat"
                         | "choose_rune"
+                        | "laugh"
+                        | "reveal_hand_card"
+                        | "guess_card_color"
+                        | "reveal_and_resolve_guess"
+                        | "place_runes"
                         | "choose_card_color"
+                        | "directional_move_units"
                         | "force_discard_by_color"
+                        | "swap_resolved_cards"
+                        | "swap_card"
+                        | "swap_item_card"
+                        | "swap_with_deck_card"
                         | "defeat_unit"
                         | "resolve_combat"
                         | "snapshot_adjacent_heroes"
@@ -417,9 +533,11 @@ impl BoundObjects {
                         | "resolve_card_text"
                         | "resolve_defense_text"
                         | "gain_coins"
+                        | "gain_item"
                         | "lose_coins"
                         | "steal_coins"
                         | "restore_spent_life_counter"
+                        | "spend_additional_life_counter"
                         | "resolve_on_block_effect"
                         | "resolve_pre_action_movement"
                         | "resolve_pre_action_discard"
@@ -492,6 +610,27 @@ impl BoundObjects {
                 steps[index].instruction = Instruction::LivePassive;
             } else if wire["type"] == "offer_passive" {
                 steps[index].instruction = Instruction::LiveOfferPassive;
+            } else if wire["type"] == "place_runes" {
+                steps[index].instruction = Instruction::LiveRuneInscription;
+            } else if wire["type"] == "directional_move_units" {
+                steps[index].instruction = Instruction::LiveDirectionalMove;
+            } else if wire["type"] == "choose_card_color" {
+                steps[index].instruction = Instruction::LiveChooseCardColor;
+            } else if wire["type"] == "laugh" {
+                steps[index].instruction = Instruction::LiveLaugh;
+            } else if wire["type"] == "reveal_hand_card" {
+                for key in ["revealer_id", "target_unit_id", "owner_id", "card_id", "tier_value",
+                    "rollback_reanchor_pending", "card_reveal"] {
+                    symbols.intern(key);
+                }
+                steps[index].instruction = Instruction::LiveRevealHandCard;
+            } else if matches!(
+                wire["type"].as_str(),
+                Some("guess_card_color" | "reveal_and_resolve_guess")
+            ) {
+                steps[index].instruction = Instruction::LiveCardGuess {
+                    reveal: wire["type"] == "reveal_and_resolve_guess",
+                };
             } else if wire["type"] == "choose_rune" {
                 steps[index].instruction = Instruction::LiveRuneChoice;
             } else if wire["type"] == "mark_passive_used" {
@@ -519,14 +658,34 @@ impl BoundObjects {
                 steps[index].instruction = Instruction::LiveDiscard;
             } else if wire["type"] == "force_discard_or_defeat" {
                 steps[index].instruction = Instruction::LiveDiscardOrDefeat;
+            } else if wire["type"] == "swap_with_deck_card" {
+                steps[index].instruction = Instruction::LiveDeckCardSwap;
+            } else if wire["type"] == "swap_item_card" {
+                steps[index].instruction = Instruction::LiveItemSwap;
+            } else if wire["type"] == "swap_resolved_cards" {
+                steps[index].instruction = Instruction::LiveResolvedCardSwap;
+            } else if wire["type"] == "swap_card" {
+                steps[index].instruction = Instruction::LiveCardSwap;
+            } else if wire["type"] == "force_discard_by_color" {
+                steps[index].instruction = Instruction::LiveColorDiscard;
             } else if wire["type"] == "force_discard" {
                 steps[index].instruction = Instruction::LiveForceDiscard;
             } else if wire["type"] == "mine_path_choice" {
                 steps[index].instruction = Instruction::LiveMineChoice;
             } else if wire["type"] == "trigger_mine" {
                 steps[index].instruction = Instruction::LiveTriggerMines;
+            } else if wire["type"] == "force_defense_card_movement" {
+                steps[index].instruction = Instruction::LiveForceDefenseMovement;
             } else if wire["type"] == "move_sequence" {
                 steps[index].instruction = Instruction::LiveMoveSequence;
+            } else if wire["type"] == "schedule_journey_return" {
+                steps[index].instruction = Instruction::LiveJourney;
+            } else if wire["type"] == "schedule_action_control" {
+                steps[index].instruction = Instruction::LiveActionControl;
+            } else if wire["type"] == "set_card_initiative" {
+                steps[index].instruction = Instruction::LiveSetInitiative;
+            } else if wire["type"] == "move_toward_target" {
+                steps[index].instruction = Instruction::LiveMoveToward;
             } else if wire["type"] == "co_directional_drag" {
                 steps[index].instruction = Instruction::LiveDrag;
             } else if wire["type"] == "move_token" {
@@ -535,11 +694,19 @@ impl BoundObjects {
                 steps[index].instruction = Instruction::LiveMove;
             } else if matches!(
                 wire["type"].as_str(),
-                Some("record_hex" | "compute_hex" | "check_adjacency")
+                Some(
+                    "record_hex"
+                        | "compute_hex"
+                        | "check_adjacency"
+                        | "compute_distance"
+                        | "resolve_turn_start_hex"
+                )
             ) {
                 steps[index].instruction =
                     Instruction::LiveCoordinates(match wire["type"].as_str().unwrap() {
                         "record_hex" => CoordinateOp::Record,
+                        "compute_distance" => CoordinateOp::Distance,
+                        "resolve_turn_start_hex" => CoordinateOp::TurnStart,
                         "compute_hex" => CoordinateOp::Compute,
                         _ => CoordinateOp::Adjacency,
                     });
@@ -553,6 +720,17 @@ impl BoundObjects {
                 steps[index].instruction = Instruction::LivePerformCard;
             } else if wire["type"] == "resolve_card" {
                 steps[index].instruction = Instruction::LiveCardAction;
+            } else if wire["type"] == "razzle_mirrored_push" {
+                for key in ["razzle_mirror_dest", "Select an adjacent unit to push", "Choose push distance"] {
+                    symbols.intern(key);
+                }
+                steps[index].instruction = Instruction::LiveMirrorPush;
+            } else if wire["type"] == "remove_hero_piece" {
+                steps[index].instruction = Instruction::LiveRemovePiece;
+            } else if wire["type"] == "spawn_hero_piece" {
+                steps[index].instruction = Instruction::LiveSpawnPiece;
+            } else if wire["type"] == "set_acting_piece" {
+                steps[index].instruction = Instruction::LiveSetPiece;
             } else if wire["type"] == "choose_acting_piece" {
                 steps[index].instruction = Instruction::LiveChoosePiece;
             } else if wire["type"] == "push_unit" {
@@ -575,7 +753,14 @@ impl BoundObjects {
                 };
             } else if matches!(
                 wire["type"].as_str(),
-                Some("gain_coins" | "lose_coins" | "steal_coins" | "restore_spent_life_counter")
+                Some(
+                    "gain_item"
+                        | "gain_coins"
+                        | "lose_coins"
+                        | "steal_coins"
+                        | "restore_spent_life_counter"
+                        | "spend_additional_life_counter"
+                )
             ) {
                 steps[index].instruction = Instruction::LiveResource;
             } else if let Some(op) = match wire["type"].as_str() {
@@ -590,6 +775,8 @@ impl BoundObjects {
                 steps[index].instruction = Instruction::LiveConvertCardItem;
             } else if wire["type"] == "apply_after_attack_card_text" {
                 steps[index].instruction = Instruction::LiveAfterAttackText;
+            } else if wire["type"] == "check_unit_on_board" {
+                steps[index].instruction = Instruction::LiveUnitOnBoard;
             } else if wire["type"] == "check_unit_type" {
                 steps[index].instruction = Instruction::LiveUnitTypeCheck;
             } else if wire["type"] == "combine_boolean_context" {
@@ -600,6 +787,12 @@ impl BoundObjects {
                 steps[index].instruction = Instruction::LiveCheckUnitFilters;
             } else if wire["type"] == "respawn_minion_at_hex" {
                 steps[index].instruction = Instruction::LiveMinionRespawn;
+            } else if wire["type"] == "check_solo_win" {
+                steps[index].instruction = Instruction::LiveSoloWin;
+            } else if wire["type"] == "check_zone_change" {
+                steps[index].instruction = Instruction::LiveZoneChange;
+            } else if wire["type"] == "count_adjacent_enemies" {
+                steps[index].instruction = Instruction::LiveAdjacentEnemies;
             } else if wire["type"] == "count_cards" {
                 steps[index].instruction = Instruction::LiveCardCount;
             } else if wire["type"] == "check_hero_defeated_this_round" {
@@ -718,6 +911,7 @@ impl BoundObjects {
                 "attack_select",
                 "pre_action_select",
                 "move_unit",
+                "mirror_push",
                 "move_token",
                 "set_actor",
                 "reaction",
@@ -740,6 +934,7 @@ impl BoundObjects {
             defense_bodies: Arc::new(defense_bodies::DefenseRules::compile(steps, symbols)?),
             primary_bodies: Arc::new(primary_bodies::PrimaryRules::compile(steps, symbols)?),
             action_bodies: Arc::new(card_actions::ActionBindings::compile(steps, symbols)?),
+            journey_finishing: journey::compile_finishing(steps, symbols)?,
             step_id: symbols.intern("step_id"),
             actor_id: symbols.intern("actor_id"),
         }));
@@ -783,7 +978,7 @@ impl BoundObjects {
         self.arena
             .set_root(self.effects, list)
             .map_err(unsupported)?;
-        self.readonly = Arc::new(self.arena.readonly_objects());
+        self.readonly.take();
         Ok(())
     }
     fn generated_step(
@@ -810,7 +1005,7 @@ impl BoundObjects {
                 )
                 .map_err(unsupported)?;
         }
-        self.copied_programs.insert(object, recipe.instruction);
+        self.bind_copied_program(object, recipe.instruction);
         Ok(object)
     }
     pub fn bind_stored_programs(
@@ -906,7 +1101,7 @@ impl BoundObjects {
             .set_root(self.effects, list)
             .map_err(unsupported)?;
         // Source replaces the list. Old aliases become detached mutable data.
-        self.readonly = Arc::new(self.arena.readonly_objects());
+        self.readonly.take();
         Ok(())
     }
     pub fn bind_program(
@@ -952,8 +1147,35 @@ impl BoundObjects {
             .or_else(|| self.copied_programs.get(&step))
             .copied()
     }
+    fn bind_copied_program(&mut self, object: ObjectId, instruction: usize) {
+        let previous = self.copied_programs.insert(object, instruction);
+        if self.arena.is_recording() && previous != Some(instruction) {
+            self.copied_binding_undo
+                .0
+                .push(CopiedBinding::Program(object, previous));
+        }
+    }
+    fn restore_copied_bindings(&mut self, checkpoint: usize) {
+        for binding in self.copied_binding_undo.0.drain(checkpoint..).rev() {
+            match binding {
+                CopiedBinding::Program(object, Some(instruction)) => {
+                    self.copied_programs.insert(object, instruction);
+                }
+                CopiedBinding::Program(object, None) => {
+                    self.copied_programs.remove(&object);
+                }
+                CopiedBinding::Protection(object) => {
+                    self.copied_readonly.remove(&object);
+                }
+            }
+        }
+    }
     fn protected(&self, object: ObjectId) -> bool {
-        self.readonly.contains(&object) || self.copied_readonly.contains(&object)
+        self.copied_readonly.contains(&object)
+            || self
+                .readonly
+                .get_or_init(|| Arc::new(self.arena.readonly_objects()))
+                .contains(&object)
     }
     fn copy_template(&mut self, step: ObjectId) -> Result<(ObjectId, usize)> {
         let (ObjectValue::Object(copy), objects) = self
@@ -965,13 +1187,18 @@ impl BoundObjects {
         };
         for (original, copied) in objects {
             if let Some(instruction) = self.program(original) {
-                self.copied_programs.insert(copied, instruction);
+                self.bind_copied_program(copied, instruction);
             }
         }
         // Protection belongs to the copied operand role, not its provenance.
         // A detached Set.value copy of a world list is ordinary mutable data.
-        self.copied_readonly
-            .extend(self.arena.readonly_step_objects(copy));
+        for object in self.arena.readonly_step_objects(copy) {
+            if self.copied_readonly.insert(object) && self.arena.is_recording() {
+                self.copied_binding_undo
+                    .0
+                    .push(CopiedBinding::Protection(object));
+            }
+        }
         let instruction = self
             .program(copy)
             .ok_or_else(|| unsupported("copied step program missing"))?;
@@ -1167,6 +1394,50 @@ pub(super) fn world_projection(source: &StateEnvelope) -> StateEnvelope {
 }
 
 impl NativeSession {
+    /// Explore an operation and restore the complete native session on exit.
+    ///
+    /// The arena, copied bindings, and card and hero rows use undo journals. The
+    /// remaining typed session projection is checkpointed by value.
+    pub fn with_rollback<T>(
+        &mut self,
+        operation: impl FnOnce(&mut Self) -> Result<T>,
+    ) -> Result<T> {
+        let mut objects = self
+            .objects
+            .take()
+            .ok_or_else(|| unsupported("session rollback requires live object bindings"))?;
+        let rows = self.world.take_rows();
+        let mut snapshot = self.clone();
+        self.world.put_rows(rows);
+        let rows_checkpoint = self.world.begin_rows_rollback();
+        if self.count_observer.observed() {
+            snapshot.count_observer.record();
+        }
+        let checkpoint = objects.arena.begin_rollback();
+        let readonly = objects.readonly.clone();
+        let programs = objects.programs.clone();
+        let copied_bindings = objects.copied_binding_undo.0.len();
+        self.objects = Some(objects);
+
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| operation(self)));
+        let mut objects = self
+            .objects
+            .take()
+            .expect("speculation must preserve live bindings");
+        objects.arena.rollback_to(checkpoint);
+        objects.readonly = readonly;
+        objects.programs = programs;
+        objects.restore_copied_bindings(copied_bindings);
+        self.world
+            .restore_rows(rows_checkpoint, &mut snapshot.world);
+        snapshot.objects = Some(objects);
+        *self = snapshot;
+        match result {
+            Ok(value) => value,
+            Err(panic) => std::panic::resume_unwind(panic),
+        }
+    }
+
     pub(super) fn with_live_objects<T>(
         &mut self,
         action: impl FnOnce(&mut Self, &mut BoundObjects) -> Result<T>,
@@ -1175,6 +1446,16 @@ impl NativeSession {
             .objects
             .take()
             .ok_or_else(|| unsupported("operation requires live object bindings"))?;
+        if objects.arena.is_recording() {
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                action(self, &mut objects)
+            }));
+            self.objects = Some(objects);
+            return match result {
+                Ok(value) => value,
+                Err(panic) => std::panic::resume_unwind(panic),
+            };
+        }
         let result = action(self, &mut objects);
         self.objects = Some(objects);
         result
@@ -1184,13 +1465,7 @@ impl NativeSession {
         budget: &ExecutionBudget<'_>,
         stop_after: Option<usize>,
     ) -> Result<AdvanceResult> {
-        let mut objects = self
-            .objects
-            .take()
-            .ok_or_else(|| unsupported("object arena missing"))?;
-        let result = self.run_objects(&mut objects, budget, stop_after);
-        self.objects = Some(objects);
-        result
+        self.with_live_objects(|session, objects| session.run_objects(objects, budget, stop_after))
     }
     fn run_objects(
         &mut self,
@@ -1388,6 +1663,42 @@ impl NativeSession {
             } else {
                 None
             };
+            let journey = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveJourney
+                ) {
+                Some(self.preflight_journey_bound(
+                    objects,
+                    top_object.ok_or_else(|| unsupported("journey step missing"))?,
+                )?)
+            } else {
+                None
+            };
+            let action_control = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveActionControl
+                ) {
+                Some(self.preflight_action_control_bound(
+                    objects,
+                    top_object.ok_or_else(|| unsupported("action control step missing"))?,
+                )?)
+            } else {
+                None
+            };
+            let initiative = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveSetInitiative
+                ) {
+                Some(self.preflight_initiative_bound(
+                    objects,
+                    top_object.ok_or_else(|| unsupported("initiative step missing"))?,
+                )?)
+            } else {
+                None
+            };
             let co_movement = if !skipped
                 && matches!(
                     self.steps[top_instruction].instruction,
@@ -1401,6 +1712,15 @@ impl NativeSession {
                         Instruction::LiveDrag
                     ),
                 )?)
+            } else {
+                None
+            };
+            let move_toward = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveMoveToward
+                ) {
+                self.preflight_move_toward_bound(objects, top_object.unwrap())?
             } else {
                 None
             };
@@ -1516,6 +1836,15 @@ impl NativeSession {
                     Instruction::LiveMoveSequence
                 ) {
                 Some(self.preflight_move_sequence_bound(objects, top_object.unwrap())?)
+            } else {
+                None
+            };
+            let forced_movement = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveForceDefenseMovement
+                ) {
+                self.preflight_force_defense_movement_bound(objects, top_object.unwrap())?
             } else {
                 None
             };
@@ -1682,6 +2011,9 @@ impl NativeSession {
                     Instruction::LiveCheckUnitFilters => {
                         Some(self.preflight_unit_filters_query_bound(objects, top_object.unwrap())?)
                     }
+                    Instruction::LiveUnitOnBoard => {
+                        Some(self.preflight_unit_on_board_bound(objects, top_object.unwrap())?)
+                    }
                     Instruction::LiveUnitTypeCheck => {
                         Some(self.preflight_unit_type_check_bound(objects, top_object.unwrap())?)
                     }
@@ -1690,6 +2022,12 @@ impl NativeSession {
                     }
                     Instruction::LiveDistanceCheck => {
                         Some(self.preflight_distance_check_bound(objects, top_object.unwrap())?)
+                    }
+                    Instruction::LiveZoneChange => {
+                        Some(self.preflight_zone_change_bound(objects, top_object.unwrap())?)
+                    }
+                    Instruction::LiveAdjacentEnemies => {
+                        Some(self.preflight_adjacent_enemies_bound(objects, top_object.unwrap())?)
                     }
                     Instruction::LiveCardCount => {
                         Some(self.preflight_card_count_bound(objects, top_object.unwrap())?)
@@ -1808,6 +2146,15 @@ impl NativeSession {
             } else {
                 None
             };
+            let solo_win = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveSoloWin
+                ) {
+                self.preflight_solo_win_bound(objects, top_object.unwrap())?
+            } else {
+                None
+            };
             let game_over = if !skipped
                 && matches!(
                     self.steps[top_instruction].instruction,
@@ -1890,6 +2237,15 @@ impl NativeSession {
                     Instruction::LiveDiscardOrDefeat
                 ) {
                 self.preflight_discard_or_defeat_bound(objects, top_object.unwrap())?
+            } else {
+                None
+            };
+            let color_discard = if !skipped
+                && matches!(
+                    self.steps[top_instruction].instruction,
+                    Instruction::LiveColorDiscard
+                ) {
+                self.preflight_color_discard_bound(objects, top_object.unwrap())?
             } else {
                 None
             };
@@ -2039,18 +2395,28 @@ impl NativeSession {
                     };
                     objects.write(key, value)?;
                 }
-                Instruction::Record { input, output } => {
+                Instruction::Record { .. } => {
+                    let read_key = |name| match self
+                        .symbols
+                        .lookup(name)
+                        .and_then(|field| objects.arena.field(id, field))
+                    {
+                        Some(ObjectValue::Atom(Datum::Text(key))) => Ok(key),
+                        _ => Err(unsupported("record target key missing")),
+                    };
+                    let input = read_key("input_key")?;
+                    let output = read_key("output_list_key")?;
                     if let Some(value) = objects
                         .arena
-                        .context_value(*input)
+                        .context_value(input)
                         .filter(|value| objects.arena.truthy(value))
                     {
-                        let target = match objects.arena.context_value(*output) {
+                        let target = match objects.arena.context_value(output) {
                             None => {
                                 let list = objects.arena.allocate(&Datum::List(Vec::new()));
                                 objects
                                     .arena
-                                    .set_context(*output, list.clone())
+                                    .set_context(output, list.clone())
                                     .map_err(unsupported)?;
                                 Some(list)
                             }
@@ -2076,6 +2442,11 @@ impl NativeSession {
                             .ok_or_else(|| unsupported("live card selection plan missing"))?,
                         mandatory,
                     )?;
+                }
+                Instruction::LiveForceDefenseMovement => {
+                    if let Some(plan) = forced_movement {
+                        self.force_defense_movement_bound(objects, plan)?;
+                    }
                 }
                 Instruction::LiveMoveSequence => self.move_sequence_bound(
                     objects,
@@ -2129,7 +2500,10 @@ impl NativeSession {
                 | Instruction::LiveCheckUnitFilters
                 | Instruction::LiveDistanceCheck
                 | Instruction::LiveUnitTypeCheck
+                | Instruction::LiveUnitOnBoard
                 | Instruction::LiveBooleanCombine
+                | Instruction::LiveAdjacentEnemies
+                | Instruction::LiveZoneChange
                 | Instruction::LiveCardCount
                 | Instruction::LiveRoundDefeat => {
                     self.query_bound(
@@ -2189,6 +2563,11 @@ impl NativeSession {
                 Instruction::LiveRemoveUnit => result
                     .events
                     .extend(self.remove_unit_bound(objects, removal)?),
+                Instruction::LiveSoloWin => {
+                    if let Some(outcome) = solo_win {
+                        self.solo_win_bound(objects, outcome)?;
+                    }
+                }
                 Instruction::LiveGameOver => result.events.push(self.game_over_bound(
                     objects,
                     game_over.ok_or_else(|| unsupported("game over plan missing"))?,
@@ -2208,6 +2587,24 @@ impl NativeSession {
                         multi_selection
                             .ok_or_else(|| unsupported("multi selection plan missing"))?,
                     )?;
+                }
+                Instruction::LiveRuneInscription => {
+                    request = self.inscribe_runes_bound(objects, id, &mut result.events)?;
+                }
+                Instruction::LiveDirectionalMove => {
+                    self.directional_move_bound(objects, id, &mut result.events)?;
+                }
+                Instruction::LiveChooseCardColor => {
+                    request = self.choose_card_color_bound(objects, id)?;
+                }
+                Instruction::LiveLaugh => {
+                    request = self.laugh_bound(objects, id, &mut result.events)?;
+                }
+                Instruction::LiveRevealHandCard => {
+                    result.events.extend(self.reveal_hand_card_bound(objects, id)?);
+                }
+                Instruction::LiveCardGuess { reveal } => {
+                    request = self.card_guess_bound(objects, id, *reveal, &mut result.events)?;
                 }
                 Instruction::LiveRuneChoice => {
                     request = self.rune_bound(
@@ -2238,6 +2635,21 @@ impl NativeSession {
                 }
                 Instruction::LiveDiscardOrDefeat => {
                     self.discard_or_defeat_bound(objects, discard_or_defeat)?;
+                }
+                Instruction::LiveItemSwap => {
+                    result
+                        .events
+                        .extend(self.swap_item_card_bound(objects, id)?);
+                }
+                Instruction::LiveDeckCardSwap => result
+                    .events
+                    .extend(self.swap_deck_card_bound(objects, id)?),
+                Instruction::LiveResolvedCardSwap => {
+                    result.events.extend(self.swap_resolved_cards_bound(objects, id)?);
+                }
+                Instruction::LiveCardSwap => self.swap_cards_bound(objects, id)?,
+                Instruction::LiveColorDiscard => {
+                    self.color_discard_bound(objects, color_discard)?;
                 }
                 Instruction::LiveForceDiscard => {
                     self.forced_discard_bound(
@@ -2324,6 +2736,38 @@ impl NativeSession {
                         acting_piece.ok_or_else(|| unsupported("acting-piece plan missing"))?,
                     )?;
                 }
+                Instruction::LiveMirrorPush => {
+                    request = self.mirror_push_bound(objects, id, mandatory)?;
+                }
+                Instruction::LiveRemovePiece => {
+                    request = self.remove_piece_bound(objects, id, &mut result.events)?;
+                }
+                Instruction::LiveSpawnPiece => {
+                    request = self.spawn_piece_bound(objects, id, &mut result.events)?;
+                }
+                Instruction::LiveSetPiece => {
+                    let value = |name| {
+                        self.symbols.lookup(name).and_then(|key| objects.arena.field(id, key))
+                    };
+                    let hero = self.truthy_symbol_bound(objects, value("hero_id"))?;
+                    let mut piece = self.truthy_symbol_bound(objects, value("piece_id"))?;
+                    if piece.is_none()
+                        && let Some(key) = self.truthy_symbol_bound(objects, value("piece_key"))?
+                    {
+                        piece = self.truthy_symbol_bound(objects, objects.arena.context_value(key))?;
+                    }
+                    if let (Some(hero), Some(piece)) = (hero, piece) {
+                        if self.world.piece_ids(hero).any(|candidate| candidate == piece) {
+                            objects.arena.set_root(
+                                objects.phases.k(phases::Field::Piece),
+                                ObjectValue::Atom(Datum::Text(piece)),
+                            ).map_err(unsupported)?;
+                            self.world.acting_piece = Some(piece);
+                        } else if mandatory {
+                            self.abort_objects(objects)?;
+                        }
+                    }
+                }
                 Instruction::LivePush => {
                     if let Some(event) = self.push_bound(
                         objects,
@@ -2340,12 +2784,41 @@ impl NativeSession {
                         repeat.ok_or_else(|| unsupported("live repeat plan missing"))?,
                     )?;
                 }
+                Instruction::LiveJourney => {
+                    if let Some(event) = self.journey_bound(
+                        objects,
+                        journey.ok_or_else(|| unsupported("journey plan missing"))?,
+                    )? {
+                        result.events.push(event);
+                    }
+                }
+                Instruction::LiveActionControl => {
+                    if let Some(event) = self.action_control_bound(
+                        objects,
+                        action_control.ok_or_else(|| unsupported("action control plan missing"))?,
+                    )? {
+                        result.events.push(event);
+                    }
+                }
+                Instruction::LiveSetInitiative => {
+                    if let Some(event) = self.initiative_bound(
+                        objects,
+                        initiative.ok_or_else(|| unsupported("initiative plan missing"))?,
+                    )? {
+                        result.events.push(event);
+                    }
+                }
                 Instruction::LiveDrag | Instruction::LiveTokenMove => {
                     if let Some(event) = self.co_movement_bound(
                         objects,
                         co_movement.ok_or_else(|| unsupported("co-movement plan missing"))?,
                     )? {
                         result.events.push(event);
+                    }
+                }
+                Instruction::LiveMoveToward => {
+                    if let Some(plan) = move_toward {
+                        self.move_toward_bound(objects, plan)?;
                     }
                 }
                 Instruction::LiveCoordinates(_) => {
@@ -2371,6 +2844,7 @@ impl NativeSession {
                     if let Some(event) = self.resource_bound(
                         objects,
                         resource.ok_or_else(|| unsupported("live resource plan missing"))?,
+                        &mut result.events,
                     )? {
                         result.events.push(event);
                     }
@@ -2507,12 +2981,22 @@ impl NativeSession {
                     objects,
                     actor.ok_or_else(|| unsupported("actor plan missing"))?,
                 )?,
-                Instruction::ForEach { list, item, .. } => {
+                Instruction::ForEach { .. } => {
+                    let operand = |name| match self
+                        .symbols
+                        .lookup(name)
+                        .and_then(|key| objects.arena.field(id, key))
+                    {
+                        Some(ObjectValue::Atom(Datum::Text(value))) => Ok(value),
+                        _ => Err(unsupported("live loop context key missing")),
+                    };
+                    let list = operand("list_key")?;
+                    let item = operand("item_key")?;
                     let index = match objects.arena.field(id, objects.index) {
                         Some(ObjectValue::Atom(Datum::Int(index))) => index,
                         _ => return Err(unsupported("live loop index missing")),
                     };
-                    let (len, value) = match objects.arena.context_value(*list) {
+                    let (len, value) = match objects.arena.context_value(list) {
                         None => continue,
                         Some(ObjectValue::Object(list)) => {
                             let values = objects
@@ -2542,7 +3026,7 @@ impl NativeSession {
                     };
                     objects
                         .arena
-                        .set_context(*item, value)
+                        .set_context(item, value)
                         .map_err(unsupported)?;
                     let next = index
                         .checked_add(1)
@@ -2682,23 +3166,62 @@ impl NativeSession {
         Ok(result)
     }
     fn abort_objects(&mut self, objects: &mut BoundObjects) -> Result<()> {
+        let truthy = |field| {
+            objects
+                .arena
+                .context_value(objects.phases.k(field))
+                .is_some_and(|value| objects.arena.truthy(&value))
+        };
+        let pending_combat = if truthy(phases::Field::DefenseCardId)
+            && truthy(phases::Field::PrimaryDefense)
+        {
+            self.stack.iter().enumerate().rev().take_while(|(_, frame)| {
+                let instruction = &self.steps[frame.instruction].instruction;
+                !matches!(
+                    instruction,
+                    Instruction::FinishedEffect
+                        | Instruction::LiveSpell(crate::spells::SpellOp::Wish)
+                        | Instruction::Flow(crate::turn::FlowStep::Confirm(_) | crate::turn::FlowStep::Finalize(_))
+                ) && !matches!(instruction, Instruction::ParkedPhase(family)
+                    if self.symbols.name(*family) == "finalize_hero_turn")
+            }).find_map(|(index, frame)| {
+                matches!(self.steps[frame.instruction].instruction, Instruction::LiveCombatResolve)
+                    .then_some(index)
+            }).map(|index| {
+                let restore = self.stack.get(index + 1).and_then(|frame| {
+                    matches!(self.steps[frame.instruction].instruction, Instruction::SetActor { .. })
+                        .then_some(frame.object).flatten()
+                }).and_then(|step| objects.arena.field(step, objects.phases.k(phases::Field::ActorKey)));
+                let restores_attacker = matches!(restore, Some(ObjectValue::Atom(Datum::Text(key)))
+                    if self.symbols.name(key) == "_pre_defense_actor");
+                index + 1 + usize::from(restores_attacker)
+            })
+        } else {
+            None
+        };
         while let Some(frame) = self.stack.last() {
-            if matches!(
-                self.steps[frame.instruction].instruction,
-                Instruction::RestoreContext { other: true }
-            ) {
-                return Ok(());
-            }
-            if matches!(
-                self.steps[frame.instruction].instruction,
-                Instruction::LiveSpell(crate::spells::SpellOp::Wish)
-                    | Instruction::FinishedEffect
-                    | Instruction::Flow(
-                        crate::turn::FlowStep::Confirm(_) | crate::turn::FlowStep::Finalize(_)
-                    )
-            ) || matches!(self.steps[frame.instruction].instruction, Instruction::ParkedPhase(family) if self.symbols.name(family) == "finalize_hero_turn")
-            {
-                break;
+            if let Some(keep) = pending_combat {
+                if self.stack.len() <= keep {
+                    return Ok(());
+                }
+            } else {
+                if matches!(
+                    self.steps[frame.instruction].instruction,
+                    Instruction::RestoreContext { other: true }
+                ) {
+                    return Ok(());
+                }
+                if matches!(
+                    self.steps[frame.instruction].instruction,
+                    Instruction::LiveSpell(crate::spells::SpellOp::Wish)
+                        | Instruction::FinishedEffect
+                        | Instruction::Flow(
+                            crate::turn::FlowStep::Confirm(_) | crate::turn::FlowStep::Finalize(_)
+                        )
+                ) || matches!(self.steps[frame.instruction].instruction, Instruction::ParkedPhase(family) if self.symbols.name(family) == "finalize_hero_turn")
+                {
+                    break;
+                }
             }
             let frame = self.stack.pop().unwrap();
             let id = frame
@@ -2729,7 +3252,7 @@ impl NativeSession {
         objects: &mut BoundObjects,
         before: &[bool],
     ) -> Result<()> {
-        for (card, before) in self.world.cards.iter().zip(before) {
+        for (card, before) in self.world.cards().iter().zip(before) {
             if card.active == *before {
                 continue;
             }
@@ -2761,7 +3284,7 @@ impl NativeSession {
         let finishing = objects.finishing_for_indices(&self.world.effects, &indices)?;
         let before = self
             .world
-            .cards
+            .cards()
             .iter()
             .map(|card| card.active)
             .collect::<Vec<_>>();
@@ -2834,7 +3357,7 @@ impl NativeSession {
         self.phase_generation_check(finishing.len(), 0)?;
         let before = self
             .world
-            .cards
+            .cards()
             .iter()
             .map(|card| card.active)
             .collect::<Vec<_>>();
@@ -2851,7 +3374,7 @@ impl NativeSession {
         objects.remove_effect_nodes(ids)?;
         let before = self
             .world
-            .cards
+            .cards()
             .iter()
             .map(|card| card.active)
             .collect::<Vec<_>>();
@@ -2885,7 +3408,7 @@ impl NativeSession {
                 .map_err(unsupported)?;
             self.stack.push(frame);
         }
-        objects.readonly = Arc::new(objects.arena.readonly_objects());
+        objects.readonly.take();
         Ok(())
     }
     /// Boundary adapter for the source push_steps helper. Engine callers use
@@ -2925,6 +3448,18 @@ impl NativeSession {
         objects.push_scope(action, card, owner)
     }
     pub(super) fn submit_objects(&mut self, request: RequestToken, selection: Datum) -> Result<()> {
+        if let Some(frame) = self.stack.last()
+            && matches!(
+                self.steps[frame.instruction].instruction,
+                Instruction::LiveRuneInscription
+            )
+            && let Some(objects) = self.objects.as_ref()
+            && let Some(id) = frame.object
+            && objects.token(id)? == Some(request)
+        {
+            self.validate_inscription_bound(objects, id, &selection)?;
+        }
+
         if let Some(frame) = self.stack.last()
             && matches!(
                 self.steps[frame.instruction].instruction,
@@ -2969,7 +3504,7 @@ impl NativeSession {
 }
 
 #[cfg(test)]
-fn fixture_case(name: &str) -> Value {
+pub(super) fn fixture_case(name: &str) -> Value {
     let base = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures"));
     let index: Value = serde_json::from_reader(std::io::BufReader::new(
         crate::fixture_cache::open(base.join("object-execution.json")).unwrap(),
@@ -2995,3 +3530,276 @@ mod spellbook_tests;
 
 #[cfg(test)]
 mod spell_body_tests;
+
+#[cfg(test)]
+mod rollback_tests {
+    use super::test_support::object_session;
+
+    #[test]
+    fn resolution_position_score_orders_targets_and_counts_minion_support() {
+        use crate::world::{EntityKind, MinionKind};
+        let mut session = object_session("object-execution-card-planning-cycle");
+        let hero = session.world.heroes[0].clone();
+        let red = session.symbols.lookup("RED");
+        let gold = session.symbols.lookup("GOLD");
+        let mut empty = hero.clone();
+        empty.hand.clear();
+        let world = &mut session.world;
+        let enemy_hero = world
+            .heroes
+            .iter()
+            .find(|row| row.team != hero.team)
+            .unwrap()
+            .id;
+        let minion = |friendly, kind| {
+            world
+                .definitions
+                .entities
+                .iter()
+                .find(|entity| {
+                    entity.kind == EntityKind::Minion
+                        && entity
+                            .team
+                            .is_some_and(|team| (team == hero.team) == friendly)
+                        && entity.minion_kind == Some(kind)
+                })
+                .unwrap()
+                .id
+        };
+        let enemy_melee = minion(false, MinionKind::Melee);
+        let enemy_ranged = minion(false, MinionKind::Ranged);
+        let friendly_melee = minion(true, MinionKind::Melee);
+        let origin = world.tile_hexes()[0];
+        let adjacent = world
+            .tile_hexes()
+            .iter()
+            .copied()
+            .find(|hex| origin.distance(*hex) == 1)
+            .unwrap();
+        let two_away = world
+            .tile_hexes()
+            .iter()
+            .copied()
+            .find(|hex| origin.distance(*hex) == 2)
+            .unwrap();
+        for (entity, _) in world.locations.clone() {
+            world.remove_entity(entity).unwrap();
+        }
+        world.place_entity(hero.id, origin).unwrap();
+        assert_eq!(session.hero_position_score(&hero, true, red, gold), 0);
+        session.world.place_entity(enemy_melee, adjacent).unwrap();
+        assert_eq!(session.hero_position_score(&hero, true, red, gold), 12);
+        assert_eq!(session.hero_position_score(&hero, false, red, gold), 4);
+        assert_eq!(session.hero_position_score(&empty, true, red, gold), 4);
+        session.world.remove_entity(enemy_melee).unwrap();
+        session.world.place_entity(enemy_hero, adjacent).unwrap();
+        assert_eq!(session.hero_position_score(&hero, true, red, gold), 8);
+        session.world.remove_entity(enemy_hero).unwrap();
+        session
+            .world
+            .place_entity(friendly_melee, adjacent)
+            .unwrap();
+        assert_eq!(session.hero_position_score(&empty, true, red, gold), 1);
+        session.world.place_entity(enemy_ranged, two_away).unwrap();
+        assert_eq!(session.hero_position_score(&empty, true, red, gold), 0);
+    }
+
+    #[test]
+    fn resolution_search_returns_live_move_and_restores_root_when_bounded() {
+        use super::super::{
+            DecisionMove, ExecutionBudget, OpponentPolicy, SearchLimits, SequenceVerdict,
+        };
+        let mut session = object_session("object-execution-confirmation-repeated-step");
+        let budget = ExecutionBudget::default();
+        let request = session.advance(&budget).unwrap().request.unwrap();
+        let before = serde_json::to_value(session.export_envelope().unwrap()).unwrap();
+        let complete = session
+            .search_resolution(
+                request.owner,
+                SearchLimits {
+                    max_depth: 64,
+                    max_nodes: 10,
+                    opponent_policy: OpponentPolicy::Adversarial,
+                },
+                &budget,
+            )
+            .unwrap();
+        assert_eq!(complete.completed_depth, 1);
+        assert!(complete.score.is_some());
+        assert!(complete.resolved);
+        assert_eq!(complete.nodes, 2);
+        let bounded = session
+            .search_resolution(
+                request.owner,
+                SearchLimits {
+                    max_depth: 2,
+                    max_nodes: 1,
+                    opponent_policy: OpponentPolicy::Adversarial,
+                },
+                &budget,
+            )
+            .unwrap();
+        assert_eq!(bounded.completed_depth, 0);
+        assert_eq!(bounded.nodes, 1);
+        assert!(!bounded.resolved);
+        assert_eq!(bounded.decision, complete.decision);
+        assert!(
+            matches!(bounded.decision, DecisionMove::Input { request: Some(token), .. } if token == request.id)
+        );
+        let checked = session
+            .check_sequences(&[vec![bounded.decision]], &budget)
+            .unwrap();
+        assert_eq!(checked.verdicts, [SequenceVerdict::Legal { checked: 1 }]);
+        assert_eq!(
+            serde_json::to_value(session.export_envelope().unwrap()).unwrap(),
+            before
+        );
+    }
+
+    #[test]
+    fn generated_respawn_options_are_legal_and_leave_the_live_prompt_intact() {
+        use super::super::{DecisionMove, ExecutionBudget, SequenceVerdict};
+        let mut session = object_session("object-execution-hero-respawn-live-ordinary-first");
+        let budget = ExecutionBudget::default();
+        let request = session.advance(&budget).unwrap().request.unwrap();
+        let other = session.symbols.lookup("hero_hanu").unwrap();
+        assert!(session.resolution_choices(other).unwrap().is_empty());
+        let moves = session.resolution_choices(request.owner).unwrap();
+        let wire = session.request_json(&request);
+        let expected = wire["options"].as_array().unwrap();
+        assert!(!moves.is_empty());
+        assert_eq!(moves.len(), expected.len());
+        for (decision, option) in moves.iter().zip(expected) {
+            let DecisionMove::Input {
+                player,
+                request: token,
+                selection,
+            } = decision
+            else {
+                panic!("expected input decision");
+            };
+            assert_eq!(*player, request.owner);
+            assert_eq!(*token, Some(request.id));
+            let value = option["metadata"].get("hex").unwrap_or(&option["id"]);
+            assert_eq!(selection.to_json(&session.symbols), *value);
+        }
+        let before = serde_json::to_value(session.export_envelope().unwrap()).unwrap();
+        let sequences = moves
+            .into_iter()
+            .map(|decision| vec![decision])
+            .collect::<Vec<_>>();
+        let result = session.check_sequences(&sequences, &budget).unwrap();
+        assert_eq!(result.applied_decisions, 0);
+        assert_eq!(
+            result.verdicts,
+            vec![SequenceVerdict::Legal { checked: 1 }; sequences.len()]
+        );
+        assert_eq!(
+            serde_json::to_value(session.export_envelope().unwrap()).unwrap(),
+            before
+        );
+    }
+
+    #[test]
+    fn sequence_checks_share_planning_prefixes_and_prune_failures() {
+        use super::super::{DecisionMove, EngineError, ExecutionBudget, SequenceVerdict};
+        let mut session = object_session("object-execution-planning-command-pass");
+        let hero = session.symbols.lookup("hero_arien").unwrap();
+        let pass = DecisionMove::Pass { hero };
+        let before = serde_json::to_value(session.export_envelope().unwrap()).unwrap();
+        let sequences = [
+            vec![],
+            vec![pass.clone()],
+            vec![pass.clone(), pass.clone()],
+            vec![pass.clone(), pass.clone(), pass.clone()],
+            vec![pass],
+        ];
+        let batch = session
+            .check_sequences(&sequences, &ExecutionBudget::default())
+            .unwrap();
+        assert_eq!(batch.applied_decisions, 1);
+        assert_eq!(batch.verdicts[0], SequenceVerdict::Legal { checked: 0 });
+        assert_eq!(batch.verdicts[1], SequenceVerdict::Legal { checked: 1 });
+        assert!(matches!(
+            batch.verdicts[2],
+            SequenceVerdict::Illegal { failed_at: 1, .. }
+        ));
+        assert_eq!(batch.verdicts[2], batch.verdicts[3]);
+        assert_eq!(batch.verdicts[1], batch.verdicts[4]);
+        let cancelled = std::sync::atomic::AtomicBool::new(true);
+        let budget = ExecutionBudget {
+            cancelled: Some(&cancelled),
+            ..ExecutionBudget::default()
+        };
+        assert!(matches!(
+            session.check_sequences(&sequences, &budget),
+            Err(EngineError::Cancelled)
+        ));
+        assert_eq!(
+            serde_json::to_value(session.export_envelope().unwrap()).unwrap(),
+            before
+        );
+    }
+
+    #[test]
+    fn session_rollback_restores_world_rows_across_nested_staging() {
+        let mut session = object_session("object-execution-hero-respawn-live-ordinary-first");
+        let initial = session.world.cards()[0].clone();
+        let id = crate::cards::CardId(initial.source_instance);
+        let initial_gold = session.world.heroes[0].gold;
+        let before = serde_json::to_value(session.export_envelope().unwrap()).unwrap();
+        session
+            .with_rollback(|outer| {
+                outer.world.card_mut(id).unwrap().initiative_override = Some(41);
+                outer.world.heroes[0].gold = 41;
+                outer.with_rollback(|inner| {
+                    let mut staged = inner.world.staged_clone();
+                    staged.card_mut(id).unwrap().initiative_override = Some(42);
+                    staged.card_mut(id).unwrap().initiative_override = Some(43);
+                    staged.heroes[0].gold = 43;
+                    inner.world = staged;
+                    assert_eq!(inner.world.heroes[0].gold, 43);
+                    assert_eq!(inner.world.card(id).unwrap().initiative_override, Some(43));
+                    Ok(())
+                })?;
+                assert_eq!(outer.world.card(id).unwrap().initiative_override, Some(41));
+                assert_eq!(outer.world.heroes[0].gold, 41);
+                assert_eq!(
+                    outer.clone().world.card(id).unwrap().initiative_override,
+                    Some(41)
+                );
+                Ok(())
+            })
+            .unwrap();
+        assert_eq!(
+            session.world.card(id).unwrap().initiative_override,
+            initial.initiative_override
+        );
+        assert_eq!(session.world.heroes[0].gold, initial_gold);
+        assert_eq!(
+            serde_json::to_value(session.export_envelope().unwrap()).unwrap(),
+            before
+        );
+    }
+
+    #[test]
+    fn session_rollback_recovers_arena_when_live_dispatch_panics() {
+        let mut session = object_session("object-execution-hero-respawn-live-ordinary-first");
+        let before = serde_json::to_value(session.export_envelope().unwrap()).unwrap();
+        let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            session.with_rollback(|branch| {
+                branch.with_live_objects::<()>(|branch, objects| {
+                    objects.arena.list_pop(objects.stack).unwrap();
+                    branch.next_step += 1;
+                    panic!("interrupted live dispatch");
+                })
+            })
+        }));
+        assert!(panic.is_err());
+        assert_eq!(
+            serde_json::to_value(session.export_envelope().unwrap()).unwrap(),
+            before
+        );
+        assert!(session.advance_prefix(1).unwrap().request.is_some());
+    }
+}

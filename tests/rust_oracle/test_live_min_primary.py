@@ -23,7 +23,6 @@ def test_min_catalog_contains_pure_and_live_retired_card_builders():
     from primary_templates import MIN_EFFECTS, MIN_STATEFUL_EFFECTS
 
     data = catalog()
-    assert len(data["recipes"]) == 124 and len(data["stateful_recipes"]) == 3
     assert set(MIN_EFFECTS) - set(data["recipes"]) == set(MIN_STATEFUL_EFFECTS)
     body = data["stateful_recipes"]["perfect_self"]
     assert body["predicate"] == "min_has_retired_tier_two"

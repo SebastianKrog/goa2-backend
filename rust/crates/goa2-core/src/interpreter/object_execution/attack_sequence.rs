@@ -258,7 +258,7 @@ impl NativeSession {
                 let instruction = objects
                     .program(original)
                     .ok_or_else(|| unsupported("attack program missing"))?;
-                objects.copied_programs.insert(copy, instruction);
+                objects.bind_copied_program(copy, instruction);
                 for (field, value) in [
                     (Field::AttackTargetKey, Datum::Text(plan.key)),
                     (Field::AttackOutputKey, Datum::Null),

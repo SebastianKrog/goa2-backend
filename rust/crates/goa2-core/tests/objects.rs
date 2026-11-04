@@ -51,10 +51,36 @@ fn real_source_models_steps_and_containers_match_values_identity_and_ordered_key
         let plan = case["operations"].as_array().unwrap().clone();
         operations += plan.len();
         assert_eq!(
-            aggregate_trace(source.clone(), plan).unwrap()["records"],
+            aggregate_trace(source.clone(), plan.clone()).unwrap()["records"],
             case["expected"],
             "{}",
             case["name"]
+        );
+        let mut arena = ObjectArena::compile(&source).unwrap();
+        let plan = plan
+            .iter()
+            .map(|op| arena.compile_mutation(op).unwrap())
+            .collect::<Vec<_>>();
+        let before = serde_json::to_value(arena.boundary(&source).unwrap()).unwrap();
+        arena.with_rollback(|arena| {
+            for (op, expected) in plan.iter().zip(case["expected"].as_array().unwrap()) {
+                let error = arena.apply(op).err().map(|_| "invalid_operation");
+                assert_eq!(
+                    json!({
+                        "semantic_state": arena.boundary(&source).unwrap().materialize().unwrap(),
+                        "object_bindings": arena.object_bindings().unwrap(),
+                        "object_keys": arena.object_keys().unwrap(),
+                        "error": error,
+                    }),
+                    *expected,
+                    "{}",
+                    case["name"]
+                );
+            }
+        });
+        assert_eq!(
+            serde_json::to_value(arena.boundary(&source).unwrap()).unwrap(),
+            before
         );
     }
     assert_eq!(checked, 12);

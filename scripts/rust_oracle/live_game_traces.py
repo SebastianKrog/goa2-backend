@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import json
 import random
 
 
@@ -111,7 +112,7 @@ def choose_input(state, request, rng):
     return selection_value(min(options, key=score))
 
 
-def play(state, seed, *, max_steps=12000):
+def play(state, seed, *, max_steps=12000, input_policy=None):
     from state_codec import export_state_with_instances
 
     from goa2.domain.input import InputResponse
@@ -144,7 +145,7 @@ def play(state, seed, *, max_steps=12000):
                 value = "SKIP"
             else:
                 assert request.options, (kind, request)
-                value = choose_input(probe, request, rng)
+                value = (input_policy or choose_input)(probe, request, rng)
             submit_input(probe, InputResponse(request_id=request.id, selection=value))
             ops.append({"kind": "input", "selection": value})
             request = None
@@ -180,21 +181,28 @@ def play(state, seed, *, max_steps=12000):
     raise AssertionError("complete game exceeded source step budget")
 
 
-def scenes(names=None):
+def scenes(names=None, *, mixed=False):
     from model_traces import setup
     from oracle import ROOT
 
     from goa2.engine.setup import GameSetup
 
     setup()
-    for map_id, seed in (("forgotten_island", 11), ("magma_and_ice", 19)):
-        name = f"complete-game-live-{map_id}-progress-{seed}"
+    if mixed:
+        games = (("forgotten_island", 47),)
+        red, blue = ["Garrus", "Gydion"], ["Razzle", "Mortimer"]
+    else:
+        games = (("forgotten_island", 11), ("magma_and_ice", 19))
+        red, blue = ["Arien", "Brogan"], ["Tigerclaw", "Sabina"]
+    roster = "mixed" if mixed else "live"
+    for map_id, seed in games:
+        name = f"complete-game-{roster}-{map_id}-progress-{seed}"
         if names is not None and name not in names:
             continue
         state = GameSetup.create_game(
             str(ROOT / f"src/goa2/data/maps/{map_id}.json"),
-            ["Arien", "Brogan"],
-            ["Tigerclaw", "Sabina"],
+            red,
+            blue,
             seed=29,
         )
         state.execution_context.update(
@@ -205,4 +213,57 @@ def scenes(names=None):
         )
         ops, facts = play(state, seed)
         assert facts["round"] > 1 and facts["decisions"].get("CHOOSE_ACTION", 0) > 0
+        yield name, state, ops
+
+
+def choose_hanu_input(state, request, rng):
+    """Exercise Hanu primary skills alongside the baseline progress policy."""
+    from goa2.domain.models import ActionType, StatType
+
+    if request.request_type.value == "CHOOSE_ACTION" and state.current_actor_id == "hero_hanu":
+        hero = state.get_hero("hero_hanu")
+        card = hero.current_turn_card
+        if card and card.current_primary_action in (ActionType.SKILL, ActionType.DEFENSE_SKILL):
+            positions = state.get_positions(hero.id)
+            distance = min((distance_to_targets(state, hero.id, p) for p in positions), default=0)
+            reach = (
+                card.get_base_stat_value(StatType.RADIUS)
+                or card.get_base_stat_value(StatType.RANGE)
+                or 3
+            )
+            if (
+                0 < distance <= reach
+                and any(option.id == "SKILL" for option in request.options)
+                and rng.randrange(3)
+            ):
+                return "SKILL"
+    return choose_input(state, request, rng)
+
+
+def hanu_scenes(names=None):
+    from model_traces import setup
+    from oracle import ROOT
+
+    from goa2.engine.setup import GameSetup
+
+    setup()
+    for map_id, seed in (("forgotten_island", 41), ("magma_and_ice", 43)):
+        name = f"complete-game-hanu-{map_id}-progress-{seed}"
+        if names is not None and name not in names:
+            continue
+        state = GameSetup.create_game(
+            str(ROOT / f"src/goa2/data/maps/{map_id}.json"),
+            ["Hanu", "Arien"],
+            ["Brogan", "Tigerclaw"],
+            seed=29,
+        )
+        state.execution_context.update(
+            locations_alias=state.entity_locations,
+            snapshot_alias=state.last_turn_positions,
+            stack_alias=state.execution_stack,
+            effects_alias=state.active_effects,
+        )
+        ops, facts = play(state, seed, input_policy=choose_hanu_input)
+        assert facts["round"] > 1 and facts["decisions"].get("CHOOSE_ACTION", 0) > 0
+        print(json.dumps({"source_game_ready": name, "operations": len(ops), **facts}), flush=True)
         yield name, state, ops

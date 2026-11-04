@@ -18,6 +18,7 @@ COMMITTED = {
     "effect-errors.json",
     "mine-reference-errors.json",
     "instruction-templates.json",
+    "loadout-provenance.json",
     "primary-effects.json",
     "primary-builders.json",
     "spell-builders.json",
@@ -27,6 +28,7 @@ COMMITTED = {
     "object-execution.json",
     "object-arena.json",
     "complete-games.json",
+    "complete-games-hanu.json",
     "cache-identities.json",
 }
 

@@ -8,10 +8,12 @@
 /tests/fixtures/*.gz
 !/tests/fixtures/action-builders.json
 !/tests/fixtures/complete-games.json
+!/tests/fixtures/complete-games-hanu.json
 !/tests/fixtures/defense-builders.json
 !/tests/fixtures/effect-defaults.json
 !/tests/fixtures/effect-errors.json
 !/tests/fixtures/instruction-templates.json
+!/tests/fixtures/loadout-provenance.json
 !/tests/fixtures/mine-reference-errors.json
 !/tests/fixtures/movement.json
 !/tests/fixtures/object-arena.json

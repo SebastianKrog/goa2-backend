@@ -1,10 +1,9 @@
 """Freeze Python's wire defaults for native-generated continuation frames."""
 
-from fixture_cache import write_text
-
 import json
 import sys
 
+from fixture_cache import write_text
 from oracle import ROOT, verify_sources
 
 sys.path.insert(0, str(ROOT / "src"))
@@ -52,6 +51,7 @@ from goa2.engine.steps import (
     MoveSequenceStep,
     MoveTokenStep,
     MoveUnitStep,
+    PushUnitStep,
     OfferPassiveStep,
     OfferRockUltimateStep,
     PerformCardActionStep,
@@ -79,14 +79,31 @@ from goa2.engine.steps import (
     RetrieveUnresolvedCardStep,
     ReturnMinionToZoneStep,
     RoundResetStep,
+    ScheduleActionControlStep,
+    ScheduleJourneyReturnStep,
     SelectStep,
     SetActorStep,
+    SetCardInitiativeStep,
     SetContextFlagStep,
     TriggerGameOverStep,
     TriggerMineStep,
     ValidateRepeatStep,
     WishSequenceStep,
 )
+
+
+def journey_finishing():
+    """Freeze actual manager-created children, including nested filter models."""
+    from model_traces import setup
+    from primary_builders import freeze_steps
+    from goa2.engine.steps import ScheduleJourneyReturnStep
+
+    state = setup()
+    state.current_actor_id = "template-passive-owner"
+    ScheduleJourneyReturnStep(enemy_key="enemy", move_after=True).resolve(
+        state, {"enemy": "template-journey-enemy"}
+    )
+    return freeze_steps(state.active_effects[-1].finishing_steps)
 
 
 def passive_continuations():
@@ -312,6 +329,10 @@ def export():
         "context": SetContextFlagStep(step_id="template", key="template", value=None),
         "select_hex": SelectStep(step_id="template", target_type=TargetType.HEX, prompt=""),
         "move_unit": MoveUnitStep(step_id="template"),
+        "mirror_push": PushUnitStep(step_id="template"),
+        "set_initiative": SetCardInitiativeStep(step_id="template", hero_key="template"),
+        "schedule_control": ScheduleActionControlStep(step_id="template", hero_key="template"),
+        "schedule_journey": ScheduleJourneyReturnStep(step_id="template", enemy_key="template"),
         "move_token": MoveTokenStep(step_id="template", token_key="template"),
         "co_drag": CoDirectionalDragStep(
             step_id="template", anchor_key="template", partner_key="template"
@@ -427,6 +448,7 @@ def export():
         ),
         "registered_effects": sorted(CardEffectRegistry._effects),
         "passive_continuations": passive_continuations(),
+        "journey_finishing": journey_finishing(),
         "turret_default": Turret(id="trinkets_turret", name="Turret").model_dump(mode="json"),
         "token_batch_filters": {
             "obstacle": ObstacleFilter().model_dump(mode="json"),
@@ -457,7 +479,10 @@ def export():
         },
         "templates": {key: value.model_dump(mode="json") for key, value in values.items()},
     }
-    write_text(ROOT / "rust/tests/fixtures/instruction-templates.json", json.dumps(payload, indent=2) + "\n")
+    write_text(
+        ROOT / "rust/tests/fixtures/instruction-templates.json",
+        json.dumps(payload, indent=2) + "\n",
+    )
     print("Exported frozen continuation templates")
 
 

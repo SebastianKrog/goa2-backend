@@ -57,8 +57,10 @@ fn method_kind(method: &str) -> Result<Kind> {
 #[derive(Clone, Debug)]
 pub(super) struct Recipe {
     pub(super) step: StepRecipe,
+    pub(super) topology_anchor: Option<(Symbol, ObjectId)>,
     pub(super) objects: Vec<(Vec<ObjectSlot>, ObjectKind)>,
     pub(super) raw_card_bindings: Vec<Vec<ObjectSlot>>,
+    imports: Vec<(Vec<ObjectSlot>, usize, Vec<ObjectSlot>)>,
     range: Option<Vec<ObjectSlot>>,
     aliases: Vec<(Vec<ObjectSlot>, Vec<ObjectSlot>)>,
     programs: Vec<(Vec<ObjectSlot>, usize)>,
@@ -81,7 +83,8 @@ impl Recipe {
         {
             let binding: crate::codec::ObjectBinding = serde_json::from_value(value.clone())
                 .map_err(|error| unsupported(error.to_string()))?;
-            if binding.paths.is_empty() || binding.deepcopy_shared {
+            if binding.paths.is_empty()
+                || (binding.deepcopy_shared && binding.kind != ObjectKind::FrozenModel) {
                 return Err(unsupported("invalid source recipe binding"));
             }
             let typed = |path: &[ObjectPathPart], symbols: &mut Symbols| {
@@ -112,13 +115,44 @@ impl Recipe {
             }
             objects.push((first, binding.kind));
         }
+        let mut imports = Vec::new();
+        if let Some(rows) = row.get("imports") {
+            for import in rows
+                .as_array()
+                .ok_or_else(|| unsupported("recipe imports missing"))?
+            {
+                let path = |value: &Value, symbols: &mut Symbols| -> Result<Vec<ObjectSlot>> {
+                    let parts: Vec<ObjectPathPart> = serde_json::from_value(value.clone())
+                        .map_err(|e| unsupported(e.to_string()))?;
+                    Ok(parts
+                        .into_iter()
+                        .map(|part| match part {
+                            ObjectPathPart::Key(key) => ObjectSlot::Field(symbols.intern(&key)),
+                            ObjectPathPart::Index(index) => ObjectSlot::Index(index),
+                        })
+                        .collect())
+                };
+                let back = import["back"]
+                    .as_u64()
+                    .and_then(|v| usize::try_from(v).ok())
+                    .filter(|v| *v > 0)
+                    .ok_or_else(|| unsupported("recipe import offset invalid"))?;
+                imports.push((
+                    path(&import["path"], symbols)?,
+                    back,
+                    path(&import["original"], symbols)?,
+                ));
+            }
+        }
         Ok(Self {
             step: StepRecipe {
                 instruction,
                 fields: Datum::from_json(wire, symbols).map_err(unsupported)?,
             },
             objects,
+            topology_anchor: None,
             raw_card_bindings: Vec::new(),
+            imports,
             range,
             aliases,
             programs,
@@ -634,9 +668,11 @@ impl NativeSession {
             } else {
                 None
             };
-            for recipe in &dynamic.recipes {
-                let child =
-                    self.allocate_source_recipe_bound(objects, recipe, &Datum::Text(plan.owner))?;
+            let children = self.allocate_source_recipes_bound(
+                objects,
+                dynamic.recipes.iter().map(|recipe| (recipe, plan.owner)),
+            )?;
+            for child in children {
                 let kind = match objects
                     .arena
                     .field(child, objects.phases.k(Field::FilterType))
@@ -747,7 +783,45 @@ impl NativeSession {
         queued.push(mark);
         self.push_live_steps_bound(objects, &queued)
     }
+    pub(super) fn allocate_source_recipes_bound<'a>(
+        &mut self,
+        objects: &mut BoundObjects,
+        recipes: impl IntoIterator<Item = (&'a Recipe, Symbol)>,
+    ) -> Result<Vec<ObjectId>> {
+        let mut queued = Vec::new();
+        for (recipe, owner) in recipes {
+            let step =
+                self.allocate_source_recipe_value_bound(objects, recipe, &Datum::Text(owner))?;
+            for (path, back, original) in &recipe.imports {
+                let index = queued
+                    .len()
+                    .checked_sub(*back)
+                    .ok_or_else(|| unsupported("recipe import group incomplete"))?;
+                let target = objects
+                    .arena
+                    .recipe_object(queued[index], original)
+                    .map_err(unsupported)?;
+                objects
+                    .arena
+                    .alias_recipe_object(step, path, target)
+                    .map_err(unsupported)?;
+            }
+            queued.push(step);
+        }
+        Ok(queued)
+    }
     pub(super) fn allocate_source_recipe_bound(
+        &mut self,
+        objects: &mut BoundObjects,
+        recipe: &Recipe,
+        owner: &Datum,
+    ) -> Result<ObjectId> {
+        if !recipe.imports.is_empty() {
+            return Err(unsupported("shared recipe needs grouped allocation"));
+        }
+        self.allocate_source_recipe_value_bound(objects, recipe, owner)
+    }
+    fn allocate_source_recipe_value_bound(
         &mut self,
         objects: &mut BoundObjects,
         recipe: &Recipe,
@@ -785,6 +859,10 @@ impl NativeSession {
                 .alias_recipe_object(step, path, target)
                 .map_err(unsupported)?;
         }
+        if let Some((field, anchor)) = recipe.topology_anchor {
+            objects.arena.set_field(step, field, ObjectValue::Object(anchor))
+                .map_err(unsupported)?;
+        }
         self.bind_body_program_bound(objects, step, recipe.step.instruction)?;
         for (path, instruction) in &recipe.programs {
             let object = objects
@@ -801,7 +879,7 @@ impl NativeSession {
         object: ObjectId,
         instruction: usize,
     ) -> Result<()> {
-        objects.copied_programs.insert(object, instruction);
+        objects.bind_copied_program(object, instruction);
         if let Instruction::ForEach { templates, .. } | Instruction::LiveRepeat { templates } =
             &self.steps[instruction].instruction
         {

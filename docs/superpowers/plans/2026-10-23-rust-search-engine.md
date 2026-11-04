@@ -217,6 +217,22 @@ the first illegal decision, and preserve the first failing index. A terminal
 input need not execute its consequences if the current engine decision proves
 it legal. If a caller requests its resulting state, it must actually execute.
 
+The native live-session checker now walks a shared-prefix trie under rollback,
+reports the first illegal or unknown decision, and validates terminal supported
+inputs without submitting them. It supports typed planning moves and the
+enumerated options represented by native requests. The CLI exposes `check_sequences`, with physical
+card references matching the stack trace protocol. The differential verifier
+matches Python legality, checked counts, and failing indexes for 65 sequences,
+covering planning, chained number selections, runes, full upgrade batches,
+respawn hexes, team-owned actor prompts, multiselect completion, confirmation,
+spellbook selection, and ordered rune inscription batches. The inscription
+trace also checks partial progress, prompt context, object identity, and the
+completion event. Snorri's Inscribe the Runes also matches Python through
+card text and normal action dispatch. Native planning choice generation reads the
+live hand and commitment fields. Sequence checks use those choices to reject
+foreign, missing, and already-committed cards before dispatch. Broader
+differential coverage remains open.
+
 Retain a three-way result for oracle checks: legal, illegal, unsupported/unknown.
 Python `legal=None` is not a positive or negative oracle label. Propagate internal
 engine errors distinctly. Include structured rune/upgrade batches, optional
@@ -227,6 +243,28 @@ use stable typed identities instead of minting UUIDs at every search node.
 ## 6. Search design
 
 ### Resolution: team-aware alpha-beta
+
+The native session now has an experimental resolution search. It expands typed
+live inputs under rollback, scores material from the root team's perspective,
+and retains the last completed iteration when a node limit or deadline stops
+search. Before the first iteration completes, it retains the best fully
+evaluated root move. This implementation counts branching decisions and stops
+at planning. Forced inputs use the node and time budgets without consuming
+search depth, including when they follow the last branching decision.
+An optional fixed-policy continuation scores leaves at a one- or two-game-turn
+cutoff and uses first-legal joint choices at later planning boundaries. Before
+trying the turn horizon, the search uses at most one eighth of its node budget
+(rounded up to at least one node) to score immediate successors. A score at
+completed depth zero can therefore come from an immediate successor or a fully
+evaluated root move from an interrupted first iteration. The resolution CLI
+labels scores as immediate, decision_depth, or turn_rollout.
+The CLI's rollout_game_turns diagnostic matches Python's first-legal stopping
+round, turn, phase, decision count and full semantic leaf state for both
+horizons on Forgotten Island and Magma and Ice. Each map starts from both its
+opening and turn four before cleanup and upgrades. The comparison sorts only
+unordered board zone hex and neighbor sets. Reproduce the eight cases with
+rollout_parity.py and the pinned oracle runtime. Adversarial planning across
+turns and bot integration remain open.
 
 Use fixed root-perspective values and explicit MAX/MIN nodes. This is safer than
 negating the score after every input: the same team can make several consecutive
@@ -265,6 +303,27 @@ Ordinary minimax assumes a fully specified sequential game. GoA2 also has hidden
 loadouts, facedown commitments and simultaneous choices. Treat this as an
 explicit search problem rather than pretending server-visible private cards are
 available to the bot.
+
+The Rust session can project player-scoped facts using stable printed card IDs.
+It includes public hero resources, positions, and reveals plus the requesting
+hero's own cards. Other heroes' hand sizes, card identities, and commitment
+buffers are excluded. A source-pinned catalog now enumerates ordinary upgrade
+paths and filters them by public items and card reveals. Nonstandard hero
+provenance stays unavailable. Seeded ordinary planning hands are reconstructed
+from the sampled path and public played/discarded cards. Facedown cards in those
+zones leave reconstruction unavailable. The sampled hands describe the pool
+before hidden commitments. Ordinary planning worlds can install those hands
+in an independent native worker, preserving revealed played and discarded
+physical cards in their existing zones. The search_sampled_planning CLI operation
+exposes the bounded matrix for one seeded sample. Turn-horizon matrices prune
+a row once its known worst reply ties or loses to a complete earlier row. A
+joint transition validates a complete set of
+choices against one pre-reveal state and applies it under rollback in roster
+order. The bounded pure maximin evaluator now scores supplied team and opponent
+plans on one sampled world through native resolution. It reports complete
+rows and evaluated cells. Native generation can cap the joint action sets
+and reports their uncapped sizes. The requesting hero's choices vary first.
+Aggregation across worlds and broader world reconstruction remain open.
 
 1. Build the root observation from public facts and the acting hero's permitted
    private information. Preserve teammate secrecy where Python does.
@@ -5936,3 +5995,376 @@ all-boundary restoration gate. Primary coverage remains 172/596; Hanu's remainin
 co-movement, initiative override and delayed journey/control primitives are still
 required before admitting his complete family. No search-throughput claim follows
 from this prerequisite.
+
+
+#### Hanu prerequisite: coordinated movement
+
+Implemented the mirrored destination filter, co-directional drag sequencer and
+its token-walking dependency in authoritative live adapters. Source parity covers
+280 scenarios / 1,020 operations, with independent release parity and restoration
+at every boundary. Four native regressions check generation guards, private live
+filter/destination operands and the explicit unsupported non-straight raw call.
+Generic handler gates apply to token walking before its step body is invoked.
+
+Following the full-disk interruption, the 22,135 indexed arena/canonical/live
+fixtures passed case-content and semantic-index integrity checks using compressed
+storage. The recovered development footprint was 6.07 GiB before the release
+rebuild. Continue with initiative override and journey/action-control scheduling,
+then admit Hanu's reviewed primary recipes. Primary/spell counts remain 172/596
+and 22/22; the full engine/search/performance requirements remain unchanged.
+
+
+#### Hanu prerequisite: initiative override
+
+Ported `SetCardInitiativeStep` for the admitted current rules. The arena physical
+card and native card cache receive the same override; printed definitions and
+active-effect containers remain unchanged. State transitions already clear the
+override, including repeated non-UNRESOLVED assignments. Source differential
+coverage is 52 scenarios / 118 operations, covering aliases, owner-resolved piece
+IDs, zero/negative/large integer values, discard transitions and initiative item
+bonuses during actor selection. The all-boundary restoration gate and 305 core
+unit tests pass, along with 38 affected Python contracts and strict Clippy.
+
+Next: action-control and journey-return scheduling, delegated co-movement input
+flows, then reviewed Hanu primary recipes. Full raw exception fidelity, remaining
+roster/defense/passive/filter closure and the original search/performance goals
+remain required; this does not change primary/spell coverage (172/596, 22/22).
+
+
+#### Hanu prerequisite: action-control scheduling
+
+Implemented `ScheduleActionControlStep` using a shared manager-creation path.
+Existing CreateEffectStep scopes remain live references; internal manager calls
+receive fresh literal scopes and avoid context-card/action inference. Collection
+validation, entity counters, registration and card flags use the same machinery.
+Unbound manager finishing programs are explicitly rejected pending the Journey
+port, rather than silently discarded.
+
+Source parity passes 61 new scenarios / 302 operations and 64 affected existing
+creation scenarios / 258 operations. The new source flows cover controller
+ownership during complete HOLD/confirm turns, forced windows, explicit other
+players, stale card guards, repeat scheduling, colliding IDs and round cleanup.
+Three native regressions cover entity-counter failure, live level/ultimate gates,
+step-counter independence and private scopes/retained lists.
+
+Next: bind manager-created Journey finishing programs with their actual model
+identities, then port journey return scheduling and delegated co-movement card
+flows before admitting Hanu's primary recipes. Primary/spell counts and the full
+engine/search/performance requirements remain unchanged.
+
+
+#### Hanu prerequisite: Journey return scheduling
+
+Implemented ScheduleJourneyReturnStep through shared literal manager creation.
+Manager finishing programs now retain actual bound step/model identities;
+CreateEffectStep continues to copy its templates. The delayed payload freezes
+literal performer/target IDs, so clearing turn context cannot redirect the return.
+The optional move retains source MovementPathFilter and ObstacleFilter models.
+Deduplication happens before generated-program allocation; aggregate entity and
+step limits are checked before either half mutates state.
+
+Python parity passes 77 scenarios / 321 operations. All-boundary restoration
+passes for these cases and the affected 125 generic/control cases (560 operations).
+312 core unit tests and 60 affected Python contracts pass. Source, requests,
+events and identity are compared; this is not a speed benchmark.
+
+Next: delegated co-movement input flows and reviewed Hanu primary recipes.
+Primary/spell counts remain 172/596 and 22/22. All original engine, raw-exception,
+compact-state, make/unmake, hashing, evaluation, search and throughput requirements
+remain open. See rust/artifacts/journey-final-validation.json for scoped evidence.
+
+
+#### Hanu primary recipes and cross-root source aliases
+
+Admitted all 18 reviewed Hanu primary builders. Delegated distance selection
+already used the correct context-selected decision owner; full card-flow tests
+now prove the return to Hanu for direction selection and equal displacement of
+both movers. Journeys exercise natural turn cleanup, and Hurry Up exercises
+initiative override plus level-eight action control.
+
+Trusted Sidekick and Pile On exposed shared filter models across separate root
+steps. Recipes now record backward model/container imports. Grouped native
+allocation restores these identities for ordinary, copied, reperformed, deferred
+and dynamic passive bodies, while per-worker arena state remains private. Shared
+executable roots still require their own generation-ID policy and are explicitly
+rejected by the source freezer.
+
+Source/native parity passes 471 primary scenarios / 7,902 operations and 16
+focused Flurry/Cloak rebuild scenarios / 32 operations. An additional 18 zero/absent/negative-range scenes add 405 operations. The maintained
+exporter contains all 505 scenes / 8,339 operations. Primary coverage increases to 190/596 (145 custom bodies,
+including three stateful Misa/Min builders, plus 45 base no-op faces); spell
+coverage remains 22/22. Full roster/defense/passive/filter closure, raw exception
+fidelity, dense retirement and all original optimized-state/search/performance
+requirements remain open. No throughput claim follows from this expansion.
+
+Final verification is recorded in rust/artifacts/hanu-primary-final-validation.json.
+
+
+Hanu edge-case closure also exposed source `range or 1` semantics that the
+previous placeholder substitution lost at zero. Both catalogs now audit and
+freeze range-default operands independently of radius-default operands. Native
+binding uses the fallback only at zero, preserving negative values. Range-driven
+physical alias changes are explicitly rejected during source freezing. The dense
+importer accepts inert Hanu instructions and guards reached ones before popping,
+so expanding arena coverage does not break unrelated dense imports.
+
+
+Next verification/implementation priorities after this family:
+
+- [x] Replay a complete natural Hanu/Arien versus Brogan/Tigerclaw game through the
+  frozen source and native arena; primary-family traces do not prove that scope.
+- [x] Finish reviewed primary-body catalog coverage for all 596 hero card faces
+  and native casting and copied-card coverage for all 22 spells.
+- [ ] Verify current defense, passive, filter and world interactions against the
+  frozen Python engine across the full roster. Catalog coverage alone does not
+  prove those interactions or complete-game parity.
+- [x] Establish a fair Rust/Python two-turn simulation benchmark with imports,
+  protocol JSON and snapshot export outside the timed region; report cloning and
+  advancement separately before claiming a search speedup.
+- [ ] Keep the original compact-state/make-unmake, hashing/evaluation, team-aware
+  iterative search, hidden/simultaneous planning, parallelism, integration and
+  1,000 complete two-game-turn simulations/second requirements intact.
+
+
+#### Hanu complete-game verification
+
+Two seeded source-policy games now reach GAME_OVER with state/request/event and
+physical-identity parity at every operation: Forgotten Island seed 41 (5,475
+operations, round 13 turn 4) and Magma and Ice seed 43 (2,090 operations, round 6
+turn 1). The separate Hanu policy sometimes chooses offered primary skills; the
+baseline policy and its two existing games remain intact. The recorder now emits
+encountered-step/event statistics and bounded progress, with roster-specific
+output defaults. Source verification peaked at 148,672 KiB RSS; this measures the
+verifier, not engine-search memory or throughput.
+
+The new compact corpus index is complete-games-hanu.json, SHA-256
+`6f9743e3a6c1b14f8cadeb527e8ca130f9770feea51c91ad6d05afddc4c9c56a`.
+Full payloads remain ignored compressed cache entries. The native test runner
+shares one complete-game replay helper between the two indexes; validation scope
+and final results are in rust/artifacts/hanu-complete-games-final-validation.json.
+
+Primary/spell counts remain 190/596 and 22/22. No Python engine/pin, lab or bot
+service changes are involved. All remaining engine and search requirements,
+including a fair benchmark and the original throughput gate, remain open.
+
+
+#### Matched two-turn simulation baseline
+
+Added a prepared-command native benchmark endpoint and a matched Python driver.
+Six windows come from the verified Hanu games: opening, round boundary and combat
+on both maps. Consecutive one-step diagnostic advances are replaced by normal
+advance-until-decision calls. Their copied/coalesced source endpoints are checked
+against the original atomic game trace before timing. Native timed execution
+checks full endpoint values/bindings, event/request counts and unchanged roots.
+Import, decoding, serialization and comparison stay outside the timers. Copy,
+advancement, cleanup and end-to-end costs are reported separately.
+
+Python deepcopy can reorder Zone.hexes, a declared set. Only that serialized set
+is canonicalized; executable simulations are unchanged, ordered lists remain
+ordered, and identity paths into that set are guarded explicitly. Automatic GC
+stays enabled, with an untimed full collection before each sample.
+
+On one i5-10400F CPU under WSL, five interleaved samples of 32 simulations per
+language per window measure 1.95–3.77x Rust speedup: 41.1–84.0 Rust versus
+16.7–34.2 Python complete two-turn simulations/second. Root copies take roughly
+0.15–0.18 ms in Rust versus 5.77–7.08 ms in Python. Advancement consumes 97–98.5%
+of Rust time. These serial replay results do not establish search throughput,
+parallel scaling, full-roster performance or the original 1,000 simulations/s gate.
+
+Next: profile advancement and replace its expensive work from evidence. Full
+compact-state/make-unmake, canonical hashing/evaluation, team-aware iterative
+search, hidden/simultaneous planning, parallel search, roster/rules closure and
+integration/strength requirements remain intact. Primary/spell counts remain
+190/596 and 22/22. See rust/artifacts/simulation-benchmark-final-validation.json.
+
+
+#### Dense object-protection membership
+
+A user-space CPU profile of 1,500 two-turn round-boundary simulations found
+14.8% of sampled self time in the arena reachability walk and 9.5% in
+ObjectId hash-set growth, alongside substantial generic hashing cost. The
+retained profile resolves ELF file offsets using the executable load-segment
+delta; generic hash labels may be merged by LTO and are not independently
+attributed to symbol-table work.
+
+Object protection now uses the dense arena IDs as bitmap indices and keeps a
+compact list of visited handles for copied-step membership transfer. The exact
+root set, step-payload exclusions, graph edges, refresh points and mutation
+guards are unchanged. No reachability cache or lazy invalidation is introduced.
+Focused tests cover word boundaries, duplicate IDs, private copies, shared
+references, cycles, payload exclusions and root replacement.
+
+The same six source-verified windows, single CPU, five interleaved samples and
+32 iterations now measure 83.5–149.5 Rust versus 16.7–34.0 Python simulations/s:
+3.97–7.99× Python, and 1.76–2.22× the prior Rust baseline. All endpoint, alias,
+request/event-count and root-privacy checks pass. Original and optimized raw
+measurements remain separate; see rust/artifacts/simulation-benchmark-dense-protection.json.
+
+This is still fixed-decision serial replay. Remaining roster/rule/exception
+closure, compact-state/make-unmake, canonical hashing/evaluation, team-aware
+iterative search, hidden/simultaneous planning, parallel search, integration and
+strength gates remain required, as does 1,000 complete two-global-turn simulations/s.
+
+Regression verification passes all 319 core tests, three object-identity tests,
+the 505-case / 8,339-operation Hanu restoration gate and all 11 CLI tests. CLI
+coverage includes all 16,226 live cases / 130,859 operations, 6,592 canonical
+cases / 27,145 operations and four complete games / 14,624 operations. Strict
+Clippy, Rustfmt, whitespace and frozen Python checks pass. Other workspace
+integration tests and the older exhaustive all-corpus restoration gate were not
+rerun. See rust/artifacts/dense-protection-final-validation.json.
+
+
+#### Protection traversal follow-up
+
+The optimized-build profile contains 3,425 self samples: 25.0% in the protection
+walk, 44.2% in unresolved libc code. Library samples remain unattributed; they do
+not prove allocator/caller cost. Added scripts/rust_oracle/native_profile.py to
+verify worker build identity, translate executable ELF file offsets and retain
+LTO symbol aliases. Its two guard tests pass, including nonzero segment deltas,
+symbol gaps, shared aliases and mismatched build/path identities; a real old
+profile is also rejected against the current worker.
+
+The next small refinement resolves exclusion keys to interned IDs once per walk
+and checks exclusions only for object references. Scalar fields cannot add
+graph edges; equally named fields on non-step containers still traverse. All
+319 core tests pass before an equivalent Clippy condition cleanup. Strict lint
+and formatting pass. All six matched benchmark endpoints and alias/count/root
+checks pass, with 87.5–150.6 simulations/s (4.10–8.13× Python). The small
+cross-run improvement over the dense bitmap alone is not a firm speedup claim.
+Full CLI corpus regression passes all 11 tests, covering all 16,226 live cases /
+130,859 operations, 6,592 canonical cases / 27,145 operations and four complete
+games / 14,624 operations. The three protection-specific tests also pass after
+the equivalent condition cleanup, and the frozen source remains unchanged.
+Results are in rust/artifacts/protection-fields-final-validation.json; the retained
+full replay log is rust/artifacts/protection-fields-cli-tests.log. The original engine,
+roster, search, integration and performance requirements remain open.
+
+
+#### Xargatha primary recipes and cached-tile adjacency
+
+Added CountAdjacentEnemiesStep as an authoritative live query. It reads the
+actor's direct location and board dictionary tile occupants, matching the frozen
+source rather than deriving occupancy from current location records. Hero pieces
+count individually; an unlocated multi-piece owner does not acquire an acting
+piece position. Missing actors/units/locations return zero. Arithmetic subtracts,
+clamps the count at zero and then multiplies, preserving negative multipliers.
+Unrepresentable i64 results remain an explicit unsupported-rule guard before
+popping or writing; this does not claim arbitrary-precision/raw-exception closure.
+
+All 18 Xargatha primary faces now have reviewed recipes (16 newly admitted).
+Reviewed primary coverage is 206/596: 158 pure builders, three stateful builders
+and 45 inherited base no-op faces. Spell coverage remains 22/22. Independent
+iterate-worker parity passes 482 scenes / 7,850 operations, including copies,
+reperformance, optional/invalid choices, negative attacks, range/radius defaults,
+heavy-minion immunity, real round-end delayed defeat, cached occupancy drift and
+Rapid Thrusts recounting after its first kill. All 107 affected source contracts and all 321 core tests pass, including the two
+new native counter tests and expanded dense guard test. Full-family restoration and independent release replay pass all 482 cases and
+7,850 operations. All 11 CLI tests pass for the Xargatha milestone. The family corpus SHA-256 is
+`a2f2a426a78d5c870731a2fd10f64f2434ea31312586c3f5142a09daef4ac457`.
+
+Full roster/defense/passive/filter/world and exception closure, dense retirement,
+compact state/make-unmake, canonical hashing/evaluation, team-aware iterative
+minimax/alpha-beta, hidden/simultaneous planning, parallel search, integration and
+strength validation, and 1,000 complete two-global-turn simulations/s remain
+required. No Python source/pin, NN runtime or live service changes are involved.
+
+
+#### Bain bounty targeting
+
+Bain's Dead or Alive, Hand Crossbow and Hunter Seeker are now admitted to the
+native primary catalog. Marker filtering reads the marker registry by key and
+matches the exact target ID. Source cases cover aliases across marker keys,
+markers in supply, placement and removal, exact Razzle piece targets, minions,
+and both attack orders. All 85 scenarios match Python across 2,441 operations
+with state, request, event and identity parity. Reviewed primary coverage is
+209/596 at this milestone. All 321 core tests, the boundary restoration check,
+release replay and all 11 CLI tests passed.
+
+
+#### Shared line of sight and Bain line attacks
+
+The native sight filter supports hex, unit and token selections. It resolves a
+literal origin, a context origin or the acting hero and uses the board position
+of the acting piece when applicable. The scan checks intermediate tiles for map
+gaps and applies the requested unit, Petrify-aware terrain and actor-specific
+obstacle rules. It walks the path lazily and excludes the destination from
+blocker checks.
+
+Light Crossbow, Heavy Crossbow, Arbalest and Get Over Here now have native
+primary recipes. The initial iterate replay matched the source across all 181
+scenarios and 2,366 operations. All 321 core tests, the 2,366-boundary restoration check and the release replay
+pass with the final lazy scan. The expanded CLI suite is running. Reviewed
+primary coverage is 213/596. Cutter's Grappling Bolt
+also needs its movement step.
+
+
+#### Grappling Bolt pull
+
+Cutter's Grappling Bolt now selects a visible obstacle and queues a straight-line
+move to the hex before that obstacle. The pull resolves the current acting
+piece, checks topology and leaves movement validation to MoveUnitStep. The
+iterate replay matches Python across 33 scenarios and 353 operations covering
+terrain, units, tokens, adjacent anchors, topology splits and copied cards.
+All 321 core tests, boundary restoration and release replay pass. Reviewed
+primary coverage is 214/596.
+
+
+#### Walk the Plank and zone changes
+
+The native query reads the recorded hex and the unit's direct position. It
+returns true when their zone IDs differ and null otherwise. The lookup
+uses the tile's cached zone when present and falls back to the first zone
+containing the hex for missing tiles.
+
+Walk the Plank now uses this query between the push and forced discard or
+defeat. The iterate replay matches Python across 20 cases and 402 operations,
+including no-op pushes, unchanged zones, an empty defender hand and the minion
+branch. All 321 core tests, boundary restoration and release replay pass. The
+combined CLI regression for both Cutter cards passed all 11 tests. Reviewed primary
+coverage is 215/596.
+
+
+#### Cutter primary deck
+
+The remaining fifteen custom Cutter primary builders are frozen from Python.
+The direction filter handles literal, actor and recorded-hex origins and
+checks topology before accepting candidates on the same ray. The solo victory
+step reads live gold and queues the existing individual game-over step.
+
+The charge attack uses a separate checked operand for primary attack plus two.
+The freezer verifies both damage operands with a probe distinct from the radius
+placeholder. The source traces exercise a negative charge attack, a retreat
+after defeating the target and a victory after gaining coins.
+
+All 18 Cutter primary faces are accounted for. The focused iterate run matches
+Python across 320 scenarios and 5,871 operations. The release replay, boundary
+restoration and all 321 core tests pass. The expanded CLI regression is running.
+Reviewed primary coverage is 230/596.
+
+
+#### Arena undo journal
+
+Speculative arena scopes record an object's or physical card override row's
+previous value on its first write in that scope. Nested scopes track their own
+first writes. Rollback restores those records in reverse order, discards
+temporary objects and card instances, and restores the symbol table.
+Scopes can nest and unwind safely. Worker forks inherit the current arena
+values and start a separate journal. The 323 core tests and all three aggregate
+tests pass. Speculative replay matches Python for 49 operations across 12
+aggregate cases and restores each starting arena envelope.
+
+Live session scopes carry the arena journal through staged respawn, cleanup,
+and upgrade commits. Copied step program bindings and protection entries are
+undone individually. Session frames, planning state, counters, and the typed
+world projection still use a value checkpoint. The checkpoint shares the fixed
+card, entity, and hero lookup tables and shares card history until it changes.
+Physical card and hero rows use first-write undo at the typed world boundary.
+Staged world commits carry the journal, and ordinary worker clones start an
+independent journal. Spatial undo restores location order, symbol indexes, and tile occupants.
+The compact occupancy bitmap and other mutable world state still use a
+checkpoint. Incremental undo for those components and a search fingerprint
+remain open.
+
+Snorri's Inscribe the Runes brings reviewed primary coverage to 231/596 faces.
+Its source-derived live recipe matches Python over seven card-text operations
+and 23 normal card-action operations, including ordered batches and auto-fill.

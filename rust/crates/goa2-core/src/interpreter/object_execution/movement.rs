@@ -299,7 +299,7 @@ impl NativeSession {
                     .map_err(unsupported)?;
             }
             let copy = objects.arena.shallow_step(step).map_err(unsupported)?;
-            objects.copied_programs.insert(
+            objects.bind_copied_program(
                 copy,
                 objects
                     .program(step)

@@ -271,14 +271,10 @@ impl NativeSession {
                     .map_err(unsupported)?;
             }
         }
-        let mut queued = Vec::with_capacity(plan.recipes.len());
-        for recipe in &plan.recipes {
-            queued.push(self.allocate_source_recipe_bound(
-                objects,
-                recipe,
-                &Datum::Text(plan.owner),
-            )?);
-        }
+        let queued = self.allocate_source_recipes_bound(
+            objects,
+            plan.recipes.iter().map(|recipe| (recipe, plan.owner)),
+        )?;
         self.push_live_steps_bound(objects, &queued)
     }
 }

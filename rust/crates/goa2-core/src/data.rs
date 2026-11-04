@@ -1,35 +1,57 @@
 //! Search-local, typed values and interned symbols. JSON conversion is boundary-only.
 use serde_json::{Map, Value};
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Symbol(pub(crate) usize);
 #[derive(Clone, Debug, Default)]
+struct SymbolTable {
+    names: Vec<Arc<str>>,
+    ids: HashMap<Arc<str>, Symbol>,
+}
+
+#[derive(Clone, Debug, Default)]
 pub struct Symbols {
-    names: Vec<String>,
-    ids: HashMap<String, Symbol>,
+    compiled: Option<Arc<SymbolTable>>,
+    local: SymbolTable,
 }
 impl Symbols {
+    /// Share the compiled prefix while keeping subsequent inserts branch-local.
+    pub(crate) fn freeze_compiled(&mut self) {
+        debug_assert!(self.compiled.is_none());
+        self.compiled = Some(Arc::new(std::mem::take(&mut self.local)));
+    }
     pub fn intern(&mut self, name: &str) -> Symbol {
-        if let Some(&id) = self.ids.get(name) {
+        if let Some(id) = self.lookup(name) {
             return id;
         }
-        let id = Symbol(self.names.len());
-        self.names.push(name.to_owned());
-        self.ids.insert(name.to_owned(), id);
+        let id = Symbol(self.len());
+        let name: Arc<str> = Arc::from(name);
+        self.local.names.push(Arc::clone(&name));
+        self.local.ids.insert(name, id);
         id
     }
     pub fn name(&self, id: Symbol) -> &str {
-        &self.names[id.0]
+        if let Some(compiled) = &self.compiled {
+            if id.0 < compiled.names.len() {
+                return &compiled.names[id.0];
+            }
+            return &self.local.names[id.0 - compiled.names.len()];
+        }
+        &self.local.names[id.0]
     }
     pub fn lookup(&self, name: &str) -> Option<Symbol> {
-        self.ids.get(name).copied()
+        self.local
+            .ids
+            .get(name)
+            .copied()
+            .or_else(|| self.compiled.as_ref()?.ids.get(name).copied())
     }
     pub fn len(&self) -> usize {
-        self.names.len()
+        self.local.names.len() + self.compiled.as_ref().map_or(0, |base| base.names.len())
     }
     pub fn is_empty(&self) -> bool {
-        self.names.is_empty()
+        self.len() == 0
     }
 }
 #[derive(Clone, Debug, PartialEq)]
@@ -259,48 +281,40 @@ impl RegisterRead for Registers {
 /// Missing and present-null values are different. Keys are resolved once at import.
 #[derive(Clone, Debug, Default)]
 pub struct Registers {
-    slots: Vec<Option<Datum>>,
-    order: Vec<Symbol>,
+    entries: Vec<(Symbol, Datum)>,
 }
 impl Registers {
-    pub fn new(symbols: &Symbols) -> Self {
+    pub fn new(_symbols: &Symbols) -> Self {
         Self {
-            slots: vec![None; symbols.len()],
-            order: Vec::new(),
+            entries: Vec::new(),
         }
     }
     pub fn clear(&mut self) {
-        self.slots.fill(None);
-        self.order.clear();
+        self.entries.clear();
     }
     pub fn get(&self, key: Symbol) -> Option<&Datum> {
-        self.slots.get(key.0).and_then(Option::as_ref)
+        self.entries
+            .iter()
+            .find(|(id, _)| *id == key)
+            .map(|(_, value)| value)
     }
     pub fn set(&mut self, key: Symbol, value: Datum) {
-        if key.0 >= self.slots.len() {
-            self.slots.resize(key.0 + 1, None);
+        if let Some((_, existing)) = self.entries.iter_mut().find(|(id, _)| *id == key) {
+            *existing = value;
+        } else {
+            self.entries.push((key, value));
         }
-        if self.slots[key.0].is_none() {
-            self.order.push(key);
-        }
-        self.slots[key.0] = Some(value);
     }
     pub fn remove(&mut self, key: Symbol) {
-        if let Some(slot) = self.slots.get_mut(key.0) {
-            *slot = None;
-            self.order.retain(|item| *item != key);
+        if let Some(index) = self.entries.iter().position(|(id, _)| *id == key) {
+            self.entries.remove(index);
         }
     }
     pub fn to_json(&self, symbols: &Symbols) -> Value {
         Value::Object(
-            self.order
+            self.entries
                 .iter()
-                .map(|key| {
-                    (
-                        symbols.name(*key).to_owned(),
-                        self.get(*key).unwrap().to_json(symbols),
-                    )
-                })
+                .map(|(key, value)| (symbols.name(*key).to_owned(), value.to_json(symbols)))
                 .collect(),
         )
     }

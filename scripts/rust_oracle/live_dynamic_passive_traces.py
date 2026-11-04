@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 
-def scenes(names=None):
+def scenes(names=None, *, effects=None):
     from live_passive_traces import build, retain
     from primary_templates import ALL_EFFECTS
 
@@ -11,7 +11,7 @@ def scenes(names=None):
     from goa2.domain.models import CardState
     from goa2.engine.steps import OfferPassiveStep
 
-    effects = (
+    effects = effects or (
         "crane_stance",
         "dragon_stance",
         "war_drummer",

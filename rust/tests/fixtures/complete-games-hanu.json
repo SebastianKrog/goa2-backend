@@ -1,0 +1,22 @@
+{
+  "schema_version": 2,
+  "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+  "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+  "contract": "complete-games-snapshot-deltas-v3",
+  "policy": "hanu-progress-v1",
+  "python_hash_seed": "0",
+  "semantic_sha256": "2e77cab7c657cf10cb0106e5a9bee32238e0ad7bd2a3a6451a878e2a33913258",
+  "cases": [
+    {
+      "name": "complete-game-hanu-forgotten_island-progress-41",
+      "path": "complete-games-hanu/9f1f83c47c182af163f3e0f0d4095109f5b8155f66eb353eb2e901925481f5af.json",
+      "case_sha256": "9f1f83c47c182af163f3e0f0d4095109f5b8155f66eb353eb2e901925481f5af"
+    },
+    {
+      "name": "complete-game-hanu-magma_and_ice-progress-43",
+      "path": "complete-games-hanu/c1d4a7fbd7f6c8243d16827b9810ca020d098438097efc84a1ac9db0d9fb47bd.json",
+      "case_sha256": "c1d4a7fbd7f6c8243d16827b9810ca020d098438097efc84a1ac9db0d9fb47bd"
+    }
+  ],
+  "corpus_sha256": "6f9743e3a6c1b14f8cadeb527e8ca130f9770feea51c91ad6d05afddc4c9c56a"
+}

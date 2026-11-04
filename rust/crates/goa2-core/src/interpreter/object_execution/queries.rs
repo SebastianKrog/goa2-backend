@@ -126,6 +126,27 @@ impl NativeSession {
             },
         })
     }
+    pub(super) fn preflight_unit_on_board_bound(
+        &mut self,
+        objects: &BoundObjects,
+        step: ObjectId,
+    ) -> Result<QueryPlan> {
+        let output = self.passive_text_bound(objects, step, Field::Output)?;
+        let key = self.passive_text_bound(objects, step, Field::UnitKey)?;
+        let mut value = Datum::Null;
+        if let Some(unit) = objects
+            .arena
+            .context_value(key)
+            .filter(|unit| objects.arena.truthy(unit))
+        {
+            let id = self.resource_identity_bound(objects, unit)?;
+            if self.world.position(id).is_some() {
+                value = Datum::Bool(true);
+            }
+        }
+        Ok(QueryPlan { output, value })
+    }
+
     pub(super) fn preflight_unit_type_check_bound(
         &mut self,
         objects: &BoundObjects,
@@ -237,6 +258,108 @@ impl NativeSession {
             } else {
                 Datum::Null
             },
+        })
+    }
+    pub(super) fn preflight_zone_change_bound(
+        &mut self,
+        objects: &BoundObjects,
+        step: ObjectId,
+    ) -> Result<QueryPlan> {
+        let output = self.passive_text_bound(objects, step, Field::Output)?;
+        let unit_key = self.passive_text_bound(objects, step, Field::UnitKey)?;
+        let before_key = self.passive_text_bound(objects, step, Field::BeforeHexKey)?;
+        let unit = objects
+            .arena
+            .context_value(unit_key)
+            .filter(|value| objects.arena.truthy(value));
+        let before = objects
+            .arena
+            .context_value(before_key)
+            .filter(|value| !matches!(value, ObjectValue::Atom(Datum::Null)));
+        let mut value = Datum::Null;
+        if let Some((unit, before)) = unit.zip(before) {
+            let (before, _) = self.spatial_hex_bound(objects, &before)?;
+            let unit = self.resource_identity_bound(objects, unit)?;
+            if let Some(after) = self.world.position(unit)
+                && self.world.zone_at(before) != self.world.zone_at(after)
+            {
+                value = Datum::Bool(true);
+            }
+        }
+        Ok(QueryPlan { output, value })
+    }
+    pub(super) fn preflight_adjacent_enemies_bound(
+        &self,
+        objects: &BoundObjects,
+        step: ObjectId,
+    ) -> Result<QueryPlan> {
+        use crate::world::EntityKind;
+        let output = self.passive_text_bound(objects, step, Field::Output)?;
+        let zero = || QueryPlan {
+            output,
+            value: Datum::Int(0),
+        };
+        let Some(actor) = self
+            .planning
+            .actor
+            .filter(|id| !self.symbols.name(*id).is_empty())
+        else {
+            return Ok(zero());
+        };
+        let unit = |id| {
+            self.world.entity(id).filter(|entity| {
+                matches!(
+                    entity.kind,
+                    EntityKind::Hero | EntityKind::Minion | EntityKind::Piece
+                ) && entity.has_team
+            })
+        };
+        let Some(actor_unit) = unit(actor) else {
+            return Ok(zero());
+        };
+        // The source uses the actor's direct location, not acting-piece resolution.
+        let locations = objects.phases.root(&objects.arena, Field::Locations)?;
+        let Some(position) = objects.arena.field(locations, actor) else {
+            return Ok(zero());
+        };
+        let (origin, _) = self.spatial_hex_bound(objects, &position)?;
+        let board = objects.phases.root(&objects.arena, Field::Board)?;
+        let Some(ObjectValue::Object(tiles)) =
+            objects.arena.field(board, objects.phases.k(Field::Tiles))
+        else {
+            return Err(unsupported("adjacent enemy count board tiles missing"));
+        };
+        let mut count = 0i64;
+        for neighbor in origin.neighbors() {
+            let (q, r, s) = neighbor.coordinates();
+            let Some(key) = objects.arena.symbols.lookup(&format!("({q}, {r}, {s})")) else {
+                continue;
+            };
+            let Some(ObjectValue::Object(tile)) = objects.arena.field(tiles, key) else {
+                continue;
+            };
+            let Some(occupant) =
+                self.passive_optional_text_bound(objects, tile, Field::Occupant)?
+            else {
+                continue;
+            };
+            if unit(occupant).is_some_and(|enemy| enemy.team != actor_unit.team) {
+                count += 1;
+            }
+        }
+        let subtract = self
+            .spatial_int_bound(objects, step, Field::Subtract)?
+            .ok_or_else(|| unsupported("adjacent enemy subtraction missing"))?;
+        let multiplier = self
+            .spatial_int_bound(objects, step, Field::Multiplier)?
+            .ok_or_else(|| unsupported("adjacent enemy multiplier missing"))?;
+        let value = count
+            .checked_sub(subtract)
+            .and_then(|n| n.max(0).checked_mul(multiplier))
+            .ok_or_else(|| unsupported("adjacent enemy bonus outside i64"))?;
+        Ok(QueryPlan {
+            output,
+            value: Datum::Int(value),
         })
     }
     pub(super) fn preflight_card_count_bound(
@@ -364,5 +487,72 @@ impl NativeSession {
             .arena
             .set_context(plan.output, value)
             .map_err(unsupported)
+    }
+}
+
+#[cfg(test)]
+mod adjacent_tests {
+    use super::*;
+    fn session(suffix: &str) -> NativeSession {
+        let case = fixture_case(&format!("object-execution-xargatha-count-{suffix}"));
+        NativeSession::compile(serde_json::from_value(case["envelope"].clone()).unwrap()).unwrap()
+    }
+    fn snapshot(session: &NativeSession) -> Value {
+        serde_json::to_value(session.export_envelope().unwrap()).unwrap()
+    }
+    #[test]
+    fn adjacency_reads_live_operands_and_output_without_generation_or_shared_worker_mutation() {
+        let root = session("ordinary");
+        let before = snapshot(&root);
+        let mut worker = root.clone();
+        let step = worker.stack.last().unwrap().object.unwrap();
+        let output = worker.symbols.lookup("tail").unwrap();
+        let objects = worker.objects.as_mut().unwrap();
+        for (field, value) in [
+            (Field::Multiplier, Datum::Int(-3)),
+            (Field::Subtract, Datum::Int(1)),
+            (Field::Output, Datum::Text(output)),
+        ] {
+            objects
+                .arena
+                .set_field(step, objects.phases.k(field), ObjectValue::Atom(value))
+                .unwrap();
+        }
+        worker.next_step = u64::MAX - 1;
+        assert!(worker.advance_prefix(1).unwrap().events.is_empty());
+        assert_eq!(
+            worker.semantic_state().unwrap()["execution_context"]["tail"],
+            json!(-15)
+        );
+        assert_eq!(snapshot(&root), before);
+    }
+    #[test]
+    fn adjacency_overflow_rejects_before_pop_but_absent_actor_returns_zero_first() {
+        for suffix in ["ordinary", "no-actor"] {
+            let mut worker = session(suffix);
+            let step = worker.stack.last().unwrap().object.unwrap();
+            let objects = worker.objects.as_mut().unwrap();
+            objects
+                .arena
+                .set_field(
+                    step,
+                    objects.phases.k(Field::Subtract),
+                    ObjectValue::Atom(Datum::Int(i64::MIN)),
+                )
+                .unwrap();
+            let before = snapshot(&worker);
+            if suffix == "ordinary" {
+                assert!(
+                    matches!(worker.advance_prefix(1),Err(EngineError::Unsupported(message)) if message.contains("adjacent enemy bonus outside i64"))
+                );
+                assert_eq!(snapshot(&worker), before);
+            } else {
+                worker.advance_prefix(1).unwrap();
+                assert_eq!(
+                    worker.semantic_state().unwrap()["execution_context"]["adjacency_probe"],
+                    json!(0)
+                );
+            }
+        }
     }
 }

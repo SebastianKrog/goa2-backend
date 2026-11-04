@@ -18,8 +18,21 @@ use crate::{
     targeting::{UnitCandidates, UnitFilter},
     world::{EntityKind, NativeWorld},
 };
+mod loadout;
 mod object_execution;
+mod observation;
+pub use loadout::{LoadoutHypothesis, SampledHand};
+mod search;
+pub use observation::{HeroObservation, PlayerObservation, PrivateCards, PublicCard};
+mod sequences;
 pub use object_execution::LiveEffectExpiry;
+pub use search::{
+    GameTurnRollout,
+    JointPlans, OpponentPolicy, PlanningSearch, PlanningSearchOptions, ResolutionScoreKind, ResolutionSearch,
+    SampledPlanningSearch,
+    SearchLimits,
+};
+pub use sequences::{DecisionMove, PlanningCommitment, SequenceBatch, SequenceVerdict};
 
 use serde_json::{Value, json};
 use std::{
@@ -171,6 +184,8 @@ struct Conditions {
 }
 #[derive(Clone, Copy, Debug)]
 enum CoordinateOp {
+    TurnStart,
+    Distance,
     Record,
     Compute,
     Adjacency,
@@ -205,9 +220,18 @@ enum Instruction {
     LiveMove,
     LiveTokenMove,
     LiveDrag,
+    LiveMoveToward,
+    LiveSetInitiative,
+    LiveActionControl,
+    LiveJourney,
     LiveMineChoice,
     LiveTriggerMines,
     LiveForceDiscard,
+    LiveColorDiscard,
+    LiveCardSwap,
+    LiveResolvedCardSwap,
+    LiveDeckCardSwap,
+    LiveItemSwap,
     LiveDiscardOrDefeat,
     LiveDiscard,
     LiveRetrieve,
@@ -225,6 +249,14 @@ enum Instruction {
     LiveOfferPassive,
     LiveMarkPassive,
     LiveRuneChoice,
+    LiveChooseCardColor,
+    LiveDirectionalMove,
+    LiveRevealHandCard,
+    LiveLaugh,
+    LiveCardGuess {
+        reveal: bool,
+    },
+    LiveRuneInscription,
     LiveHexSelect,
     LiveUnitSelect,
     LiveMultiSelect,
@@ -244,16 +276,21 @@ enum Instruction {
     LiveCheckUnitFilters,
     LiveDistanceCheck,
     LiveUnitTypeCheck,
+    LiveUnitOnBoard,
     LiveBooleanCombine,
     LiveConvertCardItem,
     LiveAfterAttackText,
     LiveMinionRespawn,
     LiveCardCount,
+    LiveAdjacentEnemies,
+    LiveZoneChange,
+    LiveSoloWin,
     LiveRoundDefeat,
     LiveQuery {
         collect: bool,
     },
     LiveMoveSequence,
+    LiveForceDefenseMovement,
     LiveCardSelect,
     MinionProtection {
         spec: crate::protection::ProtectionBinding,
@@ -498,6 +535,10 @@ enum Instruction {
         hero: Symbol,
         prompt: Symbol,
     },
+    LiveSetPiece,
+    LiveSpawnPiece,
+    LiveRemovePiece,
+    LiveMirrorPush,
     SetPiece {
         hero: Symbol,
         piece: Option<Symbol>,
@@ -613,11 +654,19 @@ pub enum RequestChoices {
         max: i64,
     },
     Runes(Vec<Symbol>),
+    CardColors(Vec<Symbol>),
+    RuneInscription {
+        hero: Symbol,
+        placed: Vec<(Symbol, Symbol)>,
+        remaining: Vec<Symbol>,
+    },
     Passive {
         card: Symbol,
         name: Symbol,
     },
     ConfirmAction,
+    Laugh,
+    MirrorDistances(Vec<(i64, i64)>),
     Upgrades(Vec<crate::round::UpgradePlayer>),
     Actors {
         team: Symbol,
@@ -667,6 +716,83 @@ pub struct NativeRequest {
 }
 #[derive(Clone, Debug)]
 pub enum NativeEvent {
+    AdditionalLifeSpent {
+        team: Symbol,
+        target: Symbol,
+        total: i64,
+        change: i64,
+    },
+    LifePenaltyAnnihilation {
+        winner: Symbol,
+    },
+    DirectionalMove {
+        unit: Symbol,
+        from: Hex,
+        to: Hex,
+        direction: i64,
+    },
+    ItemGranted {
+        owner: Symbol,
+        stat: crate::stats::Stat,
+        amount: i64,
+    },
+    GuessSelected {
+        actor: Option<Symbol>,
+        victim: Symbol,
+        attempt: i64,
+    },
+    HeroLaughed(Symbol),
+    HeroPieceRemoved { owner: Symbol, piece: Symbol, from: Option<Hex> },
+    HeroPieceSpawned { owner: Symbol, piece: Symbol, to: Hex },
+    ResolvedCardsSwapped { actor: Option<Symbol>, target: Symbol, a: Symbol, b: Symbol },
+    HandCardRevealed {
+        actor: Option<Symbol>,
+        target: Symbol,
+        owner: Symbol,
+        card: Symbol,
+        name: Symbol,
+        color: Option<Symbol>,
+        tier: Symbol,
+        tier_value: i64,
+    },
+    GuessRevealed {
+        actor: Option<Symbol>,
+        victim: Symbol,
+        attempt: i64,
+        card: Symbol,
+        name: Symbol,
+        actual: Option<Symbol>,
+        guessed: Symbol,
+        correct: bool,
+    },
+
+    DeckCardSwapped {
+        actor: Symbol,
+        outgoing: Symbol,
+        incoming: Symbol,
+        state: &'static str,
+        facedown: bool,
+    },
+    RunesPlaced {
+        hero: Symbol,
+        placed: Vec<(Symbol, Symbol)>,
+    },
+    JourneyScheduled {
+        actor: Symbol,
+        target: Symbol,
+        kind: Symbol,
+    },
+    ActionControlScheduled {
+        actor: Symbol,
+        target: Symbol,
+        card: Symbol,
+    },
+    InitiativeOverride {
+        actor: Option<Symbol>,
+        target: Symbol,
+        card: Symbol,
+        value: i64,
+    },
     MineTriggered {
         actor: Option<Symbol>,
         target: Symbol,
@@ -889,6 +1015,7 @@ impl NativeSession {
                         "create_effect"
                             | "remove_token"
                             | "check_adjacency"
+                            | "compute_distance"
                             | "place_unit"
                             | "swap_units"
                             | "set_actor"
@@ -981,7 +1108,11 @@ impl NativeSession {
         let marker_rules = MarkerRules::compile(&mut symbols);
         let attack_rules = AttackRules::compile(&mut symbols);
         let action_rules = ActionRules::compile(&mut symbols);
-        let primary_operands = PrimaryOperands::compile(&mut symbols).map_err(unsupported)?;
+        let primary_operands = PrimaryOperands::compile_with_live(
+            &mut symbols,
+            object_execution::primary_operand_catalog()?,
+        )
+        .map_err(unsupported)?;
         let reaction_rules = Arc::new(ReactionRules::compile(&mut symbols).map_err(unsupported)?);
         let mut context_items = Vec::new();
         for (key, value) in raw["execution_context"]
@@ -1489,6 +1620,7 @@ impl NativeSession {
                 step.initial.pending = None;
             }
         }
+        symbols.freeze_compiled();
         let symbols = Arc::new(symbols);
         if let Some(objects) = &mut objects {
             objects.arena.symbols = symbols.clone();
@@ -1642,7 +1774,7 @@ impl NativeSession {
     }
     fn advance_turn(&mut self, clear_log: bool) -> Result<()> {
         if clear_log {
-            self.world.history.discarded.clear();
+            self.world.history.clear_discards();
         }
         loop {
             if self.world.combat.turn < 4 {
@@ -1654,7 +1786,7 @@ impl NativeSession {
                     .auto_pass(&mut self.world)
                     .map_err(card_error)?
                 {
-                    self.world.history.discarded.clear();
+                    self.world.history.clear_discards();
                     continue;
                 }
             } else {
@@ -1891,11 +2023,20 @@ impl NativeSession {
             }
             if matches!(
                 compiled.instruction,
-                Instruction::LiveCardCount
+                Instruction::LiveDrag
+                    | Instruction::LiveMoveToward
+                    | Instruction::LiveSetInitiative
+                    | Instruction::LiveActionControl
+                    | Instruction::LiveJourney
+                    | Instruction::LiveAdjacentEnemies
+                    | Instruction::LiveZoneChange
+                    | Instruction::LiveSoloWin
+                    | Instruction::LiveCardCount
                     | Instruction::LiveRoundDefeat
                     | Instruction::LiveCheckUnitFilters
                     | Instruction::LiveDistanceCheck
                     | Instruction::LiveUnitTypeCheck
+                    | Instruction::LiveUnitOnBoard
                     | Instruction::LiveBooleanCombine
                     | Instruction::LiveConvertCardItem
                     | Instruction::LiveAfterAttackText
@@ -4228,11 +4369,16 @@ impl NativeSession {
                 | Instruction::LiveMove
                 | Instruction::LiveTokenMove
                 | Instruction::LiveDrag
+                | Instruction::LiveMoveToward
+                | Instruction::LiveSetInitiative
+                | Instruction::LiveActionControl
+                | Instruction::LiveJourney
                 | Instruction::LiveMineChoice
                 | Instruction::LiveTriggerMines
                 | Instruction::LivePassive
                 | Instruction::LiveOfferPassive
                 | Instruction::LiveMoveSequence
+                | Instruction::LiveForceDefenseMovement
                 | Instruction::LiveHexSelect
                 | Instruction::LiveUnitSelect
                 | Instruction::LiveMultiSelect
@@ -4253,13 +4399,27 @@ impl NativeSession {
                 | Instruction::LiveCheckUnitFilters
                 | Instruction::LiveDistanceCheck
                 | Instruction::LiveUnitTypeCheck
+                | Instruction::LiveUnitOnBoard
                 | Instruction::LiveBooleanCombine
                 | Instruction::LiveConvertCardItem
                 | Instruction::LiveAfterAttackText
                 | Instruction::LiveMinionRespawn
+                | Instruction::LiveAdjacentEnemies
+                | Instruction::LiveZoneChange
+                | Instruction::LiveSoloWin
                 | Instruction::LiveCardCount
                 | Instruction::LiveRoundDefeat
                 | Instruction::LiveRuneChoice
+                | Instruction::LiveMirrorPush
+                | Instruction::LiveRemovePiece
+                | Instruction::LiveSpawnPiece
+                | Instruction::LiveSetPiece
+                | Instruction::LiveLaugh
+                | Instruction::LiveRevealHandCard
+                | Instruction::LiveCardGuess { .. }
+                | Instruction::LiveChooseCardColor
+                | Instruction::LiveDirectionalMove
+                | Instruction::LiveRuneInscription
                 | Instruction::LiveMarkPassive
                 | Instruction::LiveDiscard
                 | Instruction::LiveRetrieve
@@ -4270,6 +4430,11 @@ impl NativeSession {
                 | Instruction::LiveTokenBatch
                 | Instruction::LiveTokenRemove
                 | Instruction::LiveForceDiscard
+                | Instruction::LiveColorDiscard
+                | Instruction::LiveResolvedCardSwap
+                | Instruction::LiveCardSwap
+                | Instruction::LiveDeckCardSwap
+                | Instruction::LiveItemSwap
                 | Instruction::LiveDiscardOrDefeat
                 | Instruction::LiveCardSelect => {
                     return Err(unsupported(
@@ -5416,6 +5581,10 @@ impl NativeSession {
         frame.request = None;
         Ok(())
     }
+    pub fn selection_json(&self, selection: &Datum) -> Value {
+        selection.to_json(&self.symbols)
+    }
+
     pub fn import_selection(&mut self, value: &Value) -> Result<Datum> {
         let value =
             Datum::from_json(value, Arc::make_mut(&mut self.symbols)).map_err(unsupported)?;
@@ -5803,6 +5972,32 @@ impl NativeSession {
                 "options":cards.iter().map(|id| {let d=&self.world.definitions.cards[self.world.card(*id).unwrap().definition]; json!({"id":self.symbols.name(d.printed_id),"text":self.symbols.name(d.name),"metadata":{"card_id":self.symbols.name(d.printed_id),"color":d.color.map(|id| self.symbols.name(id))}})}).collect::<Vec<_>>(),
                 "can_skip":true,"can_rollback":false,"context":{},"decision_context":{"purpose":"discard","actor_id":self.symbols.name(owner),"source_card_id":null,"choice_facts":{}}});
         }
+        if let RequestChoices::RuneInscription {
+            hero,
+            placed,
+            remaining,
+        } = &request.choices
+        {
+            let slot = placed.len() + 1;
+            let count = remaining.len();
+            let mut counts = vec![1, count - 1, count];
+            counts.dedup();
+            return json!({"id":self.request_token(request.id),"request_type":"SELECT_OPTION","player_id":self.symbols.name(owner),"prompt":format!("Place a rune below turn slot {slot}"),
+                "options":remaining.iter().map(|id| {let name=self.symbols.name(*id);let mut label=name.to_owned();label[..1].make_ascii_uppercase();json!({"id":name,"text":label,"metadata":{}})}).collect::<Vec<_>>(),
+                "can_skip":false,"can_rollback":false,"context":{"supports_batch":true,"next_slot":slot,"placed_runes":self.runes_json(placed),"max_selections":count,"selection_counts":counts},"decision_context":{"purpose":"rune_inscription","actor_id":self.symbols.name(*hero),"source_card_id":null,"choice_facts":{}}});
+        }
+        if let RequestChoices::CardColors(values) = &request.choices {
+            let options = values
+                .iter()
+                .map(|id| {
+                    let name = self.symbols.name(*id);
+                    json!({"id":name,"text":name,"metadata":{}})
+                })
+                .collect::<Vec<_>>();
+            return json!({"id":self.request_token(request.id),"request_type":"SELECT_OPTION",
+                "player_id":self.symbols.name(owner),"prompt":self.symbols.name(request.prompt),
+                "options":options,"can_skip":false,"can_rollback":false,"context":{},"decision_context":null});
+        }
         if let RequestChoices::Runes(values) = &request.choices {
             return json!({"id":self.request_token(request.id),"request_type":"SELECT_OPTION","player_id":self.symbols.name(owner),"prompt":self.symbols.name(request.prompt),"options":values.iter().map(|id| {let name=self.symbols.name(*id);let label=match name {"axe"=>"Axe","bird"=>"Bird","anvil"=>"Anvil","horn"=>"Horn",_=>name};json!({"id":name,"text":label,"metadata":{}})}).collect::<Vec<_>>(),"can_skip":false,"can_rollback":false,"context":{},"decision_context":{"purpose":"rune_selection","actor_id":self.symbols.name(owner),"source_card_id":null,"choice_facts":{}}});
         }
@@ -5876,11 +6071,11 @@ impl NativeSession {
                 "options":[],"can_skip":false,"can_rollback":false,"context":{"players":players,"supports_batch":true,"supports_preview":true},"decision_context":null});
         }
         let (kind,options)=match &request.choices {
-            RequestChoices::Minions(_) | RequestChoices::SpellCards { .. } | RequestChoices::PrimaryReplacement { .. } | RequestChoices::Runes(_) | RequestChoices::Protection(_) | RequestChoices::Mines(_) | RequestChoices::Defense(_) | RequestChoices::Action(_)|RequestChoices::Actors{..}|RequestChoices::Respawn{..}|RequestChoices::Upgrades(_)=>unreachable!(),
+            RequestChoices::Minions(_) | RequestChoices::SpellCards { .. } | RequestChoices::PrimaryReplacement { .. } | RequestChoices::Runes(_) | RequestChoices::CardColors(_) | RequestChoices::RuneInscription { .. } | RequestChoices::Protection(_) | RequestChoices::Mines(_) | RequestChoices::Defense(_) | RequestChoices::Action(_)|RequestChoices::Actors{..}|RequestChoices::Respawn{..}|RequestChoices::Upgrades(_)=>unreachable!(),
             RequestChoices::ConfirmAction=>("CHOOSE_ACTION",vec![json!({"id":"CONFIRM","text":"Confirm","metadata":{}})]),
             RequestChoices::Multiple{values,..}=>("SELECT_UNIT",values.iter().map(|id|json!({"id":self.symbols.name(*id),"text":self.symbols.name(*id),"metadata":{}})).collect()),
             RequestChoices::Units {tokens,values}=>(if *tokens {"SELECT_UNIT_OR_TOKEN"}else{"SELECT_UNIT"},values.iter().map(|(id,label)|{
-                let text=label.map_or_else(||self.symbols.name(*id).to_owned(),|(name,hex)|{let(q,r,s)=hex.coordinates();format!("{} at ({q}, {r}, {s})",self.symbols.name(name))});
+                let text=label.map_or_else(||if *id == self.skip { "Keep all pieces".to_owned() } else { self.symbols.name(*id).to_owned() },|(name,hex)|{let(q,r,s)=hex.coordinates();format!("{} at ({q}, {r}, {s})",self.symbols.name(name))});
                 json!({"id":self.symbols.name(*id),"text":text,"metadata":{}})
             }).collect()),
             RequestChoices::Hexes(values)|RequestChoices::ZoneHexes{values,..}=>("SELECT_HEX",values.iter().map(|hex|{
@@ -5888,8 +6083,11 @@ impl NativeSession {
             }).collect()),
             RequestChoices::CardIds{values,..}=>("SELECT_CARD",values.iter().map(|id|json!({"id":self.symbols.name(*id),"text":self.symbols.name(*id),"metadata":{}})).collect()),
             RequestChoices::Cards(values)=>("SELECT_CARD",values.iter().map(|(id,name,initiative)|json!({"id":self.symbols.name(*id),"text":format!("{} (initiative {initiative})",self.symbols.name(*name)),"metadata":{}})).collect()),
-            RequestChoices::Passive{..}=>("CONFIRM_PASSIVE",vec![json!({"id":"YES","text":"Yes","metadata":{}}),json!({"id":"NO","text":"No","metadata":{}})]),
+            RequestChoices::Passive{..} | RequestChoices::Laugh=>("CONFIRM_PASSIVE",vec![json!({"id":"YES","text":"Yes","metadata":{}}),json!({"id":"NO","text":"No","metadata":{}})]),
             RequestChoices::Repeat{..} | RequestChoices::YesNo=>("SELECT_OPTION",vec![json!({"id":"YES","text":"Yes","metadata":{}}),json!({"id":"NO","text":"No","metadata":{}})]),
+            RequestChoices::MirrorDistances(values)=>("SELECT_NUMBER", values.iter().map(|(distance, actual)|
+                json!({"id":distance.to_string(),"text":distance.to_string(),"metadata":{"actual_moved":actual}})
+            ).collect()),
             RequestChoices::Numbers {values,labels}=>("SELECT_NUMBER",values.iter().map(|n|{
                 let label=labels.iter().find(|(number,_)|number==n).map(|(_,id)|self.symbols.name(*id).to_owned()).unwrap_or_else(||n.to_string());
                 json!({"id":n.to_string(),"text":label,"metadata":if labels.is_empty(){json!({})}else{json!({"raw":n})}})
@@ -5929,8 +6127,46 @@ impl NativeSession {
             "prompt":prompt,"options":options,"can_skip":request.can_skip,"can_rollback":false,"context":match &request.choices {RequestChoices::Passive{card,name}=>json!({"card_id":self.symbols.name(*card),"card_name":self.symbols.name(*name)}),RequestChoices::ZoneHexes{unit:Some(id),..}=>json!({"context_unit_id":self.symbols.name(*id)}),_=>json!({})},
             "decision_context":if request.discard {json!({"purpose":"discard","actor_id":self.symbols.name(owner),"source_card_id":null,"choice_facts":{}})}else{Value::Null}})
     }
+    fn runes_json(&self, placed: &[(Symbol, Symbol)]) -> Value {
+        Value::Object(
+            placed
+                .iter()
+                .map(|(slot, rune)| {
+                    (
+                        self.symbols.name(*slot).into(),
+                        json!(self.symbols.name(*rune)),
+                    )
+                })
+                .collect(),
+        )
+    }
     pub fn event_json(&self, event: &NativeEvent) -> Value {
         match event {
+            NativeEvent::RunesPlaced { hero, placed } => {
+                json!({"event_type":"RUNES_PLACED","actor_id":self.symbols.name(*hero),"target_id":null,"from_hex":null,"to_hex":null,"metadata":{"rune_slots":self.runes_json(placed)}})
+            }
+            NativeEvent::JourneyScheduled {
+                actor,
+                target,
+                kind,
+            } => {
+                json!({"event_type":"EFFECT_CREATED","actor_id":self.symbols.name(*actor),"target_id":self.symbols.name(*target),"from_hex":null,"to_hex":null,"metadata":{"effect_type":self.symbols.name(*kind)}})
+            }
+            NativeEvent::ActionControlScheduled {
+                actor,
+                target,
+                card,
+            } => {
+                json!({"event_type":"EFFECT_CREATED","actor_id":self.symbols.name(*actor),"target_id":self.symbols.name(*target),"from_hex":null,"to_hex":null,"metadata":{"effect":"action_control","controller_id":self.symbols.name(*actor),"card_id":self.symbols.name(*card)}})
+            }
+            NativeEvent::InitiativeOverride {
+                actor,
+                target,
+                card,
+                value,
+            } => {
+                json!({"event_type":"EFFECT_CREATED","actor_id":actor.map(|id|self.symbols.name(id)),"target_id":self.symbols.name(*target),"from_hex":null,"to_hex":null,"metadata":{"effect":"initiative_override","card_id":self.symbols.name(*card),"value":value}})
+            }
             NativeEvent::EffectCreated(event) => {
                 let mut metadata = serde_json::Map::new();
                 metadata.insert("effect_type".into(), json!(self.symbols.name(event.kind)));
@@ -6032,6 +6268,14 @@ impl NativeSession {
             } => {
                 json!({"event_type":if *token{"TOKEN_PUSHED"}else{"UNIT_PUSHED"},"actor_id":actor.map(|id|self.symbols.name(id)),"target_id":self.symbols.name(*target),"from_hex":from,"to_hex":to,"metadata":{"distance":distance,"collision":collision}})
             }
+            NativeEvent::ItemGranted {
+                owner,
+                stat,
+                amount,
+            } => {
+                json!({"event_type":"ITEM_GAINED","actor_id":self.symbols.name(*owner),"target_id":null,
+                    "from_hex":null,"to_hex":null,"metadata":{"stat_type":stat.name(),"amount":amount}})
+            }
             NativeEvent::GoldEffect {
                 actor,
                 target,
@@ -6053,6 +6297,20 @@ impl NativeSession {
                 amount,
             } => {
                 json!({"event_type":"GOLD_GAINED","actor_id":self.symbols.name(*actor),"target_id":self.symbols.name(*victim),"from_hex":null,"to_hex":null,"metadata":{"amount":amount.to_json(&self.symbols),"reason":"steal"}})
+            }
+            NativeEvent::AdditionalLifeSpent {
+                team,
+                target,
+                total,
+                change,
+            } => {
+                json!({"event_type":"LIFE_COUNTER_CHANGED","actor_id":null,"target_id":self.symbols.name(*target),
+                    "from_hex":null,"to_hex":null,"metadata":{"team":self.symbols.name(*team),"change":change,
+                    "remaining":total,"reason":"additional_life_counter"}})
+            }
+            NativeEvent::LifePenaltyAnnihilation { winner } => {
+                json!({"event_type":"GAME_OVER","actor_id":null,"target_id":null,"from_hex":null,"to_hex":null,
+                    "metadata":{"reason":"annihilation","winning_team":self.symbols.name(*winner)}})
             }
             NativeEvent::LifeRestored {
                 hero,
@@ -6080,12 +6338,81 @@ impl NativeSession {
                 }
                 json!({"event_type":"CARD_RETRIEVED","actor_id":self.symbols.name(*hero),"target_id":null,"from_hex":null,"to_hex":null,"metadata":metadata})
             }
+            NativeEvent::GuessSelected {
+                actor,
+                victim,
+                attempt,
+            } => {
+                json!({"event_type":"CARD_SELECTED_FOR_GUESS","actor_id":actor.map(|id|self.symbols.name(id)),
+                    "target_id":self.symbols.name(*victim),"from_hex":null,"to_hex":null,"metadata":{"attempt":attempt}})
+            }
+            NativeEvent::ResolvedCardsSwapped { actor, target, a, b } => json!({
+                "event_type":"RESOLVED_CARDS_SWAPPED",
+                "actor_id":actor.map(|id|self.symbols.name(id)),
+                "target_id":self.symbols.name(*target), "from_hex":null, "to_hex":null,
+                "metadata":{"card_a_id":self.symbols.name(*a),"card_b_id":self.symbols.name(*b)}
+            }),
+            NativeEvent::HeroPieceRemoved { owner, piece, from } => json!({
+                "event_type":"UNIT_REMOVED", "actor_id":self.symbols.name(*owner),
+                "target_id":self.symbols.name(*piece), "from_hex":from, "to_hex":null,
+                "metadata":{"owner_hero_id":self.symbols.name(*owner),"voluntary":true}
+            }),
+            NativeEvent::HeroPieceSpawned { owner, piece, to } => json!({
+                "event_type":"UNIT_PLACED", "actor_id":self.symbols.name(*owner),
+                "target_id":self.symbols.name(*piece), "from_hex":null, "to_hex":to,
+                "metadata":{"owner_hero_id":self.symbols.name(*owner)}
+            }),
+            NativeEvent::HeroLaughed(actor) => json!({
+                "event_type":"HERO_LAUGHED", "actor_id":self.symbols.name(*actor),
+                "target_id":null, "from_hex":null, "to_hex":null, "metadata":{}
+            }),
+            NativeEvent::HandCardRevealed { actor, target, owner, card, name, color, tier, tier_value } =>
+                json!({"event_type":"CARD_REVEALED",
+                    "actor_id":actor.map(|id|self.symbols.name(id)),
+                    "target_id":self.symbols.name(*target),"from_hex":null,"to_hex":null,
+                    "metadata":{"owner_id":self.symbols.name(*owner),
+                        "card_id":self.symbols.name(*card),"card_name":self.symbols.name(*name),
+                        "card_color":color.map(|id|self.symbols.name(id)),
+                        "card_tier":self.symbols.name(*tier),"tier_value":tier_value}}),
+            NativeEvent::GuessRevealed {
+                actor,
+                victim,
+                attempt,
+                card,
+                name,
+                actual,
+                guessed,
+                correct,
+            } => {
+                json!({"event_type":"GUESSED_CARD_REVEALED","actor_id":actor.map(|id|self.symbols.name(id)),
+                    "target_id":self.symbols.name(*victim),"from_hex":null,"to_hex":null,
+                    "metadata":{"attempt":attempt,"card_id":self.symbols.name(*card),"card_name":self.symbols.name(*name),
+                        "card_color":actual.map(|id|self.symbols.name(id)),"guessed_color":self.symbols.name(*guessed),"guess_correct":correct}})
+            }
+            NativeEvent::DeckCardSwapped {
+                actor,
+                outgoing,
+                incoming,
+                state,
+                facedown,
+            } => {
+                json!({"event_type":"DECK_CARD_SWAPPED","actor_id":self.symbols.name(*actor),"target_id":null,"from_hex":null,"to_hex":null,"metadata":{"outgoing_card_id":self.symbols.name(*outgoing),"incoming_card_id":self.symbols.name(*incoming),"incoming_card_state":state,"incoming_is_facedown":facedown}})
+            }
             NativeEvent::ItemGained { actor, stat, card } => {
                 json!({"event_type":"ITEM_GAINED","actor_id":self.symbols.name(*actor),"target_id":null,"from_hex":null,"to_hex":null,"metadata":{"stat_type":stat.name(),"amount":1,"source_card_id":self.symbols.name(*card)}})
             }
             NativeEvent::TieBreakerFlipped { blue } => {
                 json!({"event_type":"TIE_BREAKER_FLIPPED","actor_id":null,"target_id":null,"from_hex":null,"to_hex":null,
                 "metadata":{"tie_breaker_team":if *blue {"BLUE"}else{"RED"},"coin_face":if *blue {"BLUE"}else{"ORANGE"}}})
+            }
+            NativeEvent::DirectionalMove {
+                unit,
+                from,
+                to,
+                direction,
+            } => {
+                json!({"event_type":"UNIT_MOVED","actor_id":self.symbols.name(*unit),"target_id":null,
+                    "from_hex":from,"to_hex":to,"metadata":{"direction":direction,"simultaneous":true}})
             }
             NativeEvent::UnitMoved {
                 unit,
@@ -6098,6 +6425,29 @@ impl NativeSession {
         }
     }
 }
+fn valid_rune_batch(selection: &Datum, remaining: &[Symbol]) -> Option<Vec<Symbol>> {
+    let values = match selection {
+        Datum::List(values) => values.as_slice(),
+        value => std::slice::from_ref(value),
+    };
+    if values.is_empty()
+        || ![1, remaining.len().saturating_sub(1), remaining.len()].contains(&values.len())
+    {
+        return None;
+    }
+    let mut chosen = Vec::with_capacity(values.len());
+    for value in values {
+        let Datum::Text(rune) = value else {
+            return None;
+        };
+        if !remaining.contains(rune) || chosen.contains(rune) {
+            return None;
+        }
+        chosen.push(*rune);
+    }
+    Some(chosen)
+}
+
 fn datum_hex(value: &Datum, symbols: &Symbols, keys: [Symbol; 3]) -> Result<Hex> {
     value.hex(keys, symbols).map_err(EngineError::Rule)
 }
@@ -6628,12 +6978,16 @@ fn compile_step(
         "remove_prepared_spells" => Instruction::LiveSpell(crate::spells::SpellOp::Remove),
         "check_unit_filters" => Instruction::LiveCheckUnitFilters,
         "check_distance" => Instruction::LiveDistanceCheck,
+        "check_unit_on_board" => Instruction::LiveUnitOnBoard,
         "check_unit_type" => Instruction::LiveUnitTypeCheck,
         "combine_boolean_context" => Instruction::LiveBooleanCombine,
         "convert_card_to_item" => Instruction::LiveConvertCardItem,
         "apply_after_attack_card_text" => Instruction::LiveAfterAttackText,
         "place_token" => Instruction::LiveTokenPlace,
         "respawn_minion_at_hex" => Instruction::LiveMinionRespawn,
+        "count_adjacent_enemies" => Instruction::LiveAdjacentEnemies,
+        "check_zone_change" => Instruction::LiveZoneChange,
+        "check_solo_win" => Instruction::LiveSoloWin,
         "count_cards" => Instruction::LiveCardCount,
         "check_hero_defeated_this_round" => Instruction::LiveRoundDefeat,
         "gain_coins" | "lose_coins" | "restore_spent_life_counter" | "steal_coins" => {
@@ -7141,6 +7495,13 @@ fn compile_step(
                 defeat,
             }
         }
+        // Arena-only primary recipes may be imported as inert templates by the
+        // transitional dense path. Reaching them retains the pre-pop guard.
+        "co_directional_drag" => Instruction::LiveDrag,
+        "move_toward_target" => Instruction::LiveMoveToward,
+        "set_card_initiative" => Instruction::LiveSetInitiative,
+        "schedule_action_control" => Instruction::LiveActionControl,
+        "schedule_journey_return" => Instruction::LiveJourney,
         "set_context_flag" => Instruction::Set {
             key: required_symbol(raw, "key", symbols)?,
             value: Datum::from_json(raw.get("value").unwrap_or(&Value::Bool(true)), symbols)
@@ -7700,6 +8061,37 @@ mod tests {
         }
     }
     #[test]
+    fn inert_hanu_templates_import_but_reached_dense_instructions_are_guarded() {
+        for kind in [
+            "co_directional_drag",
+            "set_card_initiative",
+            "schedule_action_control",
+            "schedule_journey_return",
+        ] {
+            for enabled in [false, true] {
+                let mut envelope = source("action-execution-Min-HOLD");
+                envelope.state["execution_stack"] = json!([{
+                    "type": kind, "active_if_key": "hanu_enabled", "step_id": "fixture/hanu-inert"
+                }]);
+                envelope.state["execution_context"]["hanu_enabled"] = json!(enabled);
+                let mut worker = NativeSession::compile(envelope).unwrap();
+                let before = worker.semantic_state().unwrap();
+                if enabled {
+                    assert!(matches!(
+                        worker.advance(&ExecutionBudget::default()),
+                        Err(EngineError::Unsupported(_))
+                    ));
+                    assert_eq!(worker.semantic_state().unwrap(), before);
+                    assert_eq!(worker.stack.len(), 1);
+                } else {
+                    worker.advance(&ExecutionBudget::default()).unwrap();
+                    assert!(worker.stack.is_empty());
+                }
+            }
+        }
+    }
+
+    #[test]
     fn inert_distance_templates_import_but_reached_dense_distance_is_guarded_before_pop() {
         for active in [false, true] {
             let mut envelope = source("action-execution-Min-HOLD");
@@ -7983,12 +8375,18 @@ mod tests {
                 (step.primary_template
                     && matches!(
                         step.instruction,
-                        Instruction::LiveCardCount | Instruction::LiveRoundDefeat
+                        Instruction::LiveAdjacentEnemies
+                            | Instruction::LiveCardCount
+                            | Instruction::LiveRoundDefeat
                     ))
                 .then_some(i)
             })
             .collect();
         assert!(indices.len() >= 3);
+        assert!(indices.iter().any(|index| matches!(
+            root.steps[*index].instruction,
+            Instruction::LiveAdjacentEnemies
+        )));
         for index in indices {
             for enabled in [false, true] {
                 let mut worker = root.clone();
@@ -10055,14 +10453,7 @@ mod tests {
         assert_eq!(worker.semantic_state().unwrap(), before);
         let mut worker = root.clone();
         let card = worker.world.hero(actor).unwrap().discard[0];
-        worker
-            .world
-            .heroes
-            .iter_mut()
-            .find(|h| h.id == actor)
-            .unwrap()
-            .discard
-            .push(card);
+        worker.world.hero_row_mut(actor).unwrap().discard.push(card);
         let before = worker.semantic_state().unwrap();
         assert!(matches!(
             worker.world.retrieve_card(actor, None, true),

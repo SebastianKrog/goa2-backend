@@ -12,8 +12,7 @@ pub(super) struct RoundTransitionPlan {
     request: Option<NativeRequest>,
 }
 impl NativeSession {
-    fn sync_upgrade_state_bound(&mut self, objects: &BoundObjects) -> Result<()> {
-        self.sync_card_collections_bound(objects)?;
+    pub(super) fn sync_hero_items_bound(&mut self, objects: &BoundObjects) -> Result<()> {
         for (hero, model) in &objects.phases.heroes {
             let items = match objects.arena.field(*model, self.cleanup_key("items")) {
                 Some(ObjectValue::Object(id)) => id,
@@ -23,12 +22,7 @@ impl NativeSession {
                 .arena
                 .fields(items)
                 .ok_or_else(|| unsupported("upgrade items must be a mapping"))?;
-            let row = self
-                .world
-                .heroes
-                .iter_mut()
-                .find(|row| row.id == *hero)
-                .unwrap();
+            let row = self.world.hero_row_mut(*hero).unwrap();
             row.items.fill(0);
             row.items_order.clear();
             for (key, value) in rows {
@@ -41,6 +35,12 @@ impl NativeSession {
                 row.items_order.push(stat);
             }
         }
+        Ok(())
+    }
+
+    fn sync_upgrade_state_bound(&mut self, objects: &BoundObjects) -> Result<()> {
+        self.sync_card_collections_bound(objects)?;
+        self.sync_hero_items_bound(objects)?;
         let pending = self.battle_root_map(objects, "pending_upgrades")?;
         self.round.pending = objects
             .arena
@@ -56,7 +56,10 @@ impl NativeSession {
             .collect::<Result<Vec<_>>>()?;
         Ok(())
     }
-    pub(super) fn validate_upgrade_submission_bound(&self, selection: &Datum) -> Result<()> {
+    pub(in crate::interpreter) fn validate_upgrade_submission_bound(
+        &self,
+        selection: &Datum,
+    ) -> Result<()> {
         let mut preview = self.clone();
         let objects = self
             .objects
@@ -187,7 +190,7 @@ impl NativeSession {
                     .arena
                     .set_field(items, key, ObjectValue::Atom(Datum::Int(n)))
                     .map_err(unsupported)?;
-                let h = self.world.heroes.iter_mut().find(|h| h.id == hero).unwrap();
+                let h = self.world.hero_row_mut(hero).unwrap();
                 h.items[stat.index()] = n;
                 if !h.items_order.contains(&stat) {
                     h.items_order.push(stat);
@@ -370,7 +373,8 @@ impl NativeSession {
         reset: bool,
     ) -> Result<RoundTransitionPlan> {
         let mut session = self.clone();
-        let mut arena = objects.clone();
+        session.world.inherit_row_undo(&self.world);
+        let mut arena = objects.staged_clone();
         if !matches!(arena.arena.list_pop(arena.stack).map_err(unsupported)?,Some(ObjectValue::Object(id)) if id==step)
         {
             return Err(unsupported("round transition staged stack drift"));

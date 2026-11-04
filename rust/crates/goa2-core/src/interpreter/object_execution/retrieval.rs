@@ -201,7 +201,7 @@ impl NativeSession {
         if objects.effect_nodes()?.len() != self.world.effects.instances.len() {
             return Err(unsupported("retrieval effect collection drift"));
         }
-        let mut world = self.world.clone();
+        let mut world = self.world.staged_clone();
         let mut current = hero.current;
         let mut cleared = HashSet::new();
         let mut rows = Vec::new();
@@ -280,7 +280,7 @@ impl NativeSession {
         };
         let before = self
             .world
-            .cards
+            .cards()
             .iter()
             .map(|c| c.active)
             .collect::<Vec<_>>();

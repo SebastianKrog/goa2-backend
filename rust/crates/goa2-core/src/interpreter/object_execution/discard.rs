@@ -310,10 +310,10 @@ impl NativeSession {
             .arena
             .append(log, ObjectValue::Atom(Datum::Text(plan.printed)))
             .map_err(unsupported)?;
-        self.world.history.discarded = plan.history;
+        self.world.history.replace_discards(plan.history);
         let before = self
             .world
-            .cards
+            .cards()
             .iter()
             .map(|card| card.active)
             .collect::<Vec<_>>();
@@ -378,7 +378,7 @@ mod tests {
         session.advance_prefix(1).unwrap();
         let arien = session.symbols.lookup("hero_arien").unwrap();
         let hanu = session.symbols.lookup("hero_hanu").unwrap();
-        let history = &session.world.history.discarded;
+        let history = session.world.history.discarded();
         let a = &history.iter().find(|(hero, _)| *hero == arien).unwrap().1;
         let b = &history.iter().find(|(hero, _)| *hero == hanu).unwrap().1;
         assert_eq!(a.len(), 2);
@@ -388,7 +388,7 @@ mod tests {
             session
                 .world
                 .history
-                .discarded
+                .discarded()
                 .iter()
                 .map(|(hero, cards)| {
                     (

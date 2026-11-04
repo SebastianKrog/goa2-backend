@@ -4,6 +4,235 @@ use super::*;
 use crate::cards::CardId;
 
 impl NativeSession {
+    /// Fork a clean planning boundary with all other ordinary hands sampled.
+    /// The returned worker leaves other heroes uncommitted so a joint planning
+    /// policy can select their moves from the same pre-reveal state.
+    pub fn sampled_planning_world(&self, player: Symbol, seed: u64) -> Result<Self> {
+        let samples = self.planning_samples(player, seed)?;
+        let mut worker = self.clone();
+        worker.install_planning_samples(samples)?;
+        Ok(worker)
+    }
+
+    /// Install one observation-derived sample for a speculative operation.
+    pub fn with_sampled_planning<T>(
+        &mut self,
+        player: Symbol,
+        seed: u64,
+        operation: impl FnOnce(&mut Self) -> Result<T>,
+    ) -> Result<T> {
+        let samples = self.planning_samples(player, seed)?;
+        self.with_rollback(|worker| {
+            worker.install_planning_samples(samples)?;
+            operation(worker)
+        })
+    }
+
+    fn planning_samples(
+        &self,
+        player: Symbol,
+        seed: u64,
+    ) -> Result<Vec<(Symbol, super::super::SampledHand)>> {
+        let observation = self.player_observation(player)?;
+        if self.planning.phase != Phase::Planning {
+            return Err(unsupported("sampled worlds require planning"));
+        }
+        for effect in &self.world.effects.instances {
+            let public = self.world.hero(effect.source).and_then(|hero| {
+                observation
+                    .heroes
+                    .iter()
+                    .find(|row| row.id == self.symbols.name(hero.id))
+            });
+            let is_public = |card| {
+                public.is_some_and(|hero| {
+                    hero.played.iter().chain(&hero.discarded).any(|entry| {
+                        matches!(entry, super::super::PublicCard::Revealed(id) if id == self.symbols.name(card))
+                    })
+                })
+            };
+            if !effect.card.is_some_and(is_public)
+                || effect.linked_card.is_some_and(|card| !is_public(card))
+            {
+                return Err(unsupported(
+                    "sampled worlds require effect cards in revealed public zones",
+                ));
+            }
+        }
+        let mut samples = Vec::new();
+        for (index, hero) in self.world.heroes.iter().enumerate() {
+            if hero.id == player {
+                continue;
+            }
+            let public = &observation.heroes[index];
+            if !hero.spells.is_empty() || !public.revealed_current.is_empty() {
+                return Err(unsupported(
+                    "sampled world requires ordinary cards without current reveals",
+                ));
+            }
+            let sample = observation
+                .sample_planning_hand(&public.id, seed.wrapping_add(index as u64))?
+                .ok_or_else(|| unsupported("no consistent ordinary planning hand"))?;
+            samples.push((hero.id, sample));
+        }
+        Ok(samples)
+    }
+
+    fn install_planning_samples(
+        &mut self,
+        samples: Vec<(Symbol, super::super::SampledHand)>,
+    ) -> Result<()> {
+        self.with_live_objects(|session, objects| {
+            for (hero, sample) in samples {
+                session.install_sampled_hand(objects, hero, &sample)?;
+            }
+            session.sync_card_collections_bound(objects)?;
+            session.world.refresh_card_auras();
+            objects.readonly.take();
+            Ok(())
+        })
+    }
+
+    fn install_sampled_hand(
+        &mut self,
+        objects: &mut BoundObjects,
+        hero: Symbol,
+        sample: &super::super::SampledHand,
+    ) -> Result<()> {
+        use crate::world::CardLifecycle;
+        let model = self
+            .hero_model_bound(objects, hero)
+            .ok_or_else(|| unsupported("sampled hero model missing"))?;
+        let pending = objects.phases.root(&objects.arena, Field::Pending)?;
+        while matches!(
+            objects.arena.field(pending, hero),
+            Some(ObjectValue::Atom(Datum::Instance(_)))
+        ) {
+            self.uncommit_card_bound(objects, hero)?;
+        }
+        if objects.arena.field(pending, hero).is_some() {
+            objects
+                .arena
+                .apply(&crate::objects::Mutation::Delete {
+                    target: crate::objects::Target::Object(pending),
+                    key: hero,
+                })
+                .map_err(unsupported)?;
+        }
+        let hand = self.planning_hand_bound(objects, model)?;
+        let deck = self.hero_card_list_bound(objects, model, Field::Deck)?;
+        let row = self
+            .world
+            .hero(hero)
+            .ok_or_else(|| unsupported("sampled hero missing"))?;
+        let public_cards = row
+            .played
+            .iter()
+            .flatten()
+            .chain(&row.discard)
+            .copied()
+            .collect::<Vec<_>>();
+        if public_cards.iter().any(|card| !deck.contains(&Some(*card))) {
+            return Err(unsupported(
+                "sampled world has a foreign card in a public zone",
+            ));
+        }
+        let mut selected = Vec::new();
+        for card in deck.into_iter().flatten() {
+            if public_cards.contains(&card) {
+                continue;
+            }
+            let row = self
+                .world
+                .card(card)
+                .ok_or_else(|| unsupported("sampled card missing"))?;
+            let id = self
+                .symbols
+                .name(self.world.definitions.cards[row.definition].printed_id);
+            let (state, wire) = if sample.cards.iter().any(|value| value == id) {
+                selected.push(card);
+                (CardLifecycle::Hand, "HAND")
+            } else if sample.loadout.item_card_ids.iter().any(|value| value == id) {
+                (CardLifecycle::Item, "ITEM")
+            } else if sample.retired.iter().any(|value| value == id) {
+                (CardLifecycle::Retired, "RETIRED")
+            } else {
+                (CardLifecycle::Deck, "DECK")
+            };
+            let wire = self.choice_symbol(wire);
+            objects.arena.symbols = self.symbols.clone();
+            self.planning_card_scalars_bound(objects, card, false)?;
+            let key = objects.phases.k(Field::CardState);
+            objects
+                .arena
+                .set_physical_field(card.0, key, Datum::Text(wire))
+                .map_err(unsupported)?;
+            self.world.change_lifecycle(card, state);
+            let row = self.world.card_mut(card).unwrap();
+            row.facedown = false;
+            row.played_this_round = false;
+        }
+        if selected.len() != sample.cards.len() {
+            return Err(unsupported("sampled hand does not match the physical deck"));
+        }
+        objects.arena.clear_list(hand).map_err(unsupported)?;
+        for card in selected {
+            objects
+                .arena
+                .append(hand, ObjectValue::Atom(Datum::Instance(card.0)))
+                .map_err(unsupported)?;
+        }
+        Ok(())
+    }
+
+    pub(in crate::interpreter) fn planning_choices_bound(
+        &self,
+        objects: &BoundObjects,
+        hero: Symbol,
+    ) -> Result<Vec<super::super::DecisionMove>> {
+        use super::super::DecisionMove;
+        if self.planning.phase != Phase::Planning
+            || !objects.phases.heroes.iter().any(|(id, _)| *id == hero)
+        {
+            return Ok(Vec::new());
+        }
+        let model = self
+            .hero_model_bound(objects, hero)
+            .ok_or_else(|| unsupported("planning hero model missing"))?;
+        let p = &objects.phases;
+        let pending = p.root(&objects.arena, Field::Pending)?;
+        let first = objects.arena.field(pending, hero);
+        if let Some(first) = &first {
+            let second = p.root(&objects.arena, Field::Second)?;
+            let done = p.root(&objects.arena, Field::Done)?;
+            if matches!(first, ObjectValue::Atom(Datum::Null))
+                || !self.planning.two_cards(&self.world, hero)
+                || objects.arena.field(second, hero).is_some()
+                || objects
+                    .arena
+                    .sequence(done)
+                    .ok_or_else(|| unsupported("planning done list missing"))?
+                    .iter()
+                    .any(|value| matches!(value, ObjectValue::Atom(Datum::Text(id)) if *id == hero))
+            {
+                return Ok(Vec::new());
+            }
+        }
+        let hand = self.hero_card_list_bound(objects, model, Field::Hand)?;
+        let mut choices = Vec::new();
+        for card in hand.iter().flatten().copied() {
+            if self.world.normal_card(card).is_ok() {
+                choices.push(DecisionMove::Card { hero, card });
+            }
+        }
+        if first.is_some() {
+            choices.push(DecisionMove::FinishPlanning { hero });
+        } else if hand.is_empty() {
+            choices.push(DecisionMove::Pass { hero });
+        }
+        Ok(choices)
+    }
+
     fn hero_card_list_bound(
         &self,
         objects: &BoundObjects,
@@ -198,7 +427,7 @@ impl NativeSession {
             )
             .map_err(unsupported)?;
         self.sync_card_collections_bound(objects)?;
-        objects.readonly = Arc::new(objects.arena.readonly_objects());
+        objects.readonly.take();
         self.check_planning_transition_bound(objects)
     }
     pub(in crate::interpreter) fn uncommit_card_bound(
@@ -285,7 +514,7 @@ impl NativeSession {
                 .map_err(unsupported)?;
         }
         self.sync_card_collections_bound(objects)?;
-        objects.readonly = Arc::new(objects.arena.readonly_objects());
+        objects.readonly.take();
         Ok(())
     }
     pub(super) fn hero_hand_nonempty_bound(
@@ -388,7 +617,7 @@ impl NativeSession {
             .arena
             .set_field(pending, hero, ObjectValue::Atom(Datum::Null))
             .map_err(unsupported)?;
-        objects.readonly = Arc::new(objects.arena.readonly_objects());
+        objects.readonly.take();
         self.check_planning_transition_bound(objects)
     }
     pub(in crate::interpreter) fn finish_planning_bound(
@@ -446,8 +675,8 @@ mod tests {
         let Some(ObjectValue::Object(kept)) = objects.arena.field(old, key) else {
             unreachable!()
         };
-        assert!(objects.readonly.contains(&old));
-        assert!(objects.readonly.contains(&kept));
+        assert!(objects.protected(old));
+        assert!(objects.protected(kept));
         session.pass_planning(hero).unwrap();
         let objects = session.objects.as_ref().unwrap();
         let current = objects
@@ -455,9 +684,9 @@ mod tests {
             .root(&objects.arena, Field::Requests)
             .unwrap();
         assert_ne!(old, current);
-        assert!(!objects.readonly.contains(&old));
-        assert!(objects.readonly.contains(&current));
-        assert!(objects.readonly.contains(&kept));
+        assert!(!objects.protected(old));
+        assert!(objects.protected(current));
+        assert!(objects.protected(kept));
     }
 
     #[test]

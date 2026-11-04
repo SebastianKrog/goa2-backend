@@ -275,6 +275,71 @@ impl NativeSession {
         self.world.history.reveal(hero, card);
         Ok(())
     }
+    pub(super) fn reveal_hand_card_bound(
+        &mut self,
+        objects: &mut BoundObjects,
+        step: ObjectId,
+    ) -> Result<Option<NativeEvent>> {
+        let operand = |name| {
+            let key = self.symbols.lookup(name)?;
+            match objects.arena.field(step, key)? {
+                ObjectValue::Atom(Datum::Text(value)) => Some(value),
+                _ => None,
+            }
+        };
+        let context_id = |name| match objects.arena.field(objects.arena.context_id(), operand(name)?)? {
+            ObjectValue::Atom(Datum::Text(value)) => Some(value),
+            _ => None,
+        };
+        let (Some(target), Some(card)) = (context_id("owner_key"), context_id("card_key")) else {
+            return Ok(None);
+        };
+        let Some(owner) = self.world.hero(target) else {
+            return Ok(None);
+        };
+        let Some(definition) = owner.hand.iter().filter_map(|id| self.world.card(*id))
+            .map(|card| &self.world.definitions.cards[card.definition])
+            .find(|definition| definition.printed_id == card)
+        else {
+            return Ok(None);
+        };
+        let (owner, name, color, tier) = (owner.id, definition.name, definition.color, definition.tier);
+        let tier_value = match self.symbols.name(tier) {
+            "UNTIERED" => 0,
+            "I" => 1,
+            "II" => 2,
+            "III" => 3,
+            "IV" => 4,
+            _ => return Err(unsupported("unknown revealed card tier")),
+        };
+        let output = operand("tier_value_key")
+            .ok_or_else(|| unsupported("missing revealed tier output"))?;
+        let actor = self.planning.actor;
+        let field = |key| self.symbols.lookup(key).expect("hand reveal field compiled");
+        let reanchor = field("rollback_reanchor_pending");
+        let root = field("card_reveal");
+        let fields = [
+            ("revealer_id", actor.map_or(Datum::Null, Datum::Text)),
+            ("target_unit_id", Datum::Text(target)),
+            ("owner_id", Datum::Text(owner)),
+            ("card_id", Datum::Text(card)),
+            ("tier_value", Datum::Int(tier_value)),
+        ]
+        .into_iter()
+        .map(|(key, value)| (field(key), ObjectValue::Atom(value)))
+        .collect();
+        let reveal = objects.arena.dictionary(fields).map_err(unsupported)?;
+        self.reveal_knowledge_bound(objects, owner, card)?;
+        objects.arena.set_context(output, ObjectValue::Atom(Datum::Int(tier_value)))
+            .map_err(unsupported)?;
+        objects.arena.set_context(reanchor, ObjectValue::Atom(Datum::Bool(true)))
+            .map_err(unsupported)?;
+        objects.arena.set_root(root, reveal).map_err(unsupported)?;
+        Ok(Some(NativeEvent::HandCardRevealed {
+            actor, target, owner, card, name, color, tier, tier_value,
+        }))
+    }
+
     fn reveal_card_bound(
         &mut self,
         objects: &mut BoundObjects,
@@ -598,7 +663,7 @@ impl NativeSession {
                     ObjectValue::Atom(Datum::Instance(kept_physical)),
                 )
                 .map_err(unsupported)?;
-            objects.readonly = Arc::new(objects.arena.readonly_objects());
+            objects.readonly.take();
             return Ok((
                 None,
                 Some(NativeEvent::CardRetrieved {

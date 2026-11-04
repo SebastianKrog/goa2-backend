@@ -108,7 +108,8 @@ impl NativeSession {
         step: ObjectId,
     ) -> Result<HeroRespawnPlan> {
         let mut session = self.clone();
-        let mut arena = objects.clone();
+        session.world.inherit_row_undo(&self.world);
+        let mut arena = objects.staged_clone();
         if !matches!(arena.arena.list_pop(arena.stack).map_err(unsupported)?,Some(ObjectValue::Object(id)) if id==step)
         {
             return Err(unsupported("hero respawn staged stack drift"));

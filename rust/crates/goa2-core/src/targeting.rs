@@ -40,6 +40,7 @@ pub enum UnitFilter {
         visible: bool,
     },
     HasTeam,
+    HasMarker(Symbol),
     PreviousSlotCard,
     UnresolvedCard,
     ResolvedCard,
@@ -50,6 +51,7 @@ pub enum UnitFilter {
     BehindEmpty(crate::spatial::Origin),
     Spatial(HexFilter),
     AdjacentContext(Symbol),
+    AdjacentToken { kind: Symbol, max_range: i64 },
     EmptyNeighbor,
     Displacement(crate::validation::DisplacementKind),
     Team(Relation),
@@ -61,6 +63,17 @@ pub enum UnitFilter {
     Immunity,
     Range(HexFilter),
     ContextIds(Symbol),
+    OnSpawnPoint,
+    AdjacentObstacles(i64),
+    TurnStartPositions {
+        positions: Vec<(Symbol, crate::geometry::Hex)>,
+        stationary: bool,
+    },
+    StraightDestination {
+        minimum: i64,
+        maximum: i64,
+        through: bool,
+    },
     Piece {
         exclude_acting: bool,
     },
@@ -413,6 +426,26 @@ impl UnitFilter {
                     false
                 }
             }
+            Self::AdjacentToken { kind, max_range } => {
+                let Some((actor, target)) = context.actor.and_then(|actor| world.position(actor))
+                    .zip(world.position(id)) else {
+                    return Ok(false);
+                };
+                let mut found = false;
+                for neighbor in target.neighbors() {
+                    if world.occupant(neighbor).and_then(|id| world.entity(id))
+                        .is_some_and(|entity| {
+                            entity.kind == EntityKind::Token && entity.token_type == Some(*kind)
+                        })
+                        && world.effect_connected(target, neighbor, &[])?
+                        && crate::queries::topology_distance(world, actor, neighbor)?.threshold_order(*max_range).is_le()
+                    {
+                        found = true;
+                        break;
+                    }
+                }
+                found
+            }
             Self::AdjacentContext(key) => {
                 HexFilter::AdjacentContext(*key).accept_unit(context, id)?
             }
@@ -463,6 +496,10 @@ impl UnitFilter {
                             && world.equivalent_illusion(id, context.actor)
                 }
             }
+            Self::HasMarker(key) => world
+                .markers
+                .iter()
+                .any(|marker| marker.key == *key && marker.target == Some(id)),
             Self::Exclude { self_, keys } => {
                 let own = *self_
                     && (context.actor == Some(id)
@@ -487,6 +524,101 @@ impl UnitFilter {
             }),
             Self::Immunity => world.immune_filter(id, context)?,
             Self::Range(filter) => filter.accept_unit(context, id)?,
+            Self::TurnStartPositions {
+                positions,
+                stationary,
+            } => positions.iter().any(|(unit, hex)| {
+                *unit == id && (!stationary || world.position(id) == Some(*hex))
+            }),
+            Self::StraightDestination {
+                minimum,
+                maximum,
+                through,
+            } => {
+                let Some(origin) = world.position(id) else {
+                    return Ok(false);
+                };
+                for adjacent in origin.neighbors() {
+                    let (dq, dr, ds) = origin.direction_to(adjacent).unwrap();
+                    let (oq, or, os) = origin.coordinates();
+                    for distance in 1..=*maximum {
+                        let (Ok(q), Ok(r), Ok(s)) = (
+                            i32::try_from(
+                                i64::from(oq).saturating_add(dq.saturating_mul(distance)),
+                            ),
+                            i32::try_from(
+                                i64::from(or).saturating_add(dr.saturating_mul(distance)),
+                            ),
+                            i32::try_from(
+                                i64::from(os).saturating_add(ds.saturating_mul(distance)),
+                            ),
+                        ) else {
+                            break;
+                        };
+                        let Ok(point) = crate::geometry::Hex::new(q, r, s) else {
+                            break;
+                        };
+                        if !world.on_map(point) {
+                            break;
+                        }
+                        if distance >= *minimum
+                            && world.effect_connected(origin, point, &[id])?
+                            && !world.obstacle_for_actor(point, context.actor)?
+                        {
+                            return Ok(true);
+                        }
+                        if !through
+                            && world.obstacle_for_actor(point, Some(id))?
+                            && !world.passable_token(point, &[id])
+                        {
+                            break;
+                        }
+                    }
+                }
+                false
+            }
+            Self::AdjacentObstacles(minimum) => {
+                let Some(hex) = world.position(id) else {
+                    return Ok(false);
+                };
+                let over_the_top =
+                    context
+                        .actor
+                        .and_then(|actor| world.hero(actor))
+                        .is_some_and(|hero| {
+                            hero.level >= 8
+                                && hero.ultimate.and_then(|card| world.card(card)).is_some_and(
+                                    |card| {
+                                        !card.facedown
+                                            && context.symbols.name(
+                                                world.definitions.cards[card.definition].effect,
+                                            ) == "over_the_top"
+                                    },
+                                )
+                                && entity.is_some_and(|target| {
+                                    matches!(target.kind, EntityKind::Hero | EntityKind::Piece)
+                                        && target.team
+                                            != world.entity(hero.id).and_then(|actor| actor.team)
+                                })
+                        });
+                let mut count = 0;
+                if !over_the_top {
+                    for neighbor in hex.neighbors() {
+                        if world.effect_connected(hex, neighbor, &[])?
+                            && world.obstacle_for_actor(neighbor, context.actor)?
+                        {
+                            count += 1;
+                            if count >= *minimum {
+                                break;
+                            }
+                        }
+                    }
+                }
+                over_the_top || count >= *minimum
+            }
+            Self::OnSpawnPoint => world
+                .position(id)
+                .is_some_and(|hex| world.spawn_at(hex, false)),
             Self::ContextIds(key) => {
                 if let Some(Datum::List(items)) = context.registers.get(*key) {
                     // Context ID lists are normally strings. Reject aggregate/string
@@ -564,9 +696,16 @@ pub fn compile_unit_filter(raw: &Value, symbols: &mut Symbols) -> Result<UnitFil
         "adjacency_filter"
         | "line_behind_target_filter"
         | "between_hexes_filter"
+        | "clear_line_of_sight_filter"
+        | "same_direction_from_origin_filter"
         | "relative_distance_filter"
         | "in_straight_line_filter"
+        | "adjacent_to_terrain_filter"
         | "not_in_straight_line_filter" => UnitFilter::Spatial(compile_filter(raw, symbols)?),
+        "adjacent_to_token_in_range_filter" => UnitFilter::AdjacentToken {
+            kind: symbols.intern(raw["token_type"].as_str().unwrap_or("ILLUSION")),
+            max_range: raw["max_range"].as_i64().ok_or("token range missing")?,
+        },
         "adjacency_to_context_filter" => UnitFilter::AdjacentContext(
             symbols.intern(
                 raw["target_key"]
@@ -611,6 +750,9 @@ pub fn compile_unit_filter(raw: &Value, symbols: &mut Symbols) -> Result<UnitFil
             Some("TOKEN") => EntityKind::Token,
             _ => return Err("invalid unit type".into()),
         }),
+        "has_marker_filter" => UnitFilter::HasMarker(
+            symbols.intern(raw["marker_type"].as_str().ok_or("marker type missing")?),
+        ),
         "exclude_identity_filter" => UnitFilter::Exclude {
             self_: raw["exclude_self"].as_bool().unwrap_or(true),
             keys: keys("exclude_keys", symbols)?,
@@ -638,6 +780,10 @@ pub fn compile_unit_filter(raw: &Value, symbols: &mut Symbols) -> Result<UnitFil
         }
         "immunity_filter" => UnitFilter::Immunity,
         "range_filter" => UnitFilter::Range(compile_filter(raw, symbols)?),
+        "adjacent_to_obstacles_filter" => {
+            UnitFilter::AdjacentObstacles(raw["min_count"].as_i64().unwrap_or(3))
+        }
+        "unit_on_spawn_point_filter" => UnitFilter::OnSpawnPoint,
         "context_ids_filter" => UnitFilter::ContextIds(
             symbols.intern(raw["ids_key"].as_str().ok_or("IDs key missing")?),
         ),

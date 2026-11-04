@@ -3008,3 +3008,240 @@ reader; both read a committed small JSON file or decompress a cached payload.
 Indexed corpora continue to stream one case at a time. Do not extract or retain
 a second full corpus. Temporary path-based tooling must clean up its output.
 See `rust/README.md` for migration, regeneration and the 12 GiB development budget.
+
+
+### Coordinated movement and token walking
+
+`co_movement_traces.py` freezes 280 scenarios / 1,020 operations for
+`CoMoverValidHexFilter`, `CoDirectionalDragStep` and `MoveTokenStep`. Coverage
+includes both movement orders, unit/token anchors, obstacles and gaps, vacating
+units, terrain at landings, passable tokens/mines, context gates, custom/shared
+keys, identical movers and retained Hex aliases. Raw non-straight drag remains
+an explicit pre-consumption guard; source exception side effects are not ported.
+
+The all-boundary restore gate and independent iterate/release parity pass.
+After disk recovery, every case hash and semantic hash in the arena, canonical
+and live indexes was verified through the compressed reader, one case at a time.
+The live corpus contains 15,531 cases / 121,779 operations, with corpus SHA-256
+`8813ae830455ea29743cf203e6a6b4d0f0084bff5a4681e7c9a14893cb4f0977`.
+This primitive milestone does not add Hanu's remaining primary bodies; reviewed
+primary/spell coverage stays 172/596 and 22/22. Search completion remains open.
+
+Final validation after recovery: 302 core unit tests, the 280-case restoration
+gate, 29 affected Python tests, strict Clippy and format checks pass. Independent
+release replay matches all 1,020 movement operations. See
+[validation record](../../artifacts/co-movement-final-validation.json).
+
+
+### Initiative overrides
+
+`initiative_traces.py` adds 52 scenarios / 118 operations for Hanu's
+`SetCardInitiativeStep` under the admitted rule version 9. It changes only the
+unresolved physical card's temporary base-initiative override, leaving printed
+initiative and the effect-list identity intact. Coverage includes zero/negative
+values, existing/missing overrides, all card states, shared and independent
+current cards, piece-owner lookup, absent actors/targets, discard clearing and
+actor ordering with additive initiative items. Three native regressions verify
+private live operands, physical aliases, no generation-capacity requirement and
+pre-consumption rejection of a malformed raw override value.
+
+The maintained live corpus is 15,583 cases / 121,897 operations; corpus SHA-256
+`d3e85faa3799cf3a2974c5e53126c65942b6ac0c9e1ac6bf5000020f4c17ece0`.
+Primary/spell coverage remains 172/596 and 22/22. This primitive does not admit
+Hurry Up!'s remaining action-control scheduling or Hanu's journey bodies.
+
+Validation: 305 core unit tests, the new initiative restoration gate, 38 affected
+Python tests and independent release parity pass. Strict Clippy, Rustfmt, Black,
+Ruff, whitespace and frozen-source/lock checks pass. The final development
+footprint was 4.33 GiB, within the 12 GiB planning budget. See
+[validation record](../../artifacts/initiative-final-validation.json). Full
+workspace integrations and full-corpus/whole-game replays were not rerun.
+
+
+### Action-control scheduling
+
+`action_control_traces.py` adds 61 scenarios / 302 operations for
+`ScheduleActionControlStep`. It uses literal manager defaults and fresh scopes,
+without inheriting the current action or source-card context. Coverage includes
+level/ultimate/card gates, piece IDs, repeated unlinked effects, duplicate IDs,
+first-match ownership, actual controlled turns through confirmation, forced
+windows, explicit other-player prompts, discarded cards and round cleanup.
+A separate affected corpus replays 64 existing creation scenarios / 258 operations.
+The mixed restoration gate covers all 125 scenarios / 560 operations.
+
+The frozen handler checks the active flag and current card ID through the owned
+turn window. It continues controlling confirmation after the current card becomes
+RESOLVED; it does not independently recheck duration timestamps. These are source
+contracts, not new policy in Rust.
+
+The maintained live corpus is 15,644 cases / 122,199 operations; corpus SHA-256
+`7578afc440170a1ac588b24ee85e48e7a7628bd6d9a28ce56bbeb655ff009442`.
+Primary/spell coverage remains 172/596 and 22/22. Journey finishing programs and
+reviewed Hanu card recipes remain required.
+
+Validation: 308 core unit tests, the mixed 125-case / 560-operation restore gate,
+52 affected Python contracts, and both iterate/release differential corpora pass.
+Strict Clippy, Rustfmt, Black, Ruff and frozen-source/lock checks pass. The final
+development footprint was 4.40 GiB. See
+[validation record](../../artifacts/action-control-final-validation.json). Other
+workspace integrations and full-corpus/whole-game replays were not rerun.
+
+
+### Journey return scheduling
+
+`journey_traces.py` adds 77 scenarios / 321 operations for
+`ScheduleJourneyReturnStep`: card-bound immunity, delayed return and the optional
+one-space move. Finishing steps and nested filter models are frozen from the
+actual source constructor, allocated as bound programs and retained directly by
+the effect. Generic CreateEffectStep template-copy semantics are preserved.
+
+Coverage includes changed/cleared context, normal and copied performers,
+multi-piece targets, unavailable targets, optional movement, card-discard
+cancellation, bound/unbound repetition, partial/full deduplication, inactive
+existing rows and duplicate effect IDs. Native guards cover aggregate entity
+capacity, generated-step capacity, capacity-free deduplication and private
+finishing models between cloned workers. Save/restore is checked at all 321
+operation boundaries; the affected 125-case / 560-operation manager/generic
+creation restore gate is also retained.
+
+The maintained live corpus is 15,721 cases / 122,520 operations; corpus SHA-256
+`6f0a7784a40bd7157ccec830a81541a5e862e3ace37273a0c29626c942267976`.
+Primary/spell coverage remains 172/596 and 22/22. Reviewed Hanu card recipes and
+delegated co-movement flows remain required. This does not establish general
+engine closure or search throughput.
+
+Validation: 312 core unit tests, both restore gates, 60 affected Python contracts
+and strict Clippy pass. Both iterate and release parity pass for Journey and
+the 125 affected manager/generic cases. See the scoped
+[validation record](../../artifacts/journey-final-validation.json) for final
+release replay and storage measurements. Full workspace integration suites and
+whole-corpus/whole-game replays were not rerun for this primitive.
+
+
+### Hanu primary family and cross-root model imports
+
+All 18 Hanu primary recipes are reviewed and admitted. The maintained exporter
+contains 505 cases / 8,339 operations: normal text, action menu, reperformance,
+copied actions, changed stats, missing targets, multi-piece enemies, natural
+Journey cleanup, level-eight control, raw/attributed passive rebuilds and
+zero/absent/negative attack ranges. Primary coverage is now 190/596 card faces:
+142 pure custom builders, three stateful Misa/Min builders and 45 base no-op
+faces. Spell coverage remains 22/22.
+
+Trusted Sidekick and Pile On share filter models across separate generated
+attacks. Recipe rows record backward model/container imports; grouped allocation
+restores those identities across ordinary, copied, reperformed, deferred and
+passive-generated bodies. Root generation IDs remain separate, and cloned workers
+retain private mutable arenas. Source freezing still rejects shared executable
+roots until their generation-ID semantics receive an explicit port.
+
+The catalogs also audit range defaults independently of radius defaults.
+`range or 1` uses one only at zero; negative range remains negative. Both native
+paths consume the audited operands. Inert arena-only Hanu instructions can be
+imported by the transitional dense interpreter; reaching them fails before frame
+consumption.
+
+The maintained live corpus is 16,226 cases / 130,859 operations; corpus SHA-256
+`5fd32f05a5c5f9fdc8a2ee2e6667849363a039699c7fcd3ade8d3e5b4dc554e5`.
+The focused Hanu corpus SHA-256 is
+`610ffd3dec5ba16611e38508e5844d8d872bae23950ddbfd308f80e4473bd09f`.
+316 core tests and 99 affected Python contracts pass. All four restoration gates
+(1,485 cases / 13,334 operations), development/release Hanu parity and strict
+lint/format checks pass. Final evidence and exact verification scope are recorded in
+[the Hanu validation record](../../artifacts/hanu-primary-final-validation.json).
+Full roster/world/defense/passive/filter closure, raw exception fidelity and the
+original optimized search/performance requirements remain open.
+
+
+### Complete Hanu games
+
+`complete-games-hanu.json` contains two compact full-game traces for Hanu/Arien
+versus Brogan/Tigerclaw: Forgotten Island seed 41 and Magma and Ice seed 43.
+Every state, request, event and physical binding matches the pinned source across
+7,565 operations through GAME_OVER. Case records retain only a source envelope,
+commands and content-addressed 64-record snapshot-delta chunks; payloads remain
+ignored `.json.gz` caches. Only the small index is retained in Git.
+
+Corpus SHA-256:
+`6f9743e3a6c1b14f8cadeb527e8ca130f9770feea51c91ad6d05afddc4c9c56a`.
+Record digests are `ed097285aa5eaeb54a2eeb5ed23aacd7b8165ea6bf7457a03690d357945ea584`
+and `816aca130dece503c1087c2a3054c4c6b038bc124c6ee669b3b1b5008a83e2a8`.
+The two native full-game tests also pass for all four saved games; 16 affected
+Python contracts and strict lint/format checks pass. The baseline two-game corpus
+is unchanged (7,059 operations). The combined scope
+is four particular games / 14,624 operations, not arbitrary roster or search
+closure. See [final evidence](../../artifacts/hanu-complete-games-final-validation.json).
+
+
+### Xargatha primary bodies and cached adjacency
+
+`live_xargatha_primary_traces.py` adds 482 source scenes / 7,850 operations:
+all 18 primary faces through text/action/reperformance/copied entry points,
+optional/invalid selections, negative attacks, range/radius defaults, minion
+immunity and real round-end delayed defeats. The standalone counter scenes
+separate cached tile occupants from location records, cover pieces and missing
+actors, and preserve subtraction-before-clamping and negative multipliers.
+Rapid Thrusts is checked to recount after its first target dies.
+
+Independent iterate-worker comparison passes complete states, requests, events
+and physical identity. The focused corpus SHA-256 is
+`a2f2a426a78d5c870731a2fd10f64f2434ea31312586c3f5142a09daef4ac457`.
+The maintained live corpus now contains 16,708 scenes / 138,709 operations;
+SHA-256 `4d4268565f4e2721d61a70fa248ebb79d5cb455632a79859ea6713810725a905`.
+Current reviewed primary coverage is 206/596, spells 22/22. Every-boundary restoration and release parity pass. All 11 CLI tests pass for the Xargatha milestone. Full
+engine/search closure and the original throughput gate remain open.
+
+
+### Bain bounty targeting
+
+The marker fixture generator covers the three Bain bounty cards and live marker
+targeting. All 85 scenarios and 2,441 operations match Python with state, request,
+event and object identity parity. The focused corpus SHA-256 is
+`d73bef02be89d9a212b532127d134156408e1fbd74fd450dcce2084be9561a2c`.
+The maintained corpus now contains 16,793 cases and 141,150 operations.
+Its SHA-256 is
+`1b68d1ccf36e443ee464c73325565ba47e04bdb3b640102c5b73984b1f3059a7`.
+
+
+### Line of sight
+
+The line-of-sight fixture generator covers all eight blocker combinations, hex
+and unit or token targets, gaps in the board, Petrify, static barriers, and
+four Bain cards through ordinary and copied entry points. Its 181 scenarios
+and 2,366 operations match Python in the initial iterate replay. The focused
+corpus SHA-256 is
+`fcd0672cf72029253897a0a35ed8f2abd631807b5b925fff93a617a0310fd6b7`.
+The maintained corpus now contains 16,974 cases and 143,516 operations.
+Its SHA-256 is
+`8b4efd4938810633bf985d971c499f94d233f472dff20287f680f1733180d0a9`.
+
+
+### Grappling Bolt
+
+The pull fixtures cover 33 isolated steps and card flows across 353 operations.
+Their corpus SHA-256 is
+`5c8b01ab1ff4661c011db1ac68be1a10909acaa34ab4aea55cdb22ab483215e3`.
+The maintained corpus contains 17,007 cases and 143,869 operations.
+Its SHA-256 is
+`8d6facb09cadffcc9ad857ad1eb10acd9dc9b20403969c009fc36971a29aed2c`.
+
+
+### Walk the Plank
+
+The zone-change query and card fixtures cover 20 cases and 402 operations.
+Their corpus SHA-256 is
+`f1e0c932a80a68c01e30a94f0081e7b128a9851eff0814337de829c5ed1f095b`.
+The maintained corpus contains 17,027 cases and 144,271 operations.
+Its SHA-256 is
+`620ba704bf0f3931a051607f508267ef428a55c96059b62ba5632d3df81099c7`.
+
+
+### Cutter primary deck
+
+The remaining fifteen custom Cutter primary recipes, direction filters and
+individual coin victory checks have 320 source scenarios and 5,871 operations.
+The focused corpus SHA-256 is
+`41d6691de4e08baa3d703ea1279cddffc3dbbf392bb2b6bbec3276525d4a8e79`.
+The maintained corpus contains 17,347 cases and 150,142 operations.
+Its SHA-256 is
+`1755700499d68733bd5402f6f96cd92db1f968f17d53028df234d3aed6f758c2`.

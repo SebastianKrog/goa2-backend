@@ -49,27 +49,25 @@ impl Hex {
         self.q == other.q || self.r == other.r || self.s == other.s
     }
     pub fn line_to(self, other: Self) -> Option<Vec<Self>> {
+        self.line_points(other).map(Iterator::collect)
+    }
+
+    pub(crate) fn line_points(self, other: Self) -> Option<impl Iterator<Item = Self>> {
         if !self.straight(other) {
             return None;
         }
         let distance = self.distance(other);
-        if distance == 0 {
-            return Some(Vec::new());
-        }
+        let divisor = i64::from(distance.max(1));
         let (dq, dr, ds) = (
-            (i64::from(other.q) - i64::from(self.q)) / i64::from(distance),
-            (i64::from(other.r) - i64::from(self.r)) / i64::from(distance),
-            (i64::from(other.s) - i64::from(self.s)) / i64::from(distance),
+            (i64::from(other.q) - i64::from(self.q)) / divisor,
+            (i64::from(other.r) - i64::from(self.r)) / divisor,
+            (i64::from(other.s) - i64::from(self.s)) / divisor,
         );
-        Some(
-            (1..=distance)
-                .map(|n| Self {
-                    q: (i64::from(self.q) + dq * i64::from(n)) as i32,
-                    r: (i64::from(self.r) + dr * i64::from(n)) as i32,
-                    s: (i64::from(self.s) + ds * i64::from(n)) as i32,
-                })
-                .collect(),
-        )
+        Some((1..=distance).map(move |n| Self {
+            q: (i64::from(self.q) + dq * i64::from(n)) as i32,
+            r: (i64::from(self.r) + dr * i64::from(n)) as i32,
+            s: (i64::from(self.s) + ds * i64::from(n)) as i32,
+        }))
     }
     pub fn direction_to(self, other: Self) -> Option<(i64, i64, i64)> {
         let distance = self.distance(other);

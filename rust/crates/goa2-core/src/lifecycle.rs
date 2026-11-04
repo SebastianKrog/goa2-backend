@@ -90,8 +90,10 @@ impl NativeWorld {
             })
             .collect::<Vec<_>>();
         self.has_uncompiled_auras = flags.iter().any(|flag| *flag);
-        for (hero, flag) in self.heroes.iter_mut().zip(flags) {
-            hero.uncompiled_auras = flag;
+        for (index, flag) in flags.into_iter().enumerate() {
+            if self.heroes[index].uncompiled_auras != flag {
+                self.heroes[index].uncompiled_auras = flag;
+            }
         }
     }
     pub fn play_card(&mut self, hero: Symbol, id: CardId) -> Result<()> {

@@ -48,6 +48,7 @@ def catalog():
     state.place_entity(hero.id, point)
     groups = {
         "restore_context": [RestoreActionContextStep()],
+        "restore_other_context": [RestoreActionContextStep(other_hero_action=True)],
         "piece": [ChooseActingPieceStep(hero_id=OWNER)],
         "passive": [CheckPassiveAbilitiesStep(trigger=DATA)],
         "pre_move": [ResolvePreActionMovementStep(hero_id=OWNER)],

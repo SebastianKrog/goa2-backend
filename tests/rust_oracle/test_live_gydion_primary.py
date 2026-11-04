@@ -19,7 +19,8 @@ def test_reviewed_school_recipes_offer_exact_source_school_spell_ids():
 
     from goa2.scripts.gydion_effects import SPELL_ACCESS_MAP
 
-    recipes = catalog()["recipes"]
+    catalog_payload = catalog()
+    recipes = catalog_payload["recipes"]
     assert set(EFFECTS) == {"prepare_spells", *SPELL_ACCESS_MAP}
     for effect, allowed in SPELL_ACCESS_MAP.items():
         assert len(recipes[effect]) == 1
@@ -117,19 +118,17 @@ def test_dense_and_authoritative_recipe_sets_follow_reviewed_live_dependencies()
         ALL_EFFECTS,
         DENSE_EFFECTS,
         GYDION_EFFECTS,
-        MIN_EFFECTS,
-        MISA_EFFECTS,
-        WASP_EFFECTS,
+        LIVE_ONLY_EFFECTS,
     )
 
-    recipes = catalog()["recipes"]
+    catalog_payload = catalog()
+    recipes = catalog_payload["recipes"]
     live = {
         effect
         for effect, rows in recipes.items()
         if any(row["fields"]["type"] in ("cast_spell", "prepare_spellbook") for row in rows)
     }
     assert live == set(GYDION_EFFECTS)
-    assert set(ALL_EFFECTS) == set(DENSE_EFFECTS) | live | set(MISA_EFFECTS) | set(
-        WASP_EFFECTS
-    ) | set(MIN_EFFECTS)
+    assert set(ALL_EFFECTS) == set(recipes) | set(catalog_payload["stateful_recipes"])
+    assert set(DENSE_EFFECTS) <= set(recipes) - live - set(LIVE_ONLY_EFFECTS)
     assert len(DENSE_EFFECTS) == 64

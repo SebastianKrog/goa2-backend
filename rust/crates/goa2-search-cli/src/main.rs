@@ -1,5 +1,8 @@
 //! JSON-lines diagnostic worker. Native search is not yet advertised.
 #![forbid(unsafe_code)]
+mod resolution_search;
+mod sequence_legality;
+mod simulation_bench;
 use goa2_core::codec::StateEnvelope;
 use goa2_core::geometry::{BoardGeometry, MovementQuery, TileSpec};
 use goa2_core::interpreter::{EngineError, ExecutionBudget, NativeSession};
@@ -82,6 +85,64 @@ enum Operation {
         envelope: StateEnvelope,
         operations: Vec<Value>,
     },
+    HeuristicInput {
+        envelope: StateEnvelope,
+        player_id: String,
+    },
+    EvaluateLabAttackRange {
+        envelope: StateEnvelope,
+        player_id: String,
+    },
+    SearchResolution {
+        envelope: StateEnvelope,
+        player_id: String,
+        max_depth: u8,
+        max_nodes: usize,
+        time_ms: u64,
+        rollout_turns: Option<u8>,
+        #[serde(default)]
+        opponent_policy: goa2_core::interpreter::OpponentPolicy,
+    },
+    SearchSampledPlanning {
+        envelope: StateEnvelope,
+        player_id: String,
+        seed: u64,
+        cap: usize,
+        max_depth: u8,
+        max_nodes: usize,
+        time_ms: u64,
+        rollout_turns: Option<u8>,
+        workers: Option<usize>,
+    },
+    RolloutGameTurns {
+        envelope: StateEnvelope,
+        player_id: String,
+        turns: u8,
+        max_nodes: usize,
+        time_ms: u64,
+        #[serde(default)]
+        capture_state: bool,
+        sample_seed: Option<u64>,
+    },
+    CheckSequences {
+        envelope: StateEnvelope,
+        sequences: Vec<Vec<sequence_legality::WireMove>>,
+    },
+    RolloutBench {
+        envelope: StateEnvelope,
+        player_id: String,
+        iterations: u32,
+        sample_seed: Option<u64>,
+        #[serde(default)]
+        lab_evaluation: bool,
+    },
+    SimulationBench {
+        envelope: StateEnvelope,
+        operations: Vec<Value>,
+        iterations: u32,
+        #[serde(default)]
+        rollback: bool,
+    },
     StackTraceStream {
         envelope: StateEnvelope,
         operations: Vec<Value>,
@@ -114,8 +175,96 @@ fn execute(
     }
     match request.operation {
         Operation::Capabilities => Ok(
-            json!({"plain_fast_travel":true,"unit_selection_traces":true,"acting_piece_traces":true,"action_recipes":true,"fast_travel_zones":true,"planning_phase_traces":true,"card_models":true,"scalar_stats":true,"native_step_traces":true,"streamed_step_traces":true,"state_codec":true,"plain_board_movement":true,"stateful_plain_movement":true,"game_transitions":false,"search":false,"rules_versions":[]}),
+            json!({"plain_fast_travel":true,"unit_selection_traces":true,"acting_piece_traces":true,"action_recipes":true,"fast_travel_zones":true,"planning_phase_traces":true,"card_models":true,"scalar_stats":true,"native_step_traces":true,"streamed_step_traces":true,"state_codec":true,"sequence_legality":true,"resolution_search":true,"plain_board_movement":true,"stateful_plain_movement":true,"game_transitions":false,"search":false,"rules_versions":[]}),
         ),
+        Operation::HeuristicInput { envelope, player_id } => {
+            let mut session = NativeSession::compile(envelope).map_err(|error| error.to_string())?;
+            let player = sequence_legality::player(&mut session, player_id)?;
+            session.advance_to_decision(&ExecutionBudget::default()).map_err(|error| error.to_string())?;
+            let choice = session.heuristic_input_choice(player).map_err(|error| error.to_string())?;
+            let selection = match choice {
+                Some(goa2_core::interpreter::DecisionMove::Input { selection, .. }) => session.selection_json(&selection),
+                _ => Value::Null,
+            };
+            Ok(json!({"selection": selection}))
+        }
+        Operation::EvaluateLabAttackRange { envelope, player_id } => {
+            let mut session = NativeSession::compile(envelope).map_err(|error| error.to_string())?;
+            let player = sequence_legality::player(&mut session, player_id)?;
+            let value = session.evaluate_lab_attack_range(player).map_err(|error| error.to_string())?;
+            Ok(json!({"recipe_id": "lab-attack-range-v1", "value": value}))
+        }
+        Operation::SearchResolution {
+            envelope,
+            player_id,
+            max_depth,
+            max_nodes,
+            time_ms,
+            rollout_turns,
+            opponent_policy,
+        } => resolution_search::search(
+            envelope,
+            player_id,
+            time_ms,
+            rollout_turns,
+            goa2_core::interpreter::SearchLimits {
+                max_depth,
+                max_nodes,
+                opponent_policy,
+            },
+        ),
+        Operation::SearchSampledPlanning {
+            envelope,
+            player_id,
+            seed,
+            cap,
+            max_depth,
+            max_nodes,
+            time_ms,
+            rollout_turns,
+            workers,
+        } => resolution_search::sampled_planning(
+            envelope,
+            player_id,
+            seed,
+            cap,
+            time_ms,
+            goa2_core::interpreter::PlanningSearchOptions {
+                rollout_turns,
+                workers: workers.unwrap_or(1),
+            },
+            goa2_core::interpreter::SearchLimits {
+                max_depth,
+                max_nodes,
+                opponent_policy: goa2_core::interpreter::OpponentPolicy::Adversarial,
+            },
+        ),
+        Operation::RolloutGameTurns {
+            envelope,
+            player_id,
+            turns,
+            max_nodes,
+            time_ms,
+            capture_state,
+            sample_seed,
+        } => resolution_search::rollout(envelope, player_id, turns, max_nodes, time_ms, capture_state, sample_seed),
+        Operation::CheckSequences {
+            envelope,
+            sequences,
+        } => sequence_legality::check(envelope, sequences),
+        Operation::RolloutBench {
+            envelope,
+            player_id,
+            iterations,
+            sample_seed,
+            lab_evaluation,
+        } => simulation_bench::measure_rollout(envelope, player_id, iterations, sample_seed, lab_evaluation),
+        Operation::SimulationBench {
+            envelope,
+            operations,
+            iterations,
+            rollback,
+        } => simulation_bench::measure(envelope, operations, iterations, rollback),
         Operation::AggregateTrace {
             envelope,
             operations,
@@ -359,30 +508,38 @@ fn replay_trace_checked(
             }
             _ => return Err("unknown trace operation".into()),
         }
-        let envelope = session.export_envelope().map_err(|e| e.to_string())?;
-        let mut record = json!({"semantic_state":envelope.materialize()?,"request":request,"events":events,"error":error});
-        if !envelope.object_bindings.is_empty() {
-            record["context_keys"] = json!(
-                envelope.state["execution_context"]
-                    .as_object()
-                    .ok_or("execution context missing")?
-                    .keys()
-                    .collect::<Vec<_>>()
-            );
-            record["instance_bindings"] = serde_json::to_value(envelope.instance_bindings()?)
-                .map_err(|error| error.to_string())?;
-            record["generated_step_objects"] = serde_json::to_value(
-                session
-                    .generated_step_objects(&envelope.object_bindings)
-                    .map_err(|e| e.to_string())?,
-            )
-            .map_err(|e| e.to_string())?;
-            record["object_bindings"] =
-                serde_json::to_value(envelope.object_bindings).map_err(|e| e.to_string())?;
-        }
-        record_ready(record)?;
+        record_ready(session_record(&session, request, events, error)?)?;
     }
     Ok(())
+}
+fn session_record(
+    session: &NativeSession,
+    request: Value,
+    events: Vec<Value>,
+    error: Value,
+) -> Result<Value, String> {
+    let envelope = session.export_envelope().map_err(|e| e.to_string())?;
+    let mut record = json!({"semantic_state":envelope.materialize()?,"request":request,"events":events,"error":error});
+    if !envelope.object_bindings.is_empty() {
+        record["context_keys"] = json!(
+            envelope.state["execution_context"]
+                .as_object()
+                .ok_or("execution context missing")?
+                .keys()
+                .collect::<Vec<_>>()
+        );
+        record["instance_bindings"] = serde_json::to_value(envelope.instance_bindings()?)
+            .map_err(|error| error.to_string())?;
+        record["generated_step_objects"] = serde_json::to_value(
+            session
+                .generated_step_objects(&envelope.object_bindings)
+                .map_err(|e| e.to_string())?,
+        )
+        .map_err(|e| e.to_string())?;
+        record["object_bindings"] =
+            serde_json::to_value(envelope.object_bindings).map_err(|e| e.to_string())?;
+    }
+    Ok(record)
 }
 fn write_packet(out: &mut impl Write, value: &Value) -> io::Result<()> {
     serde_json::to_writer(&mut *out, value)?;
@@ -820,6 +977,13 @@ mod trace_tests {
     }
     #[test]
     fn complete_games_match_python_at_every_operation_using_lossless_snapshot_deltas() {
+        assert_compact_games("complete-games.json", 2);
+    }
+    #[test]
+    fn hanu_complete_games_match_python_at_every_operation_with_shared_models_and_turns() {
+        assert_compact_games("complete-games-hanu.json", 2);
+    }
+    fn assert_compact_games(index_name: &str, expected_cases: usize) {
         #[derive(Deserialize)]
         struct Entry {
             name: String,
@@ -847,12 +1011,12 @@ mod trace_tests {
         let base =
             std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures"));
         let index: Index = serde_json::from_reader(std::io::BufReader::new(
-            crate::fixture_cache::open(base.join("complete-games.json")).unwrap(),
+            crate::fixture_cache::open(base.join(index_name)).unwrap(),
         ))
         .unwrap();
         assert_eq!(index.schema_version, 2);
         assert_eq!(index.contract, "complete-games-snapshot-deltas-v3");
-        assert_eq!(index.cases.len(), 2);
+        assert_eq!(index.cases.len(), expected_cases);
         fixture_parallel::for_each_case(index.cases.into_iter(), |entry| {
             let case: Case = serde_json::from_reader(std::io::BufReader::new(
                 crate::fixture_cache::open(base.join(entry.path)).unwrap(),
@@ -901,7 +1065,7 @@ mod trace_tests {
     }
     #[test]
     fn live_shared_steps_and_context_match_python_values_requests_and_identity() {
-        verify_index("object-execution.json", Some(15531));
+        verify_index("object-execution.json", Some(17347));
     }
     #[test]
     fn every_native_transition_matches_python_full_state_request_and_event_order() {

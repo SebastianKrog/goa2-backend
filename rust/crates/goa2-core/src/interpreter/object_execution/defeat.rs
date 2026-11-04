@@ -88,7 +88,7 @@ impl NativeSession {
     /// serialized state or execution context is copied to calculate consequences.
     fn combat_world_bound(&mut self, objects: &BoundObjects) -> Result<NativeWorld> {
         self.sync_card_collections_bound(objects)?;
-        let mut world = self.world.clone();
+        let mut world = self.world.staged_clone();
         for &(hero, model) in &objects.phases.heroes {
             let row = world
                 .hero_index(hero)
@@ -291,7 +291,7 @@ impl NativeSession {
         }
         let flags = self
             .world
-            .cards
+            .cards()
             .iter()
             .map(|card| card.active)
             .collect::<Vec<_>>();
@@ -495,6 +495,51 @@ impl NativeSession {
         }
         Ok(())
     }
+    pub(super) fn preflight_solo_win_bound(
+        &mut self,
+        objects: &BoundObjects,
+        step: ObjectId,
+    ) -> Result<Option<GameOutcome>> {
+        let key = self.spatial_text_bound(objects, step, Field::HeroKey)?;
+        let target = key
+            .and_then(|key| objects.arena.context_value(key))
+            .filter(|value| objects.arena.truthy(value));
+        let hero = if let Some(target) = target {
+            Some(self.resource_identity_bound(objects, target)?)
+        } else {
+            self.planning
+                .actor
+                .filter(|id| !self.symbols.name(*id).is_empty())
+        };
+        let Some((hero, model)) = hero.and_then(|hero| {
+            self.hero_model_bound(objects, hero)
+                .map(|model| (hero, model))
+        }) else {
+            return Ok(None);
+        };
+        let gold = self.combat_integer_bound(objects, model, Field::Gold)?;
+        let threshold = self.combat_integer_bound(objects, step, Field::Threshold)?;
+        if gold < threshold {
+            return Ok(None);
+        }
+        self.phase_generation_check(0, 1)?;
+        Ok(Some(GameOutcome {
+            team: None,
+            hero: Some(hero),
+            condition: objects.phases.k(Field::FistfulVictory),
+        }))
+    }
+
+    pub(super) fn solo_win_bound(
+        &mut self,
+        objects: &mut BoundObjects,
+        outcome: GameOutcome,
+    ) -> Result<()> {
+        let step = self.phase_step(objects, "game_over")?;
+        self.set_outcome_step_bound(objects, step, outcome)?;
+        self.push_live_steps_bound(objects, &[step])
+    }
+
     pub(super) fn preflight_game_over_bound(
         &self,
         objects: &BoundObjects,

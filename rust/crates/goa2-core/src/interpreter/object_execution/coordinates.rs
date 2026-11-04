@@ -4,6 +4,8 @@ use super::*;
 
 pub(super) enum CoordinatePlan {
     Done,
+    Abort,
+    Shared(Symbol, ObjectValue),
     Value(Symbol, Datum),
     Hex(Symbol, Hex),
 }
@@ -83,6 +85,73 @@ impl NativeSession {
     ) -> Result<CoordinatePlan> {
         let output = self.passive_text_bound(objects, step, Field::Output)?;
         match op {
+            CoordinateOp::TurnStart => {
+                let key = self.passive_text_bound(objects, step, Field::UnitKey)?;
+                let snapshot = objects.phases.root(&objects.arena, Field::Snapshot)?;
+                if let Some(unit) = objects.symbol_from_context(key, &self.symbols)?
+                    && let Some(value) = objects.arena.field(snapshot, unit)
+                {
+                    let (hex, _) = self.spatial_hex_bound(objects, &value)?;
+                    if self.world.on_map(hex) && self.world.occupant(hex).is_none() {
+                        return Ok(CoordinatePlan::Shared(output, value));
+                    }
+                }
+                if self.spatial_bool_bound(objects, step, Field::Mandatory)? {
+                    Ok(CoordinatePlan::Abort)
+                } else {
+                    Ok(CoordinatePlan::Done)
+                }
+            }
+            CoordinateOp::Distance => {
+                let zero = CoordinatePlan::Value(output, Datum::Int(0));
+                let Some(unit) =
+                    self.coordinate_identity_bound(objects, step, Field::UnitId, Field::UnitKey)?
+                else {
+                    return Ok(zero);
+                };
+                let Some(origin) = self.coordinate_position_bound(objects, &unit)? else {
+                    return Ok(zero);
+                };
+                let target =
+                    if let Some(key) = self.spatial_text_bound(objects, step, Field::HexKey)? {
+                        match objects.arena.context_value(key) {
+                            Some(value @ ObjectValue::Atom(Datum::Object(_))) => {
+                                Some(self.spatial_hex_bound(objects, &value)?.0)
+                            }
+                            Some(value @ ObjectValue::Object(id))
+                                if matches!(
+                                    objects.arena.kind(id),
+                                    ObjectKind::Dict | ObjectKind::Model
+                                ) =>
+                            {
+                                Some(self.spatial_hex_bound(objects, &value)?.0)
+                            }
+                            _ => None,
+                        }
+                    } else if let Some(unit) = self.coordinate_identity_bound(
+                        objects,
+                        step,
+                        Field::OtherUnitId,
+                        Field::OtherUnitKey,
+                    )? {
+                        self.coordinate_position_bound(objects, &unit)?
+                    } else {
+                        None
+                    };
+                let Some(target) = target else {
+                    return Ok(zero);
+                };
+                let distance = if self
+                    .world
+                    .effect_connected(origin, target, &[])
+                    .map_err(unsupported)?
+                {
+                    Datum::Int(i64::from(origin.distance(target)))
+                } else {
+                    Datum::Float(f64::INFINITY)
+                };
+                Ok(CoordinatePlan::Value(output, distance))
+            }
             CoordinateOp::Record => {
                 let Some(value) =
                     self.coordinate_identity_bound(objects, step, Field::UnitId, Field::UnitKey)?
@@ -184,6 +253,8 @@ impl NativeSession {
         objects.arena.symbols = self.symbols.clone();
         let (key, value) = match plan {
             CoordinatePlan::Done => return Ok(()),
+            CoordinatePlan::Abort => return self.abort_objects(objects),
+            CoordinatePlan::Shared(key, value) => (key, value),
             CoordinatePlan::Value(key, value) => {
                 let value = match value {
                     Datum::Object(fields) => objects

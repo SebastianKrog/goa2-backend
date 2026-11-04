@@ -154,3 +154,137 @@ def scenes():
             )
             ops, _ = retain(state, [step])
             yield f"live-marker-bain-{kind.value}-{variant}", state, ops
+
+    yield from bounty_targeting_scenes()
+
+
+def bounty_targeting_scenes():
+    from aura_traces import _board, _pieces
+    from live_defeat_traces import retain
+    from model_traces import setup
+
+    from goa2.domain.input import selection_value
+    from goa2.domain.models import CardState, GamePhase, Marker, MarkerType
+    from goa2.engine.filters_units import HasMarkerFilter
+    from goa2.engine.steps import (
+        CollectUnitsStep,
+        PerformCardActionStep,
+        PerformPrimaryActionStep,
+        PlaceMarkerStep,
+        RemoveMarkerStep,
+        ResolveCardStep,
+        ResolveCardTextStep,
+    )
+
+    def board(variant):
+        state = setup(["Bain", "Hanu"], ["Brogan", "Razzle"])
+        h = _board(state)
+        piece, second_piece = _pieces(state, "hero_razzle")[:2]
+        state.phase = GamePhase.RESOLUTION
+        state.current_actor_id = state.resolution_owner_id = "hero_bain"
+        minion = next(m for m in state.teams["BLUE"].minions if not m.is_heavy)
+        for unit, point in [
+            ("hero_bain", h(0, 0)),
+            ("hero_hanu", h(-1, 0)),
+            ("hero_brogan", h(2, 0)),
+            (piece, h(0, 1)),
+            (second_piece, h(2, -1)),
+            (minion.id, h(-1, 1)),
+        ]:
+            state.place_entity(unit, point)
+        marker = Marker(
+            type=MarkerType.POISON if variant == "alias" else MarkerType.BOUNTY,
+            target_id={
+                "supply": None,
+                "piece": piece,
+                "owner": "hero_razzle",
+                "minion": minion.id,
+            }.get(variant, "hero_brogan"),
+        )
+        state.markers = {}
+        if variant != "absent":
+            state.markers[MarkerType.BOUNTY] = marker
+        if variant == "alias":
+            state.markers[MarkerType.POISON] = marker
+        state.execution_context.update(marker_alias=marker, markers_alias=state.markers)
+        return state, piece
+
+    for variant in ("placed", "absent", "supply", "alias", "piece", "owner", "minion"):
+        state, piece = board(variant)
+
+        def collect(key):
+            return CollectUnitsStep(
+                filters=[HasMarkerFilter(marker_type=MarkerType.BOUNTY)],
+                output_key=key,
+                skip_immunity_filter=True,
+            )
+
+        steps = [
+            collect("bounty_before"),
+            PlaceMarkerStep(marker_type=MarkerType.BOUNTY, target_id=piece, value=0),
+            collect("bounty_moved"),
+            RemoveMarkerStep(marker_type=MarkerType.BOUNTY),
+            collect("bounty_removed"),
+        ]
+        ops, final = retain(state, steps)
+        assert final.execution_context["bounty_moved"] == [piece]
+        assert final.execution_context["bounty_removed"] == []
+        yield f"bain-bounty-filter-{variant}", state, ops
+
+    for effect in ("dead_or_alive", "hand_crossbow", "hunter_seeker"):
+        variants = [
+            (entry, mode, "placed")
+            for entry in ("text", "action", "perform", "copy")
+            for mode in ("first", "last", "skip", "invalid")
+        ]
+        variants.extend(
+            ("text", mode, variant)
+            for variant in ("absent", "supply", "alias", "piece", "owner")
+            for mode in ("first", "last")
+        )
+        for entry, mode, variant in variants:
+            state, _ = board(variant)
+            bain = state.get_hero("hero_bain")
+            card = next(c for c in bain.deck if c.effect_id == effect)
+            if card in bain.hand:
+                bain.hand.remove(card)
+            bain.current_turn_card = card
+            card.state, card.is_facedown = CardState.UNRESOLVED, False
+            state.execution_context["bounty_card_alias"] = card
+            if entry == "text":
+                step = ResolveCardTextStep(hero_id=bain.id, card_id=card.id)
+            elif entry == "action":
+                step = ResolveCardStep(hero_id=bain.id)
+            elif entry == "copy":
+                state.current_actor_id = "hero_hanu"
+                state.execution_context.update(bounty_copy=card.id, bounty_owner=bain.id)
+                step = PerformCardActionStep(
+                    card_key="bounty_copy",
+                    card_owner_key="bounty_owner",
+                    hero_id="hero_hanu",
+                    suppress_after_resolve_card=True,
+                )
+            else:
+                step = PerformPrimaryActionStep(hero_id=bain.id)
+            invalid_sent = False
+
+            def choose(request, mode):
+                nonlocal invalid_sent
+                kind = request.request_type.value
+                if mode == "invalid" and not invalid_sent:
+                    invalid_sent = True
+                    return "not-offered"
+                if kind == "CHOOSE_ACTION":
+                    return "ATTACK"
+                if kind == "SELECT_CARD_OR_PASS":
+                    return "PASS"
+                if kind == "CONFIRM_PASSIVE":
+                    return "NO"
+                if request.can_skip and mode == "skip":
+                    return "SKIP"
+                return selection_value(
+                    request.options[-1] if mode == "last" else request.options[0]
+                )
+
+            ops, _ = retain(state, [step], mode=mode, select=choose)
+            yield f"bain-bounty-{effect}-{entry}-{mode}-{variant}", state, ops

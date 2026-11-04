@@ -1,16 +1,337 @@
 # Native search engine
 
 Work in progress, following [the implementation plan](../docs/superpowers/plans/2026-10-23-rust-search-engine.md).
-Two complete-game traces now match Python for Arien/Brogan versus Tigerclaw/Sabina
-on Forgotten Island and Magma and Ice. General roster support and bot action
-selection remain unfinished.
+Six complete-game traces match Python on Forgotten Island and Magma and Ice.
+They cover four distinct rosters, including games with spellcasting, multi-piece
+heroes, passive offers, respawn, lane pushes and upgrades.
+General roster support and bot action selection remain unfinished.
+All 18 Hanu primary recipes now execute natively, including delegated co-movement,
+alternate-target attacks, initiative/action control and literal delayed Journey
+returns. Shared filter models across generated attacks retain source identity in
+ordinary, copied, reperformed and passive-generated bodies.
+All 18 Xargatha primary faces now have reviewed native recipes, adding 16 faces
+beyond the previously supported retrieval cards. Their 482 source scenes / 7,850
+operations match the native iterate worker. Every-boundary restoration and release replay pass for this family. All 11 CLI tests pass for the Xargatha milestone. This does not establish
+defense/passive or whole-game roster closure.
+Bain's Dead or Alive, Hand Crossbow and Hunter Seeker now have native primary
+recipes. Bounty targeting matches the marker dictionary key and exact target ID.
+All 85 source scenarios match the native iterate worker across 2,441 operations.
+Bain's Light Crossbow, Heavy Crossbow, Arbalest and Get Over Here also have
+native primary recipes. The sight filter supports both unit and hex targets
+with independent unit, terrain and actor-specific obstacle blockers. The focused
+iterate replay matches Python across 181 scenarios and 2,366 operations.
+Cutter's 18 primary faces are accounted for, including the inherited no-op
+ultimate face. The latest 320 scenarios match the iterate worker across 5,871
+operations. They cover the remaining 15 recipes, the shared direction filter,
+the charge damage modifier and the individual coin victory.
 The live Python backend and lab are unchanged.
 
-Current reviewed primary coverage: **172/596 card faces** (127 custom bodies,
-including three state-dependent Misa/Min builders, and 45 base no-op faces). All **22/22 spell bodies** now execute through native
+Current reviewed primary coverage: **596/596 card faces** (545 custom bodies,
+48 registered no-op primary faces, and three primitive fallbacks for Over the Top, Chaos Incarnate, and Rock and a Hard Place). All **22/22 spell bodies** now execute through native
 casting and copied-card paths, with independent Python parity across 304 scenes /
 6,113 operations. These counts do not establish complete defense, passive,
 world-rule or search support.
+The current Rust worker also matches the frozen Python defense corpus across
+750 scenarios and 5,167 operations, including defense text, on-block hooks,
+actor and card bindings, and targeting predicates.
+Mortimer’s Corpse Slam, Morbid Mosh, Macabre Mayhem, Robbing Zombies and
+Stalking Scalpers match Python across seven scenes and 423 operations. The
+scenes cover a stationary Zombie push, coin gain, optional skips and Master
+of Puppets increasing the three-choice limit to five.
+Bain’s Drinking Buddies and Another One match Python across six scenarios
+and 106 operations. The replays cover both retrievals, optional skips, and the
+end-of-turn repeat, including when the first opportunity was skipped.
+Mortimer’s Master of Puppets and Takahide’s Ready for War have explicit empty
+primary recipes. Five Ready for War unlock scenarios match across 20 operations.
+Bain’s A Game of Chance, Dead Man’s Hand and We’re Not Done Yet match Python
+across six scenarios and 152 operations, covering correct and incorrect guesses,
+consolation coins and the second attempt. The reveal reanchors rollback.
+Bain’s Vantage Point and High Ground match Python across eight scenarios and
+72 operations, including terrain traversal and the +1/+2 placed-Bounty bonuses.
+Swift’s Snipe, Prepared Shot, Killshot, Shotgun and Super-Shotgun match Python
+across seven scenarios and 168 operations, including straight-line eligibility,
+bystander discard and defeat when the bystander cannot discard.
+Swift’s Steam Jump, Assault Jump, Suppress, Pin Down and Killing Ground match
+Python across six scenarios and 81 operations. Terrain adjacency includes the
+board edge, and placement and optional pushes follow the offered choices.
+Swift’s Mark for Death, Hunting Season, Delayed Jump, Mobile Scout and Drop
+Trooper match Python across five scenarios and 86 operations. The replays
+cover minion relocation and bounty creation, delayed placement with no
+eligible fast-travel destination, and two sequential pushes.
+Swift’s Bounce matches Python across four scenarios and 64 operations. Its
+initial move crosses obstacles, and re-performing the current or a resolved
+card offers a second move that can be declined.
+Swift’s Reload matches Python across three scenarios and 58 operations,
+including a gapped played-card row, no previous card, and adjacent minion defeat.
+Swift’s Bullet Time matches Python across four scenarios and 118 operations.
+The normal resolution path covers accepting, declining and the level gate.
+A separate passive replay verifies exclusion of the prior combat target.
+Rowenna’s Accept Surrender, Glorious Triumph, Opening Shots and Opening
+Volley match Python across six scenarios and 74 operations. The replays
+cover empty-hand targeting, triple assist coins, and repeat discard eligibility.
+Rowenna’s Stand Guard, Protect the Weak and Defend the Innocent match Python
+across five scenarios and 44 operations, covering both swap eligibility rules,
+no eligible target, and optional retrieval after swapping.
+Rowenna’s five Fabled Lance attack recipes match Python across ten scenarios
+and 350 operations. They cover melee before level eight, ranged attacks with
+a range item at level eight, ally rewards, and attacks repeated on another target.
+Rowenna’s Close Quarters, Melee and Grand Melee match Python across five
+scenarios and 161 operations, including both placement branches, the post-move
+adjacency gate, and taking Grand Melee’s second choice after skipping its first.
+Rowenna’s Code of Chivalry and Throw the Gauntlet match Python across four
+scenarios and 93 operations, closing her primary recipe coverage. The replays
+cover pre-attack retrievals, ranged targeting and the opponent’s optional move.
+Mrak’s Seismic Slam, Seismic Assault, Epicenter, Treacherous Ground, Rockslide
+and Avalanche match Python across six scenarios and 93 operations. The replays
+cover terrain and Rock eligibility, forced discard or defeat, and optional repeats.
+Mrak’s Stomping Step, Ground Shaker, Stone Grip and Fissure match Python
+across four scenarios and 100 operations, including vacated-space placement,
+three-Rock batches and Rock and a Hard Place triggering enemy discard.
+Mrak’s Stone Carapace and Rock Solid match Python across four scenarios and
+54 operations, covering shield creation, consumption on forced discard, and
+Rock Solid’s optional retrieval.
+Mrak’s Boulder Rush, Boulder Blitz and Boulderdozer match Python across three
+scenarios and 51 operations, covering pushes through terrain and optional
+movement in the direction of the push.
+Mrak’s Rolling Stone and Strolling Stone match Python across four scenarios
+and 32 operations. The replays verify their different empty-interior limits
+and the effect of terrain on legal straight-line destinations.
+Dodger’s Weakness and Enfeeblement match Python across three scenarios and
+29 operations. The replays cover the attack penalty effects and whether an
+enemy can repeat an action inside or outside Enfeeblement’s radius.
+Dodger’s Burning Skull and Blazing Skull match Python across four scenarios
+and 126 operations. The replays cover optional movement of friendly and
+enemy minions after the attack, including skipping the second destination.
+Dodger’s Necromancy and Necromastery match Python across three scenarios
+and 20 operations, covering lane-bound placement, Tide of Darkness placement
+outside a lane, and a team with no minions in limbo.
+Dodger’s Dark Ritual and Darker Ritual match Python across six scenarios
+and 32 operations, including the normal battle-zone count, Tide of Darkness,
+and insufficient eligible spaces.
+Darkest Ritual matches Python across four scenarios and 24 operations. Its
+coin reward and level-eight Attack item are evaluated independently.
+Dread Razor matches Python across three scenarios and 75 operations, covering
+both attack modes and the absence of a choice when no battle zone is active.
+Death Trap matches Python across four scenarios and 45 operations, covering
+filtered targets, two eligible heroes, no active battle zone, and a discard
+routed to Razzle after selecting one of his pieces.
+Dodger’s three Finger of Death cards match Python across five scenarios and
+197 operations, including both attack orders and the optional different target.
+Wuk’s Toss Away, Mighty Throw and Monstrous Throw match Python across four
+scenarios and 59 operations, including enemy and Tree-token throws and the
+optional second throw.
+Wuk’s Into the Canopy and Treetop Ride match Python across four scenarios
+and 81 operations. Python retains the first Tree selection when switching
+from self-swap to ally-swap, causing the self-swap to run again before the
+ally-swap. The mixed-branch replay preserves this behavior.
+Wuk’s Claim Dominance and Assert Dominance match Python through minion battle
+across two scenarios and 17 operations. The exclusions are bound to the played
+card and cap the reduction at one and two enemy minions, respectively.
+Wuk’s Gifts of Nature, Tree of Plenty and Abundance match Python across five
+scenarios and 80 operations, covering the Tree cost and optional retrievals
+by Wuk and his ally.
+Wuk’s Nature’s Protector, Nature’s Guardian and Nature’s Champion match
+Python across four scenarios and 178 operations, including Tree-adjacent
+targets and both orders of Champion’s two attacks.
+Wuk’s Mystic Saplings and Tree Slam match Python across four scenarios and
+91 operations, including early placement stop and paying the Tree cost for
+a ranged attack.
+Wuk’s Trample and Angry Stampede match Python across four scenarios and 113
+operations, completing his primary recipes. The replays cover ordinary movement,
+straight-line crossing, forced discard or defeat, and optional minion defeats.
+Tali’s Glacial Barrier, Wall of Frost, Pack Ice, Ancestral Totem and Venerated
+Totem match Python across six scenarios and 77 operations. The replays cover
+Ice placement and its token-bound initiative penalty, stopping early, and
+the two Totem protection and immunity configurations.
+Tali’s Winter Dagger, Winter Spear and Winter Scepter match Python across
+six scenarios and 123 operations, including the +3 attack on ordinary play
+and its absence when performing the card from discard.
+Tali’s Guardian Spirit and Warrior Spirit match Python across six scenarios
+and 78 operations, covering ally retrieval and the different self-retrieval
+options when the cards are performed from discard.
+Tali’s Spirit Wolf and Spirit Bear match Python across five scenarios and
+224 operations. The replays cover both Spirit Bear orders, the adjacent-only
+discard path, and live card-specific target history.
+Tali’s Ice Blast matches Python across three scenarios and 86 operations,
+including a matching-color discard, declining the follow-up, and a target
+with no matching card.
+Tali’s Commune with Spirits matches Python across two scenarios and 47
+operations. The ally names a color, then Tali performs a matching card
+just discarded or already in her discard pile.
+Tali’s Cold Snap and Snowstorm match Python across four scenarios and 32
+operations. The directional shift moves a line simultaneously and propagates
+a terrain block back through the line.
+Tali’s Blizzard matches Python across three scenarios and 47 operations.
+Playing it shifts once. Performing it from discard offers a second shift
+at the end of the turn.
+Ursafar’s Sniff Out, Eyes on the Prey, Apex Predator and Rip match Python
+across seven scenarios and 88 operations, including active and dormant rage,
+Unbound Fury, forced discard or defeat, and Rip’s coin reward.
+Ursafar’s Cold Ire and Eyes of Flame match Python across six scenarios and
+60 operations. Their rage bonuses stack with Movement items, and both cards
+create a new rage effect after movement.
+Ursafar’s Prey Drive, Prey Abundance and Feeding Frenzy match Python
+across four scenarios and 111 operations, covering the post-attack board
+presence gate and removal of one or two enemy minions.
+Ursafar’s Prowling Brute, Rampaging Beast and Unstoppable Force match Python
+across six scenarios and 94 operations, including the rage gate, the optional
+swap, and taking or staying put on the follow-up movement.
+Ursafar’s Claws That Catch matches Python across three scenarios and 74
+operations, including taking or declining the rage-gated pre-attack move.
+Ursafar’s Tear matches Python across four scenarios and 107 operations,
+including the rage gate, minion defeat, and a game-ending extra life penalty.
+Ursafar’s Instinctive Reaction and Evolutionary Response match Python across
+five scenarios and 105 operations, including both orders of performing and
+retrieving a discarded card.
+Ursafar’s Angry Roar matches Python across three scenarios and 28 operations,
+including the active-card eligibility check and the resulting primary action.
+Unbound Fury matches Python across five primary dispatch scenarios and its
+ultimate unlock trace, completing reviewed coverage of Ursafar’s 18 faces.
+Ignatia’s Equilibrium and first three fire attacks match Python across six
+scenarios and 146 operations, covering both coin faces, free branch choice,
+and a Chaos Incarnate repeat that flips the coin.
+Ignatia’s Crack of Doom and Imminent Eruption match Python across four
+scenarios and 109 operations, including exact maximum range and the optional
+adjacent-minion repeat.
+Ignatia’s Chaos Bolt, Unstable Portal, and Chaos Gate match Python across
+six scenarios and 82 operations, including both sides of each card and the
+branch-specific movement after Chaos Gate’s swap.
+Ignatia’s Abrupt Combustion, Spontaneous Immolation, and Violent Conflagration
+match Python across six scenarios and 62 operations, covering adjacency to
+minions and tokens, forced discard, removal, and defeat.
+Ignatia’s Searing Heat and Scorching Blaze match Python across four scenarios
+and 44 operations, including friendly and enemy targets, movement distance,
+and paths blocked by terrain.
+Ignatia’s Path of Ashes, Path of Cinders, and Path of Flames match Python
+across six scenarios and 87 operations, covering Magma trails and the placement
+cap on the orange face.
+Chaos Incarnate matches Python across three additional scenarios and 75
+operations. Declining preserves the coin face, accepting excludes the original
+target even when it remains in range, and direct primary dispatch uses the
+primitive Skill fallback. This completes reviewed coverage of Ignatia’s 18 faces.
+Cordelia’s three Broom attacks match Python across six scenarios and 78
+operations. A completed attack grants the round-long basic-action bonus,
+and an attack with no legal target stops before creating it.
+Cordelia’s Collateral Misfortune and Fatal Bonds match Python across four
+scenarios and 144 operations, covering both initial attacks and both orders
+of Fatal Bonds’ optional second attack.
+Cordelia’s Vile Vial and Potion Explosion match Python across four scenarios
+and 62 operations, covering opponent selection, public reveal, tier-based coin
+gain, and both discard thresholds.
+Cordelia’s Healing Spores, Fungal Favor, and Toxic Tranquility match Python
+across six scenarios and 85 operations, covering optional allied retrieval
+and coin loss for one enemy or all enemies in radius.
+Cordelia’s Charmed Step, Candy Trail, and Enchanted Path match Python
+across four scenarios and 58 operations, covering placement next to the
+target and both available push distances.
+Cordelia’s Trouble Brewing and Recipe for Disaster match Python across
+three scenarios and 41 operations, covering enemy minion placement and
+accepting or declining retrieval of a basic card.
+Cordelia’s Bewitch matches Python across 25 operations, covering the bounded
+range penalty, adjacent attack, and early stop when no target is available.
+Cordelia’s Jinx matches Python across 46 operations, covering the attack
+penalty and accepting or declining movement after Cordelia discards a card.
+Witching Hour’s existing action hook passes the action-rule oracle, completing
+reviewed coverage of Cordelia’s 18 faces.
+Widget’s Take Off and All Aboard match Python across 24 operations, including
+swapping Pyro with Widget or an ally and stopping when Pyro is absent.
+Widget’s Safe Landing and Dragon Bond match Python across five scenarios
+and 122 operations, covering the optional move before swapping, Pyro
+placement, and both orders of moving Widget and Pyro.
+Widget’s Nibble and Gnaw match Python across 29 operations, covering Pyro
+adjacency, Widget’s range limit, removal versus defeat, and preserving Pyro
+when there is no eligible target.
+Widget’s three Breath cards match Python across 52 operations, covering
+straight-line targeting from Pyro, forced discard, and the empty-hand
+difference between Flaming Breath and Scorching Breath.
+Widget’s three Diversionary attacks match Python across 118 operations,
+covering optional Pyro movement of up to two, three, or four spaces and
+no follow-up when the attack has no target.
+Widget’s Airborne Attack and Airborne Assault match Python across 126
+operations, including optional swaps before and after the attack and
+choosing the target from Widget’s post-swap position.
+Widget’s Drag Off and Carry Away match Python across 30 operations,
+including parallel displacement, the distinction between path obstacles
+and blocked destinations, and Carry Away’s ability to cross terrain.
+Widget’s Fight as One matches Python across 93 operations, including
+performing Dragon Bond after the attack, declining, and filtering out a
+facedown Skill card.
+Dragon Knight’s existing passive matches Python through the normal movement
+action menu, including an accepted Skill, a declined offer, and level gating.
+This completes reviewed coverage of Widget’s 18 faces.
+Mrak’s Rock and a Hard Place matches Python across 25 scenarios and 482
+operations, covering the Skill fallback, level gating, once-per-turn limit,
+and the trigger after Stone Grip. This completes Mrak’s 18 faces.
+Trinkets’ Deployable Barrier and Deployable Bastion match Python across
+four scenarios and 62 operations, covering the first placement next to the
+Turret, early stopping, placement caps, and token-bound defense auras.
+Trinkets’ three Disruptor cards match Python across eight traces and 48
+operations, covering effect creation and separate activated-state triggers
+for discard, empty hands, and enemies outside the Turret’s radius.
+Trinkets’ Self Destruct and Emergency Protocol match Python across 52
+operations, including optional multi-target selection, the empty-hand
+outcome, and removing the Turret even when no targets are selected.
+Trinkets’ Early Prototype, Updated Design, and Perfected Design match
+Python across six scenarios and 71 operations, covering the Turret’s range
+gate, swaps, placement, and Early Prototype’s Turret removal.
+Trinkets’ Salvage Parts and Rapid Redeployment match Python across five
+scenarios and 100 operations, covering every menu branch for deployment,
+movement, retrieval, and minion defeat.
+Trinkets’ Steam Discharge and Flame Belcher match Python across three
+scenarios and 129 operations, covering both repeat limits, early decline,
+and tracking distinct Turret-adjacent targets.
+Trinkets’ Makeshift Minigun, Gatling Gun, and Supercharged Cannon match
+Python across six scenarios and 138 operations, covering alignment from both
+origins and each card’s Attack bonus.
+Unlimited Firepower’s existing stat aura passes the Python stat oracle,
+completing reviewed coverage of Trinkets’ 18 faces.
+NebKher’s Imbue Doubt and Time to Reconsider match Python across 30
+operations for color selection, next-turn trigger creation, forced discard
+after revelation, and dropping stale triggers at a round boundary.
+NebKher’s Illusionary Force and Illusionary Army match Python across 56
+operations, covering their distinct placement limits, early stopping, and
+the round-long Illusion equivalence effect.
+NebKher’s Twist Fate and Devious Scheme match Python across 85 operations,
+covering the attack, both Illusion selection ranges, and declining the swap.
+NebKher’s Fleeting Image, Multiple Projections, and Master of Illusions
+match Python across 65 operations, covering their placement limits and swaps
+with newly placed or existing Illusions.
+NebKher’s Phantasmal Sentry, Warrior, and Champion match Python across six
+scenarios and 194 operations, covering their adjacent attacks and targeting
+through stationary or moved Illusions.
+NebKher’s Crack in Reality and Shift Reality match Python across 86
+operations, covering all three split axes, the shared cast-time anchor,
+and the off-board case.
+NebKher’s An Illusion of Choice matches Python across 19 operations,
+including two distinct next-turn discard targets and round-boundary expiry.
+NebKher’s Diabolical Laughter matches Python across 207 operations, including
+the laugh prompt, the ultimate before the follow-up menu, Illusion placement,
+and swapping resolved enemy cards without expiring their effects.
+Razzle’s Theatrics and Spectacle match Python across 46 operations, covering
+both initial acting pieces and switching pieces for Spectacle’s optional
+second swap with a different minion.
+Razzle’s Tightrope, High Wire, and Wire Dancers match Python across 90
+operations, covering declining the follow-up and moving the other piece
+one, two, or three spaces without changing the acting piece.
+Razzle’s Rummage and Ransack match Python across 120 operations, covering
+zero to three nearby pieces and the two cards’ different retrieval limits.
+Razzle’s Alleyoop, Group Performance, and Team Spirit match Python across
+84 operations, including the friendly-hero swap and accepting or declining
+the other piece’s follow-up move.
+Razzle’s Stunt Doubles matches Python across 99 operations, covering
+optional spawning from supply and Twin Strike’s repeat from another piece.
+Razzle’s Phantom Strike, Hit and Gone, Into Thin Air, and Crowd Control
+primary actions match Python across 108 operations for voluntary removal,
+including keeping one piece, removing all pieces, and clearing the acting piece.
+Razzle’s Magic Trick and Aaaand It’s Gone match Python across 57 operations,
+including a shortened push, an obstructed return path, and a zero-distance
+choice. This completes the primary card catalog.
+Whisper’s Swift Justice primary matches Python across six end-to-end scenarios
+(233 operations), including both Grim Reaper attack orders. Six separate
+forced-movement scenarios cover primary and secondary movement, card location,
+and restoration when no legal destination exists.
+Snorri’s focused oracle traces include Rune Mastery feeding into Deep Passage
+and copied Deep Passage using the original card owner’s rune slots.
 Misa’s 18 primary bodies also pass independent Python parity across 691 scenes /
 8,598 operations; see the [validation record](artifacts/misa-primary-final-validation.json).
 Wasp adds 14 primary bodies and two conditional query steps, verified across
@@ -92,6 +413,137 @@ PYTHONHASHSEED=0 PYTHONPATH=scripts/rust_oracle:src \
   "$HOME/.cache/goa2-rust/oracle-venv/bin/python" -m streamed_games \
   --worker "$HOME/.cache/goa2-rust/target/release/goa2-search-cli"
 ```
+
+The Hanu roster has a separate seeded policy and compact index. It adds 7,565
+source/native operation comparisons through GAME_OVER, including natural Journey
+cleanup, upgrades, respawns and lane pushes. The two baseline games retain their
+original policy and 7,059 operations. These four examples do not establish full
+roster closure or simulation/search throughput.
+
+To regenerate the Hanu corpus (its output defaults to `complete-games-hanu.json`):
+
+```sh
+PYTHONHASHSEED=0 PYTHONPATH=scripts/rust_oracle:src \
+  "$HOME/.cache/goa2-rust/oracle-venv/bin/python" -m streamed_games \
+  --roster hanu --worker "$HOME/.cache/goa2-rust/target/release/goa2-search-cli"
+```
+
+See the [Hanu whole-game validation record](artifacts/hanu-complete-games-final-validation.json).
+
+Garrus and Gydion versus Razzle and Mortimer matched the frozen Python engine
+across all 4,699 operations through game over in round 11 on Forgotten Island.
+To rerun the comparison without exporting fixture chunks, use this command.
+
+```sh
+PYTHONHASHSEED=0 PYTHONPATH=scripts/rust_oracle:src \
+  "$HOME/.cache/goa2-rust/oracle-venv/bin/python" -m streamed_games \
+  --check-only --roster mixed --worker "$HOME/.cache/goa2-rust/target/iterate/goa2-search-cli"
+```
+
+Snorri and Ignatia versus NebKher and Trinkets also matched across all 1,722
+operations through game over in round 5 on Magma and Ice. The replay uses
+setup seed 29 and the baseline decision policy with seed 53. It includes
+passive offers, hero respawn, upgrades and lane pushes.
+
+### Fixed-policy two-turn rollouts
+
+The iterate build completed 441–718 rollouts per second across the four
+Python-verified positions, compared with 35–46 per second in Python. Each
+position ran 100 timed iterations after parity verification. Rust shares the
+compiled symbol index, copies runtime symbol entries on a fork, and refreshes
+object protection only when a guard needs it. The benchmark includes policy
+selection, rules execution and rollback. It excludes session import and snapshot
+export. Run it with rollout_parity.py and --bench-iterations 100. Add
+--planning to verify serial and parallel sampled-planning scores and
+commitments, including Python legality for the selected card.
+
+A later release run measured 410–762 Rust rollouts per second with the CLI
+parity suite running concurrently. This is a fixed first-legal diagnostic.
+It excludes determinization and uses the native evaluator, so the result
+does not satisfy the full-simulation performance gate.
+
+The rollout_bench CLI operation also accepts sample_seed. With that option,
+every timed iteration reconstructs and installs a sampled planning hand before
+running the two turns. A 300-iteration paired iterate run measured 431–533
+sampled rollouts/s against 554–630 on the same positions without sampling.
+These runs use a fixed seed and native evaluation. Moving sampling into the undo
+journal brought a later paired run to 490–583 sampled rollouts/s versus
+523–602 without sampling, with a 3–7% gap on the same positions.
+
+Use --lab-evaluator with the lab's bot_evaluation.py path to compare the
+lab-attack-range-v1 leaf value in both engines. With 100 first-legal
+iterations per position and the parity suite running concurrently, this
+mode measured 371–698 Rust rollouts/s and 25–36 Python rollouts/s. The Rust
+diagnostic computes both native and lab values. This matched workload uses
+the imported hands, so it still excludes hidden-world sampling.
+
+### Matched serial simulation benchmark
+
+Release Rust is **3.97–7.99× faster** than the frozen Python engine on six
+verified two-game-turn windows, including openings, round transitions and combat.
+These are fixed-decision serial replays, not minimax search or full-roster throughput.
+
+| Workload | Python simulations/s | Rust simulations/s | Rust speedup |
+| --- | ---: | ---: | ---: |
+| forgotten_island-opening | 23.9 | 149.5 | 6.25× |
+| forgotten_island-round-boundary | 27.9 | 114.5 | 4.11× |
+| forgotten_island-combat | 34.0 | 146.0 | 4.30× |
+| magma_and_ice-opening | 16.7 | 133.6 | 7.99× |
+| magma_and_ice-round-boundary | 21.0 | 83.5 | 3.97× |
+| magma_and_ice-combat | 25.0 | 120.9 | 4.84× |
+
+Measured on an Intel i5-10400F under WSL, pinned to one CPU: Python 3.11.17,
+Rust release build, five interleaved samples of 32 simulations per language and
+workload (960 timed simulations each). Every simulation copies its root, resolves
+all heroes over two complete global game turns, and discards the working state.
+Import, command decoding, JSON, export, validation and explicit pre-sample GC are
+outside the clocks; both typed input commands and Python InputResponse templates
+are prepared beforehand. Current tokens and owned selection copies are bound
+during execution. Automatic Python GC remains enabled during timing. Python
+copies state and physical-card references with one deepcopy memo; Rust clones its
+NativeSession. Endpoints, bindings, event/request counts and unchanged roots are checked.
+
+Only declared `Zone.hexes` sets are canonicalized for endpoint comparison:
+Python deepcopy can change their serialized order. Other lists, gameplay values
+and bindings remain exact; zone-set identity paths cause explicit rejection.
+
+Rust root copying takes about 0.14–0.18 ms versus Python’s 5.77–7.08 ms.
+The measured optimization replaces hashed object-protection membership with a
+dense bitmap while retaining the same reachability walk and mutation guards.
+It improves Rust throughput by 1.76–2.22× over the initial 41–84 simulations/s
+baseline. Advancement still consumes about 95–97% of total simulation time;
+further profiling and optimization remain necessary for the original
+1,000 simulations/s gate. These timings do not establish whole-engine memory use.
+The original baseline remains in `artifacts/simulation-benchmark.json`; current
+measurements are in `artifacts/simulation-benchmark-dense-protection.json`.
+See the [regression record](artifacts/dense-protection-final-validation.json) for
+its completed core, identity, restoration and full-corpus replay checks.
+
+For a recorded Linux perf profile, resolve raw file offsets before interpreting
+function costs. The helper checks the worker build ID, uses executable ELF load
+segments and retains merged LTO symbol aliases. It reports self samples, grouping
+unresolved library samples by DSO; those samples do not identify a caller or prove
+allocation cost. Keep the matching unstripped binary available until resolution:
+
+```sh
+python3 scripts/rust_oracle/native_profile.py --perf /path/to/perf \
+  --binary "$HOME/.cache/goa2-rust/target/release/goa2-search-cli" \
+  --data rust/artifacts/dense-advance-perf.data \
+  --output rust/artifacts/dense-advance-profile-resolved.json
+```
+
+
+Reproduce after building the release worker:
+
+```sh
+PYTHONHASHSEED=0 PYTHONPATH=scripts/rust_oracle:src \
+  "$HOME/.cache/goa2-rust/oracle-venv/bin/python" -m simulation_bench \
+  --worker "$HOME/.cache/goa2-rust/target/release/goa2-search-cli" \
+  --samples 5 --iterations 32
+```
+
+Raw samples: [simulation-benchmark.json](artifacts/simulation-benchmark.json).
+Scoped verification: [validation record](artifacts/simulation-benchmark-final-validation.json).
 
 ## Build and test in WSL
 
@@ -227,10 +679,10 @@ Movement disagreements are saved under ignored `rust/artifacts/` for diagnosis.
 | Reference | Frozen source manifest; independent Python BFS comparisons; fingerprinted corpora | Complete decision/event trace export, replay and minimization; full-search baseline runner |
 | State boundary | Semantic round trips; dense entities/physical cards and typed effects/hero collections; live context, step and model identities; arena/dense walking, placement and removal with shared tile caches; ordered planning buffers and revelation knowledge | Remaining authoritative token/effect/world bindings and physical-child/value-equality coverage |
 | Geometry | Checked cube/hex IDs; dynamic bitsets; terrain/occupancy; batched movement; effect-aware walking paths, dynamic obstacles and passable tokens; compiled range, obstacle, movement-path and straight-line predicates | Effect-aware push paths, targeting and remaining spatial-filter consumers |
-| Execution | Ordinary closed-rule movement, combat, card-action and phase traces; live context/control, planning/revelation/actor selection, confirmation/finalization, minion-return controller, walking and placement fallback, mine choices/triggers, forced-discard expansion, intrinsic CARD selection, live equality-aware discard, passive discovery/offer/body construction, rune choice and usage | Dynamic Flurry/Cloak card-body rebuilding, remaining body consumers and generic CARD predicates; remaining card/passive/spell, respawn, lane/battle/round consumers; make/unmake and hashing |
-| Stats/card model | Item/marker/active-effect stats, scoped immunity/topology, minion defense, masked card-stat recipes, Metamorphosis, Unlimited Firepower and conditional Big Sodding Gun stat auras; play/unplay/discard/resolve/swap/retrieve; physical alias export | Illusion-minion equivalence, non-JSON physical metadata equality, remaining phase-specific effect hooks |
-| Card action rules | Typed menus/recipes, action/repeat restrictions, movement caps and Witching Hour; ordinary secondary actions; 38 reviewed primary effects; passive scan/offer/use, Big Sodding Gun and ordinary/granted Wild Hunt; unregistered-effect fallback; repeated unit/token selection and Clear; native placement/swap/recording, effect-aware movement sequences and bounded repeats | Remaining primary/passive effects, general active-effect execution consumers, spell faces and phase-specific effects |
-| Search/integration | No live integration or advertised search capability | Evaluation, iterative team-aware search, hidden/simultaneous planning, parallelism, optional lab adapter |
+| Execution | Native planning, reveal, action resolution, respawn, lane battles, upgrades and round reset; differential replays through game over | Wider roster and map combinations, remaining world-rule interactions, and complete transition parity |
+| Stats/card model | Item, marker and active-effect stats; scoped immunity and topology; physical card lifecycle and object aliases | Complete equality, effect lifetime and world-rule coverage |
+| Card action rules | Reviewed primary catalog for 596 hero card faces; 22 spell bodies; 750 defense and on-block scenarios; passive scans, offers and live card-body rebuilding | Full-roster passive, filter and cross-card interaction verification |
+| Search/integration | Experimental resolution and planning search entry points | Search correctness and throughput gates, hidden and simultaneous planning verification, parallelism and bot integration |
 
 The JSON state envelope is an outer boundary format, **not** the eventual native
 simulation representation. Importing a saved continuation losslessly does not
@@ -4366,3 +4818,14 @@ payloads from the current Git index. It never rewrites published Git history.
 Run it with no corpus generators/readers active. Keep runtime catalogs as normal
 JSON because the engine embeds them at compile time. The exact retained files
 are listed in `fixture_cache.COMMITTED` and `rust/.gitignore`.
+
+The experimental `search_resolution` worker operation takes a live envelope,
+`player_id`, `max_depth`, `max_nodes`, and `time_ms`. It returns a typed input
+as a `check_sequences` decision, with its score, completed decision depth, and
+node count. The `resolved` flag indicates that search proved deeper iterations
+cannot change the result within this resolution. If the first iteration is interrupted, the worker keeps the best
+fully scored root move so far, with a completed depth of zero. The request token belongs to the native envelope replay. Search
+stops at planning and scores material with simple positional tie-breakers.
+The optional `opponent_policy` defaults to `adversarial`. Use `first_legal`
+for a deterministic baseline that follows the first native option at each
+opposing prompt.

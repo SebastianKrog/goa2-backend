@@ -21,12 +21,12 @@ def apply(rows, paths):
 def test_raw_bindings_cover_all_reviewed_pure_and_stateful_builders():
     data = catalog()
     assert set(data["raw_card_bindings"]) == set(data["recipes"])
-    assert len(data["raw_card_bindings"]) == 124
+    assert len(data["raw_card_bindings"]) == 447
     for effect, rows in data["recipes"].items():
         paths = data["raw_card_bindings"][effect]
         raw = apply(rows, paths)
         assert raw_binding_paths(rows, raw) == paths
-    assert len(data["stateful_recipes"]) == 3
+    assert len(data["stateful_recipes"]) == 101
     for body in data["stateful_recipes"].values():
         for name, rows in body["variants"].items():
             paths = body["raw_card_bindings"][name]

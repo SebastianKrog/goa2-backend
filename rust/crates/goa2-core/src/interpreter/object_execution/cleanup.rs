@@ -111,7 +111,7 @@ impl NativeSession {
             .collect::<Vec<_>>();
         let before = self
             .world
-            .cards
+            .cards()
             .iter()
             .map(|c| c.active)
             .collect::<Vec<_>>();
@@ -358,7 +358,7 @@ impl NativeSession {
         };
         let before = self
             .world
-            .cards
+            .cards()
             .iter()
             .map(|c| c.active)
             .collect::<Vec<_>>();
@@ -443,12 +443,7 @@ impl NativeSession {
                     ObjectValue::Atom(Datum::Int(0)),
                 )
                 .map_err(unsupported)?;
-            self.world
-                .heroes
-                .iter_mut()
-                .find(|row| row.id == hero)
-                .unwrap()
-                .resolved_turns = 0;
+            self.world.hero_row_mut(hero).unwrap().resolved_turns = 0;
             self.sync_card_collections_bound(objects)?;
         }
         let mut events = Vec::new();
@@ -521,18 +516,8 @@ impl NativeSession {
                         ObjectValue::Atom(Datum::Int(level)),
                     )
                     .map_err(unsupported)?;
-                self.world
-                    .heroes
-                    .iter_mut()
-                    .find(|row| row.id == hero)
-                    .unwrap()
-                    .gold = gold;
-                self.world
-                    .heroes
-                    .iter_mut()
-                    .find(|row| row.id == hero)
-                    .unwrap()
-                    .level = level;
+                self.world.hero_row_mut(hero).unwrap().gold = gold;
+                self.world.hero_row_mut(hero).unwrap().level = level;
                 if level == 8 {
                     ultimate = true;
                     self.cleanup_unlock(objects, hero, model, &mut events)?;
@@ -567,12 +552,7 @@ impl NativeSession {
                 gold = gold
                     .checked_add(1)
                     .ok_or_else(|| unsupported("cleanup gold overflow"))?;
-                self.world
-                    .heroes
-                    .iter_mut()
-                    .find(|row| row.id == hero)
-                    .unwrap()
-                    .gold = gold;
+                self.world.hero_row_mut(hero).unwrap().gold = gold;
                 objects
                     .arena
                     .set_field(
@@ -675,7 +655,8 @@ impl NativeSession {
         step: ObjectId,
     ) -> Result<CleanupPlan> {
         let mut candidate = self.clone();
-        let mut arena = objects.clone();
+        candidate.world.inherit_row_undo(&self.world);
+        let mut arena = objects.staged_clone();
         let popped = arena.arena.list_pop(arena.stack).map_err(unsupported)?;
         if !matches!(popped,Some(ObjectValue::Object(id)) if id==step) {
             return Err(unsupported("cleanup staged stack drift"));

@@ -98,6 +98,11 @@ impl NativeSession {
                     _ => return Err(unsupported("unit kind invalid")),
                 },
             ),
+            "has_marker_filter" => UnitFilter::HasMarker(self.passive_text_bound(
+                objects,
+                object,
+                Field::MarkerType,
+            )?),
             "exclude_identity_filter" => UnitFilter::Exclude {
                 self_: self.spatial_bool_bound(objects, object, Field::ExcludeSelf)?,
                 keys: self.unit_filter_texts_bound(objects, object, Field::ExcludeKeys)?,
@@ -107,8 +112,11 @@ impl NativeSession {
             "adjacency_filter"
             | "line_behind_target_filter"
             | "between_hexes_filter"
+            | "clear_line_of_sight_filter"
+            | "same_direction_from_origin_filter"
             | "relative_distance_filter"
             | "in_straight_line_filter"
+            | "adjacent_to_terrain_filter"
             | "not_in_straight_line_filter" => {
                 UnitFilter::Spatial(self.hex_filter_bound(objects, object)?)
             }
@@ -118,6 +126,11 @@ impl NativeSession {
                 Field::OriginId,
                 Field::OriginKey,
             )?),
+            "adjacent_to_token_in_range_filter" => UnitFilter::AdjacentToken {
+                kind: self.passive_text_bound(objects, object, Field::TokenType)?,
+                max_range: self.spatial_int_bound(objects, object, Field::MaxRange)?
+                    .ok_or_else(|| unsupported("token range missing"))?,
+            },
             "adjacency_to_context_filter" => UnitFilter::AdjacentContext(self.passive_text_bound(
                 objects,
                 object,
@@ -130,6 +143,37 @@ impl NativeSession {
             "can_be_placed_filter" => {
                 UnitFilter::Displacement(crate::validation::DisplacementKind::Place)
             }
+            "remained_in_place_filter" | "has_turn_start_position_filter" => {
+                let snapshot = objects.phases.root(&objects.arena, Field::Snapshot)?;
+                let positions = objects
+                    .arena
+                    .fields(snapshot)
+                    .ok_or_else(|| unsupported("turn-start positions must be a mapping"))?
+                    .iter()
+                    .map(|(id, value)| Ok((*id, self.spatial_hex_bound(objects, value)?.0)))
+                    .collect::<Result<Vec<_>>>()?;
+                UnitFilter::TurnStartPositions {
+                    positions,
+                    stationary: self.symbols.name(kind) == "remained_in_place_filter",
+                }
+            }
+            "has_straight_line_destination_filter" => {
+                let minimum = self
+                    .spatial_int_bound(objects, object, Field::PushDistance)?
+                    .unwrap_or(2);
+                UnitFilter::StraightDestination {
+                    minimum,
+                    maximum: self
+                        .spatial_int_bound(objects, object, Field::MaxDistance)?
+                        .unwrap_or(minimum),
+                    through: self.spatial_bool_bound(objects, object, Field::Through)?,
+                }
+            }
+            "adjacent_to_obstacles_filter" => UnitFilter::AdjacentObstacles(
+                self.spatial_int_bound(objects, object, Field::MinCount)?
+                    .unwrap_or(3),
+            ),
+            "unit_on_spawn_point_filter" => UnitFilter::OnSpawnPoint,
             "context_ids_filter" => {
                 UnitFilter::ContextIds(self.passive_text_bound(objects, object, Field::IdsKey)?)
             }

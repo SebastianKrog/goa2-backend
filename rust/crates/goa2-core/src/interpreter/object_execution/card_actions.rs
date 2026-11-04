@@ -48,6 +48,7 @@ impl ActionBindings {
         let mut recipes = HashMap::new();
         for name in [
             "restore_context",
+            "restore_other_context",
             "piece",
             "passive",
             "pre_move",

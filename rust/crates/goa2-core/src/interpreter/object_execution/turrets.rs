@@ -213,7 +213,7 @@ impl NativeSession {
                         .set_context(key, ObjectValue::Atom(Datum::Text(id)))
                         .map_err(unsupported)?;
                 }
-                objects.readonly = Arc::new(objects.arena.readonly_objects());
+                objects.readonly.take();
                 Ok(vec![NativeEvent::BoardEntityPlaced {
                     actor,
                     entity: id,

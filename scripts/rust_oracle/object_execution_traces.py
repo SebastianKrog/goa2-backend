@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from fixture_cache import write_text
-
 import argparse
 import copy
 import json
 from pathlib import Path
 
+from fixture_cache import write_text
 from oracle import ROOT, Worker, verify_sources
 from shared_objects import export_state_with_shared_objects, instance_bindings
 from stack_traces import TraceNormalizer, read_case, read_index, write_corpus_stream
@@ -86,6 +85,27 @@ class ObjectTraceNormalizer(TraceNormalizer):
 
 
 def scenes():
+    from cutter_primary_traces import scenes as cutter_scenes
+
+    yield from cutter_scenes()
+    from line_of_sight_traces import scenes as line_of_sight_scenes
+
+    yield from line_of_sight_scenes()
+    from live_xargatha_primary_traces import scenes as xargatha_scenes
+
+    yield from xargatha_scenes()
+    from live_hanu_primary_traces import scenes as hanu_scenes
+
+    yield from hanu_scenes()
+    from journey_traces import scenes as journey_scenes
+
+    yield from journey_scenes()
+    from action_control_traces import scenes as action_control_scenes
+
+    yield from action_control_scenes()
+    from initiative_traces import scenes as initiative_scenes
+
+    yield from initiative_scenes()
     from co_movement_traces import scenes as co_movement_scenes
 
     yield from co_movement_scenes()

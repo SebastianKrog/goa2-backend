@@ -11,6 +11,7 @@ use std::sync::Arc;
 pub const HERO: &str = "native-primary-hero";
 pub const CARD: &str = "native-primary-card";
 pub const PRIMARY: i64 = 1234567891;
+pub const PRIMARY_PLUS_TWO: i64 = 1234568102;
 pub const RANGE: i64 = 1234567892;
 pub const RADIUS: i64 = 1234567893;
 pub const DEFENSE_LOG: &str = "native-primary-defense-log";
@@ -28,25 +29,44 @@ pub struct PrimaryOperands {
     hero: Symbol,
     card: Symbol,
     radius_defaults: Arc<[(i64, i64)]>,
+    range_defaults: Arc<[(i64, i64)]>,
 }
 impl PrimaryOperands {
     pub fn compile(s: &mut Symbols) -> Result<Self, String> {
-        let radius_defaults = catalog()?["radius_fallbacks"]
-            .as_object()
-            .ok_or("primary radius fallbacks missing")?
-            .iter()
-            .map(|(slot, value)| {
-                Ok((
-                    slot.parse::<i64>().map_err(|e| e.to_string())?,
-                    value.as_i64().ok_or("primary radius fallback invalid")?,
-                ))
-            })
-            .collect::<Result<Vec<_>, String>>()?;
+        Self::compile_with_live(s, catalog()?)
+    }
+
+    pub(crate) fn compile_with_live(s: &mut Symbols, live: &Value) -> Result<Self, String> {
+        let frozen = catalog()?;
+        let defaults = |key: &str| -> Result<Arc<[(i64, i64)]>, String> {
+            let shared = frozen[key].as_object().ok_or("primary fallbacks missing")?;
+            let live = live[key].as_object().ok_or("live primary fallbacks missing")?;
+            if shared.iter().any(|(slot, value)| live.get(slot) != Some(value)) {
+                return Err(format!("primary {key} catalogs disagree"));
+            }
+            live.iter()
+                .map(|(slot, value)| {
+                    Ok((
+                        slot.parse::<i64>().map_err(|error| error.to_string())?,
+                        value.as_i64().ok_or("primary fallback invalid")?,
+                    ))
+                })
+                .collect()
+        };
+        let radius_defaults = defaults("radius_fallbacks")?;
+        let range_defaults = defaults("range_fallbacks")?;
         Ok(Self {
             hero: s.intern(HERO),
             card: s.intern(CARD),
-            radius_defaults: Arc::from(radius_defaults),
+            radius_defaults,
+            range_defaults,
         })
+    }
+    pub fn range_default(&self, slot: i64, range: i64) -> Option<i64> {
+        self.range_defaults
+            .iter()
+            .find(|(key, _)| *key == slot)
+            .map(|(_, default)| if range == 0 { *default } else { range })
     }
     pub fn radius_default(&self, slot: i64, radius: Option<i64>) -> Option<i64> {
         self.radius_defaults
@@ -71,12 +91,20 @@ impl PrimaryOperands {
     pub fn number(&self, value: i64, v: &PrimaryValues) -> Result<i64, String> {
         match value {
             PRIMARY => Ok(v.stats.primary_value),
+            PRIMARY_PLUS_TWO => v
+                .stats
+                .primary_value
+                .checked_add(2)
+                .ok_or("charge attack exceeds i64".into()),
             RANGE => Ok(v.stats.range),
             RADIUS => v
                 .stats
                 .radius
                 .ok_or("required primary radius is absent".into()),
-            _ => Ok(self.radius_default(value, v.stats.radius).unwrap_or(value)),
+            _ => Ok(self
+                .range_default(value, v.stats.range)
+                .or_else(|| self.radius_default(value, v.stats.radius))
+                .unwrap_or(value)),
         }
     }
     pub fn optional_number(
@@ -138,7 +166,10 @@ impl PrimaryOperands {
             HexFilter::Relative { origin, .. }
             | HexFilter::BehindTarget { origin, .. }
             | HexFilter::Straight { origin, .. }
-            | HexFilter::ClearLine { origin, .. } => self.origin(origin, v),
+            | HexFilter::MaxEmptySpacesInLine { origin, .. }
+            | HexFilter::ClearLine { origin, .. }
+            | HexFilter::SameDirection { origin, .. }
+            | HexFilter::LineOfSight { origin, .. } => self.origin(origin, v),
             HexFilter::FastTravel {
                 origin,
                 source_card,
@@ -157,7 +188,8 @@ impl PrimaryOperands {
             | HexFilter::AdjacentSpawn { .. }
             | HexFilter::AdjacentTags(_)
             | HexFilter::Reject
-            | HexFilter::Terrain(_) => {}
+            | HexFilter::Terrain(_)
+            | HexFilter::AdjacentTerrain(_) => {}
         }
         Ok(())
     }

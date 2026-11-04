@@ -24,6 +24,28 @@
         ]
       }
     ],
+    "restore_other_context": [
+      {
+        "fields": {
+          "type": "restore_action_context",
+          "step_id": "template",
+          "pending_input": null,
+          "pending_request_id": null,
+          "is_mandatory": true,
+          "active_if_key": null,
+          "skip_if_key": null,
+          "other_hero_action": true
+        },
+        "objects": [
+          {
+            "kind": "step",
+            "paths": [
+              []
+            ]
+          }
+        ]
+      }
+    ],
     "piece": [
       {
         "fields": {
@@ -565,5 +587,5 @@
     "data": "template-action-value",
     "log": "template-action-log"
   },
-  "catalog_sha256": "4f740420af5a513216ece02f492560bef8b9eb49e0a1e63c91ecd7fb171f9238"
+  "catalog_sha256": "18ee1b190cc4c08b0cc9b78c577a868fba3664b9f147c4ef0baa36b62a44b6e0"
 }

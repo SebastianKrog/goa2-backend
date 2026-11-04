@@ -7,18 +7,18 @@ planning and round boundaries. Never starts a server or imports neural models.
 
 from __future__ import annotations
 
-from fixture_cache import read_bytes, write_bytes, write_text
-
 import argparse
 import hashlib
 import json
 import os
 import resource
 import subprocess
+from collections import Counter
 from contextlib import suppress
 from pathlib import Path
 from time import perf_counter
 
+from fixture_cache import read_bytes, write_bytes, write_text
 from object_execution_traces import ObjectTraceNormalizer, iter_reference
 from oracle import ORACLE_REVISION, ROOT, canonical, verify_sources
 from shared_objects import export_state_with_shared_objects
@@ -165,17 +165,19 @@ def verify_case(name, state, operations, command, directory):
     expected = iter_reference(state, operations, inplace_records=True)
     worker = StreamWorker(command)
     previous = None
+    steps_seen, events_seen = Counter(), Counter()
+    initial_state = envelope["state"]
     chunks = []
     pending = []
-    directory.mkdir(parents=True, exist_ok=True)
+    if directory is not None:
+        directory.mkdir(parents=True, exist_ok=True)
 
     def flush():
-        if not pending:
+        if directory is None or not pending:
             return
         encoded = canonical(pending).encode()
         identity = hashlib.sha256(encoded).hexdigest()
         path = directory / (identity + ".json")
-        temporary = path.with_suffix(".tmp")
         write_bytes(path, encoded + b"\n")
         chunks.append(
             dict(
@@ -191,10 +193,18 @@ def verify_case(name, state, operations, command, directory):
     try:
         actual = worker.records(envelope, operations)
         for index, (want, raw) in enumerate(zip(expected, actual, strict=True)):
+            before = initial_state if previous is None else previous["semantic_state"]
+            if operations[index]["kind"] == "advance_prefix" and before["execution_stack"]:
+                steps_seen[before["execution_stack"][-1]["type"]] += 1
+            for event in want["events"]:
+                events_seen[event["event_type"]] += 1
             got = normalizer.record(raw, inplace=True)
             if want != got:
                 path = ROOT / "rust/artifacts/complete-game-stream-mismatch.json"
-                write_text(path, json.dumps(
+                path.parent.mkdir(parents=True, exist_ok=True)
+                write_text(
+                    path,
+                    json.dumps(
                         dict(
                             name=name,
                             index=index,
@@ -204,16 +214,30 @@ def verify_case(name, state, operations, command, directory):
                         ),
                         indent=2,
                     )
-                    + "\n")
+                    + "\n",
+                )
                 raise AssertionError(f"{name} operation {index} differs: {path}")
-            pending.append(list(snapshot_delta(previous, want)))
-            if len(pending) == 64:
-                flush()
+            if directory is not None:
+                pending.append(list(snapshot_delta(previous, want)))
+                if len(pending) == 64:
+                    flush()
             hasher.update(
                 json.dumps(want, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
             )
             hasher.update(b"\n")
             previous = want
+            if (index + 1) % 1024 == 0:
+                print(
+                    json.dumps(
+                        dict(
+                            name=name,
+                            verified_operations=index + 1,
+                            round=want["semantic_state"]["round"],
+                            turn=want["semantic_state"]["turn"],
+                        )
+                    ),
+                    flush=True,
+                )
         worker.close()
     except BaseException:
         worker.abort()
@@ -226,6 +250,8 @@ def verify_case(name, state, operations, command, directory):
         round=previous["semantic_state"]["round"],
         turn=previous["semantic_state"]["turn"],
         phase="GAME_OVER",
+        step_types_encountered=dict(steps_seen),
+        events_emitted=dict(events_seen),
         record_sha256=hasher.hexdigest(),
         seconds=round(perf_counter() - start, 2),
         source_peak_rss_kib=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,
@@ -234,14 +260,19 @@ def verify_case(name, state, operations, command, directory):
     return case, facts
 
 
-def export(path, command):
-    from live_game_traces import scenes
+def export(path, command, *, roster="baseline"):
+    from live_game_traces import hanu_scenes, scenes
+
+    provider, policy = {
+        "baseline": (scenes, "progress-v1"),
+        "hanu": (hanu_scenes, "hanu-progress-v1"),
+    }[roster]
 
     manifest = verify_sources()
     facts = []
 
     def cases():
-        for name, state, operations in scenes():
+        for name, state, operations in provider():
             case, result = verify_case(
                 name, state, operations, command, path.parent / path.stem / "chunks-v3"
             )
@@ -256,7 +287,7 @@ def export(path, command):
             oracle_revision=ORACLE_REVISION,
             source_sha256=manifest["source_sha256"],
             contract="complete-games-snapshot-deltas-v3",
-            policy="progress-v1",
+            policy=policy,
             python_hash_seed="0",
         ),
         cases(),
@@ -327,23 +358,48 @@ def verify_compact_corpus(path, command):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--worker", required=True)
+    parser.add_argument("--roster", choices=("baseline", "hanu", "mixed"), default="baseline")
     parser.add_argument(
-        "--output", type=Path, default=ROOT / "rust/tests/fixtures/complete-games.json"
+        "--check-only", action="store_true", help="Compare live games without exporting a corpus"
+    )
+    parser.add_argument(
+        "--output", type=Path, help="Defaults to the compact corpus matching --roster"
     )
     args = parser.parse_args()
+    if args.check_only and args.output is not None:
+        parser.error("--output cannot be used with --check-only")
+    if args.roster == "mixed" and not args.check_only:
+        parser.error("--roster mixed requires --check-only")
+    if args.output is None and not args.check_only:
+        name = "complete-games-hanu.json" if args.roster == "hanu" else "complete-games.json"
+        args.output = ROOT / "rust/tests/fixtures" / name
     if os.environ.get("PYTHONHASHSEED") != "0":
         parser.error("run with PYTHONHASHSEED=0 for reproducible source option order")
     start = perf_counter()
-    index, facts = export(args.output, [args.worker])
+    if args.check_only:
+        from live_game_traces import hanu_scenes, scenes
+
+        verify_sources()
+        games = hanu_scenes() if args.roster == "hanu" else scenes(mixed=args.roster == "mixed")
+        facts = [
+            verify_case(name, state, ops, [args.worker], None)[1]
+            for name, state, ops in games
+        ]
+    else:
+        index, facts = export(args.output, [args.worker], roster=args.roster)
     result = dict(
         cases=len(facts),
         operations=sum(c["operations"] for c in facts),
         games=facts,
-        corpus_sha256=index["corpus_sha256"],
         state_request_event_and_identity_parity=True,
         seconds=round(perf_counter() - start, 2),
     )
-    write_text(ROOT / "rust/artifacts/complete-games-stream-validation.json", json.dumps(result, indent=2) + "\n")
+    if not args.check_only:
+        result["corpus_sha256"] = index["corpus_sha256"]
+        write_text(
+            ROOT / f"rust/artifacts/{args.output.stem}-stream-validation.json",
+            json.dumps(result, indent=2) + "\n",
+        )
     print(json.dumps(result), flush=True)
 
 

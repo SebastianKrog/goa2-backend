@@ -672,7 +672,7 @@ impl NativeSession {
                         .collect::<Vec<_>>();
                     let before = self
                         .world
-                        .cards
+                        .cards()
                         .iter()
                         .map(|c| c.active)
                         .collect::<Vec<_>>();

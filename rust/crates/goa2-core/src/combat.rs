@@ -79,6 +79,9 @@ impl CombatState {
             outcome: None,
         })
     }
+    pub(crate) fn team_lives(&self) -> impl Iterator<Item = (Symbol, i64)> + '_ {
+        self.teams.iter().map(|row| (row.key, row.life))
+    }
     pub(crate) fn set_team_life(
         &mut self,
         team: Symbol,

@@ -4,6 +4,22 @@ use super::*;
 
 pub(super) enum ResourcePlan {
     Done,
+    SpendLife {
+        model: ObjectId,
+        team: Symbol,
+        target: Symbol,
+        total: i64,
+        change: i64,
+        outcome: Option<GameOutcome>,
+    },
+    Item {
+        items: ObjectId,
+        owner: Symbol,
+        stat: crate::stats::Stat,
+        key: Symbol,
+        total: i64,
+        amount: i64,
+    },
     Gold {
         model: ObjectId,
         owner: Symbol,
@@ -61,6 +77,8 @@ impl NativeSession {
         if kind == "steal_coins" {
             return self.preflight_steal_bound(objects, step);
         }
+        let item = kind == "gain_item";
+        let spend_life = kind == "spend_additional_life_counter";
         let life = kind == "restore_spent_life_counter";
         let lost = kind == "lose_coins";
         let value = if life {
@@ -88,7 +106,7 @@ impl NativeSession {
             let key = self.passive_text_bound(
                 objects,
                 step,
-                if lost {
+                if lost || spend_life {
                     Field::VictimKey
                 } else {
                     Field::HeroKey
@@ -113,6 +131,83 @@ impl NativeSession {
             .arena
             .field(step, objects.phases.k(Field::Amount))
             .ok_or_else(|| unsupported("resource amount missing"))?;
+        if item {
+            let stat_field = self.cleanup_key("stat_type");
+            let Some(ObjectValue::Atom(Datum::Text(key))) = objects.arena.field(step, stat_field)
+            else {
+                return Err(unsupported("item stat missing"));
+            };
+            let stat = crate::stats::Stat::parse(self.symbols.name(key)).map_err(unsupported)?;
+            let Some(ObjectValue::Object(items)) =
+                objects.arena.field(model, self.cleanup_key("items"))
+            else {
+                return Err(unsupported("hero items mapping missing"));
+            };
+            let amount = self.resource_integer_bound(objects, &amount)?;
+            let current = objects
+                .arena
+                .field(items, key)
+                .map(|value| self.resource_integer_bound(objects, &value))
+                .transpose()?
+                .unwrap_or(0);
+            let total = current
+                .checked_add(amount)
+                .ok_or_else(|| unsupported("item total outside i64"))?;
+            return Ok(ResourcePlan::Item {
+                items,
+                owner,
+                stat,
+                key,
+                total,
+                amount,
+            });
+        }
+        if spend_life {
+            let team = self.world.hero(owner).unwrap().team;
+            let teams = objects.phases.root(&objects.arena, Field::Teams)?;
+            let Some(ObjectValue::Object(model)) = objects.arena.field(teams, team) else {
+                return Ok(ResourcePlan::Done);
+            };
+            let current = objects
+                .arena
+                .field(model, objects.phases.k(Field::Life))
+                .ok_or_else(|| unsupported("life counters missing"))?;
+            let amount = self.resource_integer_bound(objects, &amount)?;
+            let change = amount
+                .checked_neg()
+                .ok_or_else(|| unsupported("life penalty overflow"))?;
+            let total = self
+                .resource_integer_bound(objects, &current)?
+                .checked_add(change)
+                .ok_or_else(|| unsupported("life counter overflow"))?
+                .max(0);
+            let outcome = if total == 0 {
+                self.phase_generation_check(0, 1)?;
+                let winner = if self.symbols.name(team) == "RED" {
+                    "BLUE"
+                } else {
+                    "RED"
+                };
+                Some(GameOutcome {
+                    team: self.symbols.lookup(winner),
+                    hero: None,
+                    condition: self
+                        .symbols
+                        .lookup("ANNIHILATION")
+                        .ok_or_else(|| unsupported("annihilation condition missing"))?,
+                })
+            } else {
+                None
+            };
+            return Ok(ResourcePlan::SpendLife {
+                model,
+                team,
+                target: raw,
+                total,
+                change,
+                outcome,
+            });
+        }
         if life {
             let Some(team) =
                 self.passive_optional_text_bound(objects, model, Field::ResourceTeam)?
@@ -352,10 +447,74 @@ impl NativeSession {
         &mut self,
         objects: &mut BoundObjects,
         plan: ResourcePlan,
+        events: &mut Vec<NativeEvent>,
     ) -> Result<Option<NativeEvent>> {
         objects.arena.symbols = self.symbols.clone();
         match plan {
             ResourcePlan::Done => Ok(None),
+            ResourcePlan::SpendLife {
+                model,
+                team,
+                target,
+                total,
+                change,
+                outcome,
+            } => {
+                objects
+                    .arena
+                    .set_field(
+                        model,
+                        objects.phases.k(Field::Life),
+                        ObjectValue::Atom(Datum::Int(total)),
+                    )
+                    .map_err(unsupported)?;
+                self.world
+                    .combat
+                    .set_team_life(team, total)
+                    .map_err(unsupported)?;
+                let penalty = NativeEvent::AdditionalLifeSpent {
+                    team,
+                    target,
+                    total,
+                    change,
+                };
+                if let Some(outcome) = outcome {
+                    self.solo_win_bound(objects, outcome)?;
+                    events.push(penalty);
+                    Ok(Some(NativeEvent::LifePenaltyAnnihilation {
+                        winner: outcome
+                            .team
+                            .ok_or_else(|| unsupported("annihilation winner missing"))?,
+                    }))
+                } else {
+                    Ok(Some(penalty))
+                }
+            }
+
+            ResourcePlan::Item {
+                items,
+                owner,
+                stat,
+                key,
+                total,
+                amount,
+            } => {
+                objects
+                    .arena
+                    .set_field(items, key, ObjectValue::Atom(Datum::Int(total)))
+                    .map_err(unsupported)?;
+                let hero = self.world.hero_row_mut(owner).unwrap();
+                hero.items[stat.index()] = total;
+                if !hero.items_order.contains(&stat) {
+                    hero.items_order.push(stat);
+                }
+                Ok(Some(NativeEvent::ItemGranted {
+                    owner,
+                    stat,
+                    amount,
+                }))
+            }
+
             ResourcePlan::Gold {
                 model,
                 owner,

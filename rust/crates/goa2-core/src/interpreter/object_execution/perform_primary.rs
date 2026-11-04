@@ -201,7 +201,8 @@ impl NativeSession {
                 actor,
             ),
             _ => {
-                let plan = self.prepare_primary_body_bound(objects, actor, card, Some(stats))?;
+                let plan =
+                    self.prepare_reperformed_primary_body_bound(objects, actor, card, stats)?;
                 (plan.recipes, owner)
             }
         };
@@ -271,13 +272,11 @@ impl NativeSession {
                 offboard_clear,
             } => {
                 objects.push_scope(action, card, owner)?;
-                let mut children = Vec::new();
-                for recipe in &recipes {
-                    let child = self.allocate_source_recipe_bound(
-                        objects,
-                        recipe,
-                        &Datum::Text(body_owner),
-                    )?;
+                let mut children = self.allocate_source_recipes_bound(
+                    objects,
+                    recipes.iter().map(|recipe| (recipe, body_owner)),
+                )?;
+                for child in children.iter().copied() {
                     if replacement == Some(ActionKind::FastTravel) {
                         objects
                             .arena
@@ -308,7 +307,6 @@ impl NativeSession {
                         Self::inject_perform_exclusion_bound(objects, child, key, 0)?;
                     }
                     Self::validate_returned_step_bound(objects, child)?;
-                    children.push(child);
                 }
                 let rules = objects.scheduler.as_ref().unwrap().action_bodies.clone();
                 children.push(self.allocate_source_recipe_bound(

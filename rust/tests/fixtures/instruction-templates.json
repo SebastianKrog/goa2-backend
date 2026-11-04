@@ -3775,6 +3775,167 @@
       ]
     }
   },
+  "journey_finishing": [
+    {
+      "fields": {
+        "type": "swap_units",
+        "step_id": "template",
+        "pending_input": null,
+        "pending_request_id": null,
+        "is_mandatory": true,
+        "active_if_key": null,
+        "skip_if_key": null,
+        "unit_a_id": "template-passive-owner",
+        "unit_b_id": "template-journey-enemy",
+        "unit_a_key": null,
+        "unit_b_key": null
+      },
+      "objects": [
+        {
+          "kind": "step",
+          "paths": [
+            []
+          ]
+        }
+      ]
+    },
+    {
+      "fields": {
+        "type": "select_step",
+        "step_id": "template",
+        "pending_input": null,
+        "pending_request_id": null,
+        "is_mandatory": false,
+        "active_if_key": null,
+        "skip_if_key": null,
+        "target_type": "HEX",
+        "prompt": "You may move 1 space",
+        "output_key": "journey_move_dest",
+        "decision_purpose": null,
+        "filters": [
+          {
+            "type": "movement_path_filter",
+            "range_val": 1,
+            "unit_id": "template-passive-owner",
+            "unit_key": null,
+            "pass_through_obstacles": false
+          },
+          {
+            "type": "occupied_filter",
+            "is_obstacle": false,
+            "exclude_id": null,
+            "exclude_id_key": null
+          }
+        ],
+        "auto_select_if_one": false,
+        "context_hero_id": null,
+        "context_hero_id_key": null,
+        "card_container": "HAND",
+        "card_containers": null,
+        "restrict_played_to_shields": false,
+        "include_facedown": false,
+        "number_options": [],
+        "number_labels": {},
+        "skip_immunity_filter": false,
+        "skip_self_filter": false,
+        "override_player_id": null,
+        "override_player_id_key": null,
+        "card_action_types": null,
+        "card_colors": null,
+        "card_color_key": null,
+        "card_tier_key": null,
+        "card_is_basic": null,
+        "card_is_active": null,
+        "card_has_item": null,
+        "allowed_card_ids": null,
+        "exclude_card_id_keys": null,
+        "card_states": null,
+        "exclude_card_states": null,
+        "selected_card_color_key": null,
+        "selected_card_tier_key": null
+      },
+      "objects": [
+        {
+          "kind": "step",
+          "paths": [
+            []
+          ]
+        },
+        {
+          "kind": "list",
+          "paths": [
+            [
+              "filters"
+            ]
+          ]
+        },
+        {
+          "kind": "model",
+          "paths": [
+            [
+              "filters",
+              0
+            ]
+          ]
+        },
+        {
+          "kind": "model",
+          "paths": [
+            [
+              "filters",
+              1
+            ]
+          ]
+        },
+        {
+          "kind": "list",
+          "paths": [
+            [
+              "number_options"
+            ]
+          ]
+        },
+        {
+          "kind": "dict",
+          "paths": [
+            [
+              "number_labels"
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "fields": {
+        "type": "move_unit",
+        "step_id": "template",
+        "pending_input": null,
+        "pending_request_id": null,
+        "is_mandatory": true,
+        "active_if_key": "journey_move_dest",
+        "skip_if_key": null,
+        "unit_id": "template-passive-owner",
+        "unit_key": null,
+        "destination_key": "journey_move_dest",
+        "target_hex_arg": null,
+        "range_val": 1,
+        "is_movement_action": false,
+        "pass_through_obstacles": false,
+        "force_straight_line": false,
+        "crossed_obstacles_output_key": null,
+        "success_output_key": null,
+        "mine_path_prechosen": false
+      },
+      "objects": [
+        {
+          "kind": "step",
+          "paths": [
+            []
+          ]
+        }
+      ]
+    }
+  ],
   "turret_default": {
     "id": "trinkets_turret",
     "name": "Turret",
@@ -5103,6 +5264,56 @@
       "crossed_obstacles_output_key": null,
       "success_output_key": null,
       "mine_path_prechosen": false
+    },
+    "mirror_push": {
+      "type": "push_unit",
+      "step_id": "template",
+      "pending_input": null,
+      "pending_request_id": null,
+      "is_mandatory": true,
+      "active_if_key": null,
+      "skip_if_key": null,
+      "target_id": null,
+      "target_key": null,
+      "source_hex": null,
+      "source_key": null,
+      "distance": 1,
+      "distance_key": null,
+      "collision_output_key": null,
+      "ignore_obstacles": false
+    },
+    "set_initiative": {
+      "type": "set_card_initiative",
+      "step_id": "template",
+      "pending_input": null,
+      "pending_request_id": null,
+      "is_mandatory": true,
+      "active_if_key": null,
+      "skip_if_key": null,
+      "hero_key": "template",
+      "value": 11
+    },
+    "schedule_control": {
+      "type": "schedule_action_control",
+      "step_id": "template",
+      "pending_input": null,
+      "pending_request_id": null,
+      "is_mandatory": true,
+      "active_if_key": null,
+      "skip_if_key": null,
+      "hero_key": "template"
+    },
+    "schedule_journey": {
+      "type": "schedule_journey_return",
+      "step_id": "template",
+      "pending_input": null,
+      "pending_request_id": null,
+      "is_mandatory": true,
+      "active_if_key": null,
+      "skip_if_key": null,
+      "enemy_key": "template",
+      "move_after": false,
+      "source_card_id": null
     },
     "move_token": {
       "type": "move_token",

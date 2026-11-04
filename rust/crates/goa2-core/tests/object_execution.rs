@@ -3563,3 +3563,110 @@ fn current_card_status_filters_restore_each_boundary_with_private_card_aliases()
 fn coordinated_unit_and_token_movement_restores_every_boundary_with_private_hex_aliases() {
     primary_family_restores_each_boundary(&["object-execution-co-movement-"], 280, 1020);
 }
+
+#[test]
+fn initiative_overrides_restore_every_boundary_with_private_physical_card_aliases() {
+    primary_family_restores_each_boundary(&["object-execution-initiative-"], 52, 118);
+}
+
+#[test]
+fn manager_control_and_generic_effect_creation_restore_all_boundaries_with_private_scopes() {
+    primary_family_restores_each_boundary(
+        &[
+            "object-execution-action-control-",
+            "object-execution-live-effect-step-",
+        ],
+        125,
+        560,
+    );
+}
+
+#[test]
+fn journey_delayed_programs_restore_every_boundary_with_private_steps_filters_and_effects() {
+    primary_family_restores_each_boundary(&["object-execution-journey-"], 77, 321);
+}
+
+#[test]
+fn hanu_bodies_and_passive_rebuilds_restore_every_boundary_with_private_shared_filters() {
+    primary_family_restores_each_boundary(&["object-execution-hanu-primary-"], 505, 8339);
+}
+
+#[test]
+fn xargatha_bodies_and_cached_adjacency_restore_every_boundary_with_private_workers() {
+    primary_family_restores_each_boundary(&["object-execution-xargatha-"], 482, 7850);
+}
+
+#[test]
+fn bain_bounty_cards_and_marker_targeting_restore_every_boundary() {
+    primary_family_restores_each_boundary(&["object-execution-bain-bounty-"], 85, 2441);
+}
+
+#[test]
+fn line_of_sight_and_bain_line_attacks_restore_every_boundary() {
+    primary_family_restores_each_boundary(&["object-execution-line-of-sight-"], 181, 2366);
+}
+
+#[test]
+fn grappling_bolt_restores_every_boundary() {
+    primary_family_restores_each_boundary(&["object-execution-grappling-"], 33, 353);
+}
+
+#[test]
+fn walk_the_plank_restores_every_boundary() {
+    primary_family_restores_each_boundary(&["object-execution-plank-"], 20, 402);
+}
+
+#[test]
+fn cutter_primary_family_restores_every_boundary() {
+    primary_family_restores_each_boundary(&["object-execution-cutter-primary-"], 320, 5871);
+}
+
+#[test]
+fn session_rollback_restores_live_branches_and_staged_transitions() {
+    let names = [
+        "object-execution-hero-respawn-live-ordinary-first",
+        "object-execution-cleanup-live-Takahide-ultimate-with-upgrades",
+        "object-execution-upgrade-live-reset-shared-snapshot",
+        "object-execution-phase-closure-live-round-upgrade-reset",
+        "object-execution-cutter-primary-a_fistful_of_coins-text-last-win",
+    ];
+    let snapshot = |session: &NativeSession| {
+        json!({
+            "envelope": session.export_envelope().unwrap(),
+            "request": session.last_request.as_ref().map(|request| session.request_json(request)),
+        })
+    };
+    let mut checked = 0;
+    for case in cases_matching(|name| names.contains(&name)) {
+        checked += 1;
+        let mut worker =
+            NativeSession::compile(serde_json::from_value(case["envelope"].clone()).unwrap())
+                .unwrap();
+        let operations = case["operations"].as_array().unwrap();
+        let root = snapshot(&worker);
+        let error = worker.with_rollback(|outer| {
+            apply(outer, &operations[0]);
+            let before_inner = snapshot(outer);
+            outer.with_rollback(|inner| {
+                for operation in &operations[1..] {
+                    apply(inner, operation);
+                }
+                Ok(())
+            })?;
+            assert_eq!(snapshot(outer), before_inner, "{}", case["name"]);
+            Err::<(), _>(EngineError::Deadline)
+        });
+        assert!(matches!(error, Err(EngineError::Deadline)));
+        assert_eq!(snapshot(&worker), root, "{}", case["name"]);
+
+        for operation in operations {
+            let before = snapshot(&worker);
+            let result = worker
+                .with_rollback(|branch| Ok(apply(branch, operation)))
+                .unwrap();
+            assert_eq!(snapshot(&worker), before, "{}", case["name"]);
+            assert_eq!(apply(&mut worker, operation), result, "{}", case["name"]);
+        }
+    }
+    assert_eq!(checked, names.len());
+}

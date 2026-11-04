@@ -9,7 +9,10 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -134,27 +137,169 @@ pub struct WorldDefinitions {
     tile_hexes: Vec<Hex>,
     loaded_map: bool,
 }
+#[derive(Debug)]
+struct RowUndo<T> {
+    entries: Vec<(usize, T)>,
+    recorded: Option<HashSet<usize>>,
+}
+
+impl<T> Default for RowUndo<T> {
+    fn default() -> Self {
+        Self {
+            entries: Vec::new(),
+            recorded: None,
+        }
+    }
+}
+
+impl<T> Clone for RowUndo<T> {
+    fn clone(&self) -> Self {
+        Self::default()
+    }
+}
+
+struct RowCheckpoint {
+    entry_count: usize,
+    parent_recorded: Option<HashSet<usize>>,
+}
+
+impl<T: Clone> RowUndo<T> {
+    fn record(&mut self, index: usize, row: &T) {
+        if let Some(recorded) = &mut self.recorded
+            && recorded.insert(index)
+        {
+            self.entries.push((index, row.clone()));
+        }
+    }
+
+    fn begin(&mut self) -> RowCheckpoint {
+        RowCheckpoint {
+            entry_count: self.entries.len(),
+            parent_recorded: self.recorded.replace(HashSet::new()),
+        }
+    }
+
+    fn rollback(&mut self, checkpoint: RowCheckpoint, rows: &mut [T]) {
+        for (index, previous) in self.entries.drain(checkpoint.entry_count..).rev() {
+            rows[index] = previous;
+        }
+        self.recorded = checkpoint.parent_recorded;
+    }
+
+    fn inherit(&mut self, source: &Self) {
+        self.entries.clone_from(&source.entries);
+        self.recorded.clone_from(&source.recorded);
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+pub(crate) struct HeroRows {
+    rows: Vec<HeroRecord>,
+    undo: RowUndo<HeroRecord>,
+}
+
+impl std::ops::Deref for HeroRows {
+    type Target = [HeroRecord];
+
+    fn deref(&self) -> &Self::Target {
+        &self.rows
+    }
+}
+
+impl std::ops::IndexMut<usize> for HeroRows {
+    fn index_mut(&mut self, index: usize) -> &mut HeroRecord {
+        self.undo.record(index, &self.rows[index]);
+        &mut self.rows[index]
+    }
+}
+
+impl std::ops::Index<usize> for HeroRows {
+    type Output = HeroRecord;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.rows[index]
+    }
+}
+
+impl<'a> IntoIterator for &'a HeroRows {
+    type Item = &'a HeroRecord;
+    type IntoIter = std::slice::Iter<'a, HeroRecord>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.rows.iter()
+    }
+}
+
+#[derive(Clone, Debug)]
+enum SpatialUndo {
+    Placed {
+        id: Symbol,
+        index_len: usize,
+    },
+    Moved {
+        index: usize,
+        previous: Hex,
+    },
+    Removed {
+        index: usize,
+        row: (Symbol, Hex),
+    },
+    Occupant {
+        index: usize,
+        previous: Option<Symbol>,
+    },
+}
+
+#[derive(Debug, Default)]
+struct SpatialJournal {
+    active: bool,
+    entries: Vec<SpatialUndo>,
+}
+
+impl Clone for SpatialJournal {
+    fn clone(&self) -> Self {
+        Self::default()
+    }
+}
+
+pub(crate) struct WorldRows {
+    cards: Vec<CardInstance>,
+    heroes: HeroRows,
+    locations: Vec<(Symbol, Hex)>,
+    location_by_symbol: Vec<Option<usize>>,
+    occupants: Vec<Option<Symbol>>,
+}
+
+pub(crate) struct WorldRowsCheckpoint {
+    cards: RowCheckpoint,
+    heroes: RowCheckpoint,
+    spatial_start: usize,
+    spatial_parent_active: bool,
+}
+
 #[derive(Clone, Debug)]
 pub struct NativeWorld {
     pub(crate) history: crate::history::CardHistory,
     pub(crate) combat: crate::combat::CombatState,
     pub definitions: Arc<WorldDefinitions>,
-    pub cards: Vec<CardInstance>,
-    pub card_by_instance: Vec<Option<usize>>,
-    entity_by_symbol: Vec<Option<usize>>,
+    cards: Vec<CardInstance>,
+    card_undo: RowUndo<CardInstance>,
+    pub card_by_instance: Arc<[Option<usize>]>,
+    entity_by_symbol: Arc<[Option<usize>]>,
     entity_overrides: Arc<HashMap<usize, EntityDefinition>>,
     board_entity_overrides: Arc<HashMap<Symbol, EntityDefinition>>,
     pub(crate) locations: Vec<(Symbol, Hex)>,
     location_by_symbol: Vec<Option<usize>>,
     occupants: Vec<Option<Symbol>>,
     occupancy: Occupancy,
+    spatial_undo: SpatialJournal,
     /// At least one currently active card has an unported aura hook.
     pub(crate) has_uncompiled_auras: bool,
     pub(crate) acting_piece: Option<Symbol>,
     pub(crate) battle_zones: Vec<(Symbol, Symbol)>,
     pub(crate) waves: Vec<(Symbol, i64)>,
-    pub(crate) heroes: Vec<HeroRecord>,
-    hero_by_symbol: Vec<Option<usize>>,
+    pub(crate) heroes: HeroRows,
+    hero_by_symbol: Arc<[Option<usize>]>,
     pub(crate) markers: Vec<NativeMarker>,
     pub(crate) has_effects: bool,
     pub effects: crate::effects::EffectStore,
@@ -496,20 +641,25 @@ impl NativeWorld {
                     .is_some_and(|s| !s.is_empty()),
             }),
             cards,
-            card_by_instance,
-            entity_by_symbol,
+            card_undo: RowUndo::default(),
+            card_by_instance: card_by_instance.into(),
+            entity_by_symbol: entity_by_symbol.into(),
             entity_overrides: Arc::new(HashMap::new()),
             board_entity_overrides: Arc::new(HashMap::new()),
             locations,
             location_by_symbol,
             occupants,
             occupancy,
+            spatial_undo: SpatialJournal::default(),
             has_uncompiled_auras: false,
             acting_piece,
             battle_zones,
             waves,
-            heroes,
-            hero_by_symbol,
+            heroes: HeroRows {
+                rows: heroes,
+                undo: RowUndo::default(),
+            },
+            hero_by_symbol: hero_by_symbol.into(),
             markers,
             effects: crate::effects::EffectStore::compile(&semantic["active_effects"], symbols)?,
             has_effects: semantic["active_effects"]
@@ -530,17 +680,125 @@ impl NativeWorld {
     pub fn hero(&self, id: Symbol) -> Option<&HeroRecord> {
         self.hero_index(id).map(|i| &self.heroes[i])
     }
+    pub(crate) fn hero_row_mut(&mut self, id: Symbol) -> Option<&mut HeroRecord> {
+        let index = self.hero_by_symbol.get(id.0).copied().flatten()?;
+        Some(&mut self.heroes[index])
+    }
     pub fn card(&self, id: CardId) -> Option<&CardInstance> {
         self.card_by_instance
             .get(id.0 as usize)
             .and_then(|v| *v)
             .map(|i| &self.cards[i])
     }
-    pub(crate) fn card_mut(&mut self, id: CardId) -> Option<&mut CardInstance> {
-        self.card_by_instance
+    pub fn cards(&self) -> &[CardInstance] {
+        &self.cards
+    }
+
+    pub fn card_mut(&mut self, id: CardId) -> Option<&mut CardInstance> {
+        let index = self
+            .card_by_instance
             .get(id.0 as usize)
-            .and_then(|v| *v)
-            .map(|i| &mut self.cards[i])
+            .copied()
+            .flatten()?;
+        self.card_undo.record(index, &self.cards[index]);
+        Some(&mut self.cards[index])
+    }
+
+    pub(crate) fn begin_rows_rollback(&mut self) -> WorldRowsCheckpoint {
+        WorldRowsCheckpoint {
+            cards: self.card_undo.begin(),
+            heroes: self.heroes.undo.begin(),
+            spatial_start: self.spatial_undo.entries.len(),
+            spatial_parent_active: std::mem::replace(&mut self.spatial_undo.active, true),
+        }
+    }
+
+    pub(crate) fn restore_rows(&mut self, checkpoint: WorldRowsCheckpoint, snapshot: &mut Self) {
+        self.card_undo.rollback(checkpoint.cards, &mut self.cards);
+        self.heroes
+            .undo
+            .rollback(checkpoint.heroes, &mut self.heroes.rows);
+        self.restore_spatial(checkpoint.spatial_start);
+        self.spatial_undo.active = checkpoint.spatial_parent_active;
+        snapshot.put_rows(self.take_rows());
+        snapshot.card_undo = std::mem::take(&mut self.card_undo);
+        snapshot.spatial_undo = std::mem::take(&mut self.spatial_undo);
+    }
+
+    pub(crate) fn take_rows(&mut self) -> WorldRows {
+        WorldRows {
+            cards: std::mem::take(&mut self.cards),
+            heroes: std::mem::take(&mut self.heroes),
+            locations: std::mem::take(&mut self.locations),
+            location_by_symbol: std::mem::take(&mut self.location_by_symbol),
+            occupants: std::mem::take(&mut self.occupants),
+        }
+    }
+
+    pub(crate) fn put_rows(&mut self, rows: WorldRows) {
+        self.cards = rows.cards;
+        self.heroes = rows.heroes;
+        self.locations = rows.locations;
+        self.location_by_symbol = rows.location_by_symbol;
+        self.occupants = rows.occupants;
+    }
+
+    fn record_spatial(&mut self, undo: SpatialUndo) {
+        if self.spatial_undo.active {
+            self.spatial_undo.entries.push(undo);
+        }
+    }
+
+    fn restore_spatial(&mut self, start: usize) {
+        for undo in self.spatial_undo.entries.drain(start..).rev() {
+            match undo {
+                SpatialUndo::Placed { id, index_len } => {
+                    self.locations.pop();
+                    self.location_by_symbol[id.0] = None;
+                    self.location_by_symbol.truncate(index_len);
+                }
+                SpatialUndo::Moved { index, previous } => self.locations[index].1 = previous,
+                SpatialUndo::Removed { index, row } => {
+                    self.locations.insert(index, row);
+                    for (offset, (id, _)) in self.locations[index..].iter().enumerate() {
+                        self.location_by_symbol[id.0] = Some(index + offset);
+                    }
+                }
+                SpatialUndo::Occupant { index, previous } => self.occupants[index] = previous,
+            }
+        }
+    }
+
+    fn set_occupant(
+        &mut self,
+        index: usize,
+        hex: Hex,
+        occupant: Option<Symbol>,
+    ) -> Result<(), String> {
+        self.definitions
+            .geometry
+            .set_occupied(&mut self.occupancy, hex, occupant.is_some())?;
+        self.record_spatial(SpatialUndo::Occupant {
+            index,
+            previous: self.occupants[index],
+        });
+        self.occupants[index] = occupant;
+        Ok(())
+    }
+
+    pub(crate) fn inherit_row_undo(&mut self, source: &Self) {
+        self.card_undo.inherit(&source.card_undo);
+        self.heroes.undo.inherit(&source.heroes.undo);
+        self.spatial_undo.active = source.spatial_undo.active;
+        self.spatial_undo
+            .entries
+            .clone_from(&source.spatial_undo.entries);
+    }
+
+    pub(crate) fn staged_clone(&self) -> Self {
+        let mut candidate = self.clone();
+        candidate.inherit_row_undo(self);
+        candidate
     }
     pub fn export_cards(&self, source: &mut StateEnvelope, symbols: &Symbols) {
         for hero in &self.heroes {
@@ -794,22 +1052,22 @@ impl NativeWorld {
         {
             return Err("place destination is occupied".into());
         }
+        self.record_spatial(SpatialUndo::Placed {
+            id,
+            index_len: self.location_by_symbol.len(),
+        });
         if id.0 >= self.location_by_symbol.len() {
             self.location_by_symbol.resize(id.0 + 1, None);
         }
         self.location_by_symbol[id.0] = Some(self.locations.len());
         self.locations.push((id, end));
         if let Some(tile) = target {
-            self.occupants[tile.index()] = Some(id);
-            self.definitions
-                .geometry
-                .set_occupied(&mut self.occupancy, end, true)?;
+            self.set_occupant(tile.index(), end, Some(id))?;
         }
         Ok(())
     }
     pub fn move_entity(&mut self, id: Symbol, end: Hex) -> Result<(), String> {
-        let geometry = &self.definitions.geometry;
-        let target = geometry.id(end);
+        let target = self.definitions.geometry.id(end);
         if self.definitions.loaded_map && target.is_none() {
             return Err("move destination is outside loaded map".into());
         }
@@ -819,20 +1077,22 @@ impl NativeWorld {
             return Err("move destination is occupied".into());
         }
         if let Some(old) = self.position(id)
-            && let Some(tile) = geometry.id(old)
+            && let Some(tile) = self.definitions.geometry.id(old)
             && self.occupants[tile.index()] == Some(id)
         {
-            self.occupants[tile.index()] = None;
-            geometry.set_occupied(&mut self.occupancy, old, false)?;
+            self.set_occupant(tile.index(), old, None)?;
         }
         if let Some(index) = self.location_by_symbol.get(id.0).and_then(|v| *v) {
+            self.record_spatial(SpatialUndo::Moved {
+                index,
+                previous: self.locations[index].1,
+            });
             self.locations[index].1 = end;
         } else {
             return Err("moving an unplaced entity is not a movement transition".into());
         }
         if let Some(tile) = target {
-            self.occupants[tile.index()] = Some(id);
-            geometry.set_occupied(&mut self.occupancy, end, true)?;
+            self.set_occupant(tile.index(), end, Some(id))?;
         }
         Ok(())
     }
@@ -840,18 +1100,17 @@ impl NativeWorld {
         let Some(index) = self.location_by_symbol.get(id.0).and_then(|v| *v) else {
             return Ok(None);
         };
-        let from = self.locations.remove(index).1;
+        let row = self.locations.remove(index);
+        self.record_spatial(SpatialUndo::Removed { index, row });
+        let from = row.1;
         self.location_by_symbol[id.0] = None;
-        for (index, (uid, _)) in self.locations.iter().enumerate() {
-            self.location_by_symbol[uid.0] = Some(index);
+        for (offset, (uid, _)) in self.locations[index..].iter().enumerate() {
+            self.location_by_symbol[uid.0] = Some(index + offset);
         }
         if let Some(tile) = self.definitions.geometry.id(from)
             && self.occupants[tile.index()] == Some(id)
         {
-            self.occupants[tile.index()] = None;
-            self.definitions
-                .geometry
-                .set_occupied(&mut self.occupancy, from, false)?;
+            self.set_occupant(tile.index(), from, None)?;
         }
         Ok(Some(from))
     }
@@ -923,6 +1182,51 @@ mod tests {
     fn cases() -> Value {
         serde_json::from_str(include_str!("../../../tests/fixtures/states.json")).unwrap()
     }
+    #[test]
+    fn nested_spatial_undo_restores_order_indexes_and_occupancy() {
+        fn checkpoint(world: &mut NativeWorld) -> (NativeWorld, WorldRowsCheckpoint) {
+            let rows = world.take_rows();
+            let snapshot = world.clone();
+            world.put_rows(rows);
+            let mark = world.begin_rows_rollback();
+            (snapshot, mark)
+        }
+
+        let source = serde_json::from_value(cases()["cases"][2]["envelope"].clone()).unwrap();
+        let mut symbols = Symbols::default();
+        let mut world = NativeWorld::compile(&source, &mut symbols).unwrap();
+        let (actor, start) = world.locations[0];
+        let end = world
+            .tile_hexes()
+            .iter()
+            .copied()
+            .find(|hex| !world.obstacle(*hex))
+            .unwrap();
+        let new_id = Symbol(world.location_by_symbol.len() + 3);
+        let locations = world.locations.clone();
+        let index = world.location_by_symbol.clone();
+        let occupants = world.occupants.clone();
+        let (mut root, root_mark) = checkpoint(&mut world);
+        world.move_entity(actor, end).unwrap();
+        assert_eq!(world.occupant(end), Some(actor));
+        let (mut outer, outer_mark) = checkpoint(&mut world);
+        let mut staged = world.staged_clone();
+        assert_eq!(staged.remove_entity(actor).unwrap(), Some(end));
+        staged.place_entity(new_id, end).unwrap();
+        staged.place_entity(actor, start).unwrap();
+        staged.restore_rows(outer_mark, &mut outer);
+        assert_eq!(outer.position(new_id), None);
+        assert_eq!(outer.position(actor), Some(end));
+        assert_eq!(outer.occupant(end), Some(actor));
+        assert!(outer.obstacle(end));
+        outer.restore_rows(root_mark, &mut root);
+        assert_eq!(root.locations, locations);
+        assert_eq!(root.location_by_symbol, index);
+        assert_eq!(root.occupants, occupants);
+        assert_eq!(root.position(actor), Some(start));
+        assert!(!root.obstacle(end));
+    }
+
     #[test]
     fn physical_card_instances_and_scenario_definitions_compile_without_merging() {
         let cases = cases();

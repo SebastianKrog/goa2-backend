@@ -68,13 +68,17 @@ pub(super) struct FinishingPlan {
     children: Vec<(Symbol, Vec<FinishingPlan>)>,
     payload: Datum,
 }
+pub(super) enum EffectFinishing {
+    Templates(Vec<FinishingPlan>),
+    Bound(Vec<ObjectId>),
+}
 pub(super) enum CreatePlan {
     Skip,
     Create {
         spec: Box<EffectCreateSpec>,
-        scope: ObjectId,
+        scope: Option<ObjectId>,
         copy_scope: bool,
-        finishing: Vec<FinishingPlan>,
+        finishing: EffectFinishing,
         isolated: Option<ObjectValue>,
         effects: ObjectId,
         context: SparseRegisters,
@@ -83,6 +87,21 @@ pub(super) enum CreatePlan {
         split_value: i64,
         color: Option<Symbol>,
     },
+}
+impl CreatePlan {
+    pub(super) fn creates(&self) -> bool {
+        matches!(self, Self::Create { .. })
+    }
+    pub(super) fn bind_manager_finishing(&mut self, steps: Vec<ObjectId>) -> Result<()> {
+        let Self::Create { finishing, .. } = self else {
+            return Err(unsupported("cannot attach finishing to skipped effect"));
+        };
+        if !matches!(finishing, EffectFinishing::Bound(_)) {
+            return Err(unsupported("manager finishing requires literal creation"));
+        }
+        *finishing = EffectFinishing::Bound(steps);
+        Ok(())
+    }
 }
 impl NativeSession {
     fn effect_optional_text(
@@ -395,28 +414,9 @@ impl NativeSession {
         } else {
             None
         };
-        // Scope binding and duplicate matching are shared with NativeWorld::create_effect.
-        if template.linked_card.is_some()
-            && self.world.effects.instances.iter().any(|old| {
-                old.card == template.card
-                    && old.definition.kind == template.definition.kind
-                    && old.definition.affects == template.definition.affects
-            })
-        {
+        let Some(effects) = self.preflight_effect_collection_bound(objects, &template)? else {
             return Ok(CreatePlan::Skip);
-        }
-        let Some(ObjectValue::Object(effects)) = objects.arena.root_field(objects.effects) else {
-            return Err(unsupported("effect collection missing"));
         };
-        if !objects.arena.is_mutable_list(effects)
-            || objects.effect_nodes()?.len() != self.world.effects.instances.len()
-        {
-            return Err(unsupported("effect collection binding drift"));
-        }
-        self.world
-            .next_entity_id
-            .checked_add(1)
-            .ok_or_else(|| unsupported("effect entity counter exhausted"))?;
         self.sync_card_collections_bound(objects)?;
         let mut context = SparseRegisters::default();
         for name in ["performing_card_id", "performing_card_owner_id"] {
@@ -458,9 +458,9 @@ impl NativeSession {
             .field(step, key(&self.symbols, "isolated_hex"));
         Ok(CreatePlan::Create {
             spec: Box::new(EffectCreateSpec { template }),
-            scope,
+            scope: Some(scope),
             copy_scope,
-            finishing,
+            finishing: EffectFinishing::Templates(finishing),
             isolated,
             effects,
             context,
@@ -468,6 +468,86 @@ impl NativeSession {
             split,
             split_value,
             color,
+        })
+    }
+    fn preflight_effect_collection_bound(
+        &self,
+        objects: &BoundObjects,
+        template: &EffectInstance,
+    ) -> Result<Option<ObjectId>> {
+        if template.linked_card.is_some()
+            && self.world.effects.instances.iter().any(|old| {
+                old.card == template.card
+                    && old.definition.kind == template.definition.kind
+                    && old.definition.affects == template.definition.affects
+            })
+        {
+            return Ok(None);
+        }
+        let Some(ObjectValue::Object(effects)) = objects.arena.root_field(objects.effects) else {
+            return Err(unsupported("effect collection missing"));
+        };
+        if !objects.arena.is_mutable_list(effects)
+            || objects.effect_nodes()?.len() != self.world.effects.instances.len()
+        {
+            return Err(unsupported("effect collection binding drift"));
+        }
+        self.world
+            .next_entity_id
+            .checked_add(1)
+            .ok_or_else(|| unsupported("effect entity counter exhausted"))?;
+        Ok(Some(effects))
+    }
+    pub(super) fn preflight_manager_effect_bound(
+        &mut self,
+        objects: &BoundObjects,
+        overrides: Vec<(&'static str, Datum)>,
+        scope_overrides: Vec<(&'static str, Datum)>,
+    ) -> Result<CreatePlan> {
+        let Datum::Object(mut fields) = objects.effect_creation.prototype.clone() else {
+            unreachable!()
+        };
+        for (name, value) in overrides {
+            set(&mut fields, key(&self.symbols, name), value)?;
+        }
+        let scope_key = key(&self.symbols, "scope");
+        let Some(Datum::Object(scope)) = fields
+            .iter_mut()
+            .find(|(k, _)| *k == scope_key)
+            .map(|(_, v)| v)
+        else {
+            unreachable!()
+        };
+        for (name, value) in scope_overrides {
+            set(scope, key(&self.symbols, name), value)?;
+        }
+        let template = EffectInstance::from_datum(&Datum::Object(fields), &self.symbols)
+            .map_err(unsupported)?;
+        if !objects
+            .effect_creation
+            .kinds
+            .contains(&template.definition.kind)
+        {
+            return Err(unsupported("invalid manager effect kind"));
+        }
+        if !template.definition.finishing.is_empty() {
+            return Err(unsupported("manager finishing program not bound"));
+        }
+        let Some(effects) = self.preflight_effect_collection_bound(objects, &template)? else {
+            return Ok(CreatePlan::Skip);
+        };
+        Ok(CreatePlan::Create {
+            spec: Box::new(EffectCreateSpec { template }),
+            scope: None,
+            copy_scope: false,
+            finishing: EffectFinishing::Bound(Vec::new()),
+            isolated: None,
+            effects,
+            context: SparseRegisters::default(),
+            event: false,
+            split: None,
+            split_value: 0,
+            color: None,
         })
     }
     fn allocate_effect_finishing(
@@ -478,7 +558,7 @@ impl NativeSession {
         let mut original = plan.original;
         if let Some(color) = plan.color {
             let copy = objects.arena.shallow_step(original).map_err(unsupported)?;
-            objects.copied_programs.insert(
+            objects.bind_copied_program(
                 copy,
                 objects
                     .program(original)
@@ -503,7 +583,7 @@ impl NativeSession {
             }
             let list = objects.arena.list(values);
             let copy = objects.arena.shallow_step(original).map_err(unsupported)?;
-            objects.copied_programs.insert(
+            objects.bind_copied_program(
                 copy,
                 objects
                     .program(original)
@@ -546,11 +626,21 @@ impl NativeSession {
             return Ok(None);
         };
         let mut steps = Vec::new();
-        for plan in finishing {
-            let step = self.resolve_effect_finishing(objects, plan)?;
-            let copy = objects.copy_template(step)?.0;
-            Self::validate_returned_step_bound(objects, copy)?;
-            steps.push(ObjectValue::Object(copy));
+        match finishing {
+            EffectFinishing::Templates(plans) => {
+                for plan in plans {
+                    let step = self.resolve_effect_finishing(objects, plan)?;
+                    let copy = objects.copy_template(step)?.0;
+                    Self::validate_returned_step_bound(objects, copy)?;
+                    steps.push(ObjectValue::Object(copy));
+                }
+            }
+            EffectFinishing::Bound(programs) => {
+                for step in programs {
+                    Self::validate_returned_step_bound(objects, step)?;
+                    steps.push(ObjectValue::Object(step));
+                }
+            }
         }
         let finishing = objects.arena.list(steps);
         let payload = objects
@@ -569,7 +659,7 @@ impl NativeSession {
         )?;
         let before = self
             .world
-            .cards
+            .cards()
             .iter()
             .map(|card| card.active)
             .collect::<Vec<_>>();
@@ -588,31 +678,48 @@ impl NativeSession {
             .map_err(unsupported)?;
         objects.arena.symbols = self.symbols.clone();
         let instance = &self.world.effects.instances[row];
-        let scope = if copy_scope || instance.scope_origin != spec.template.scope_origin {
-            let fields = objects
-                .arena
-                .fields(scope)
-                .ok_or_else(|| unsupported("effect scope fields missing"))?
-                .to_vec();
-            let ObjectValue::Object(copy) =
-                objects.arena.dictionary(fields).map_err(unsupported)?
-            else {
+        let scope = if let Some(scope) = scope {
+            if copy_scope || instance.scope_origin != spec.template.scope_origin {
+                let fields = objects
+                    .arena
+                    .fields(scope)
+                    .ok_or_else(|| unsupported("effect scope fields missing"))?
+                    .to_vec();
+                let ObjectValue::Object(copy) =
+                    objects.arena.dictionary(fields).map_err(unsupported)?
+                else {
+                    unreachable!()
+                };
+                objects
+                    .arena
+                    .classify_recipe_object(copy, &[], ObjectKind::Model)
+                    .map_err(unsupported)?;
+                objects
+                    .arena
+                    .set_field(
+                        copy,
+                        key(&self.symbols, "origin_id"),
+                        ObjectValue::Atom(instance.scope_origin.map_or(Datum::Null, Datum::Text)),
+                    )
+                    .map_err(unsupported)?;
+                copy
+            } else {
+                scope
+            }
+        } else {
+            let payload = instance.payload(&self.symbols);
+            let Datum::Object(fields) = payload else {
+                unreachable!()
+            };
+            let value = get(&fields, key(&self.symbols, "scope"))
+                .ok_or_else(|| unsupported("manager scope missing"))?;
+            let ObjectValue::Object(scope) = objects.arena.allocate(value) else {
                 unreachable!()
             };
             objects
                 .arena
-                .classify_recipe_object(copy, &[], ObjectKind::Model)
+                .classify_recipe_object(scope, &[], ObjectKind::Model)
                 .map_err(unsupported)?;
-            objects
-                .arena
-                .set_field(
-                    copy,
-                    key(&self.symbols, "origin_id"),
-                    ObjectValue::Atom(instance.scope_origin.map_or(Datum::Null, Datum::Text)),
-                )
-                .map_err(unsupported)?;
-            copy
-        } else {
             scope
         };
         let ObjectValue::Object(model) = objects.arena.allocate(&instance.payload(&self.symbols))
@@ -665,7 +772,7 @@ impl NativeSession {
         };
         self.world.effects.instances[row].arena_model = Some(model);
         self.sync_effect_card_flags(objects, &before)?;
-        objects.readonly = Arc::new(objects.arena.readonly_objects());
+        objects.readonly.take();
         Ok(event.then_some(NativeEvent::EffectCreated(created)))
     }
 }

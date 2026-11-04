@@ -31,6 +31,11 @@ pub enum HexFilter {
         through: bool,
     },
     AdjacentContext(Symbol),
+    SameDirection {
+        origin: Origin,
+        origin_hex: Option<Symbol>,
+        reference: Symbol,
+    },
     Between {
         from: Symbol,
         to: Symbol,
@@ -44,6 +49,11 @@ pub enum HexFilter {
     SpawnTeam(bool),
     BattleZone,
     Terrain(bool),
+    AdjacentTerrain(bool),
+    MaxEmptySpacesInLine {
+        origin: Origin,
+        max_empty: i64,
+    },
     And(Vec<HexFilter>),
     Or(Vec<HexFilter>),
     Exclude(Vec<Symbol>),
@@ -96,6 +106,12 @@ pub enum HexFilter {
     ClearLine {
         origin: Origin,
         through: bool,
+    },
+    LineOfSight {
+        origin: Origin,
+        units: bool,
+        terrain: bool,
+        obstacles: bool,
     },
 }
 pub struct SpatialContext<'a> {
@@ -168,6 +184,23 @@ impl SpatialContext<'_> {
                 .and_then(|text| self.symbols.lookup(&text)),
         }
     }
+    fn coerced_origin(&self, origin: &Origin) -> Option<Symbol> {
+        origin
+            .literal
+            .filter(|id| !self.symbols.name(*id).is_empty())
+            .or_else(|| {
+                if let Some(key) = origin.key.filter(|key| {
+                    self.registers
+                        .get(*key)
+                        .is_some_and(|value| value.truthy(self.symbols))
+                }) {
+                    self.scalar_identity(key)
+                } else {
+                    self.actor.filter(|id| !self.symbols.name(*id).is_empty())
+                }
+            })
+    }
+
     fn int_override(&self, key: Option<Symbol>, base: Option<i64>) -> Option<i64> {
         match key.and_then(|key| self.registers.get(key)) {
             Some(Datum::Int(n)) => Some(*n),
@@ -263,6 +296,43 @@ impl HexFilter {
                 }
             }
 
+            Self::SameDirection {
+                origin,
+                origin_hex,
+                reference,
+            } => {
+                let read_hex = |key| {
+                    context
+                        .registers
+                        .get(key)
+                        .filter(|v| !matches!(v, Datum::Null))
+                        .map(|v| v.hex(context.coordinates, context.symbols))
+                        .transpose()
+                };
+                let from = if let Some(key) = origin_hex {
+                    read_hex(*key)?
+                } else {
+                    context
+                        .coerced_origin(origin)
+                        .and_then(|unit| context.world.resolved_position(unit))
+                };
+                let span = match from {
+                    Some(from) => read_hex(*reference)?.map(|reference| (from, reference)),
+                    None => None,
+                };
+                for (candidate, yes) in candidates.iter().zip(accepted.iter_mut()) {
+                    if *yes {
+                        *yes = if let Some((from, reference)) = span {
+                            context.world.effect_connected(from, *candidate, &[])?
+                                && from.direction_to(reference).is_some_and(|direction| {
+                                    from.direction_to(*candidate) == Some(direction)
+                                })
+                        } else {
+                            false
+                        };
+                    }
+                }
+            }
             Self::Between { from, to } => {
                 let start = context
                     .registers
@@ -326,6 +396,24 @@ impl HexFilter {
                 }
             }
 
+            Self::AdjacentTerrain(wanted) => {
+                for (hex, yes) in candidates.iter().zip(accepted.iter_mut()) {
+                    if !*yes {
+                        continue;
+                    }
+                    let mut adjacent = false;
+                    for neighbor in hex.neighbors() {
+                        if context.world.effect_connected(*hex, neighbor, &[])?
+                            && (!context.world.on_map(neighbor)
+                                || context.world.terrain_hex(neighbor)?)
+                        {
+                            adjacent = true;
+                            break;
+                        }
+                    }
+                    *yes = adjacent == *wanted;
+                }
+            }
             Self::Terrain(wanted) => {
                 for (hex, yes) in candidates.iter().zip(accepted.iter_mut()) {
                     if *yes {
@@ -683,6 +771,74 @@ impl HexFilter {
                     };
                 }
             }
+            Self::LineOfSight {
+                origin,
+                units,
+                terrain,
+                obstacles,
+            } => {
+                let world = context.world;
+                let unit = context.coerced_origin(origin);
+                let from = unit.and_then(|id| world.resolved_position(id));
+                for (index, &candidate) in candidates.iter().enumerate() {
+                    if !accepted[index] {
+                        continue;
+                    }
+                    let Some((from, path)) =
+                        from.and_then(|from| from.line_points(candidate).map(|path| (from, path)))
+                    else {
+                        accepted[index] = false;
+                        continue;
+                    };
+                    let intermediate = from.distance(candidate).saturating_sub(1);
+                    for point in path.take(intermediate as usize) {
+                        if !world.on_map(point)
+                            || (*terrain && world.terrain_hex(point)?)
+                            || (*units
+                                && world
+                                    .occupant(point)
+                                    .and_then(|id| world.entity(id))
+                                    .is_some_and(|entity| {
+                                        matches!(
+                                            entity.kind,
+                                            EntityKind::Hero
+                                                | EntityKind::Minion
+                                                | EntityKind::Piece
+                                        )
+                                    }))
+                            || (*obstacles && world.obstacle_for_actor(point, unit)?)
+                        {
+                            accepted[index] = false;
+                            break;
+                        }
+                    }
+                }
+            }
+            Self::MaxEmptySpacesInLine { origin, max_empty } => {
+                let unit = context.origin(origin, true)?;
+                let from = unit.and_then(|id| context.world.resolved_position(id));
+                for (hex, yes) in candidates.iter().zip(accepted.iter_mut()) {
+                    if !*yes {
+                        continue;
+                    }
+                    let Some(path) = from.and_then(|from| from.line_to(*hex)) else {
+                        *yes = false;
+                        continue;
+                    };
+                    let mut empty = 0;
+                    for point in path.iter().take(path.len().saturating_sub(1)) {
+                        if context.world.on_map(*point)
+                            && !context.world.obstacle_for_actor(*point, unit)?
+                        {
+                            empty += 1;
+                            if empty > *max_empty {
+                                break;
+                            }
+                        }
+                    }
+                    *yes = empty <= *max_empty;
+                }
+            }
             Self::ClearLine { origin, through } => {
                 let unit = context.origin(origin, true)?;
                 let from = unit.and_then(|id| context.world.resolved_position(id));
@@ -767,6 +923,9 @@ pub fn compile_filter(raw: &Value, symbols: &mut Symbols) -> Result<HexFilter, S
                 comparison: crate::queries::Comparison::parse(op),
             })
         }
+        "adjacent_to_terrain_filter" => Ok(HexFilter::AdjacentTerrain(
+            raw["is_adjacent"].as_bool().unwrap_or(true),
+        )),
         "terrain_filter" => Ok(HexFilter::Terrain(
             raw["is_terrain"].as_bool().unwrap_or(true),
         )),
@@ -884,6 +1043,25 @@ pub fn compile_filter(raw: &Value, symbols: &mut Symbols) -> Result<HexFilter, S
         "in_straight_line_filter" | "not_in_straight_line_filter" => Ok(HexFilter::Straight {
             origin: origin(symbols, "origin_id", "origin_key")?,
             invert: raw["type"] == "not_in_straight_line_filter",
+        }),
+        "same_direction_from_origin_filter" => Ok(HexFilter::SameDirection {
+            origin: origin(symbols, "origin_id", "origin_key")?,
+            origin_hex: optional(raw, "origin_hex_key", symbols)?,
+            reference: symbols.intern(
+                raw["reference_key"]
+                    .as_str()
+                    .unwrap_or("direction_reference_hex"),
+            ),
+        }),
+        "clear_line_of_sight_filter" => Ok(HexFilter::LineOfSight {
+            origin: origin(symbols, "origin_id", "origin_key")?,
+            units: raw["blocked_by_units"].as_bool().unwrap_or(true),
+            terrain: raw["blocked_by_terrain"].as_bool().unwrap_or(true),
+            obstacles: raw["blocked_by_obstacles"].as_bool().unwrap_or(false),
+        }),
+        "max_empty_spaces_in_line_filter" => Ok(HexFilter::MaxEmptySpacesInLine {
+            origin: origin(symbols, "origin_id", "origin_key")?,
+            max_empty: raw["max_empty"].as_i64().unwrap_or(1),
         }),
         "straight_line_path_filter" => Ok(HexFilter::ClearLine {
             origin: origin(symbols, "origin_id", "origin_key")?,

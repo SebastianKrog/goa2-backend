@@ -230,12 +230,12 @@ impl NativeSession {
                     )?;
                     objects.write(objects.action_keys[6], Datum::Bool(skip_markers))?;
                 }
-                let mut children = Vec::with_capacity(recipes.len());
-                for (recipe, owner) in &recipes {
-                    let child =
-                        self.allocate_source_recipe_bound(objects, recipe, &Datum::Text(*owner))?;
-                    Self::validate_returned_step_bound(objects, child)?;
-                    children.push(child);
+                let children = self.allocate_source_recipes_bound(
+                    objects,
+                    recipes.iter().map(|(recipe, owner)| (recipe, *owner)),
+                )?;
+                for child in &children {
+                    Self::validate_returned_step_bound(objects, *child)?;
                 }
                 self.push_live_steps_bound(objects, &children)?;
             }

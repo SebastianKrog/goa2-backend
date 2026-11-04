@@ -168,3 +168,174 @@ impl NativeSession {
         }))
     }
 }
+
+impl NativeSession {
+    pub(super) fn validate_inscription_bound(
+        &self,
+        objects: &BoundObjects,
+        step: ObjectId,
+        selection: &Datum,
+    ) -> Result<()> {
+        let Some(ObjectValue::Object(placed)) = objects
+            .arena
+            .field(step, objects.phases.k(Field::PlacedRunes))
+        else {
+            return Err(unsupported("placed runes missing"));
+        };
+        let fields = objects
+            .arena
+            .fields(placed)
+            .ok_or_else(|| unsupported("placed runes must be a mapping"))?;
+        let remaining = [
+            Field::RuneAxe,
+            Field::RuneBird,
+            Field::RuneAnvil,
+            Field::RuneHorn,
+        ]
+        .map(|field| objects.phases.k(field))
+        .into_iter()
+        .filter(|rune| {
+            !fields
+                .iter()
+                .any(|(_, value)| matches!(value, ObjectValue::Atom(Datum::Text(id)) if id == rune))
+        })
+        .collect::<Vec<_>>();
+        if super::super::valid_rune_batch(selection, &remaining).is_none() {
+            return Err(EngineError::InvalidInput(
+                "Choose one remaining rune or complete the remaining rune slots".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    pub(super) fn inscribe_runes_bound(
+        &mut self,
+        objects: &mut BoundObjects,
+        step: ObjectId,
+        events: &mut Vec<NativeEvent>,
+    ) -> Result<Option<NativeRequest>> {
+        let hero = self.passive_text_bound(objects, step, Field::HeroId)?;
+        let key = |field| objects.phases.k(field);
+        let slots = [
+            Field::RuneSlotOne,
+            Field::RuneSlotTwo,
+            Field::RuneSlotThree,
+            Field::RuneSlotFour,
+        ]
+        .map(key);
+        let all = [
+            Field::RuneAxe,
+            Field::RuneBird,
+            Field::RuneAnvil,
+            Field::RuneHorn,
+        ]
+        .map(key);
+        let slots_key = key(Field::RuneSlots);
+        let Some(ObjectValue::Object(placed_object)) =
+            objects.arena.field(step, key(Field::PlacedRunes))
+        else {
+            return Err(unsupported("placed runes missing"));
+        };
+        let mut placed = objects
+            .arena
+            .fields(placed_object)
+            .ok_or_else(|| unsupported("placed runes must be a mapping"))?
+            .iter()
+            .map(|(slot, value)| match value {
+                ObjectValue::Atom(Datum::Text(rune))
+                    if slots.contains(slot) && all.contains(rune) =>
+                {
+                    Ok((*slot, *rune))
+                }
+                _ => Err(unsupported("invalid placed rune")),
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let mut remaining = all
+            .into_iter()
+            .filter(|rune| !placed.iter().any(|(_, value)| value == rune))
+            .collect::<Vec<_>>();
+        if placed.len() + remaining.len() != slots.len() {
+            return Err(unsupported("duplicate placed rune"));
+        }
+        let pending = objects
+            .arena
+            .field(step, objects.pending)
+            .is_some_and(|v| objects.arena.truthy(&v));
+        let mut chosen = if pending {
+            objects
+                .selected(step, self.selection_key)
+                .and_then(|value| match value {
+                    ObjectValue::Atom(value) => Some(value),
+                    ObjectValue::Object(list)
+                        if objects.arena.kind(list) == crate::codec::ObjectKind::List =>
+                    {
+                        objects
+                            .arena
+                            .sequence(list)?
+                            .iter()
+                            .map(|item| match item {
+                                ObjectValue::Atom(Datum::Text(rune)) => Some(Datum::Text(*rune)),
+                                _ => None,
+                            })
+                            .collect::<Option<Vec<_>>>()
+                            .map(Datum::List)
+                    }
+                    _ => None,
+                })
+                .and_then(|selection| super::super::valid_rune_batch(&selection, &remaining))
+                .unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+        remaining.retain(|rune| !chosen.contains(rune));
+        if remaining.len() == 1 {
+            chosen.push(remaining.pop().unwrap());
+        }
+        if pending {
+            objects
+                .arena
+                .set_field(step, objects.pending, ObjectValue::Atom(Datum::Null))
+                .map_err(unsupported)?;
+        }
+        for rune in chosen {
+            let slot = slots[placed.len()];
+            objects
+                .arena
+                .set_field(placed_object, slot, ObjectValue::Atom(Datum::Text(rune)))
+                .map_err(unsupported)?;
+            placed.push((slot, rune));
+        }
+        if remaining.is_empty() {
+            if let Some(model) = self.hero_model_bound(objects, hero) {
+                let values = Datum::Object(
+                    placed
+                        .iter()
+                        .map(|(slot, rune)| (*slot, Datum::Text(*rune)))
+                        .collect(),
+                );
+                let value = objects.arena.allocate(&values);
+                objects
+                    .arena
+                    .set_field(model, slots_key, value)
+                    .map_err(unsupported)?;
+                events.push(NativeEvent::RunesPlaced { hero, placed });
+            }
+            return Ok(None);
+        }
+        Ok(Some(NativeRequest {
+            id: RequestToken::Generated(0),
+            owner: self.normalized_owner(hero),
+            controlled: None,
+            prompt: hero,
+            movement_range: None,
+            pre_action_range: None,
+            choices: RequestChoices::RuneInscription {
+                hero,
+                placed,
+                remaining,
+            },
+            can_skip: false,
+            discard: false,
+        }))
+    }
+}

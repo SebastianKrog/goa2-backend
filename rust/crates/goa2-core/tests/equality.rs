@@ -33,8 +33,13 @@ fn private_equality_state_survives_typed_export_and_restore() {
     let mut symbols = Symbols::default();
     let mut world = NativeWorld::compile(&source, &mut symbols).unwrap();
     assert!(world.card_model_equal(a, b).unwrap());
-    let index = world.card_by_instance[b.0 as usize].unwrap();
-    world.cards[index].equality.as_mut().unwrap().revision = 21;
+    world
+        .card_mut(b)
+        .unwrap()
+        .equality
+        .as_mut()
+        .unwrap()
+        .revision = 21;
     world.export_cards(&mut source, &symbols);
     assert_eq!(
         source.instances[b.0 as usize]

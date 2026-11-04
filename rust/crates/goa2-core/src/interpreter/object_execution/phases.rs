@@ -121,6 +121,11 @@ pub(super) enum Field {
     PassiveOptional,
     PassiveProvider,
     RuneSlots,
+    PlacedRunes,
+    RuneSlotOne,
+    RuneSlotTwo,
+    RuneSlotThree,
+    RuneSlotFour,
     PerformingCard,
     CurrentCard,
     PrepareSpells,
@@ -195,6 +200,8 @@ pub(super) enum Field {
     FullDistance,
     PerformingOwner,
     SourceCard,
+    EnemyKey,
+    MoveAfter,
     TargetType,
     SkipSelf,
     SkipImmunity,
@@ -348,6 +355,8 @@ pub(super) enum Field {
     PreviousSlot,
     SuppressAfterResolve,
     IsTerrain,
+    IsAdjacent,
+    MaxEmpty,
     AllowedSpellIds,
     CasterId,
     CasterKey,
@@ -384,8 +393,22 @@ pub(super) enum Field {
     Operation,
     Items,
     ItemState,
+    Board,
+    Tiles,
+    Multiplier,
+    Subtract,
+    BlockedByUnits,
+    BlockedByTerrain,
+    BlockedByObstacles,
+    TargetHexKey,
+    TowardDestination,
+    BeforeHexKey,
+    FistfulVictory,
+    OtherUnitId,
+    OtherUnitKey,
+    MaxDistance,
 }
-const NAMES: [&str; 381] = [
+const NAMES: [&str; 404] = [
     "phase",
     "turn",
     "turn_discard_log",
@@ -504,6 +527,11 @@ const NAMES: [&str; 381] = [
     "is_optional",
     "active_effect_id",
     "rune_slots",
+    "placed",
+    "1",
+    "2",
+    "3",
+    "4",
     "performing_card_id",
     "current_card_id",
     "prepare_spells",
@@ -578,6 +606,8 @@ const NAMES: [&str; 381] = [
     "force_full_distance",
     "performing_card_owner_id",
     "source_card_id",
+    "enemy_key",
+    "move_after",
     "target_type",
     "skip_self_filter",
     "skip_immunity_filter",
@@ -731,6 +761,8 @@ const NAMES: [&str; 381] = [
     "previous_slot",
     "suppress_after_resolve_card",
     "is_terrain",
+    "is_adjacent",
+    "max_empty",
     "allowed_spell_ids",
     "caster_id",
     "caster_key",
@@ -767,6 +799,20 @@ const NAMES: [&str; 381] = [
     "operation",
     "items",
     "ITEM",
+    "board",
+    "tiles",
+    "multiplier",
+    "subtract",
+    "blocked_by_units",
+    "blocked_by_terrain",
+    "blocked_by_obstacles",
+    "target_hex_key",
+    "_toward_dest",
+    "before_hex_key",
+    "A_FISTFUL_OF_COINS",
+    "other_unit_id",
+    "other_unit_key",
+    "max_distance",
 ];
 #[derive(Clone, Debug)]
 pub(super) struct PhaseBindings {
@@ -969,8 +1015,8 @@ impl NativeSession {
             .arena
             .set_root(objects.phases.k(Field::DiscardLog), empty)
             .map_err(unsupported)?;
-        self.world.history.discarded.clear();
-        objects.readonly = Arc::new(objects.arena.readonly_objects());
+        self.world.history.clear_discards();
+        objects.readonly.take();
         Ok(())
     }
     pub(super) fn preflight_bound_advance(&self, objects: &BoundObjects) -> Result<()> {
@@ -1129,7 +1175,7 @@ impl NativeSession {
         {
             return self.reveal_all_passes_bound(objects, pending);
         }
-        objects.readonly = Arc::new(objects.arena.readonly_objects());
+        objects.readonly.take();
         Ok(())
     }
     fn reveal_all_passes_bound(

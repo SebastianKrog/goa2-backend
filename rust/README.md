@@ -4854,11 +4854,27 @@ are listed in `fixture_cache.COMMITTED` and `rust/.gitignore`.
 
 The experimental `search_resolution` worker operation takes a live envelope,
 `player_id`, `max_depth`, `max_nodes`, and `time_ms`. It returns a typed input
-as a `check_sequences` decision, with its score, completed decision depth, and
-node count. The `resolved` flag indicates that search proved deeper iterations
-cannot change the result within this resolution. If the first iteration is interrupted, the worker keeps the best
-fully scored root move so far, with a completed depth of zero. The request token belongs to the native envelope replay. Search
-stops at planning and scores material with simple positional tie-breakers.
-The optional `opponent_policy` defaults to `adversarial`. Use `first_legal`
-for a deterministic baseline that follows the first native option at each
-opposing prompt.
+for `check_sequences`, its score, completed decision depth, and nodes used.
+The request token belongs to the imported live prompt. Search stops at the
+next planning phase by default. Set `rollout_turns` to one or two to score
+leaves after a first-legal continuation to that game-turn horizon.
+
+The default evaluator is `material_position`. Select `lab_attack_range_v1`
+for the lab evaluator. `opponent_policy` defaults to `adversarial`.
+`first_legal` follows the first native choice at each opposing prompt.
+
+Set `resolution_sample_seed` to reconstruct hidden hands at supported
+ordinary action, defense, initiative, confirmation and movement destination prompts. The optional
+`resolution_sample_worlds` count ranges from one to eight and defaults to one.
+Set `resolution_sample_workers` to score worlds concurrently, up to four workers
+and at most one per world. Serial scoring is the default.
+With multiple worlds, a root move receives a mean score only after every world
+contributes a score at the same depth. All worlds share the request's time and
+node budgets. `planning_sample_seed` separately samples hidden hands at later
+planning phases during a turn rollout. Public upgrade batches or checkpoints
+can constrain either sampler.
+
+An interrupted first iteration may return a scored move with
+`completed_depth: 0`. When no root move has been scored, the result carries the
+first legal choice with a null score. `resolved` indicates that further decision
+depth cannot change the result within the configured horizon.

@@ -15,7 +15,7 @@ pub enum Container {
     Discard,
     Deck,
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct ForceBinding {
     pub victim: Symbol,
     pub basic: Option<bool>,

@@ -46,6 +46,9 @@ def run(root, turns, *, copy_state=True, policy=None):
                                 pass_turn(state, hero.id)
                             else:
                                 raise AssertionError("unexpected validated planning move")
+                    elif hero.id in state.pending_inputs:
+                        if planning_open_for_second_card(state, hero.id):
+                            finish_planning(state, hero.id)
                     elif hero.hand:
                         commit_card(state, hero.id, hero.hand[0])
                         if planning_open_for_second_card(state, hero.id):
@@ -176,16 +179,45 @@ def verify_native_run(
         print(f"  {count} fallback(s) for {reason}")
 
 
-def verify_rust_match_replay(worker, map_id, root, turns, *, require_game_over=False):
+def describe_state_difference(expected, actual, path="state"):
+    if isinstance(expected, dict) and isinstance(actual, dict):
+        for key in expected.keys() | actual.keys():
+            if key not in expected:
+                return f"{path}.{key} only exists in Rust"
+            if key not in actual:
+                return f"{path}.{key} only exists in Python"
+        for key, value in expected.items():
+            if value != actual[key]:
+                return describe_state_difference(value, actual[key], f"{path}.{key}")
+    elif isinstance(expected, list) and isinstance(actual, list):
+        if len(expected) != len(actual):
+            return f"{path} length differs (Python {len(expected)}, Rust {len(actual)})"
+        for index, (left, right) in enumerate(zip(expected, actual, strict=True)):
+            if left != right:
+                return describe_state_difference(left, right, f"{path}[{index}]")
+    return f"{path} differs (Python {repr(expected)[:160]}, Rust {repr(actual)[:160]})"
+
+
+def verify_rust_match_replay(
+    worker, map_id, root, turns, *, require_game_over=False, sweep_policy=None, seed=39,
+    decision_ms=1_000,
+):
     from automata.runtime.legality import DecisionMove, check_moves, check_sequences
     from goa2.engine.phases import hero_can_play_two_cards
 
     envelope, _ = export_state_with_shared_objects(root)
-    baseline = dict(depth=0, max_nodes=4096, time_ms=1_000)
+    baseline = dict(depth=0, max_nodes=4096, time_ms=decision_ms)
     candidate = dict(baseline, depth=1, rollout_turns=2, evaluation="lab_attack_range_v1")
-    for policies in ([candidate, baseline], [baseline, candidate]):
+    if sweep_policy is None:
+        pairs = ([candidate, baseline], [baseline, candidate])
+    elif sweep_policy == "search":
+        pairs = ([candidate, candidate],)
+    else:
+        policy = dict(baseline, sample_choices=sweep_policy == "sampled")
+        pairs = ([policy, policy],)
+    for policies in pairs:
         result = worker.request(
-            "offline_match", envelope=envelope, turns=turns, seed=39,
+            "offline_match", envelope=envelope, turns=turns, seed=seed,
             policies=policies, capture_trace=True,
         )
 
@@ -202,29 +234,40 @@ def verify_rust_match_replay(worker, map_id, root, turns, *, require_game_over=F
                 return move
 
             assert row["kind"] == "planning"
-            assert {entry["hero"] for entry in row["commitments"]} == {
+            eligible = {
                 hero.id for team in state.teams.values() for hero in team.heroes
+                if hero.id not in state.pending_inputs
+                or planning_open_for_second_card(state, hero.id)
             }
+            commitments = row["commitments"]
+            assert len(commitments) == len(eligible) and {
+                entry["hero"] for entry in commitments
+            } == eligible, (map_id, revision, state.round, state.turn, row, eligible)
             moves = []
-            for entry in row["commitments"]:
+            for entry in commitments:
                 hero = state.get_hero(entry["hero"])
                 first, second = entry["first"], entry["second"]
+                second_slot = hero.id in state.pending_inputs
                 if first is None:
-                    moves.append(DecisionMove("PASS", hero.id))
+                    kind = "FINISH_PLANNING" if second_slot else "PASS"
+                    moves.append(DecisionMove(kind, hero.id))
                     continue
                 moves.append(DecisionMove("CARD", hero.id, first))
                 if second is not None:
                     moves.append(DecisionMove("CARD", hero.id, second))
-                elif len(hero.hand) > 1 and hero_can_play_two_cards(hero):
+                elif not second_slot and len(hero.hand) > 1 and hero_can_play_two_cards(hero):
                     moves.append(DecisionMove("FINISH_PLANNING", hero.id))
             assert check_sequences(state, [moves]).results[0].legal is True, row
             return moves
 
         final, count = run(root, turns, policy=replay)
         assert count == len(result["trace"])
-        assert normalized_state(final.model_dump(mode="json")) == normalized_state(result["state"])
+        expected = normalized_state(final.model_dump(mode="json"))
+        actual = normalized_state(result["state"])
+        assert expected == actual, describe_state_difference(expected, actual)
         if require_game_over:
             assert final.phase == GamePhase.GAME_OVER, (map_id, final.round, final.turn)
+        if final.phase == GamePhase.GAME_OVER:
             assert result["winner_team"] == (final.winner.value if final.winner else None)
             assert result["winner_hero"] == final.individual_winner_id
         endpoint = (
@@ -233,6 +276,17 @@ def verify_rust_match_replay(worker, map_id, root, turns, *, require_game_over=F
             else f"round {final.round}, turn {final.turn}"
         )
         print(f"{map_id}: Python validated {count} Rust match decisions through {endpoint}")
+        for team, (policy, stats) in enumerate(zip(policies, result["policies"], strict=True)):
+            if not policy["depth"]:
+                continue
+            print(
+                f"  {('RED', 'BLUE')[team]} search used {stats['fallback']} fallbacks across "
+                f"{stats['planning']} planning and {stats['resolution']} resolution decisions "
+                f"({stats.get('forced', 0)} forced)"
+            )
+            reasons = stats.get("resolution_fallbacks", {})
+            for reason, frequency in sorted(reasons.items(), key=lambda row: (-row[1], row[0]))[:3]:
+                print(f"    {frequency} × {reason}")
 
 
 def verify_terminal_matches(worker):
@@ -583,7 +637,134 @@ def sampled_python(root, seed):
     return sampled
 
 
-def verify_sampled_rollout(worker, map_id, root, evaluator, iterations, sample_count=1):
+def verify_sampled_resolution(
+    worker, map_path, opening, decision_ms, sample_count, workers, iterations, verify_deadline,
+    transport_reserve_ms,
+):
+    from automata.runtime.driver import eligible_hero_ids_for_request
+    from automata.runtime.legality import DecisionMove
+    from public_upgrades import ITEM_STATS
+    from resolution_validation import validate_resolution
+
+    map_id = map_path.stem
+    cases = [("opening", deepcopy(opening)), ("upgraded", upgraded_opening(opening))]
+    if map_id == "forgotten_island":
+        cases.extend((label, deepcopy(opening)) for label in ("movement", "fast travel"))
+        focus_opening = GameSetup.create_game(
+            str(map_path), ["Misa", "Brogan"], ["Tigerclaw", "Sabina"], seed=29,
+        )
+
+        def play_focus(_state, _prompt, index):
+            if index == 0:
+                return [DecisionMove("CARD", "hero_misa", "focus")]
+            return None
+
+        focus, _ = run(focus_opening, 1, policy=play_focus)
+        assert any(effect.source_card_id == "focus" for effect in focus.active_effects)
+        cases.append(("focus", focus))
+
+    for label, root in cases:
+        checkpoints = {}
+        for team in root.teams.values():
+            for hero in team.heroes:
+                if hero.level > 1:
+                    checkpoints[hero.id] = [{
+                        "level": hero.level,
+                        "card_items": [hero.items.get(stat, 0) for stat in ITEM_STATS],
+                    }]
+                commit_card(root, hero.id, hero.hand[int(label in {"movement", "fast travel"})])
+        prompt = process_stack(root).input_request
+        assert prompt is not None, (map_id, label)
+        if label in {"movement", "fast travel"}:
+            assert prompt.request_type.value == "CHOOSE_ACTION"
+            action = "MOVEMENT" if label == "movement" else "FAST_TRAVEL"
+            submit_input(root, InputResponse(request_id=prompt.id, selection=action))
+            prompt = process_stack(root).input_request
+            assert prompt is not None and prompt.request_type.value == "SELECT_HEX"
+        player = eligible_hero_ids_for_request(root, prompt)[0]
+        envelope, _ = export_state_with_shared_objects(root)
+        options = dict(
+            envelope=envelope, player_id=player,
+            max_depth=1, max_nodes=8192 if label == "fast travel" else 1024,
+            rollout_turns=2,
+            resolution_sample_seed=39, resolution_sample_worlds=sample_count,
+            planning_sample_seed=71, upgrade_checkpoints=checkpoints or None,
+        )
+        modes = (1, workers) if workers > 1 else (1,)
+        durations = {count: [] for count in modes}
+        outcomes = {count: Counter() for count in modes}
+        result = None
+        for index in range(max(1, iterations)):
+            order = modes if index % 2 == 0 else reversed(modes)
+            for count in order:
+                started = perf_counter()
+                try:
+                    timing = (
+                        dict(decision_deadline=started + decision_ms / 1_000,
+                             transport_reserve=transport_reserve_ms / 1_000)
+                        if transport_reserve_ms else dict(time_ms=decision_ms)
+                    )
+                    reply = worker.request(
+                        "search_resolution", resolution_sample_workers=count, **options, **timing,
+                    )
+                except RuntimeError as error:
+                    if not verify_deadline or str(error) != (
+                        "worker rejected request: search deadline reached during request setup"
+                    ):
+                        raise
+                    durations[count].append(1_000 * (perf_counter() - started))
+                    outcomes[count]["setup deadline (no move)"] += 1
+                    continue
+                durations[count].append(1_000 * (perf_counter() - started))
+                if verify_deadline:
+                    depth = reply["completed_depth"]
+                    assert depth in (0, 1), (map_id, label, reply)
+                    if depth == 1:
+                        assert reply["score_kind"] == "turn_rollout", (map_id, label, reply)
+                        assert reply["score"] is not None, (map_id, label, reply)
+                    else:
+                        assert reply["stop"] == "deadline", (map_id, label, reply)
+                        kind = "unscored" if reply["score"] is None else reply["score_kind"]
+                        assert kind in {"unscored", "immediate", "turn_rollout"}, (map_id, label, reply)
+                    validate_resolution(
+                        root, prompt, reply, player_id=player, controlled_ids={player},
+                        searched_revision=0, live_revision=0, require_score=False,
+                    )
+                    outcome = "completed" if depth else f"deadline ({kind})"
+                    outcomes[count][outcome] += 1
+                    continue
+                if result is None:
+                    result = reply
+                else:
+                    assert reply == result, (map_id, label, count, result, reply)
+        if verify_deadline:
+            for count in modes:
+                samples = durations[count]
+                if transport_reserve_ms:
+                    assert max(samples) <= decision_ms, (map_id, label, count, samples)
+                counts = ", ".join(f"{key}: {value}" for key, value in sorted(outcomes[count].items()))
+                print(f"{map_id} {label} {count} worker(s): {counts}; "
+                      f"end-to-end median {median(samples):.2f} ms, max {max(samples):.2f} ms")
+            continue
+        assert result["completed_depth"] == 1 and result["score_kind"] == "turn_rollout", (
+            map_id, label, result,
+        )
+        move = validate_resolution(
+            root, prompt, result, player_id=player, controlled_ids={player},
+            searched_revision=0, live_revision=0,
+        )
+        print(f"{map_id} {label} {prompt.request_type.value}: "
+              f"Python accepted {move.selection} ({result['nodes']} Rust nodes)")
+        if iterations:
+            times = ", ".join(
+                f"{count} worker(s) {median(samples):.2f} ms"
+                for count, samples in durations.items()
+            )
+            print(f"  end-to-end median over {iterations} runs: {times}")
+
+
+
+def verify_sampled_rollout(worker, map_id, root, evaluator, iterations, sample_count=1, workers=1):
     seeds = range(39, 39 + sample_count)
     envelope, _ = export_state_with_shared_objects(root)
     case = (map_id, root.turn)
@@ -601,15 +782,16 @@ def verify_sampled_rollout(worker, map_id, root, evaluator, iterations, sample_c
     if iterations or evaluator is not None:
         native = worker.request(
             "rollout_bench", envelope=envelope, player_id="hero_arien",
-            iterations=max(sample_count, iterations), sample_seed=seeds.start,
+            iterations=max(sample_count, iterations, workers), sample_seed=seeds.start,
             sample_count=sample_count, lab_evaluation=evaluator is not None,
+            **({"workers": workers} if workers > 1 else {}),
         )
         for row, (seed, nodes, value) in zip(native["sample_results"], expected, strict=True):
             assert (row["seed"], row["nodes"]) == (seed, nodes), case
             if value is not None:
                 assert isclose(row["lab_value"], value, rel_tol=1e-12, abs_tol=1e-12), case
     if iterations:
-        sampling_share = native["sampling_and_restore_seconds"] / native["seconds"]
+        sampling_share = native["sampling_and_restore_seconds"] / native.get("worker_seconds", native["seconds"])
         print(f"{map_id} turn {root.turn}: {native['rollouts_per_second']:.1f} Rust "
               f"sampled rollouts/s ({sampling_share:.1%} in sampling and restoring)")
 
@@ -626,6 +808,42 @@ def upgraded_opening(opening):
     return upgraded
 
 
+def verify_roster_sweep(worker, paths, turns, seed, policy, *, team_size, game_type, decision_ms):
+    from goa2.data.heroes import HeroRegistry
+
+    heroes = sorted(HeroRegistry.list_heroes(include_playtest=True))
+    failures = []
+    roster_size = 2 * team_size
+    for path in paths:
+        for index in range(0, len(heroes), roster_size):
+            roster = (heroes + heroes[:roster_size - 1])[index:index + roster_size]
+            case = f"{path.stem} ({', '.join(roster)})"
+            try:
+                root = GameSetup.create_game(
+                    str(path), roster[:team_size], roster[team_size:], seed=seed, game_type=game_type,
+                )
+                verify_rust_match_replay(
+                    worker, case, root, turns, sweep_policy=policy, seed=seed, decision_ms=decision_ms,
+                )
+            except (AssertionError, RuntimeError, ValueError) as error:
+                failures.append(case)
+                print(f"{case}: {type(error).__name__}: {error}", flush=True)
+    if failures:
+        raise AssertionError(f"{len(failures)} roster/map cases failed: {', '.join(failures)}")
+
+
+def verify_recorded_rollouts(worker, evaluator, iterations, sample_count, workers):
+    from simulation_bench import read_case, read_index, workloads
+
+    corpus = ROOT / "rust/tests/fixtures/complete-games-hanu.json"
+    index, _ = read_index(corpus)
+    for entry in index["cases"]:
+        for workload in workloads(read_case(corpus, entry)):
+            verify_sampled_rollout(
+                worker, workload["name"], workload["state"], evaluator, iterations, sample_count, workers,
+            )
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--worker", required=True)
@@ -638,6 +856,22 @@ def main():
                       help="Apply validated native suggestions through Python for this many turns")
     mode.add_argument("--replay-terminal", action="store_true",
                       help="Validate Rust-selected finishing moves from recorded late-game states")
+    mode.add_argument("--roster-sweep-turns", type=int,
+                      help="Replay Rust decisions for every registered hero")
+    parser.add_argument("--sweep-team-size", type=int, choices=range(1, 6), default=2)
+    parser.add_argument("--sweep-game-type", choices=("LONG", "QUICK"), default="LONG")
+    parser.add_argument("--sweep-policy", choices=("first-legal", "sampled", "search"),
+                        default="first-legal", help="Rust policy used by both teams in the sweep")
+    mode.add_argument("--recorded-rollouts", action="store_true",
+                      help="Validate and benchmark sampled rollouts from recorded game positions")
+    mode.add_argument("--sampled-resolution", action="store_true",
+                      help="Validate sampled resolution choices and two-turn scores")
+    parser.add_argument("--prepare-search", action="store_true",
+                        help="Initialize immutable Rust rule programs before timing decisions")
+    parser.add_argument("--resolution-transport-reserve-ms", type=int, default=0,
+                        help="Use a caller deadline and reserve time for the worker exchange")
+    parser.add_argument("--verify-resolution-deadline", action="store_true",
+                        help="Validate interrupted choices and report end-to-end latency")
     parser.add_argument("--decision-ms", type=int, default=2_000,
                         help="Configured native search time per decision")
     parser.add_argument(
@@ -654,11 +888,17 @@ def main():
                         help="Compare scoped planning on one, two and four workers")
     parser.add_argument("--planning", action="store_true", help="Also verify sampled planning")
     parser.add_argument("--all-maps", action="store_true", help="Check every bundled map")
+    parser.add_argument("--rollout-workers", type=int, choices=range(1, 5), default=1,
+                        help="Independent workers for the recorded rollout benchmark")
+    parser.add_argument("--sample-workers", type=int, choices=range(1, 5), default=1,
+                        help="Parallel world scorers for sampled resolution")
     parser.add_argument("--sample-count", type=int, choices=range(1, 9), default=1,
-                        help="Number of seeded worlds rotated through the sampled benchmark")
+                        help="Number of worlds for sampled rollout benchmarks or resolution search")
     parser.add_argument("--sampled", action="store_true", help="Also check sampled level-one roots")
     parser.add_argument("--sampled-upgrades", action="store_true", help="Also check upgraded samples")
     args = parser.parse_args()
+    if args.roster_sweep_turns is not None and not 1 <= args.roster_sweep_turns <= 64:
+        parser.error("--roster-sweep-turns must be in 1..64")
     if args.rust_replay_turns is not None and not 1 <= args.rust_replay_turns <= 64:
         parser.error("--rust-replay-turns must be in 1..64")
     if args.replay_roster and not args.rust_replay_turns:
@@ -669,7 +909,21 @@ def main():
         parser.error("--decision-ms must be in 1..60000")
     if args.sample_future_planning and not args.native_turns:
         parser.error("--sample-future-planning requires --native-turns")
-    if 0 < args.bench_iterations < args.sample_count:
+    if args.prepare_search and not args.sampled_resolution:
+        parser.error("--prepare-search requires --sampled-resolution")
+    if args.verify_resolution_deadline and not args.sampled_resolution:
+        parser.error("--verify-resolution-deadline requires --sampled-resolution")
+    if not 0 <= args.resolution_transport_reserve_ms < args.decision_ms:
+        parser.error("resolution transport reserve must be smaller than --decision-ms")
+    if args.resolution_transport_reserve_ms and not args.verify_resolution_deadline:
+        parser.error("resolution transport reserve requires --verify-resolution-deadline")
+    if args.rollout_workers > 1 and not args.recorded_rollouts:
+        parser.error("--rollout-workers requires --recorded-rollouts")
+    if args.rollout_workers > 1 and args.bench_iterations < args.rollout_workers:
+        parser.error("--bench-iterations must cover every rollout worker")
+    if args.sample_workers > args.sample_count:
+        parser.error("--sample-workers cannot exceed --sample-count")
+    if not args.sampled_resolution and 0 < args.bench_iterations < args.sample_count:
         parser.error("--bench-iterations must cover every sample")
     if not 0 <= args.bench_iterations <= 10_000:
         parser.error("--bench-iterations must be in 0..10000")
@@ -688,6 +942,23 @@ def main():
     roster = args.replay_roster or ["Arien", "Brogan", "Tigerclaw", "Sabina"]
     worker = Worker([args.worker])
     try:
+        if args.prepare_search:
+            started = perf_counter()
+            prepared = worker.request("prepare_search")
+            assert prepared == {"ready": True}, prepared
+            print(f"Rust search preparation: {1_000 * (perf_counter() - started):.2f} ms")
+        if args.roster_sweep_turns:
+            verify_roster_sweep(
+                worker, paths, args.roster_sweep_turns, args.game_seed, args.sweep_policy,
+                team_size=args.sweep_team_size, game_type=args.sweep_game_type,
+                decision_ms=args.decision_ms,
+            )
+            return
+        if args.recorded_rollouts:
+            verify_recorded_rollouts(
+                worker, evaluator, args.bench_iterations, args.sample_count, args.rollout_workers,
+            )
+            return
         if args.replay_terminal:
             verify_terminal_matches(worker)
             return
@@ -699,6 +970,13 @@ def main():
                 roster[2:],
                 seed=args.game_seed,
             )
+            if args.sampled_resolution:
+                verify_sampled_resolution(
+                    worker, path, opening, args.decision_ms, args.sample_count, args.sample_workers,
+                    args.bench_iterations, args.verify_resolution_deadline,
+                    args.resolution_transport_reserve_ms,
+                )
+                continue
             if args.shadow_turns:
                 verify_native_run(
                     [args.worker], map_id, opening, args.shadow_turns,

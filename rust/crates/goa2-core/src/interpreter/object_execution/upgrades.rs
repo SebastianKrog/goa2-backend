@@ -53,29 +53,28 @@ impl NativeSession {
         Ok(())
     }
     pub(in crate::interpreter) fn validate_upgrade_submission_bound(
-        &self,
+        &mut self,
         selection: &Datum,
     ) -> Result<()> {
-        let mut preview = self.clone();
-        let objects = self
-            .objects
-            .as_ref()
-            .ok_or_else(|| unsupported("upgrade arena missing"))?;
-        preview.sync_upgrade_state_bound(objects)?;
-        let rules = preview
-            .round_rules
-            .as_ref()
-            .ok_or_else(|| unsupported("upgrade rules missing"))?;
-        if rules
-            .validate(&preview.world, &preview.round, selection)
-            .map_err(card_error)?
-            .is_none()
-        {
-            return Err(EngineError::InvalidInput(
-                "Choose one legal upgrade or all remaining upgrades for your hero".into(),
-            ));
-        }
-        Ok(())
+        self.with_live_objects(|session, objects| {
+            // The preview needs the typed state, while the live arena stays borrowed.
+            let mut preview = session.clone();
+            preview.sync_upgrade_state_bound(objects)?;
+            let rules = preview
+                .round_rules
+                .as_ref()
+                .ok_or_else(|| unsupported("upgrade rules missing"))?;
+            if rules
+                .validate(&preview.world, &preview.round, selection)
+                .map_err(card_error)?
+                .is_none()
+            {
+                return Err(EngineError::InvalidInput(
+                    "Choose one legal upgrade or all remaining upgrades for your hero".into(),
+                ));
+            }
+            Ok(())
+        })
     }
     fn upgrade_card_state_bound(
         &mut self,
@@ -367,12 +366,13 @@ impl NativeSession {
         objects: &mut BoundObjects,
         step: ObjectId,
         reset: bool,
-    ) -> Result<Option<NativeRequest>> {
+    ) -> Result<()> {
         self.transition_bound(objects, step, |candidate, objects, frame| {
             candidate
                 .round_transition_direct_bound(objects, step, reset)?
                 .map(|request| candidate.issue_bound_request(objects, step, frame, request))
-                .transpose()
+                .transpose()?;
+            Ok(())
         })
     }
 }

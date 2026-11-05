@@ -99,12 +99,12 @@ fn scope_actor(
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum RequestToken {
     Imported(Symbol),
     Generated(u64),
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 struct EffectBinding {
     card: Symbol,
     context: Option<(Symbol, Datum)>,
@@ -150,7 +150,7 @@ struct PassiveBody {
     owner: Symbol,
     templates: Vec<usize>,
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 struct Frame {
     instruction: usize,
     object: Option<crate::objects::ObjectId>,
@@ -653,7 +653,7 @@ enum Team {
     Red,
     Blue,
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub enum RequestChoices {
     SpellCards {
         values: Vec<crate::cards::CardId>,
@@ -725,7 +725,7 @@ pub enum RequestChoices {
         unit: Option<Symbol>,
     },
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct NativeRequest {
     pub id: RequestToken,
     pub owner: Symbol,
@@ -1028,6 +1028,15 @@ pub struct NativeSession {
     coordinates: [Symbol; 3],
 }
 impl NativeSession {
+    /// Prepare process-wide rule data before starting a timed search request.
+    pub fn prepare_search() -> Result<()> {
+        crate::templates::instructions().map_err(unsupported)?;
+        crate::primary::catalog().map_err(unsupported)?;
+        object_execution::primary_operand_catalog()?;
+        object_execution::shared_primary_programs()?;
+        Ok(())
+    }
+
     pub fn compile(source: StateEnvelope) -> Result<Self> {
         let (phase, mut expanded) = source.expand_for_restore().map_err(unsupported)?;
         if !matches!(
@@ -2012,7 +2021,7 @@ impl NativeSession {
         stop_after: Option<usize>,
     ) -> Result<AdvanceResult> {
         if self.objects.is_some() {
-            return self.advance_objects(budget, stop_after);
+            return self.advance_objects(budget, stop_after, true);
         }
         let mut result = AdvanceResult::default();
         if !self.stack.is_empty() && self.planning.phase != Phase::GameOver {
@@ -5993,6 +6002,37 @@ impl NativeSession {
         self.world.export_cards(&mut source, &self.symbols);
         Ok(source)
     }
+    /// Root-relative rollback diagnostic for execution state and arena payloads.
+    pub fn execution_fingerprint(&self) -> u128 {
+        use std::hash::{DefaultHasher, Hash, Hasher};
+
+        let lane = |salt| {
+            let mut hash = DefaultHasher::new();
+            (
+                "execution",
+                salt,
+                &self.stack,
+                &self.context,
+                &self.last_request,
+                self.next_request,
+                self.next_step,
+            )
+                .hash(&mut hash);
+            self.symbols.hash_local(&mut hash);
+            self.objects.is_some().hash(&mut hash);
+            if let Some(objects) = &self.objects {
+                objects.hash_execution(&mut hash);
+            }
+            hash.finish()
+        };
+        u128::from(lane(0u64)) | (u128::from(lane(1u64)) << 64)
+    }
+
+    /// Diagnostic key for spatial state, typed hero and card rows, and active effects.
+    pub fn world_state_fingerprint(&mut self) -> u128 {
+        self.world.world_state_fingerprint()
+    }
+
     pub fn semantic_state(&self) -> Result<Value> {
         self.export_envelope()?.materialize().map_err(unsupported)
     }

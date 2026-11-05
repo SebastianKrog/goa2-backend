@@ -16,7 +16,7 @@ pub const RANGE: i64 = 1234567892;
 pub const RADIUS: i64 = 1234567893;
 pub const DEFENSE_LOG: &str = "native-primary-defense-log";
 pub const SKILL_LOG: &str = "native-primary-skill-log";
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct PrimaryValues {
     pub hero: Symbol,
     pub card: Symbol,

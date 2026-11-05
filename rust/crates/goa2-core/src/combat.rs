@@ -18,12 +18,12 @@ fn unsupported(s: &str) -> CombatError {
     CombatError::Unsupported(s.into())
 }
 type Result<T> = std::result::Result<T, CombatError>;
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Hash)]
 pub struct DefeatBinding {
     pub victim: Symbol,
     pub killer: Option<Symbol>,
 }
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Hash)]
 pub struct GameOutcome {
     pub team: Option<Symbol>,
     pub hero: Option<Symbol>,

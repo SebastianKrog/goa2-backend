@@ -25,12 +25,12 @@ impl NativeSession {
         model: ObjectId,
         field: Field,
     ) -> Result<Option<CardId>> {
-        match objects.arena.field(model, objects.phases.k(field)) {
+        match objects.arena.field_ref(model, objects.phases.k(field)) {
             Some(ObjectValue::Atom(Datum::Null)) => Ok(None),
             Some(ObjectValue::Atom(Datum::Instance(card)))
-                if self.world.card(CardId(card)).is_some() =>
+                if self.world.card(CardId(*card)).is_some() =>
             {
-                Ok(Some(CardId(card)))
+                Ok(Some(CardId(*card)))
             }
             _ => Err(unsupported("phase physical-card binding missing")),
         }

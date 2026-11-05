@@ -159,6 +159,25 @@ impl NativeSession {
         };
         Ok(objects.tokens.get(objects, physical)?.map(|_| physical))
     }
+    pub(super) fn token_is_public_bound(&self, objects: &BoundObjects, id: Symbol) -> Result<bool> {
+        if self.world.position(id).is_none() {
+            return Ok(false);
+        }
+        let Some(physical) = self.token_misc_bound(objects, id)? else {
+            return Ok(false);
+        };
+        let key = objects.phases.k(Field::Facedown);
+        if let Some(value) = objects.arena.physical_override(physical, key) {
+            return Ok(matches!(value, Some(Datum::Bool(false))));
+        }
+        let base = objects.arena.physical_base(physical).map_err(unsupported)?;
+        let instance = &self.source.instances[base as usize];
+        let definition = &self.source.definitions[instance.definition as usize];
+        Ok(instance.fields.get("is_facedown")
+            .or_else(|| definition.fields.get("is_facedown"))
+            .and_then(Value::as_bool) == Some(false))
+    }
+
     pub(super) fn cleanup_token_supply_bound(
         &self,
         objects: &BoundObjects,

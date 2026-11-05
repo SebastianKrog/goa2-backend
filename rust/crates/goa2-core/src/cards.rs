@@ -8,7 +8,7 @@ use serde_json::{Value, json};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct CardId(pub u32);
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct HeroRecord {
     pub id: Symbol,
     pub team: Symbol,

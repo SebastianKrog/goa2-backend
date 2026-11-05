@@ -14,20 +14,20 @@ pub enum BattleError {
     Unsupported(&'static str),
 }
 type Result<T> = std::result::Result<T, BattleError>;
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct PushSpec {
     pub lane: Symbol,
     pub loser: Symbol,
     pub target: Option<Symbol>,
     pub skip_wave: bool,
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct RemovalSpec {
     pub loser: Symbol,
     pub remaining: i64,
     pub zone: Symbol,
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub enum BattleStep {
     Check(Option<Symbol>),
     Push(PushSpec),

@@ -22,7 +22,7 @@ pub struct ReturnPlan {
     pub placement: bool,
     pub more: bool,
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub enum ReturnBinding {
     Processed(Vec<Symbol>),
     Relocate {

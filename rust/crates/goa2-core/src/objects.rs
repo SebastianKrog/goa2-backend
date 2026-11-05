@@ -1,6 +1,7 @@
 //! Worker-local mutable object identity. JSON conversion is boundary-only.
 //! Live context/frame bindings use these handles; dense world slots remain separate.
 use crate::{
+    bitset::BitSet,
     codec::{ObjectBinding, ObjectKind, ObjectPathPart, StateEnvelope},
     data::{Datum, Symbol, Symbols},
 };
@@ -8,7 +9,7 @@ use serde_json::{Value, json};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ObjectId(usize);
 /// Dense arena handles make reachability membership a bitmap lookup. The
 /// retained handles support copied-step protection; only membership is semantic.
@@ -43,19 +44,19 @@ impl IntoIterator for ProtectedObjects {
         self.objects.into_iter()
     }
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub enum ObjectValue {
     Atom(Datum),
     Object(ObjectId),
     Request(u64),
     GeneratedStep(u64),
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 enum Contents {
     List(Vec<ObjectValue>),
     Fields(Vec<(Symbol, ObjectValue)>),
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 struct Object {
     kind: ObjectKind,
     tracked: bool,
@@ -97,7 +98,7 @@ pub enum Mutation {
         key: Symbol,
     },
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 struct PhysicalCopy {
     base: u32,
     equality: Option<crate::codec::InstanceEquality>,
@@ -106,19 +107,39 @@ struct PhysicalCopy {
 #[derive(Clone, Debug)]
 enum ArenaUndo {
     Object(ObjectId, Object),
+    ListAppend(ObjectId),
+    ListRemove(ObjectId, usize, ObjectValue),
+    ListReplace(ObjectId, usize, ObjectValue),
     PhysicalFields(u32, Option<Vec<(Symbol, Option<Datum>)>>),
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-enum ArenaUndoSlot {
-    Object(ObjectId),
-    PhysicalFields(u32),
+#[derive(Debug, Default)]
+struct RecordedSlots {
+    objects: BitSet,
+    physical: BitSet,
+}
+
+impl RecordedSlots {
+    fn union_with(&mut self, other: &Self) {
+        self.objects.union_with(&other.objects);
+        self.physical.union_with(&other.physical);
+    }
+
+    fn clear(&mut self) {
+        self.objects.clear();
+        self.physical.clear();
+    }
+
+    fn capacity(&self) -> usize {
+        self.objects.capacity() + self.physical.capacity()
+    }
 }
 
 #[derive(Debug, Default)]
 struct ArenaJournal {
     entries: Vec<ArenaUndo>,
-    recorded: HashSet<ArenaUndoSlot>,
+    recorded: RecordedSlots,
+    spare_recorded: RecordedSlots,
     existing_objects: Option<usize>,
 }
 
@@ -135,7 +156,7 @@ pub(crate) struct ArenaCheckpoint {
     object_count: usize,
     copy_count: usize,
     parent_existing_objects: Option<usize>,
-    parent_recorded: HashSet<ArenaUndoSlot>,
+    parent_recorded: RecordedSlots,
 }
 
 struct ArenaRollback<'a> {
@@ -191,7 +212,10 @@ impl ObjectArena {
             object_count,
             copy_count: self.physical_copies.len(),
             parent_existing_objects: self.journal.existing_objects.replace(object_count),
-            parent_recorded: std::mem::take(&mut self.journal.recorded),
+            parent_recorded: std::mem::replace(
+                &mut self.journal.recorded,
+                std::mem::take(&mut self.journal.spare_recorded),
+            ),
         }
     }
 
@@ -199,6 +223,15 @@ impl ObjectArena {
         while self.journal.entries.len() > checkpoint.entry_count {
             match self.journal.entries.pop().unwrap() {
                 ArenaUndo::Object(id, previous) => self.objects[id.0] = previous,
+                ArenaUndo::ListAppend(id) => {
+                    self.list_items_mut(id).pop();
+                }
+                ArenaUndo::ListRemove(id, index, previous) => {
+                    self.list_items_mut(id).insert(index, previous);
+                }
+                ArenaUndo::ListReplace(id, index, previous) => {
+                    self.list_items_mut(id)[index] = previous;
+                }
                 ArenaUndo::PhysicalFields(id, Some(previous)) => {
                     self.physical_fields.insert(id, previous);
                 }
@@ -211,18 +244,29 @@ impl ObjectArena {
         self.physical_copies.truncate(checkpoint.copy_count);
         self.symbols = checkpoint.symbols;
         self.journal.existing_objects = checkpoint.parent_existing_objects;
-        self.journal.recorded = checkpoint.parent_recorded;
+        self.restore_recorded_slots(checkpoint.parent_recorded, false);
     }
 
     pub(crate) fn commit_rollback(&mut self, checkpoint: ArenaCheckpoint) {
         self.journal.existing_objects = checkpoint.parent_existing_objects;
-        if checkpoint.parent_existing_objects.is_some() {
+        let nested = checkpoint.parent_existing_objects.is_some();
+        if !nested {
+            self.journal.entries.truncate(checkpoint.entry_count);
+        }
+        self.restore_recorded_slots(checkpoint.parent_recorded, nested);
+    }
+
+    fn restore_recorded_slots(&mut self, parent: RecordedSlots, commit_nested: bool) {
+        let mut finished = std::mem::replace(&mut self.journal.recorded, parent);
+        if commit_nested {
             // Keep the child's undo entries so the enclosing rollback can
             // reverse the committed writes in order.
-            self.journal.recorded.extend(checkpoint.parent_recorded);
-        } else {
-            self.journal.entries.truncate(checkpoint.entry_count);
-            self.journal.recorded = checkpoint.parent_recorded;
+            self.journal.recorded.union_with(&finished);
+        }
+        // Reuse the allocation at the next sibling without retaining slots.
+        if finished.capacity() > self.journal.spare_recorded.capacity() {
+            finished.clear();
+            self.journal.spare_recorded = finished;
         }
     }
 
@@ -235,7 +279,7 @@ impl ObjectArena {
             .journal
             .existing_objects
             .is_some_and(|count| id.0 < count)
-            && self.journal.recorded.insert(ArenaUndoSlot::Object(id))
+            && self.journal.recorded.objects.insert_growing(id.0)
         {
             self.journal
                 .entries
@@ -244,12 +288,23 @@ impl ObjectArena {
         &mut self.objects[id.0]
     }
 
+    fn records_list_edit(&self, id: ObjectId) -> bool {
+        self.journal
+            .existing_objects
+            .is_some_and(|count| id.0 < count)
+            && !self.journal.recorded.objects.contains(id.0)
+    }
+
+    fn list_items_mut(&mut self, id: ObjectId) -> &mut Vec<ObjectValue> {
+        let Contents::List(values) = &mut self.objects[id.0].contents else {
+            unreachable!("validated list binding");
+        };
+        values
+    }
+
     fn physical_overrides_mut(&mut self, id: u32) -> &mut Vec<(Symbol, Option<Datum>)> {
         if self.journal.existing_objects.is_some()
-            && self
-                .journal
-                .recorded
-                .insert(ArenaUndoSlot::PhysicalFields(id))
+            && self.journal.recorded.physical.insert_growing(id as usize)
         {
             self.journal.entries.push(ArenaUndo::PhysicalFields(
                 id,
@@ -473,6 +528,10 @@ impl ObjectArena {
             ),
             _ => return ObjectValue::Atom(value.clone()),
         };
+        self.allocate_contents(kind, contents)
+    }
+
+    fn allocate_contents(&mut self, kind: ObjectKind, contents: Contents) -> ObjectValue {
         let id = ObjectId(self.objects.len());
         self.objects.push(Object {
             kind,
@@ -490,41 +549,52 @@ impl ObjectArena {
         }
     }
     fn reaches(&self, value: &ObjectValue, target: ObjectId) -> bool {
-        if !matches!(value, ObjectValue::Object(_)) {
+        let ObjectValue::Object(root) = value else {
             return false;
-        }
-        let mut queue = vec![value];
+        };
+        let mut pending = Vec::new();
         let mut seen = HashSet::new();
-        while let Some(value) = queue.pop() {
-            let ObjectValue::Object(id) = value else {
-                continue;
-            };
-            if *id == target {
+        let mut next = Some(*root);
+        while let Some(id) = next {
+            if id == target {
                 return true;
             }
-            if !seen.insert(*id) {
-                continue;
-            }
+            let mut enqueue = |value: &ObjectValue| {
+                if let ObjectValue::Object(child) = value {
+                    pending.push(*child);
+                }
+            };
             match &self.objects[id.0].contents {
-                Contents::List(items) => queue.extend(items),
-                Contents::Fields(fields) => queue.extend(fields.iter().map(|(_, v)| v)),
+                Contents::List(items) => items.iter().for_each(&mut enqueue),
+                Contents::Fields(fields) => {
+                    fields.iter().for_each(|(_, value)| enqueue(value));
+                }
             }
+            if pending.is_empty() {
+                return false;
+            }
+            seen.insert(id);
+            next = std::iter::from_fn(|| pending.pop()).find(|child| !seen.contains(child));
         }
         false
     }
-    fn check_input(&self, value: &Input, target: ObjectId) -> Result<(), String> {
-        let existing = match value {
-            Input::Alias(index) => Some(ObjectValue::Object(self.target(Target::Alias(*index))?)),
-            Input::Existing(value) => Some(value.clone()),
-            Input::Literal(_) => None,
-        };
-        if existing
-            .as_ref()
-            .is_some_and(|value| self.reaches(value, target))
-        {
+
+    fn check_existing_input(&self, value: &ObjectValue, target: ObjectId) -> Result<(), String> {
+        if self.reaches(value, target) {
             return Err("cyclic aggregate mutation".into());
         }
         Ok(())
+    }
+
+    fn check_input(&self, value: &Input, target: ObjectId) -> Result<(), String> {
+        match value {
+            Input::Alias(index) => self.check_existing_input(
+                &ObjectValue::Object(self.target(Target::Alias(*index))?),
+                target,
+            ),
+            Input::Existing(value) => self.check_existing_input(value, target),
+            Input::Literal(_) => Ok(()),
+        }
     }
     pub fn value_at_path(&self, path: &[ObjectPathPart]) -> Result<ObjectValue, String> {
         let mut value = self.root.clone();
@@ -879,23 +949,29 @@ impl ObjectArena {
         if self.reaches(&value, object) {
             return Err("aggregate cycle".into());
         }
-        let Contents::List(values) = &mut self.object_mut(object).contents else {
+        let Contents::List(items) = &mut self.objects[object.0].contents else {
             return Err("indexed assignment requires a list".into());
         };
-        let target = values
+        let target = items
             .get_mut(index)
             .ok_or("list assignment index out of range")?;
-        *target = value;
+        let previous = std::mem::replace(target, value);
+        if self.records_list_edit(object) {
+            self.journal
+                .entries
+                .push(ArenaUndo::ListReplace(object, index, previous));
+        }
         Ok(())
     }
     pub fn field(&self, object: ObjectId, key: Symbol) -> Option<ObjectValue> {
-        let Contents::Fields(fields) = &self.objects.get(object.0)?.contents else {
-            return None;
-        };
-        fields
+        self.field_ref(object, key).cloned()
+    }
+
+    pub(crate) fn field_ref(&self, object: ObjectId, key: Symbol) -> Option<&ObjectValue> {
+        self.fields(object)?
             .iter()
-            .find(|(k, _)| *k == key)
-            .map(|(_, value)| value.clone())
+            .find(|(field, _)| *field == key)
+            .map(|(_, value)| value)
     }
     pub(crate) fn set_root(&mut self, key: Symbol, value: ObjectValue) -> Result<(), String> {
         let ObjectValue::Object(root) = self.root else {
@@ -1049,6 +1125,11 @@ impl ObjectArena {
     pub fn allocate(&mut self, value: &Datum) -> ObjectValue {
         self.literal(value)
     }
+    pub(crate) fn allocate_input(&mut self, key: Symbol, selection: &Datum) -> ObjectValue {
+        let value = self.literal(selection);
+        self.allocate_contents(ObjectKind::Dict, Contents::Fields(vec![(key, value)]))
+    }
+
     pub fn set_field(
         &mut self,
         object: ObjectId,
@@ -1077,7 +1158,7 @@ impl ObjectArena {
         if !self.is_mutable_list(object) {
             return Err("append requires a mutable list".into());
         }
-        self.check_input(&Input::Existing(value.clone()), object)
+        self.check_existing_input(value, object)
     }
     pub fn append(&mut self, object: ObjectId, value: ObjectValue) -> Result<(), String> {
         self.apply(&Mutation::Append {
@@ -1086,10 +1167,19 @@ impl ObjectArena {
         })
     }
     pub fn list_pop(&mut self, object: ObjectId) -> Result<Option<ObjectValue>, String> {
-        let Contents::List(items) = &mut self.object_mut(object).contents else {
-            return Err("stack binding is not a list".into());
-        };
-        Ok(items.pop())
+        let index = self
+            .sequence(object)
+            .ok_or("stack binding is not a list")?
+            .len();
+        let item = self.list_items_mut(object).pop();
+        if let Some(value) = &item
+            && self.records_list_edit(object)
+        {
+            self.journal
+                .entries
+                .push(ArenaUndo::ListRemove(object, index - 1, value.clone()));
+        }
+        Ok(item)
     }
     pub(crate) fn clear_dictionary(&mut self, object: ObjectId) -> Result<(), String> {
         if self.objects[object.0].kind != ObjectKind::Dict {
@@ -1117,10 +1207,10 @@ impl ObjectArena {
                 }
                 self.check_input(value, id)?;
                 let value = self.input(value)?;
-                let Contents::List(items) = &mut self.object_mut(id).contents else {
-                    unreachable!()
-                };
-                items.push(value);
+                self.list_items_mut(id).push(value);
+                if self.records_list_edit(id) {
+                    self.journal.entries.push(ArenaUndo::ListAppend(id));
+                }
             }
             Mutation::Set { target, key, value } => {
                 let id = self.target(*target)?;
@@ -1166,10 +1256,8 @@ impl ObjectArena {
             }
             Mutation::Pop { target, index } => {
                 let id = self.target(*target)?;
-                let Contents::List(items) = &mut self.object_mut(id).contents else {
-                    return Err("pop target must be a list".into());
-                };
-                let count = i64::try_from(items.len()).map_err(|_| "list length exceeds i64")?;
+                let len = self.sequence(id).ok_or("pop target must be a list")?.len();
+                let count = i64::try_from(len).map_err(|_| "list length exceeds i64")?;
                 let index = if *index < 0 {
                     count
                         .checked_add(*index)
@@ -1179,9 +1267,14 @@ impl ObjectArena {
                 };
                 let index = usize::try_from(index)
                     .ok()
-                    .filter(|i| *i < items.len())
+                    .filter(|i| *i < len)
                     .ok_or("list index outside range")?;
-                items.remove(index);
+                let removed = self.list_items_mut(id).remove(index);
+                if self.records_list_edit(id) {
+                    self.journal
+                        .entries
+                        .push(ArenaUndo::ListRemove(id, index, removed));
+                }
             }
             Mutation::Snapshot { key } => {
                 let copy = self.objects[self.context.0].clone();
@@ -1307,6 +1400,22 @@ impl ObjectArena {
             },
         })
     }
+    pub(crate) fn hash_execution(&self, state: &mut impl std::hash::Hasher) {
+        use std::hash::Hash;
+
+        // Allocation order and handles are significant within a native root.
+        self.symbols.hash_local(state);
+        self.root.hash(state);
+        self.objects.hash(state);
+        self.aliases.hash(state);
+        self.board_keys.hash(state);
+        self.context.hash(state);
+        self.physical_copies.hash(state);
+        let mut fields: Vec<_> = self.physical_fields.iter().collect();
+        fields.sort_unstable_by_key(|(id, _)| **id);
+        fields.hash(state);
+    }
+
     pub fn compact_state(&self) -> Result<Value, String> {
         self.expand(&self.root, 0)
     }
@@ -1657,7 +1766,7 @@ mod protection_tests {
                 .unwrap();
             arena.set_physical_field(0, key, Datum::Int(6)).unwrap();
             arena.set_physical_field(0, key, Datum::Int(7)).unwrap();
-            assert_eq!(arena.journal.entries.len(), 3);
+            assert_eq!(arena.journal.entries.len(), 4);
             let (copy, _) = arena
                 .deep_copy(&ObjectValue::Atom(Datum::Instance(0)))
                 .unwrap();
@@ -1679,11 +1788,28 @@ mod protection_tests {
             );
             assert_eq!(arena.physical_override(0, key), Some(Some(&Datum::Int(7))));
             arena.set_physical_field(0, key, Datum::Int(9)).unwrap();
-            assert_eq!(arena.journal.entries.len(), 3);
+            assert_eq!(arena.journal.entries.len(), 4);
             let fork = arena.clone();
             assert!(fork.journal.entries.is_empty());
-            assert!(fork.journal.recorded.is_empty());
+            assert_eq!(fork.journal.recorded.capacity(), 0);
             assert!(fork.journal.existing_objects.is_none());
+
+            // A child may snapshot a list after the parent has recorded edits.
+            // On rollback the snapshot must be restored before those edits.
+            let child = arena.begin_rollback();
+            arena
+                .apply(&Mutation::Pop {
+                    target: Target::Object(live_list),
+                    index: -2,
+                })
+                .unwrap();
+            arena.clear_list(live_list).unwrap();
+            arena
+                .append(live_list, ObjectValue::Atom(Datum::Int(10)))
+                .unwrap();
+            arena.commit_rollback(child);
+            arena.list_pop(live_list).unwrap();
+            assert!(arena.sequence(live_list).unwrap().is_empty());
             Err("cancel")
         });
         assert_eq!(result, Err("cancel"));

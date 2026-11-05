@@ -1,6 +1,7 @@
 //! Dense native entity/card tables and independent mutable spatial state.
 //! Definitions and geometry are shared. JSON is read/written only at the boundary.
 use crate::{
+    bitset::BitSet,
     cards::{CardId, HeroRecord},
     codec::{InstanceKind, StateEnvelope},
     data::{Datum, Symbol, Symbols},
@@ -9,12 +10,9 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize, Hash)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum CardLifecycle {
     Hand,
@@ -28,7 +26,7 @@ pub enum CardLifecycle {
     Spellbook,
     OutsideSpellbook,
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize, Hash)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ActionKind {
     Movement,
@@ -40,7 +38,7 @@ pub enum ActionKind {
     Clear,
     FastTravel,
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Hash)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum MinionKind {
     Melee,
@@ -70,13 +68,13 @@ pub struct CardDefinition {
     pub secondary: Vec<(ActionKind, i64)>,
     pub basic: bool,
 }
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Hash)]
 pub struct CardEquality {
     pub model: Symbol,
     pub revision: i64,
     pub json_metadata: bool,
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct CardInstance {
     pub definition: usize,
     pub source_instance: u32,
@@ -137,10 +135,52 @@ pub struct WorldDefinitions {
     tile_hexes: Vec<Hex>,
     loaded_map: bool,
 }
+#[derive(Clone, Debug, Default)]
+struct RowFingerprint {
+    features: Vec<u128>,
+    key: u128,
+    dirty: Vec<usize>,
+    marked: BitSet,
+}
+
+impl RowFingerprint {
+    fn mark(&mut self, index: usize) {
+        if !self.features.is_empty() && self.marked.insert_growing(index) {
+            self.dirty.push(index);
+        }
+    }
+
+    fn read<T: std::hash::Hash>(&mut self, rows: &[T], domain: u64) -> u128 {
+        use std::hash::{DefaultHasher, Hash, Hasher};
+
+        let feature = |index: usize| {
+            let lane = |salt: u64| {
+                let mut hash = DefaultHasher::new();
+                (domain, salt, index, &rows[index]).hash(&mut hash);
+                hash.finish()
+            };
+            u128::from(lane(0)) | (u128::from(lane(1)) << 64)
+        };
+        if self.features.len() != rows.len() {
+            self.features = (0..rows.len()).map(feature).collect();
+            self.key = self.features.iter().fold(0, |key, value| key ^ value);
+        } else {
+            for &index in &self.dirty {
+                let next = feature(index);
+                self.key ^= std::mem::replace(&mut self.features[index], next) ^ next;
+            }
+        }
+        self.dirty.clear();
+        self.marked.clear();
+        self.key
+    }
+}
+
 #[derive(Debug)]
 struct RowUndo<T> {
     entries: Vec<(usize, T)>,
-    recorded: Option<HashSet<usize>>,
+    recorded: Option<BitSet>,
+    spare_recorded: BitSet,
 }
 
 impl<T> Default for RowUndo<T> {
@@ -148,6 +188,7 @@ impl<T> Default for RowUndo<T> {
         Self {
             entries: Vec::new(),
             recorded: None,
+            spare_recorded: BitSet::default(),
         }
     }
 }
@@ -160,13 +201,13 @@ impl<T> Clone for RowUndo<T> {
 
 struct RowCheckpoint {
     entry_count: usize,
-    parent_recorded: Option<HashSet<usize>>,
+    parent_recorded: Option<BitSet>,
 }
 
 impl<T: Clone> RowUndo<T> {
     fn record(&mut self, index: usize, row: &T) {
         if let Some(recorded) = &mut self.recorded
-            && recorded.insert(index)
+            && recorded.insert_growing(index)
         {
             self.entries.push((index, row.clone()));
         }
@@ -175,15 +216,43 @@ impl<T: Clone> RowUndo<T> {
     fn begin(&mut self) -> RowCheckpoint {
         RowCheckpoint {
             entry_count: self.entries.len(),
-            parent_recorded: self.recorded.replace(HashSet::new()),
+            parent_recorded: self
+                .recorded
+                .replace(std::mem::take(&mut self.spare_recorded)),
         }
     }
 
-    fn rollback(&mut self, checkpoint: RowCheckpoint, rows: &mut [T]) {
+    fn rollback(
+        &mut self,
+        checkpoint: RowCheckpoint,
+        rows: &mut [T],
+        mut mark_restored: impl FnMut(usize),
+    ) {
         for (index, previous) in self.entries.drain(checkpoint.entry_count..).rev() {
+            mark_restored(index);
             rows[index] = previous;
         }
-        self.recorded = checkpoint.parent_recorded;
+        self.restore_recorded(checkpoint.parent_recorded, false);
+    }
+
+    fn commit(&mut self, checkpoint: RowCheckpoint) {
+        let nested = checkpoint.parent_recorded.is_some();
+        if !nested {
+            self.entries.truncate(checkpoint.entry_count);
+        }
+        self.restore_recorded(checkpoint.parent_recorded, nested);
+    }
+
+    fn restore_recorded(&mut self, parent: Option<BitSet>, commit: bool) {
+        let mut finished =
+            std::mem::replace(&mut self.recorded, parent).expect("row journal must be active");
+        if commit {
+            self.recorded.as_mut().unwrap().union_with(&finished);
+        }
+        if finished.capacity() > self.spare_recorded.capacity() {
+            finished.clear();
+            self.spare_recorded = finished;
+        }
     }
 
     fn inherit(&mut self, source: &Self) {
@@ -196,6 +265,7 @@ impl<T: Clone> RowUndo<T> {
 pub(crate) struct HeroRows {
     rows: Vec<HeroRecord>,
     undo: RowUndo<HeroRecord>,
+    fingerprint: RowFingerprint,
 }
 
 impl std::ops::Deref for HeroRows {
@@ -208,6 +278,7 @@ impl std::ops::Deref for HeroRows {
 
 impl std::ops::IndexMut<usize> for HeroRows {
     fn index_mut(&mut self, index: usize) -> &mut HeroRecord {
+        self.fingerprint.mark(index);
         self.undo.record(index, &self.rows[index]);
         &mut self.rows[index]
     }
@@ -250,6 +321,44 @@ enum SpatialUndo {
     },
 }
 
+fn spatial_feature(domain: u64, slot: usize, entity: Symbol, value: u64) -> u128 {
+    fn mix(mut value: u64) -> u64 {
+        value ^= value >> 30;
+        value = value.wrapping_mul(0xbf58476d1ce4e5b9);
+        value ^= value >> 27;
+        value = value.wrapping_mul(0x94d049bb133111eb);
+        value ^ (value >> 31)
+    }
+    let id = mix(entity.0 as u64 ^ domain);
+    let slot = mix(slot as u64 ^ 0x9e3779b97f4a7c15);
+    u128::from(mix(value ^ id ^ slot))
+        | (u128::from(mix(value.rotate_left(27) ^ id.rotate_left(13) ^ slot)) << 64)
+}
+
+fn location_feature(slot: usize, entity: Symbol, hex: Hex) -> u128 {
+    let (q, r, _) = hex.coordinates();
+    let coordinates = (u64::from(q as u32) << 32) | u64::from(r as u32);
+    spatial_feature(1, slot, entity, coordinates)
+}
+
+fn occupant_feature(slot: usize, entity: Option<Symbol>) -> u128 {
+    entity.map_or(0, |id| spatial_feature(2, slot, id, 0))
+}
+
+fn spatial_fingerprint(locations: &[(Symbol, Hex)], occupants: &[Option<Symbol>]) -> u128 {
+    let locations = locations
+        .iter()
+        .enumerate()
+        .map(|(slot, &(id, hex))| location_feature(slot, id, hex));
+    let occupants = occupants
+        .iter()
+        .enumerate()
+        .map(|(slot, &id)| occupant_feature(slot, id));
+    locations
+        .chain(occupants)
+        .fold(0, |key, feature| key ^ feature)
+}
+
 #[derive(Debug, Default)]
 struct SpatialJournal {
     active: bool,
@@ -264,10 +373,12 @@ impl Clone for SpatialJournal {
 
 pub(crate) struct WorldRows {
     cards: Vec<CardInstance>,
+    card_fingerprint: RowFingerprint,
     heroes: HeroRows,
     locations: Vec<(Symbol, Hex)>,
     location_by_symbol: Vec<Option<usize>>,
     occupants: Vec<Option<Symbol>>,
+    occupancy: Occupancy,
 }
 
 pub(crate) struct WorldRowsCheckpoint {
@@ -275,6 +386,7 @@ pub(crate) struct WorldRowsCheckpoint {
     heroes: RowCheckpoint,
     spatial_start: usize,
     spatial_parent_active: bool,
+    spatial_fingerprint: u128,
 }
 
 #[derive(Clone, Debug)]
@@ -283,6 +395,7 @@ pub struct NativeWorld {
     pub(crate) combat: crate::combat::CombatState,
     pub definitions: Arc<WorldDefinitions>,
     cards: Vec<CardInstance>,
+    card_fingerprint: RowFingerprint,
     card_undo: RowUndo<CardInstance>,
     pub card_by_instance: Arc<[Option<usize>]>,
     entity_by_symbol: Arc<[Option<usize>]>,
@@ -293,6 +406,7 @@ pub struct NativeWorld {
     occupants: Vec<Option<Symbol>>,
     occupancy: Occupancy,
     spatial_undo: SpatialJournal,
+    spatial_fingerprint: u128,
     /// At least one currently active card has an unported aura hook.
     pub(crate) has_uncompiled_auras: bool,
     pub(crate) acting_piece: Option<Symbol>,
@@ -648,11 +762,13 @@ impl NativeWorld {
                     .is_some_and(|s| !s.is_empty()),
             }),
             cards,
+            card_fingerprint: RowFingerprint::default(),
             card_undo: RowUndo::default(),
             card_by_instance: card_by_instance.into(),
             entity_by_symbol: entity_by_symbol.into(),
             entity_overrides: Arc::new(HashMap::new()),
             board_entity_overrides: Arc::new(HashMap::new()),
+            spatial_fingerprint: spatial_fingerprint(&locations, &occupants),
             locations,
             location_by_symbol,
             occupants,
@@ -665,6 +781,7 @@ impl NativeWorld {
             heroes: HeroRows {
                 rows: heroes,
                 undo: RowUndo::default(),
+                fingerprint: RowFingerprint::default(),
             },
             hero_by_symbol: hero_by_symbol.into(),
             markers,
@@ -708,7 +825,15 @@ impl NativeWorld {
             .copied()
             .flatten()?;
         self.card_undo.record(index, &self.cards[index]);
+        self.card_fingerprint.mark(index);
         Some(&mut self.cards[index])
+    }
+
+    pub(crate) fn world_state_fingerprint(&mut self) -> u128 {
+        self.spatial_fingerprint
+            ^ self.heroes.fingerprint.read(&self.heroes.rows, 3)
+            ^ self.card_fingerprint.read(&self.cards, 4)
+            ^ self.effects.fingerprint()
     }
 
     pub(crate) fn begin_rows_rollback(&mut self) -> WorldRowsCheckpoint {
@@ -716,17 +841,38 @@ impl NativeWorld {
             cards: self.card_undo.begin(),
             heroes: self.heroes.undo.begin(),
             spatial_start: self.spatial_undo.entries.len(),
+            spatial_fingerprint: self.spatial_fingerprint,
             spatial_parent_active: std::mem::replace(&mut self.spatial_undo.active, true),
         }
     }
 
+    pub(crate) fn commit_rows(&mut self, checkpoint: WorldRowsCheckpoint) {
+        self.card_undo.commit(checkpoint.cards);
+        self.heroes.undo.commit(checkpoint.heroes);
+        self.spatial_undo.active = checkpoint.spatial_parent_active;
+        if !checkpoint.spatial_parent_active {
+            self.spatial_undo.entries.truncate(checkpoint.spatial_start);
+        }
+    }
+
     pub(crate) fn restore_rows(&mut self, checkpoint: WorldRowsCheckpoint, snapshot: &mut Self) {
-        self.card_undo.rollback(checkpoint.cards, &mut self.cards);
+        self.card_undo
+            .rollback(checkpoint.cards, &mut self.cards, |index| {
+                self.card_fingerprint.mark(index)
+            });
         self.heroes
             .undo
-            .rollback(checkpoint.heroes, &mut self.heroes.rows);
+            .rollback(checkpoint.heroes, &mut self.heroes.rows, |index| {
+                self.heroes.fingerprint.mark(index)
+            });
         self.restore_spatial(checkpoint.spatial_start);
+        self.spatial_fingerprint = checkpoint.spatial_fingerprint;
         self.spatial_undo.active = checkpoint.spatial_parent_active;
+        debug_assert_eq!(
+            self.spatial_fingerprint,
+            spatial_fingerprint(&self.locations, &self.occupants)
+        );
+        snapshot.spatial_fingerprint = self.spatial_fingerprint;
         snapshot.put_rows(self.take_rows());
         snapshot.card_undo = std::mem::take(&mut self.card_undo);
         snapshot.spatial_undo = std::mem::take(&mut self.spatial_undo);
@@ -735,19 +881,23 @@ impl NativeWorld {
     pub(crate) fn take_rows(&mut self) -> WorldRows {
         WorldRows {
             cards: std::mem::take(&mut self.cards),
+            card_fingerprint: std::mem::take(&mut self.card_fingerprint),
             heroes: std::mem::take(&mut self.heroes),
             locations: std::mem::take(&mut self.locations),
             location_by_symbol: std::mem::take(&mut self.location_by_symbol),
             occupants: std::mem::take(&mut self.occupants),
+            occupancy: std::mem::take(&mut self.occupancy),
         }
     }
 
     pub(crate) fn put_rows(&mut self, rows: WorldRows) {
         self.cards = rows.cards;
+        self.card_fingerprint = rows.card_fingerprint;
         self.heroes = rows.heroes;
         self.locations = rows.locations;
         self.location_by_symbol = rows.location_by_symbol;
         self.occupants = rows.occupants;
+        self.occupancy = rows.occupancy;
     }
 
     fn record_spatial(&mut self, undo: SpatialUndo) {
@@ -771,26 +921,23 @@ impl NativeWorld {
                         self.location_by_symbol[id.0] = Some(index + offset);
                     }
                 }
-                SpatialUndo::Occupant { index, previous } => self.occupants[index] = previous,
+                SpatialUndo::Occupant { index, previous } => {
+                    self.occupants[index] = previous;
+                    self.occupancy.set(index, previous.is_some());
+                }
             }
         }
     }
 
-    fn set_occupant(
-        &mut self,
-        index: usize,
-        hex: Hex,
-        occupant: Option<Symbol>,
-    ) -> Result<(), String> {
-        self.definitions
-            .geometry
-            .set_occupied(&mut self.occupancy, hex, occupant.is_some())?;
+    fn set_occupant(&mut self, index: usize, occupant: Option<Symbol>) {
         self.record_spatial(SpatialUndo::Occupant {
             index,
             previous: self.occupants[index],
         });
+        self.spatial_fingerprint ^=
+            occupant_feature(index, self.occupants[index]) ^ occupant_feature(index, occupant);
         self.occupants[index] = occupant;
-        Ok(())
+        self.occupancy.set(index, occupant.is_some());
     }
 
     pub(crate) fn inherit_row_undo(&mut self, source: &Self) {
@@ -1075,9 +1222,10 @@ impl NativeWorld {
             self.location_by_symbol.resize(id.0 + 1, None);
         }
         self.location_by_symbol[id.0] = Some(self.locations.len());
+        self.spatial_fingerprint ^= location_feature(self.locations.len(), id, end);
         self.locations.push((id, end));
         if let Some(tile) = target {
-            self.set_occupant(tile.index(), end, Some(id))?;
+            self.set_occupant(tile.index(), Some(id));
         }
         Ok(())
     }
@@ -1095,19 +1243,21 @@ impl NativeWorld {
             && let Some(tile) = self.definitions.geometry.id(old)
             && self.occupants[tile.index()] == Some(id)
         {
-            self.set_occupant(tile.index(), old, None)?;
+            self.set_occupant(tile.index(), None);
         }
         if let Some(index) = self.location_by_symbol.get(id.0).and_then(|v| *v) {
             self.record_spatial(SpatialUndo::Moved {
                 index,
                 previous: self.locations[index].1,
             });
+            self.spatial_fingerprint ^= location_feature(index, id, self.locations[index].1)
+                ^ location_feature(index, id, end);
             self.locations[index].1 = end;
         } else {
             return Err("moving an unplaced entity is not a movement transition".into());
         }
         if let Some(tile) = target {
-            self.set_occupant(tile.index(), end, Some(id))?;
+            self.set_occupant(tile.index(), Some(id));
         }
         Ok(())
     }
@@ -1116,16 +1266,20 @@ impl NativeWorld {
             return Ok(None);
         };
         let row = self.locations.remove(index);
+        self.spatial_fingerprint ^= location_feature(index, id, row.1);
         self.record_spatial(SpatialUndo::Removed { index, row });
         let from = row.1;
         self.location_by_symbol[id.0] = None;
-        for (offset, (uid, _)) in self.locations[index..].iter().enumerate() {
-            self.location_by_symbol[uid.0] = Some(index + offset);
+        for (offset, &(uid, hex)) in self.locations[index..].iter().enumerate() {
+            let slot = index + offset;
+            self.location_by_symbol[uid.0] = Some(slot);
+            self.spatial_fingerprint ^=
+                location_feature(slot + 1, uid, hex) ^ location_feature(slot, uid, hex);
         }
         if let Some(tile) = self.definitions.geometry.id(from)
             && self.occupants[tile.index()] == Some(id)
         {
-            self.set_occupant(tile.index(), from, None)?;
+            self.set_occupant(tile.index(), None);
         }
         Ok(Some(from))
     }
@@ -1221,20 +1375,47 @@ mod tests {
         let locations = world.locations.clone();
         let index = world.location_by_symbol.clone();
         let occupants = world.occupants.clone();
+        let initial_fingerprint = world.world_state_fingerprint();
         let (mut root, root_mark) = checkpoint(&mut world);
         world.move_entity(actor, end).unwrap();
         assert_eq!(world.occupant(end), Some(actor));
+        let outer_fingerprint = world.world_state_fingerprint();
         let (mut outer, outer_mark) = checkpoint(&mut world);
         let mut staged = world.staged_clone();
         assert_eq!(staged.remove_entity(actor).unwrap(), Some(end));
         staged.place_entity(new_id, end).unwrap();
         staged.place_entity(actor, start).unwrap();
+        assert_eq!(
+            staged.spatial_fingerprint,
+            spatial_fingerprint(&staged.locations, &staged.occupants)
+        );
+        staged.heroes[0].gold += 1;
+        let before_card = staged.world_state_fingerprint();
+        let card = CardId(staged.cards[0].source_instance);
+        staged.card_mut(card).unwrap().metadata = Datum::List(vec![Datum::Float(1.5)]);
+        let staged_fingerprint = staged.world_state_fingerprint();
+        assert_ne!(staged_fingerprint, before_card);
+        assert_eq!(
+            staged_fingerprint,
+            staged.spatial_fingerprint
+                ^ RowFingerprint::default().read(&staged.heroes.rows, 3)
+                ^ RowFingerprint::default().read(&staged.cards, 4)
+                ^ staged.effects.fingerprint()
+        );
+        assert_ne!(staged_fingerprint, outer_fingerprint);
         staged.restore_rows(outer_mark, &mut outer);
+        assert_eq!(outer.world_state_fingerprint(), outer_fingerprint);
         assert_eq!(outer.position(new_id), None);
         assert_eq!(outer.position(actor), Some(end));
+        assert_eq!(
+            outer.spatial_fingerprint,
+            spatial_fingerprint(&outer.locations, &outer.occupants)
+        );
+        assert_ne!(outer.spatial_fingerprint, root.spatial_fingerprint);
         assert_eq!(outer.occupant(end), Some(actor));
         assert!(outer.obstacle(end));
         outer.restore_rows(root_mark, &mut root);
+        assert_eq!(root.world_state_fingerprint(), initial_fingerprint);
         assert_eq!(root.locations, locations);
         assert_eq!(root.location_by_symbol, index);
         assert_eq!(root.occupants, occupants);

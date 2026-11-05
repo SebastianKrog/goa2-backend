@@ -7,6 +7,7 @@ from goa2.domain.input import InputRequestType
 
 def validate_resolution(
     state, live_request, response, *, player_id, controlled_ids, searched_revision, live_revision,
+    require_score=True,
 ):
     if searched_revision != live_revision or live_request is None:
         raise ValueError("stale resolution result")
@@ -23,7 +24,7 @@ def validate_resolution(
         player = live_request.context.get("players", {}).get(player_id, {})
         if player.get("remaining", 0) <= 0:
             raise ValueError("resolution player has no pending upgrades")
-    if response["score"] is None:
+    if require_score and response["score"] is None:
         raise ValueError("resolution result has no completed score")
 
     move = DecisionMove("INPUT", player_id, decision["selection"], live_request.id)

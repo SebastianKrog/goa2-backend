@@ -564,7 +564,11 @@ impl NativeSession {
                 max_steps: remaining,
                 ..*budget
             };
-            let advance = self.advance(&bounded)?;
+            let advance = if self.objects.is_some() {
+                self.advance_objects(&bounded, None, false)?
+            } else {
+                self.advance(&bounded)?
+            };
             if advance.steps == 0 {
                 break;
             }
@@ -574,7 +578,7 @@ impl NativeSession {
     }
 
     fn validate_sequence_input(
-        &self,
+        &mut self,
         player: Symbol,
         token: Option<RequestToken>,
         selection: &Datum,
@@ -595,8 +599,9 @@ impl NativeSession {
             return Err(invalid("input is addressed to another player"));
         }
         if matches!(request.choices, RequestChoices::Upgrades(_)) {
+            let id = request.id;
             self.validate_upgrade_submission_bound(selection)?;
-            return Ok(request.id);
+            return Ok(id);
         }
         let text = if let Datum::Text(id) = selection {
             Some(*id)

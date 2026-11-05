@@ -23,8 +23,8 @@ impl NativeSession {
         step: ObjectId,
         field: Field,
     ) -> Result<Symbol> {
-        match objects.arena.field(step, objects.phases.k(field)) {
-            Some(ObjectValue::Atom(Datum::Text(value))) => Ok(value),
+        match objects.arena.field_ref(step, objects.phases.k(field)) {
+            Some(ObjectValue::Atom(Datum::Text(value))) => Ok(*value),
             _ => Err(unsupported("passive text operand missing")),
         }
     }
@@ -34,9 +34,9 @@ impl NativeSession {
         step: ObjectId,
         field: Field,
     ) -> Result<Option<Symbol>> {
-        match objects.arena.field(step, objects.phases.k(field)) {
+        match objects.arena.field_ref(step, objects.phases.k(field)) {
             None | Some(ObjectValue::Atom(Datum::Null)) => Ok(None),
-            Some(ObjectValue::Atom(Datum::Text(value))) => Ok(Some(value)),
+            Some(ObjectValue::Atom(Datum::Text(value))) => Ok(Some(*value)),
             _ => Err(unsupported("passive nullable text operand invalid")),
         }
     }

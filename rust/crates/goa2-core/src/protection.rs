@@ -7,7 +7,7 @@ use crate::{
 };
 use std::sync::Arc;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub(crate) struct ProtectionBinding {
     pub minion: Symbol,
     pub killer: Option<Symbol>,

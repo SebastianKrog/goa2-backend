@@ -6,7 +6,7 @@ use crate::{
 use serde_json::Value;
 use std::sync::Arc;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Duration {
     ThisTurn,
     NextTurn,
@@ -24,7 +24,7 @@ impl Duration {
         }
     }
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct EffectDefinition {
     pub(crate) behavior: crate::effect_rules::Behavior,
     /// Complete typed payload, immutable and shared by worker clones.
@@ -41,7 +41,7 @@ pub struct EffectDefinition {
     pub after_cards_played: bool,
     pub reversed_initiative: bool,
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct EffectInstance {
     pub definition: Arc<EffectDefinition>,
     pub id: Symbol,
@@ -213,6 +213,19 @@ pub struct Expiry {
     pub finishing: Vec<(Symbol, Vec<Datum>)>,
 }
 impl EffectStore {
+    // Effects can be changed in place, reordered or removed. Read the current
+    // ordered rows here until their mutations share a journal.
+    pub(crate) fn fingerprint(&self) -> u128 {
+        use std::hash::{DefaultHasher, Hash, Hasher};
+
+        let lane = |salt| {
+            let mut hash = DefaultHasher::new();
+            ("active effects", salt, &self.instances).hash(&mut hash);
+            hash.finish()
+        };
+        u128::from(lane(0u64)) | (u128::from(lane(1u64)) << 64)
+    }
+
     pub fn compile(value: &Value, symbols: &mut Symbols) -> Result<Self, String> {
         Ok(Self {
             instances: value

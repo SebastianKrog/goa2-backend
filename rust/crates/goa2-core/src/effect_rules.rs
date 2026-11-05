@@ -8,7 +8,7 @@ use crate::{
     world::{EntityKind, NativeWorld},
 };
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum Kind {
     Other,
     DoubleItems,
@@ -35,7 +35,7 @@ pub(crate) enum Kind {
     PreMovement,
     PreDiscard,
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum Shape {
     Global,
     Point,
@@ -44,7 +44,7 @@ pub(crate) enum Shape {
     Line,
     Zone,
 }
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Hash)]
 pub(crate) enum Affects {
     All,
     SelfOnly,
@@ -56,7 +56,7 @@ pub(crate) enum Affects {
     Heroes,
     Minions,
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub(crate) struct Behavior {
     pub kind: Kind,
     pub shape: Shape,

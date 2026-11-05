@@ -6,7 +6,10 @@ use super::{
 };
 use crate::codec::Phase;
 use serde_json::{Value, json};
-use std::time::{Duration, Instant};
+use std::{
+    collections::BTreeMap,
+    time::{Duration, Instant},
+};
 
 #[derive(Clone, Copy, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -15,6 +18,8 @@ pub struct OfflinePolicy {
     pub max_nodes: usize,
     pub time_ms: u64,
     pub rollout_turns: Option<u8>,
+    #[serde(default)]
+    pub sample_choices: bool,
     #[serde(default)]
     pub evaluation: SearchEvaluation,
 }
@@ -41,7 +46,10 @@ impl OfflinePolicy {
 pub struct OfflinePolicyStats {
     planning: usize,
     resolution: usize,
+    forced: usize,
     fallback: usize,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    resolution_fallbacks: BTreeMap<String, usize>,
 }
 
 #[derive(serde::Serialize)]
@@ -70,6 +78,7 @@ impl NativeSession {
         if !(1..=64).contains(&turns)
             || policies.iter().any(|policy| {
                 policy.depth > 64
+                    || (policy.sample_choices && policy.depth != 0)
                     || policy.max_nodes == 0
                     || !(1..=60_000).contains(&policy.time_ms)
                     || policy
@@ -92,7 +101,7 @@ impl NativeSession {
                 "offline match requires red and blue teams".into(),
             )),
         };
-        for _ in 0..usize::from(turns) * 128 {
+        for revision in 0..usize::from(turns) * 128 {
             if self.planning.phase == Phase::GameOver || self.search_turn_index() >= cutoff {
                 let outcome = self.world.combat.outcome;
                 let name = |id| self.symbols.name(id).to_owned();
@@ -113,6 +122,12 @@ impl NativeSession {
                     state: capture_trace.then(|| self.semantic_state()).transpose()?,
                 });
             }
+            let choice_index = |hero: crate::data::Symbol, choices| {
+                super::loadout::sample_index(
+                    seed ^ (revision as u64).rotate_left(32) ^ hero.0 as u64,
+                    choices,
+                )
+            };
             let epoch_seed = seed.wrapping_add(self.search_turn_index() as u64);
             if self.planning.phase == Phase::Planning {
                 let mut joint = Vec::new();
@@ -123,7 +138,10 @@ impl NativeSession {
                     let index = team_index(self.symbols.name(hero.team))?;
                     let policy = policies[index];
                     stats[index].planning += 1;
-                    let plan = if policy.depth == 0 {
+                    let plan = if policy.sample_choices {
+                        let choices = self.hero_planning_commitments(hero.id)?;
+                        choices[choice_index(hero.id, choices.len())]
+                    } else if policy.depth == 0 {
                         fallback
                     } else {
                         match self.search_bot_team_planning(
@@ -186,25 +204,58 @@ impl NativeSession {
                         EngineError::Unsupported("offline match has no legal input".into())
                     })
                 };
-                let decision = if policy.depth == 0 {
+                let decision = if policy.sample_choices {
+                    let mut choices = self.resolution_choices(owner)?;
+                    if choices.is_empty() {
+                        return Err(EngineError::Unsupported(
+                            "offline match has no legal input".into(),
+                        ));
+                    }
+                    let index = choice_index(owner, choices.len());
+                    choices.swap_remove(index)
+                } else if policy.depth == 0 {
                     fallback(self)?
+                } else if let [only] = self.resolution_branch_probe(owner)?.as_slice() {
+                    stats[index].forced += 1;
+                    only.clone()
                 } else {
-                    match self.search_resolution_with_sampled_turn_rollout(
+                    let sample = PlanningRolloutSample {
+                        seed: epoch_seed,
+                        upgrade_checkpoints: None,
+                    };
+                    let searched = self.search_resolution_worlds(
                         owner,
+                        (sample, 2, 1),
                         policy.limits(),
                         policy.rollout_turns,
-                        policy.rollout_turns.map(|_| PlanningRolloutSample {
-                            seed: epoch_seed,
-                            upgrade_checkpoints: None,
-                        }),
+                        policy.rollout_turns.map(|_| sample),
                         &policy.budget(),
-                    ) {
+                    );
+                    match searched {
                         Ok(result) if result.score.is_some() => result.decision,
-                        Ok(_) | Err(EngineError::Unsupported(_) | EngineError::Deadline) => {
-                            stats[index].fallback += 1;
+                        other => {
+                            let reason = match other {
+                                Ok(result) => format!("{:?} before a scored move", result.stop),
+                                Err(EngineError::Unsupported(reason)) => reason,
+                                Err(EngineError::Deadline) => "search deadline".into(),
+                                Err(error) => return Err(error),
+                            };
+                            let stats = &mut stats[index];
+                            stats.fallback += 1;
+                            if capture_trace {
+                                let prompt = self
+                                    .last_request
+                                    .as_ref()
+                                    .map_or("unknown prompt", |request| {
+                                        self.symbols.name(request.prompt)
+                                    });
+                                *stats
+                                    .resolution_fallbacks
+                                    .entry(format!("{prompt}: {reason}"))
+                                    .or_default() += 1;
+                            }
                             fallback(self)?
                         }
-                        Err(error) => return Err(error),
                     }
                 };
                 let DecisionMove::Input {

@@ -5,7 +5,7 @@ use crate::{
     stats::Stat,
     world::{ActionKind, NativeWorld},
 };
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Hash)]
 pub struct ActionOption {
     pub kind: ActionKind,
     pub value: i64,
@@ -13,7 +13,7 @@ pub struct ActionOption {
     pub primary_label: bool,
     pub primary_effect: bool,
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct ActionMenu {
     pub hero: Symbol,
     pub card: Symbol,
@@ -21,7 +21,7 @@ pub struct ActionMenu {
     pub options: Vec<ActionOption>,
     pub copied: bool,
 }
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Hash)]
 pub enum Passive {
     BeforeAction,
     BeforeAttack,
@@ -50,7 +50,7 @@ impl Passive {
         }
     }
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub enum ActionStep {
     ChoosePiece(Symbol),
     Passive(Passive),

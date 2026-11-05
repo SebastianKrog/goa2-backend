@@ -184,6 +184,21 @@ pub(super) fn shared_primary_programs() -> Result<&'static SharedPrimaryPrograms
 }
 
 impl BoundObjects {
+    pub(super) fn hash_execution(&self, state: &mut impl std::hash::Hasher) {
+        use std::hash::Hash;
+
+        self.arena.hash_execution(state);
+        self.stack.hash(state);
+        for bindings in [self.programs.as_ref(), &self.copied_programs] {
+            let mut entries: Vec<_> = bindings.iter().collect();
+            entries.sort_unstable_by_key(|(id, _)| **id);
+            entries.hash(state);
+        }
+        let mut readonly: Vec<_> = self.copied_readonly.iter().copied().collect();
+        readonly.sort_unstable();
+        readonly.hash(state);
+    }
+
     pub(super) fn compile_validated(
         source: &StateEnvelope,
         symbols: Symbols,
@@ -1407,12 +1422,38 @@ impl NativeSession {
         &mut self,
         operation: impl FnOnce(&mut Self) -> Result<T>,
     ) -> Result<T> {
+        self.rollback_scope(false, operation)
+    }
+
+    /// The operation must begin by submitting an already selected input.
+    /// Its token is checked against the live step; the old request belongs
+    /// to the rollback snapshot and need not be cloned into the branch.
+    pub(super) fn with_consumed_request<T>(
+        &mut self,
+        operation: impl FnOnce(&mut Self) -> Result<T>,
+    ) -> Result<T> {
+        self.rollback_scope(true, operation)
+    }
+
+    fn rollback_scope<T>(
+        &mut self,
+        consume_request: bool,
+        operation: impl FnOnce(&mut Self) -> Result<T>,
+    ) -> Result<T> {
         let mut objects = self
             .objects
             .take()
             .ok_or_else(|| unsupported("session rollback requires live object bindings"))?;
+        let request = if consume_request {
+            self.last_request.take()
+        } else {
+            None
+        };
         let rows = self.world.take_rows();
         let mut snapshot = self.clone();
+        if consume_request {
+            snapshot.last_request = request;
+        }
         self.world.put_rows(rows);
         let rows_checkpoint = self.world.begin_rows_rollback();
         if self.count_observer.observed() {
@@ -1469,8 +1510,15 @@ impl NativeSession {
         &mut self,
         budget: &ExecutionBudget<'_>,
         stop_after: Option<usize>,
+        include_request: bool,
     ) -> Result<AdvanceResult> {
-        self.with_live_objects(|session, objects| session.run_objects(objects, budget, stop_after))
+        let mut result = self.with_live_objects(|session, objects| {
+            session.run_objects(objects, budget, stop_after)
+        })?;
+        if include_request {
+            result.request = self.last_request.clone();
+        }
+        Ok(result)
     }
     fn run_objects(
         &mut self,
@@ -1972,14 +2020,13 @@ impl NativeSession {
                     Instruction::Flow(crate::turn::FlowStep::Respawn(_))
                 )
             {
-                let (request, events) = self.hero_respawn_bound(
+                let events = self.hero_respawn_bound(
                     objects,
                     top_object.ok_or_else(|| unsupported("live respawn step missing"))?,
                 )?;
                 result.events.extend(events);
                 result.steps += 1;
-                if let Some(request) = request {
-                    result.request = Some(request);
+                if self.last_request.is_some() {
                     return Ok(result);
                 }
                 continue;
@@ -1989,13 +2036,13 @@ impl NativeSession {
                     ref flow @ (crate::turn::FlowStep::Upgrades | crate::turn::FlowStep::Reset),
                 ) = self.steps[top_instruction].instruction
             {
-                result.request = self.round_transition_bound(
+                self.round_transition_bound(
                     objects,
                     top_object.ok_or_else(|| unsupported("live round transition missing"))?,
                     matches!(flow, crate::turn::FlowStep::Reset),
                 )?;
                 result.steps += 1;
-                if result.request.is_some() {
+                if self.last_request.is_some() {
                     return Ok(result);
                 }
                 continue;
@@ -3152,28 +3199,34 @@ impl NativeSession {
                 _ => return Err(unsupported("unbound shared-object instruction")),
             }
             if let Some(request) = request {
-                result.request = Some(self.issue_bound_request(objects, id, frame, request)?);
+                self.issue_bound_request(objects, id, frame, request)?;
                 return Ok(result);
             }
         }
         Ok(result)
     }
-    /// Stage the typed session while journaling writes to the authoritative arena.
+    /// Journal the live arena and typed rows while staging the remaining session state.
     fn transition_bound<T>(
         &mut self,
         objects: &mut BoundObjects,
         step: ObjectId,
         apply: impl FnOnce(&mut Self, &mut BoundObjects, Frame) -> Result<T>,
     ) -> Result<T> {
-        let mut candidate = self.clone();
-        candidate.world.inherit_row_undo(&self.world);
+        let rows = self.world.take_rows();
+        let mut snapshot = self.clone();
+        self.world.put_rows(rows);
+        let world_checkpoint = self.world.begin_rows_rollback();
+        if self.count_observer.observed() {
+            snapshot.count_observer.record();
+            self.count_observer.clear();
+        }
         let parent_recording = objects.arena.is_recording();
         let checkpoint = objects.arena.begin_rollback();
         let readonly = objects.readonly.clone();
         let programs = objects.programs.clone();
         let copied_bindings = objects.copied_binding_undo.0.len();
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            let mut frame = candidate
+            let mut frame = self
                 .stack
                 .pop()
                 .ok_or_else(|| unsupported("staged transition frame missing"))?;
@@ -3182,7 +3235,7 @@ impl NativeSession {
                 return Err(unsupported("staged transition stack drift"));
             }
             frame.request = objects.token(step)?;
-            apply(&mut candidate, objects, frame)
+            apply(self, objects, frame)
         }));
         match result {
             Ok(Ok(value)) => {
@@ -3190,7 +3243,7 @@ impl NativeSession {
                 if !parent_recording {
                     objects.copied_binding_undo.0.truncate(copied_bindings);
                 }
-                *self = candidate;
+                self.world.commit_rows(world_checkpoint);
                 Ok(value)
             }
             other => {
@@ -3198,6 +3251,9 @@ impl NativeSession {
                 objects.readonly = readonly;
                 objects.programs = programs;
                 objects.restore_copied_bindings(copied_bindings);
+                self.world
+                    .restore_rows(world_checkpoint, &mut snapshot.world);
+                *self = snapshot;
                 match other {
                     Ok(error) => error,
                     Err(panic) => std::panic::resume_unwind(panic),
@@ -3211,7 +3267,7 @@ impl NativeSession {
         id: ObjectId,
         mut frame: Frame,
         request: NativeRequest,
-    ) -> Result<NativeRequest> {
+    ) -> Result<()> {
         let request = self.issue(&mut frame, request)?;
         let token = match request.id {
             RequestToken::Imported(id) => ObjectValue::Atom(Datum::Text(id)),
@@ -3226,8 +3282,8 @@ impl NativeSession {
             .append(objects.stack, ObjectValue::Object(id))
             .map_err(unsupported)?;
         self.stack.push(frame);
-        self.last_request = Some(request.clone());
-        Ok(request)
+        self.last_request = Some(request);
+        Ok(())
     }
     fn abort_objects(&mut self, objects: &mut BoundObjects) -> Result<()> {
         let truthy = |field| {
@@ -3551,9 +3607,7 @@ impl NativeSession {
                 "stale or unissued input request".into(),
             ));
         }
-        let pending = objects
-            .arena
-            .allocate(&Datum::Object(vec![(self.selection_key, selection)]));
+        let pending = objects.arena.allocate_input(self.selection_key, &selection);
         objects
             .arena
             .set_field(id, objects.pending, pending)

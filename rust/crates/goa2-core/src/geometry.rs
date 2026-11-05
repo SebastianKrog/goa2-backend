@@ -179,9 +179,19 @@ impl HexLookup {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Occupancy {
     occupied: BitSet,
+}
+
+impl Occupancy {
+    pub(crate) fn set(&mut self, index: usize, occupied: bool) {
+        if occupied {
+            self.occupied.insert(index);
+        } else {
+            self.occupied.remove(index);
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -315,11 +325,7 @@ impl BoardGeometry {
         value: bool,
     ) -> Result<(), String> {
         let id = self.id(hex).ok_or("occupancy location outside board")?;
-        if value {
-            occupancy.occupied.insert(id.index());
-        } else {
-            occupancy.occupied.remove(id.index());
-        }
+        occupancy.set(id.index(), value);
         Ok(())
     }
     /// One traversal for all destinations. Occupancy is read anew each call.

@@ -13,6 +13,7 @@ pub(super) fn search(
     player_id: String,
     budget: ExecutionBudget<'_>,
     rollout_turns: Option<u8>,
+    resolution_sample: Option<(PlanningRolloutSample<'_>, usize, usize)>,
     planning_sample: Option<PlanningRolloutSample<'_>>,
     limits: SearchLimits,
 ) -> Result<Value, String> {
@@ -21,15 +22,24 @@ pub(super) fn search(
     session
         .advance_to_decision(&budget)
         .map_err(|error| error.to_string())?;
-    let result = session
-        .search_resolution_with_sampled_turn_rollout(
+    let result = match resolution_sample {
+        Some(sample) => session.search_resolution_worlds(
+            player,
+            sample,
+            limits,
+            rollout_turns,
+            planning_sample,
+            &budget,
+        ),
+        None => session.search_resolution_with_sampled_turn_rollout(
             player,
             limits,
             rollout_turns,
             planning_sample,
             &budget,
-        )
-        .map_err(|error| error.to_string())?;
+        ),
+    }
+    .map_err(|error| error.to_string())?;
     let DecisionMove::Input {
         request: Some(token),
         selection,

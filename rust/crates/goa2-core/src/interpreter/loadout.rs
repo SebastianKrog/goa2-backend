@@ -4,7 +4,7 @@ use crate::stats::Stat;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct LoadoutHypothesis {
     pub active_card_ids: Vec<String>,
     pub item_card_ids: Vec<String>,
@@ -145,7 +145,7 @@ pub struct SampledHand {
     pub(crate) retired: Vec<String>,
 }
 
-fn sample_index(seed: u64, len: usize) -> usize {
+pub(super) fn sample_index(seed: u64, len: usize) -> usize {
     // SplitMix64 mixes sequential sample seeds before indexing the sorted hypotheses.
     let mut value = seed.wrapping_add(0x9e3779b97f4a7c15);
     value = (value ^ (value >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
@@ -167,7 +167,57 @@ impl PlayerObservation {
         seed: u64,
         checkpoints: &[UpgradeCheckpoint],
     ) -> Result<Option<SampledHand>> {
-        if self.phase != crate::codec::Phase::Planning || hero_id == self.private.hero {
+        if self.phase != crate::codec::Phase::Planning {
+            return Ok(None);
+        }
+        self.sample_ordinary_hand(hero_id, seed, checkpoints)
+    }
+
+    /// Sample an ordinary hidden hand after current cards are revealed.
+    /// A mismatched count indicates unsupported card provenance.
+    pub fn sample_resolution_hand_with_checkpoints(
+        &self,
+        hero_id: &str,
+        seed: u64,
+        checkpoints: &[UpgradeCheckpoint],
+    ) -> Result<Option<SampledHand>> {
+        if self.phase != crate::codec::Phase::Resolution {
+            return Ok(None);
+        }
+        self.sample_ordinary_hand(hero_id, seed, checkpoints)
+    }
+
+    fn sample_ordinary_hand(
+        &self,
+        hero_id: &str,
+        seed: u64,
+        checkpoints: &[UpgradeCheckpoint],
+    ) -> Result<Option<SampledHand>> {
+        Ok(self
+            .ordinary_hand_sampler(hero_id, checkpoints)?
+            .and_then(|sample| sample(seed)))
+    }
+
+    pub(super) fn sample_resolution_hands(
+        &self,
+        hero_id: &str,
+        seeds: impl Iterator<Item = u64>,
+        checkpoints: &[UpgradeCheckpoint],
+    ) -> Result<Option<Vec<SampledHand>>> {
+        if self.phase != crate::codec::Phase::Resolution {
+            return Ok(None);
+        }
+        Ok(self
+            .ordinary_hand_sampler(hero_id, checkpoints)?
+            .and_then(|sample| seeds.map(sample).collect()))
+    }
+
+    fn ordinary_hand_sampler<'a>(
+        &'a self,
+        hero_id: &str,
+        checkpoints: &[UpgradeCheckpoint],
+    ) -> Result<Option<impl Fn(u64) -> Option<SampledHand> + use<'a>>> {
+        if hero_id == self.private.hero {
             return Ok(None);
         }
         let Some(hero) = self.heroes.iter().find(|hero| hero.id == hero_id) else {
@@ -180,12 +230,6 @@ impl PlayerObservation {
         let Some(definition) = catalog()?.heroes.get(&hero.name) else {
             return Ok(None);
         };
-        let Some(loadouts) = self
-            .loadout_hypotheses_with_checkpoints(hero_id, checkpoints)?
-            .filter(|rows| !rows.is_empty())
-        else {
-            return Ok(None);
-        };
         let unavailable = zones
             .filter_map(|card| match card {
                 PublicCard::Revealed(id) => Some(id),
@@ -193,51 +237,78 @@ impl PlayerObservation {
             })
             .chain(&hero.revealed_current)
             .collect::<BTreeSet<_>>();
-        let selected = sample_index(seed, loadouts.len());
-        let loadout = loadouts.into_iter().nth(selected).unwrap();
-        let upgraded = definition
-            .cards
-            .iter()
-            .filter(|card| loadout.active_card_ids.contains(&card.id))
-            .map(|card| card.color.index())
-            .collect::<BTreeSet<_>>();
-        let mut cards = definition
-            .starting
-            .iter()
-            .filter(|id| {
-                !definition
-                    .cards
-                    .iter()
-                    .any(|card| card.id == **id && upgraded.contains(&card.color.index()))
+        let loadouts = if !definition.standard && hero.level == 1 {
+            // These heroes have nonstandard upgrade provenance. At level one
+            // the printed starting pool is sufficient if the evidence agrees.
+            if checkpoints
+                .iter()
+                .any(|point| point.level != 1 || point.card_items != [0; 6])
+                || unavailable.iter().any(|id| !definition.starting.contains(id))
+                || self.revealed_cards.iter().any(|(owner, id)| {
+                    owner == hero_id && !definition.starting.contains(id)
+                })
+            {
+                return Ok(None);
+            }
+            vec![LoadoutHypothesis::default()]
+        } else {
+            let Some(loadouts) = self
+                .loadout_hypotheses_with_checkpoints(hero_id, checkpoints)?
+                .filter(|rows| !rows.is_empty())
+            else {
+                return Ok(None);
+            };
+            loadouts
+        };
+        Ok(Some(move |seed| {
+            let selected = sample_index(seed, loadouts.len());
+            let loadout = &loadouts[selected];
+            let upgraded = definition
+                .cards
+                .iter()
+                .filter(|card| loadout.active_card_ids.contains(&card.id))
+                .map(|card| card.color.index())
+                .collect::<BTreeSet<_>>();
+            let mut cards = definition
+                .starting
+                .iter()
+                .filter(|id| {
+                    !definition
+                        .cards
+                        .iter()
+                        .any(|card| card.id == **id && upgraded.contains(&card.color.index()))
+                })
+                .chain(&loadout.active_card_ids)
+                .filter(|id| !unavailable.contains(id))
+                .cloned()
+                .collect::<Vec<_>>();
+            // The reconstructed pool still includes unrevealed commitments.
+            // Only the count is public and can rule out an impossible pool.
+            if cards.len() < hero.hand_size
+                || (self.phase == crate::codec::Phase::Resolution && cards.len() != hero.hand_size)
+            {
+                return None;
+            }
+            cards.sort();
+            let retired = definition
+                .cards
+                .iter()
+                .filter(|card| {
+                    !loadout.item_card_ids.contains(&card.id)
+                        && definition.cards.iter().any(|active| {
+                            loadout.active_card_ids.contains(&active.id)
+                                && active.color.index() == card.color.index()
+                                && active.tier > card.tier
+                        })
+                })
+                .map(|card| card.id.clone())
+                .collect();
+            Some(SampledHand {
+                hero: hero.id.clone(),
+                cards,
+                loadout: loadout.clone(),
+                retired,
             })
-            .chain(&loadout.active_card_ids)
-            .filter(|id| !unavailable.contains(id))
-            .cloned()
-            .collect::<Vec<_>>();
-        // The reconstructed pool still includes unrevealed commitments.
-        // Only the count is public and can rule out an impossible pool.
-        if cards.len() < hero.hand_size {
-            return Ok(None);
-        }
-        cards.sort();
-        let retired = definition
-            .cards
-            .iter()
-            .filter(|card| {
-                !loadout.item_card_ids.contains(&card.id)
-                    && definition.cards.iter().any(|active| {
-                        loadout.active_card_ids.contains(&active.id)
-                            && active.color.index() == card.color.index()
-                            && active.tier > card.tier
-                    })
-            })
-            .map(|card| card.id.clone())
-            .collect();
-        Ok(Some(SampledHand {
-            hero: hero_id.into(),
-            cards,
-            loadout,
-            retired,
         }))
     }
 
@@ -470,6 +541,66 @@ mod tests {
         reveals: Vec<String>,
         extra: bool,
         expected: Vec<LoadoutHypothesis>,
+    }
+
+    #[test]
+    fn resolution_sample_excludes_revealed_card_and_requires_exact_hand_size() {
+        let fixture =
+            super::super::object_execution::fixture_case("object-execution-card-planning-cycle");
+        let session = super::super::NativeSession::compile(
+            serde_json::from_value(fixture["envelope"].clone()).unwrap(),
+        )
+        .unwrap();
+        let mut view = session
+            .player_observation(session.world.heroes[0].id)
+            .unwrap();
+        let hero_id = view.heroes[1].id.clone();
+        let planning = view.sample_planning_hand(&hero_id, 39).unwrap().unwrap();
+        let revealed = planning.cards[0].clone();
+        view.phase = crate::codec::Phase::Resolution;
+        view.heroes[1].revealed_current.push(revealed.clone());
+        view.heroes[1].hand_size = planning.cards.len() - 1;
+        let sample = view
+            .sample_resolution_hand_with_checkpoints(&hero_id, 39, &[])
+            .unwrap()
+            .unwrap();
+        assert_eq!(sample.cards.len(), view.heroes[1].hand_size);
+        assert!(!sample.cards.contains(&revealed));
+        view.heroes[1].hand_size -= 1;
+        assert!(
+            view.sample_resolution_hand_with_checkpoints(&hero_id, 39, &[])
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn nonstandard_hero_samples_only_a_consistent_starting_pool() {
+        let fixture =
+            super::super::object_execution::fixture_case("object-execution-card-planning-cycle");
+        let session = super::super::NativeSession::compile(
+            serde_json::from_value(fixture["envelope"].clone()).unwrap(),
+        )
+        .unwrap();
+        let mut view = session.player_observation(session.world.heroes[0].id).unwrap();
+        view.phase = crate::codec::Phase::Resolution;
+        view.revealed_cards.clear();
+        let hero = &mut view.heroes[1];
+        hero.name = "Dodger".into();
+        hero.hand_size = 3;
+        hero.played = vec![PublicCard::Revealed("dark_ritual".into())];
+        hero.discarded.clear();
+        hero.revealed_current = vec!["dread_razor".into()];
+        let id = hero.id.clone();
+        let sample = view.sample_resolution_hand_with_checkpoints(&id, 39, &[]).unwrap().unwrap();
+        assert_eq!(sample.cards, ["death_trap", "littlefinger_of_death", "shield_of_decay"]);
+        assert_eq!(sample.loadout, LoadoutHypothesis::default());
+
+        view.revealed_cards.push((id.clone(), "unknown_card".into()));
+        assert!(view.sample_resolution_hand_with_checkpoints(&id, 39, &[]).unwrap().is_none());
+        view.revealed_cards.clear();
+        view.heroes[1].level = 2;
+        assert!(view.sample_resolution_hand_with_checkpoints(&id, 39, &[]).unwrap().is_none());
     }
 
     #[test]

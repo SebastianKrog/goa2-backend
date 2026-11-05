@@ -11,7 +11,7 @@ use crate::{
 use serde_json::{Value, json};
 
 type Result<T> = std::result::Result<T, CardError>;
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub enum Continuation {
     Retrieve(Symbol),
     FindActor,

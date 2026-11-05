@@ -100,6 +100,296 @@ impl NativeSession {
         })
     }
 
+    pub(in crate::interpreter) fn with_sampled_resolution<T>(
+        &mut self,
+        player: Symbol,
+        sample: super::super::PlanningRolloutSample<'_>,
+        operation: impl FnOnce(&mut Self) -> Result<T>,
+    ) -> Result<T> {
+        let samples = self
+            .resolution_samples(player, sample, &[sample.seed])?
+            .pop()
+            .unwrap();
+        self.with_installed_resolution_samples(player, samples, operation)
+    }
+
+    pub(in crate::interpreter) fn sampled_resolution_workers(
+        &mut self,
+        player: Symbol,
+        sample: super::super::PlanningRolloutSample<'_>,
+        worlds: usize,
+        budget: &ExecutionBudget<'_>,
+    ) -> Result<Vec<Self>> {
+        budget.check(0)?;
+        let seeds = (0..worlds)
+            .map(|index| {
+                sample
+                    .seed
+                    .wrapping_add((index as u64).wrapping_mul(0x9e3779b97f4a7c15))
+            })
+            .collect::<Vec<_>>();
+        let samples = self.resolution_samples(player, sample, &seeds)?;
+        samples
+            .into_iter()
+            .map(|hands| {
+                budget.check(0)?;
+                self.with_installed_resolution_samples(player, hands, |worker| Ok(worker.clone()))
+            })
+            .collect()
+    }
+
+    fn resolution_samples(
+        &self,
+        player: Symbol,
+        sample: super::super::PlanningRolloutSample<'_>,
+        seeds: &[u64],
+    ) -> Result<Vec<Vec<PlanningHandSample>>> {
+        let supported = self.last_request.as_ref().is_some_and(|request| {
+            self.resolution_request_addresses(request, player)
+                && request.controlled.is_none()
+                && self.stack.last().is_some_and(|frame| {
+                    match (&request.choices, &self.steps[frame.instruction].instruction) {
+                        (RequestChoices::Action(_), Instruction::LiveCardAction)
+                        | (RequestChoices::Defense(_), Instruction::LiveReaction)
+                        | (RequestChoices::CardColors(_), Instruction::LiveChooseCardColor)
+                        | (
+                            RequestChoices::ConfirmAction,
+                            Instruction::Flow(crate::turn::FlowStep::Confirm(_)),
+                        )
+                        | (
+                            RequestChoices::Actors { .. },
+                            Instruction::Flow(
+                                crate::turn::FlowStep::Next | crate::turn::FlowStep::Tie(_),
+                            ),
+                        ) => true,
+                        (RequestChoices::Hexes(_), Instruction::LiveHexSelect) => {
+                            !request.discard
+                                && frame.object.is_some_and(|step| {
+                                    self.is_public_board_selector(step, player)
+                                })
+                        }
+                        (RequestChoices::Numbers { values, .. }, Instruction::Number { .. }) => {
+                            !request.discard
+                                && values == &[1, 2]
+                                && frame.object.is_some_and(|step| {
+                                    self.is_public_number_selector(step)
+                                })
+                        }
+                        _ => false,
+                    }
+                })
+        });
+        if self.planning.phase != Phase::Resolution || !supported {
+            return Err(unsupported(
+                "resolution sampling requires a supported public resolution prompt",
+            ));
+        }
+        let observation = self.player_observation(player)?;
+        self.validate_sampled_resolution_effects()?;
+        self.validate_sampled_effect_cards(&observation)?;
+        if sample.upgrade_checkpoints.is_some_and(|rows| {
+            rows.keys()
+                .any(|id| !observation.heroes.iter().any(|hero| hero.id == *id))
+        }) {
+            return Err(EngineError::InvalidInput(
+                "upgrade checkpoints name an unknown hero".into(),
+            ));
+        }
+        let mut samples = (0..seeds.len()).map(|_| Vec::new()).collect::<Vec<_>>();
+        for (index, hero) in self.world.heroes.iter().enumerate() {
+            if hero.id == player {
+                continue;
+            }
+            let protected = [hero.current, hero.extra];
+            if !hero.spells.is_empty()
+                || protected
+                    .iter()
+                    .flatten()
+                    .any(|id| self.world.card(*id).is_none_or(|card| card.facedown))
+            {
+                return Err(unsupported(
+                    "resolution sampling requires revealed ordinary current cards",
+                ));
+            }
+            let hands = observation
+                .sample_resolution_hands(
+                    &observation.heroes[index].id,
+                    seeds.iter().map(|seed| seed.wrapping_add(index as u64)),
+                    sample
+                        .upgrade_checkpoints
+                        .and_then(|rows| rows.get(&observation.heroes[index].id))
+                        .map_or(&[], Vec::as_slice),
+                )?
+                .ok_or_else(|| unsupported(format!(
+                    "no consistent ordinary resolution hand for {}", observation.heroes[index].name
+                )))?;
+            for (world, hand) in samples.iter_mut().zip(hands) {
+                world.push(PlanningHandSample {
+                    hero: hero.id,
+                    hand,
+                    fixed: protected,
+                });
+            }
+        }
+        Ok(samples)
+    }
+
+    fn is_public_number_selector(&self, step: ObjectId) -> bool {
+        let Some(objects) = &self.objects else {
+            return false;
+        };
+        // These printed modes always offer the same two choices. Other
+        // numeric requests can depend on private cards or saved operands.
+        self.passive_text_bound(objects, step, Field::Output)
+            .is_ok_and(|output| {
+                matches!(
+                    self.symbols.name(output),
+                    "trap_choice" | "fg_choice" | "coin_choice" | "charge_choice"
+                        | "plank_choice" | "soar_choice" | "melee_choice" | "design_choice"
+                )
+            })
+    }
+
+    fn is_public_board_selector(&self, step: ObjectId, player: Symbol) -> bool {
+        let Some(next) = self.stack.iter().rev().nth(1) else {
+            return false;
+        };
+        let instruction = &self.steps[next.instruction].instruction;
+        let travel = matches!(instruction, Instruction::LiveTravel { sequence: false });
+        let placement = matches!(
+            instruction,
+            Instruction::LiveTokenPlace | Instruction::LiveTurret { remove: false }
+        );
+        if !travel && !placement && !matches!(instruction, Instruction::LiveMove) {
+            return false;
+        }
+        let Some(objects) = &self.objects else {
+            return false;
+        };
+        let Some(ObjectValue::Object(filters)) =
+            objects.arena.field(step, objects.phases.k(Field::Filters))
+        else {
+            return false;
+        };
+        let Some(filters) = objects.arena.sequence(filters) else {
+            return false;
+        };
+        let mut kinds = filters.iter().map(|filter| {
+            let ObjectValue::Object(filter) = filter else {
+                return None;
+            };
+            match objects
+                .arena
+                .field(*filter, objects.phases.k(Field::FilterType))
+            {
+                Some(ObjectValue::Atom(Datum::Text(kind))) => Some(self.symbols.name(kind)),
+                _ => None,
+            }
+        });
+        if placement {
+            let Some(continuation) = next.object else {
+                return false;
+            };
+            let Ok(output) = self.passive_text_bound(objects, step, Field::Output) else {
+                return false;
+            };
+            let token = self.passive_text_bound(objects, continuation, Field::TokenType)
+                .ok().map(|kind| self.symbols.name(kind));
+            let public_token = matches!(instruction, Instruction::LiveTurret { remove: false })
+                || matches!(token, Some("smoke_bomb" | "tree" | "pyro" | "glitch"));
+            if !public_token || !self.passive_text_bound(objects, continuation, Field::HexKey)
+                .is_ok_and(|input| input == output)
+            {
+                return false;
+            }
+            if token == Some("glitch")
+                && kinds.clone().next_back() == Some(Some("hex_batch_completable_filter"))
+                && let Some(ObjectValue::Object(batch)) = filters.last()
+            {
+                use crate::spatial::HexFilter;
+
+                kinds.next_back();
+                return kinds.next_back() == Some(Some("occupied_filter"))
+                    && kinds.next() == Some(Some("range_filter"))
+                    && kinds.all(|kind| kind == Some("range_filter"))
+                    && self.batch_slots_bound(objects, *batch).is_ok_and(|slots| {
+                        !slots.is_empty() && slots.iter().all(|slot| {
+                            matches!(slot.split_last(), Some((HexFilter::Obstacle { wanted: false, .. }, ranges))
+                                if !ranges.is_empty() && ranges.iter().all(|filter| matches!(filter, HexFilter::Range { .. })))
+                        })
+                    });
+            }
+            return kinds.next() == Some(Some("range_filter"))
+                && kinds.next() == Some(Some("occupied_filter"))
+                && kinds.next().is_none();
+        }
+        if travel {
+            let ([ObjectValue::Object(filter)], Some(continuation)) = (filters, next.object) else {
+                return false;
+            };
+            let keys = &objects.phases;
+            let ordinary_source =
+                |object| match objects.arena.field(object, keys.k(Field::SourceCard)) {
+                    None | Some(ObjectValue::Atom(Datum::Null)) => true,
+                    Some(ObjectValue::Atom(Datum::Text(source))) => {
+                        self.world.hero(player).is_some_and(|hero| {
+                            [hero.current, hero.extra].into_iter().flatten().any(|id| {
+                                self.world.card(id).is_some_and(|card| {
+                                    !card.facedown
+                                        && self.world.definitions.cards[card.definition].printed_id
+                                            == source
+                                })
+                            })
+                        })
+                    }
+                    _ => false,
+                };
+            return matches!(
+                objects.arena.field(*filter, keys.k(Field::FilterType)),
+                Some(ObjectValue::Atom(Datum::Text(kind)))
+                    if self.symbols.name(kind) == "fast_travel_destination_filter"
+            ) && ordinary_source(*filter)
+                && ordinary_source(continuation);
+        }
+        kinds.next() == Some(Some("occupied_filter"))
+            && kinds.next() == Some(Some("movement_path_filter"))
+            && kinds.all(|kind| {
+                matches!(
+                    kind,
+                    Some("in_straight_line_filter" | "straight_line_path_filter" | "range_filter")
+                )
+            })
+    }
+
+    fn with_installed_resolution_samples<T>(
+        &mut self,
+        player: Symbol,
+        samples: Vec<PlanningHandSample>,
+        operation: impl FnOnce(&mut Self) -> Result<T>,
+    ) -> Result<T> {
+        self.with_rollback(|worker| {
+            let root_choices = worker.resolution_choices(player)?;
+            worker.with_live_objects(|session, objects| {
+                for sample in samples {
+                    session.replace_sampled_hand(
+                        objects,
+                        sample.hero,
+                        &sample.hand,
+                        sample.fixed,
+                    )?;
+                }
+                session.sync_card_collections_bound(objects)?;
+                session.world.refresh_card_auras();
+                objects.readonly.take();
+                Ok(())
+            })?;
+            if worker.resolution_choices(player)? != root_choices {
+                return Err(unsupported("sampled resolution changed the root choices"));
+            }
+            operation(worker)
+        })
+    }
+
     fn planning_samples(
         &self,
         player: Symbol,
@@ -120,28 +410,7 @@ impl NativeSession {
         if self.planning.phase != Phase::Planning {
             return Err(unsupported("sampled worlds require planning"));
         }
-        for effect in &self.world.effects.instances {
-            let public = self.world.hero(effect.source).and_then(|hero| {
-                observation
-                    .heroes
-                    .iter()
-                    .find(|row| row.id == self.symbols.name(hero.id))
-            });
-            let is_public = |card| {
-                public.is_some_and(|hero| {
-                    hero.played.iter().chain(&hero.discarded).any(|entry| {
-                        matches!(entry, super::super::PublicCard::Revealed(id) if id == self.symbols.name(card))
-                    })
-                })
-            };
-            if !effect.card.is_some_and(is_public)
-                || effect.linked_card.is_some_and(|card| !is_public(card))
-            {
-                return Err(unsupported(
-                    "sampled worlds require effect cards in revealed public zones",
-                ));
-            }
-        }
+        self.validate_sampled_effect_cards(&observation)?;
         let mut samples = Vec::new();
         for (index, hero) in self.world.heroes.iter().enumerate() {
             if hero.id == player || preserved.contains(&hero.id) {
@@ -178,7 +447,9 @@ impl NativeSession {
                         .and_then(|rows| rows.get(&id))
                         .map_or(&[], Vec::as_slice),
                 )?
-                .ok_or_else(|| unsupported("no consistent ordinary planning hand"))?;
+                .ok_or_else(|| unsupported(format!(
+                    "no consistent ordinary planning hand for {}", self.symbols.name(hero.id)
+                )))?;
             samples.push(PlanningHandSample {
                 hero: hero.id,
                 hand,
@@ -188,10 +459,133 @@ impl NativeSession {
         Ok(samples)
     }
 
+    fn validate_sampled_resolution_effects(&self) -> Result<()> {
+        use crate::effect_rules::Kind;
+
+        let effects = &self.world.effects.instances;
+        if effects.is_empty() {
+            return Ok(());
+        }
+        let objects = self.objects.as_ref().ok_or_else(|| {
+            unsupported("sampled resolution requires live effect bindings")
+        })?;
+        let nodes = objects.effect_nodes()?;
+        if nodes.len() != effects.len() {
+            return Err(unsupported("effect collection binding drift"));
+        }
+        for (effect, node) in effects.iter().zip(nodes) {
+            let behavior = &effect.definition.behavior;
+            let kind = self.symbols.name(effect.definition.kind);
+            let action_restriction = kind == "target_prevention"
+                && !behavior.restrictions.is_empty();
+            let public = matches!(
+                behavior.kind,
+                Kind::PreMovement
+                    | Kind::AttackImmunity
+                    | Kind::PlacementPrevention
+                    | Kind::MinionProtection
+                    | Kind::MovementZone
+                    | Kind::LosBlocker
+                    | Kind::AreaStat
+                    | Kind::MovementAura
+                    | Kind::StaticBarrier
+                    | Kind::Petrify
+            ) || action_restriction;
+            if !public {
+                return Err(unsupported(format!(
+                    "resolution sampling does not support {:?} effect {kind}",
+                    behavior.kind,
+                )));
+            }
+            // The dense projection omits finishing programs for arena sessions.
+            // These programs can still retain references to hidden objects.
+            let finishing = objects.finishing_list(node)?;
+            if objects.arena.sequence(finishing).is_some_and(|steps| !steps.is_empty()) {
+                return Err(unsupported(format!(
+                    "resolution sampling does not support finishing steps on {kind}",
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_sampled_effect_cards(
+        &self,
+        observation: &super::super::PlayerObservation,
+    ) -> Result<()> {
+        for (index, effect) in self.world.effects.instances.iter().enumerate() {
+            if effect.card.is_none()
+                && effect.linked_card.is_none()
+                && effect.duration == crate::effects::Duration::Passive
+                && let Some(token) = effect.token
+                && effect.scope_origin == Some(token)
+                && let Some(kind) = self.world.entity(token).and_then(|entity| entity.token_type)
+                && matches!(
+                    (effect.definition.behavior.kind, self.symbols.name(kind)),
+                    (crate::effect_rules::Kind::LosBlocker, "smoke_bomb")
+                        | (crate::effect_rules::Kind::AreaStat, "ice" | "barrier")
+                )
+                && let Some(objects) = &self.objects
+                && self.token_is_public_bound(objects, token)?
+            {
+                // Token anchors are public during planning as well. Unlike
+                // the resolution root, a sampled planning root has not checked
+                // the live finishing programs, so verify the token row here.
+                let nodes = objects.effect_nodes()?;
+                if nodes.len() != self.world.effects.instances.len() {
+                    return Err(unsupported("effect collection binding drift"));
+                }
+                let finishing = objects.finishing_list(nodes[index])?;
+                if objects.arena.sequence(finishing).is_some_and(|steps| steps.is_empty()) {
+                    continue;
+                }
+                return Err(unsupported("sampled worlds cannot preserve token effect finishing steps"));
+            }
+            let public = self.world.hero(effect.source).and_then(|hero| {
+                observation
+                    .heroes
+                    .iter()
+                    .find(|row| row.id == self.symbols.name(hero.id))
+            });
+            let is_known = |card| {
+                let id = self.symbols.name(card);
+                public.is_some_and(|hero| {
+                    // Resolution sampling preserves both revealed current
+                    // slots as fixed physical cards.
+                    (observation.phase == Phase::Resolution
+                        && (hero.revealed_current.iter().any(|current| current == id)
+                            || (hero.id == observation.private.hero
+                                && observation.private.hand.iter()
+                                    .chain(&observation.private.current)
+                                    .chain(&observation.private.extra)
+                                    .any(|known| known == id))))
+                        || hero.played.iter().chain(&hero.discarded).any(|entry| {
+                            matches!(entry, super::super::PublicCard::Revealed(revealed) if revealed == id)
+                        })
+                })
+            };
+            let unknown = match effect.card {
+                None => Some("source card missing"),
+                Some(card) if !is_known(card) => Some("source card is outside known zones"),
+                _ if effect.linked_card.is_some_and(|card| !is_known(card)) => {
+                    Some("linked card is outside known zones")
+                }
+                _ => None,
+            };
+            if let Some(reason) = unknown {
+                return Err(unsupported(format!(
+                    "sampled worlds cannot preserve {} effect: {reason}",
+                    self.symbols.name(effect.definition.kind),
+                )));
+            }
+        }
+        Ok(())
+    }
+
     fn install_planning_samples(&mut self, samples: Vec<PlanningHandSample>) -> Result<()> {
         self.with_live_objects(|session, objects| {
             for sample in samples {
-                session.install_sampled_hand(objects, sample.hero, &sample.hand, sample.fixed)?;
+                session.install_planning_hand(objects, sample.hero, &sample.hand, sample.fixed)?;
             }
             session.sync_card_collections_bound(objects)?;
             session.world.refresh_card_auras();
@@ -200,17 +594,13 @@ impl NativeSession {
         })
     }
 
-    fn install_sampled_hand(
+    fn install_planning_hand(
         &mut self,
         objects: &mut BoundObjects,
         hero: Symbol,
         sample: &super::super::SampledHand,
         fixed: [Option<CardId>; 2],
     ) -> Result<()> {
-        use crate::world::CardLifecycle;
-        let model = self
-            .hero_model_bound(objects, hero)
-            .ok_or_else(|| unsupported("sampled hero model missing"))?;
         if fixed[0].is_none() {
             let pending = objects.phases.root(&objects.arena, Field::Pending)?;
             while matches!(
@@ -229,6 +619,22 @@ impl NativeSession {
                     .map_err(unsupported)?;
             }
         }
+        self.replace_sampled_hand(objects, hero, sample, fixed)
+    }
+
+    /// Rebuild only the sampled hand and lifecycle rows. Cards in public
+    /// zones and protected current slots retain their physical identity.
+    fn replace_sampled_hand(
+        &mut self,
+        objects: &mut BoundObjects,
+        hero: Symbol,
+        sample: &super::super::SampledHand,
+        protected: [Option<CardId>; 2],
+    ) -> Result<()> {
+        use crate::world::CardLifecycle;
+        let model = self
+            .hero_model_bound(objects, hero)
+            .ok_or_else(|| unsupported("sampled hero model missing"))?;
         let hand = self.planning_hand_bound(objects, model)?;
         let deck = self.hero_card_list_bound(objects, model, Field::Deck)?;
         let row = self
@@ -241,7 +647,7 @@ impl NativeSession {
             .flatten()
             .chain(&row.discard)
             .copied()
-            .chain(fixed.into_iter().flatten())
+            .chain(protected.into_iter().flatten())
             .collect::<Vec<_>>();
         if public_cards.iter().any(|card| !deck.contains(&Some(*card))) {
             return Err(unsupported(
@@ -374,13 +780,13 @@ impl NativeSession {
         model: ObjectId,
         field: Field,
     ) -> Result<&'a [ObjectValue]> {
-        let Some(ObjectValue::Object(list)) = objects.arena.field(model, objects.phases.k(field))
+        let Some(ObjectValue::Object(list)) = objects.arena.field_ref(model, objects.phases.k(field))
         else {
             return Err(unsupported("planning card collection missing"));
         };
         objects
             .arena
-            .sequence(list)
+            .sequence(*list)
             .ok_or_else(|| unsupported("planning cards must be a list"))
     }
 
@@ -840,6 +1246,266 @@ impl NativeSession {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sampled_resolution_accepts_public_glitch_batch_placement() {
+        let fixture = fixture_case("object-execution-token-batch-card-unstable_timeline-False-first");
+        let mut root =
+            NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
+                .unwrap();
+        root.advance_prefix(1).unwrap();
+        let request = root.advance_prefix(1).unwrap().request.unwrap();
+        assert_eq!(root.symbols.name(request.prompt), "Place glitch token 1/2");
+        let step = root.stack.last().unwrap().object.unwrap();
+        assert!(root.is_public_board_selector(step, request.owner));
+    }
+
+    #[test]
+    fn sampled_worlds_require_token_effect_anchor_to_be_faceup() {
+        let fixture = fixture_case("object-execution-min-primary-smoke_bomb-text-first");
+        let mut root =
+            NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
+                .unwrap();
+        root.advance_prefix(1).unwrap();
+        let request = root.advance_prefix(1).unwrap().request.unwrap();
+        let step = root.stack.last().unwrap().object.unwrap();
+        assert!(root.is_public_board_selector(step, request.owner));
+        let selection = root.import_selection(&fixture["operations"][2]["selection"]).unwrap();
+        root.submit(request.id, selection).unwrap();
+        for _ in 0..4 {
+            if !root.world.effects.instances.is_empty() {
+                break;
+            }
+            root.advance_prefix(1).unwrap();
+        }
+        let token = root.world.effects.instances[0].token.unwrap();
+        let mut observation = root.player_observation(root.world.heroes[0].id).unwrap();
+        observation.phase = Phase::Resolution;
+        root.validate_sampled_effect_cards(&observation).unwrap();
+        observation.phase = Phase::Planning;
+        root.validate_sampled_effect_cards(&observation).unwrap();
+
+        root.with_live_objects(|_, objects| {
+            let misc = objects.phases.root(&objects.arena, Field::MiscEntities)?;
+            let Some(ObjectValue::Atom(Datum::Instance(id))) = objects.arena.field(misc, token)
+            else {
+                panic!("placed token missing");
+            };
+            objects.arena.set_physical_field(id, objects.phases.k(Field::Facedown), Datum::Bool(true))
+                .map_err(unsupported)
+        }).unwrap();
+        assert!(root.validate_sampled_effect_cards(&observation).is_err());
+        observation.phase = Phase::Resolution;
+        assert!(root.validate_sampled_effect_cards(&observation).is_err());
+    }
+
+    #[test]
+    fn sampled_resolution_accepts_effect_cards_in_revealed_current_slots() {
+        let fixture = fixture_case("object-execution-effects-expired-finishing-True");
+        let root =
+            NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
+                .unwrap();
+        let mut observation = root.player_observation(root.world.heroes[0].id).unwrap();
+        observation.phase = Phase::Resolution;
+        observation.private.hand.clear();
+        observation.private.current = None;
+        observation.private.extra = None;
+        for row in &mut observation.heroes {
+            row.played.clear();
+            row.discarded.clear();
+            row.revealed_current.clear();
+        }
+        assert!(root.validate_sampled_effect_cards(&observation).is_err());
+        for effect in &root.world.effects.instances {
+            let source = root.world.hero(effect.source).unwrap();
+            let hero = observation.heroes.iter_mut()
+                .find(|row| row.id == root.symbols.name(source.id)).unwrap();
+            for card in [Some(effect.card.unwrap()), effect.linked_card].into_iter().flatten() {
+                hero.revealed_current.push(root.symbols.name(card).into());
+            }
+        }
+        root.validate_sampled_effect_cards(&observation).unwrap();
+        observation.phase = Phase::Planning;
+        assert!(root.validate_sampled_effect_cards(&observation).is_err());
+
+        observation.phase = Phase::Resolution;
+        let private = observation.heroes.iter_mut()
+            .find(|hero| hero.id == observation.private.hero).unwrap();
+        observation.private.hand = std::mem::take(&mut private.revealed_current);
+        root.validate_sampled_effect_cards(&observation).unwrap();
+
+        observation.private.hero = observation.heroes.iter()
+            .find(|hero| hero.id != observation.private.hero).unwrap().id.clone();
+        assert!(root.validate_sampled_effect_cards(&observation).is_err());
+    }
+
+    #[test]
+    fn sampled_resolution_checks_finishing_steps_in_the_arena() {
+        let fixture = fixture_case("object-execution-effects-expired-finishing-True");
+        let mut root =
+            NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
+                .unwrap();
+        use crate::effect_rules::Kind;
+        for kind in [
+            Kind::MovementZone,
+            Kind::LosBlocker,
+            Kind::AreaStat,
+            Kind::MovementAura,
+            Kind::StaticBarrier,
+            Kind::Petrify,
+        ] {
+            for effect in &mut root.world.effects.instances {
+                let definition = Arc::make_mut(&mut effect.definition);
+                assert!(definition.finishing.is_empty());
+                definition.behavior.kind = kind;
+            }
+            let error = root.validate_sampled_resolution_effects().unwrap_err();
+            assert!(
+                matches!(error, EngineError::Unsupported(message) if message.contains("finishing steps"))
+            );
+        }
+    }
+
+    #[test]
+    fn sampled_resolution_ignores_an_unobserved_hand_substitution() {
+        use crate::interpreter::{OpponentPolicy, SearchEvaluation, SearchLimits};
+
+        let fixture = fixture_case("object-execution-card-planning-cycle");
+        let mut root =
+            NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
+                .unwrap();
+        let player = root.world.heroes[0].id;
+        let mut plan = root.joint_plans(player, true, 1).unwrap().plans.remove(0);
+        plan.extend(root.joint_plans(player, false, 1).unwrap().plans.remove(0));
+        root.apply_joint_planning_ordered(&plan).unwrap();
+        let budget = ExecutionBudget::default();
+        root.advance_to_decision(&budget).unwrap();
+        let owner = root.last_request.as_ref().unwrap().owner;
+        let other = root
+            .world
+            .heroes
+            .iter()
+            .find(|hero| hero.id != owner)
+            .unwrap();
+        let (hero, protected) = (other.id, [other.current, other.extra]);
+        let view = root.player_observation(owner).unwrap();
+        let mut sample = view
+            .sample_resolution_hand_with_checkpoints(root.symbols.name(hero), 39, &[])
+            .unwrap()
+            .unwrap();
+
+        let mut alternate = root.clone();
+        alternate
+            .with_live_objects(|session, objects| {
+                let model = session.hero_model_bound(objects, hero).unwrap();
+                let deck = session.hero_card_list_bound(objects, model, Field::Deck)?;
+                let replacement = deck
+                    .into_iter()
+                    .flatten()
+                    .find_map(|card| {
+                        let id = session.printed_observation_card(card).unwrap();
+                        (!protected.contains(&Some(card)) && !sample.cards.contains(&id))
+                            .then_some(id)
+                    })
+                    .expect("fixture has a card outside its public and hand slots");
+                sample.cards[0] = replacement;
+                session.replace_sampled_hand(objects, hero, &sample, protected)?;
+                session.sync_card_collections_bound(objects)
+            })
+            .unwrap();
+        assert_ne!(
+            root.world.hero(hero).unwrap().hand,
+            alternate.world.hero(hero).unwrap().hand
+        );
+        assert_eq!(view, alternate.player_observation(owner).unwrap());
+
+        let limits = SearchLimits {
+            max_depth: 1,
+            max_nodes: 128,
+            opponent_policy: OpponentPolicy::Adversarial,
+            evaluation: SearchEvaluation::MaterialPosition,
+        };
+        let sample = super::super::PlanningRolloutSample {
+            seed: 39,
+            upgrade_checkpoints: None,
+        };
+        let run = |session: &mut NativeSession, worlds, workers| {
+            let before = session.semantic_state().unwrap();
+            let result = session
+                .search_resolution_worlds(
+                    owner,
+                    (sample, worlds, workers),
+                    limits,
+                    None,
+                    None,
+                    &budget,
+                )
+                .unwrap();
+            assert_eq!(session.semantic_state().unwrap(), before);
+            assert_eq!(result.completed_depth, 1);
+            assert!(result.score.is_some());
+            (result.decision, result.score, result.nodes)
+        };
+        for worlds in [1, 3] {
+            assert_eq!(run(&mut root, worlds, 1), run(&mut alternate, worlds, 1));
+        }
+        let before = root.semantic_state().unwrap();
+        assert_eq!(run(&mut root, 3, 1), run(&mut root, 3, 3));
+        let limited = root
+            .search_resolution_worlds(
+                owner,
+                (sample, 3, 3),
+                SearchLimits {
+                    max_nodes: 1,
+                    ..limits
+                },
+                None,
+                None,
+                &budget,
+            )
+            .unwrap();
+        assert_eq!(limited.nodes, 1);
+        assert_eq!(limited.completed_depth, 0);
+        assert_eq!(limited.score, None);
+        assert_eq!(limited.stop, crate::interpreter::ResolutionStop::NodeLimit);
+        assert_eq!(root.semantic_state().unwrap(), before);
+    }
+
+    #[test]
+    fn sampled_resolution_preserves_the_defender_choices_and_root() {
+        use crate::interpreter::{OpponentPolicy, SearchEvaluation, SearchLimits};
+
+        let fixture = fixture_case("object-execution-live-reaction-Arien-prompt-invalid-pass");
+        let mut root =
+            NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
+                .unwrap();
+        let budget = ExecutionBudget::default();
+        root.advance_to_decision(&budget).unwrap();
+        let request = root.last_request.as_ref().unwrap();
+        assert!(matches!(request.choices, RequestChoices::Defense(_)));
+        let player = request.owner;
+        let choices = root.resolution_choices(player).unwrap();
+        let before = root.semantic_state().unwrap();
+        let result = root
+            .search_resolution_in_sampled_world(
+                player,
+                super::super::PlanningRolloutSample {
+                    seed: 39,
+                    upgrade_checkpoints: None,
+                },
+                SearchLimits {
+                    max_depth: 1,
+                    max_nodes: 128,
+                    opponent_policy: OpponentPolicy::Adversarial,
+                    evaluation: SearchEvaluation::MaterialPosition,
+                },
+                &budget,
+            )
+            .unwrap();
+        assert!(choices.contains(&result.decision));
+        assert!(result.score.is_some());
+        assert_eq!(root.semantic_state().unwrap(), before);
+    }
 
     #[test]
     fn pass_releases_detached_request_guards_but_protects_live_shared_rows() {

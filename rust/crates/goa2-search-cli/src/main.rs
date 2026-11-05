@@ -25,6 +25,7 @@ struct Request {
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 enum Operation {
     Capabilities,
+    PrepareSearch,
     AggregateTrace {
         envelope: StateEnvelope,
         operations: Vec<Value>,
@@ -104,6 +105,9 @@ enum Operation {
         time_ms: u64,
         rollout_turns: Option<u8>,
         planning_sample_seed: Option<u64>,
+        resolution_sample_seed: Option<u64>,
+        resolution_sample_worlds: Option<usize>,
+        resolution_sample_workers: Option<usize>,
         public_upgrade_batches: Option<Vec<goa2_core::interpreter::PublicUpgradeBatch>>,
         upgrade_checkpoints: Option<UpgradeCheckpoints>,
         #[serde(default)]
@@ -159,6 +163,7 @@ enum Operation {
         iterations: u32,
         sample_seed: Option<u64>,
         sample_count: Option<u8>,
+        workers: Option<usize>,
         #[serde(default)]
         lab_evaluation: bool,
     },
@@ -218,8 +223,12 @@ fn execute(
     }
     match request.operation {
         Operation::Capabilities => Ok(
-            json!({"plain_fast_travel":true,"unit_selection_traces":true,"acting_piece_traces":true,"action_recipes":true,"fast_travel_zones":true,"planning_phase_traces":true,"card_models":true,"scalar_stats":true,"native_step_traces":true,"streamed_step_traces":true,"state_codec":true,"sequence_legality":true,"resolution_search":true,"plain_board_movement":true,"stateful_plain_movement":true,"game_transitions":false,"search":false,"rules_versions":[]}),
+            json!({"plain_fast_travel":true,"unit_selection_traces":true,"acting_piece_traces":true,"action_recipes":true,"fast_travel_zones":true,"planning_phase_traces":true,"card_models":true,"scalar_stats":true,"native_step_traces":true,"streamed_step_traces":true,"state_codec":true,"sequence_legality":true,"resolution_search":true,"prepare_search":true,"plain_board_movement":true,"stateful_plain_movement":true,"game_transitions":false,"search":false,"rules_versions":[]}),
         ),
+        Operation::PrepareSearch => {
+            NativeSession::prepare_search().map_err(|error| error.to_string())?;
+            Ok(json!({"ready": true}))
+        }
         Operation::HeuristicInput {
             envelope,
             player_id,
@@ -262,6 +271,9 @@ fn execute(
             time_ms,
             rollout_turns,
             planning_sample_seed,
+            resolution_sample_seed,
+            resolution_sample_worlds,
+            resolution_sample_workers,
             public_upgrade_batches,
             upgrade_checkpoints,
             opponent_policy,
@@ -269,15 +281,35 @@ fn execute(
             let budget = resolution_search::time_budget(started, time_ms)?;
             let checkpoints =
                 resolve_upgrade_evidence(upgrade_checkpoints, public_upgrade_batches)?;
-            if checkpoints.is_some() && (planning_sample_seed.is_none() || rollout_turns.is_none())
+            if checkpoints.is_some()
+                && resolution_sample_seed.is_none()
+                && (planning_sample_seed.is_none() || rollout_turns.is_none())
             {
-                return Err("resolution upgrade evidence requires sampled turn rollouts".into());
+                return Err(
+                    "resolution upgrade evidence requires a sampled root or sampled turn rollout"
+                        .into(),
+                );
+            }
+            if (resolution_sample_worlds.is_some() || resolution_sample_workers.is_some())
+                && resolution_sample_seed.is_none()
+            {
+                return Err("resolution sample settings require resolution_sample_seed".into());
             }
             resolution_search::search(
                 envelope,
                 player_id,
                 budget,
                 rollout_turns,
+                resolution_sample_seed.map(|seed| {
+                    (
+                        goa2_core::interpreter::PlanningRolloutSample {
+                            seed,
+                            upgrade_checkpoints: checkpoints.as_ref(),
+                        },
+                        resolution_sample_worlds.unwrap_or(1),
+                        resolution_sample_workers.unwrap_or(1),
+                    )
+                }),
                 planning_sample_seed.map(|seed| goa2_core::interpreter::PlanningRolloutSample {
                     seed,
                     upgrade_checkpoints: checkpoints.as_ref(),
@@ -386,6 +418,7 @@ fn execute(
             iterations,
             sample_seed,
             sample_count,
+            workers,
             lab_evaluation,
         } => simulation_bench::measure_rollout(
             envelope,
@@ -393,6 +426,7 @@ fn execute(
             iterations,
             sample_seed,
             sample_count.unwrap_or(1),
+            workers.unwrap_or(1),
             lab_evaluation,
         ),
         Operation::SimulationBench {
@@ -756,6 +790,9 @@ mod tests {
                 time_ms: 1,
                 rollout_turns: None,
                 planning_sample_seed: None,
+                resolution_sample_seed: None,
+                resolution_sample_worlds: None,
+                resolution_sample_workers: None,
                 public_upgrade_batches: None,
                 upgrade_checkpoints: None,
                 opponent_policy: Default::default(),

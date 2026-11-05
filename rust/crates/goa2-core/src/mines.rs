@@ -3,7 +3,7 @@ use crate::{data::Symbol, geometry::Hex, world::NativeWorld};
 use std::collections::{HashSet, VecDeque};
 use std::sync::Arc;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct MinePath {
     /// Mathematical set in stable entity/supply order, independent of symbol IDs.
     pub mines: Arc<[Symbol]>,

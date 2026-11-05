@@ -9,6 +9,7 @@ import json
 import os
 import platform
 import statistics
+from contextlib import ExitStack
 from pathlib import Path
 
 from object_execution_traces import ObjectTraceNormalizer
@@ -271,29 +272,40 @@ def summarize(samples):
     return result
 
 
-def benchmark(worker_command, *, samples=5, iterations=8, compare_rollback=False):
+def benchmark(
+    worker_command, *, samples=5, iterations=8, compare_rollback=False, baseline_command=None
+):
     manifest = verify_sources()
     corpus = ROOT / "rust/tests/fixtures/complete-games-hanu.json"
     index, identity = read_index(corpus)
-    worker = Worker(worker_command)
     rows = []
-    try:
+    with ExitStack() as stack:
+        worker = Worker(worker_command)
+        stack.callback(worker.close)
+        targets = {"rust": (worker, False)}
+        if compare_rollback:
+            targets["rust_rollback"] = (worker, True)
+        if baseline_command is not None:
+            baseline = Worker(baseline_command)
+            stack.callback(baseline.close)
+            targets["baseline"] = (baseline, False)
+            if compare_rollback:
+                targets["baseline_rollback"] = (baseline, True)
         for entry in index["cases"]:
             case = read_case(corpus, entry)
             for workload in workloads(case):
-                modes = {"rust": []}
-                if compare_rollback:
-                    modes["rust_rollback"] = []
-                order = tuple(modes)
+                modes = {mode: [] for mode in targets}
+                order = tuple(targets)
                 for sample in range(samples):
                     offset = sample % len(order)
                     for mode in order[offset:] + order[:offset]:
-                        result = worker.request(
+                        target, rollback = targets[mode]
+                        result = target.request(
                             "simulation_bench",
                             envelope=workload["envelope"],
                             operations=workload["operations"],
                             iterations=iterations,
-                            **({"rollback": True} if mode == "rust_rollback" else {}),
+                            **({"rollback": True} if rollback else {}),
                         )
                         actual = canonical_set_fields(
                             ObjectTraceNormalizer().record(result.pop("validation_record"))
@@ -341,8 +353,6 @@ def benchmark(worker_command, *, samples=5, iterations=8, compare_rollback=False
                     ),
                     flush=True,
                 )
-    finally:
-        worker.close()
     return dict(
         schema_version=2,
         source_sha256=manifest["source_sha256"],
@@ -363,6 +373,7 @@ def benchmark(worker_command, *, samples=5, iterations=8, compare_rollback=False
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--worker", required=True)
+    parser.add_argument("--baseline-worker", help="Interleave samples with this Rust worker")
     parser.add_argument("--samples", type=int, default=5)
     parser.add_argument("--iterations", type=int, default=8)
     parser.add_argument("--compare-rollback", action="store_true")
@@ -379,9 +390,13 @@ def main():
     result = benchmark(
         [args.worker], samples=args.samples, iterations=args.iterations,
         compare_rollback=args.compare_rollback,
+        baseline_command=[args.baseline_worker] if args.baseline_worker else None,
     )
     with open(args.worker, "rb") as executable:
         result["worker_sha256"] = hashlib.file_digest(executable, "sha256").hexdigest()
+    if args.baseline_worker:
+        with open(args.baseline_worker, "rb") as executable:
+            result["baseline_worker_sha256"] = hashlib.file_digest(executable, "sha256").hexdigest()
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2) + "\n")
 

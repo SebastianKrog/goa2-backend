@@ -5,7 +5,7 @@ use crate::{
     world::{CardLifecycle, NativeWorld},
 };
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Hash)]
 pub struct Offer {
     pub card: Symbol,
     pub trigger: Symbol,

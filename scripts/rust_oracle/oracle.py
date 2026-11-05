@@ -216,21 +216,46 @@ class Worker:
         self.counter = 0
         self._retired = False
 
-    def request(self, operation, *, timeout=None, **fields):
-        """Send one request. Transport failures retire the worker."""
+    def request(self, operation, *, timeout=None, decision_deadline=None,
+                transport_reserve=0.0, **fields):
+        """Send one request. A decision deadline uses the caller's perf_counter clock.
+
+        Encode the envelope first, then pass Rust the remaining milliseconds
+        minus transport headroom. The caller deadline also caps the exchange.
+        """
         if self._retired:
             raise WorkerUnavailable("worker was retired")
         if timeout is not None and not 0 < timeout < float("inf"):
             raise ValueError("worker timeout must be positive and finite")
+        if not 0 <= transport_reserve < float("inf"):
+            raise ValueError("transport reserve must be nonnegative and finite")
+        if decision_deadline is None:
+            if transport_reserve:
+                raise ValueError("transport reserve requires a decision deadline")
+        elif not 0 < decision_deadline < float("inf") or "time_ms" in fields:
+            raise ValueError("provide a finite decision deadline or time_ms")
         self.counter += 1
         request_id = self.counter
         request = {"schema_version": 1, "id": request_id, "operation": operation, **fields}
-        packet = canonical(request) + "\n"
+        if decision_deadline is not None:
+            # Keep the placeholder last so the envelope is serialized once.
+            request["time_ms"] = 0
+            packet = canonical(request)
+            remaining = decision_deadline - time.perf_counter() - transport_reserve
+            time_ms = min(60_000, int(remaining * 1_000))
+            if time_ms < 1:
+                raise TimeoutError(f"decision budget spent before sending {operation}")
+            packet = f"{packet[:-2]}{time_ms}}}\n"
+        else:
+            packet = canonical(request) + "\n"
         try:
-            if timeout is None:
+            if timeout is None and decision_deadline is None:
                 return self._exchange(request_id, packet)
             with ThreadPoolExecutor(max_workers=1) as executor:
                 exchange = executor.submit(self._exchange, request_id, packet)
+                if decision_deadline is not None:
+                    remaining = max(0.0, decision_deadline - time.perf_counter())
+                    timeout = remaining if timeout is None else min(timeout, remaining)
                 if not wait((exchange,), timeout=timeout).done:
                     self._retire()
                     raise TimeoutError(f"worker timed out during {operation}")

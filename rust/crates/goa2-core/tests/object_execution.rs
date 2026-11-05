@@ -250,6 +250,17 @@ fn shared_pending_step_clones_are_private_and_second_execution_requests_again() 
     root.advance(&ExecutionBudget::default()).unwrap();
     let before = root.export_envelope().unwrap();
     let token = root.last_request.as_ref().unwrap().id;
+    let before_execution = root.execution_fingerprint();
+    root.with_rollback(|branch| {
+        let selection = branch.import_selection(&json!(1))?;
+        branch.submit(token, selection)?;
+        assert_ne!(branch.execution_fingerprint(), before_execution);
+        branch.advance_prefix(1)?;
+        assert_ne!(branch.execution_fingerprint(), before_execution);
+        Ok(())
+    })
+    .unwrap();
+    assert_eq!(root.execution_fingerprint(), before_execution);
     let mut a = root.clone();
     let mut b = root.clone();
     for (worker, choice) in [(&mut a, 1), (&mut b, 2)] {
@@ -275,6 +286,7 @@ fn shared_pending_step_clones_are_private_and_second_execution_requests_again() 
             .unwrap();
         assert_ne!(worker.request_token(next.id), root.request_token(token));
     }
+    assert_ne!(a.execution_fingerprint(), b.execution_fingerprint());
     assert_ne!(a.semantic_state().unwrap(), b.semantic_state().unwrap());
     assert_eq!(root.export_envelope().unwrap().state, before.state);
     assert_eq!(
@@ -609,6 +621,16 @@ fn action_scope_helper_rejects_unbound_sessions_without_changing_rule_state() {
 fn natural_expiry_returns_original_finishing_lists_even_for_repeated_effect_objects() {
     let mut session =
         NativeSession::compile(source("object-execution-effects-expired-finishing-True")).unwrap();
+    let before = session.world_state_fingerprint();
+    session
+        .with_rollback(|branch| {
+            let finishing = branch.expire_effects(goa2_core::effects::Duration::ThisRound)?;
+            assert_eq!(finishing.len(), 2);
+            assert_ne!(branch.world_state_fingerprint(), before);
+            Ok(())
+        })
+        .unwrap();
+    assert_eq!(session.world_state_fingerprint(), before);
     let finishing = session
         .expire_effects(goa2_core::effects::Duration::ThisRound)
         .unwrap();
@@ -1002,8 +1024,12 @@ fn deferred_turn_input_and_generation_state_are_private_between_workers() {
 
 #[test]
 fn round_end_consumers_advance_identically_after_restore() {
-    let mut session =
-        NativeSession::compile(source("object-execution-turn-boundary-no-effects-4")).unwrap();
+    let case: RestorationCase =
+        load_cases(|name| name == "object-execution-turn-boundary-no-effects-4")
+            .next()
+            .unwrap();
+    assert_eq!(case.operations.len(), case.expected.len());
+    let mut session = NativeSession::compile(case.envelope).unwrap();
     session.end_turn().unwrap();
     session.advance_prefix(1).unwrap();
     let before = session.export_envelope().unwrap();
@@ -3492,14 +3518,12 @@ fn primary_family_restores_each_boundary(
     use std::sync::atomic::{AtomicUsize, Ordering};
     let operations = AtomicUsize::new(0);
     let count = fixture_parallel::for_each_case(
-        cases_matching(|name| prefixes.iter().any(|prefix| name.starts_with(prefix))),
-        |case| {
-            let root =
-                NativeSession::compile(serde_json::from_value(case["envelope"].clone()).unwrap())
-                    .unwrap();
+        load_cases(|name| prefixes.iter().any(|prefix| name.starts_with(prefix))),
+        |case: RestorationCase| {
+            let root = NativeSession::compile(case.envelope).unwrap();
             let before = root.export_envelope().unwrap();
             let mut worker = root.clone();
-            for operation in case["operations"].as_array().unwrap() {
+            for operation in &case.operations {
                 let mut restored =
                     NativeSession::compile(worker.export_envelope().unwrap()).unwrap();
                 restored.last_request = worker.last_request.clone().map(|mut request| {
@@ -3510,10 +3534,10 @@ fn primary_family_restores_each_boundary(
                     apply(&mut worker, operation),
                     apply(&mut restored, operation),
                     "{}",
-                    case["name"]
+                    case.name
                 );
-                operations.fetch_add(1, Ordering::Relaxed);
             }
+            operations.fetch_add(case.operations.len(), Ordering::Relaxed);
             let after = root.export_envelope().unwrap();
             assert_eq!(before.state, after.state);
             assert_eq!(before.object_bindings, after.object_bindings);

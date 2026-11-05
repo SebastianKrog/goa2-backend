@@ -101,13 +101,13 @@ impl NativeSession {
         &mut self,
         objects: &mut BoundObjects,
         step: ObjectId,
-    ) -> Result<(Option<NativeRequest>, Vec<NativeEvent>)> {
+    ) -> Result<Vec<NativeEvent>> {
         self.transition_bound(objects, step, |candidate, objects, frame| {
             let (request, events) = candidate.hero_respawn_direct_bound(objects, step)?;
-            let request = request
+            request
                 .map(|request| candidate.issue_bound_request(objects, step, frame, request))
                 .transpose()?;
-            Ok((request, events))
+            Ok(events)
         })
     }
 }

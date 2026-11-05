@@ -4,7 +4,10 @@ use goa2_core::{
     cards::CardId,
     data::{Datum, Symbol},
 };
-use std::{hint::black_box, time::Instant};
+use std::{
+    hint::black_box,
+    time::{Duration, Instant},
+};
 
 #[derive(Clone)]
 enum Command {
@@ -106,6 +109,7 @@ pub(super) fn measure_rollout(
     iterations: u32,
     sample_seed: Option<u64>,
     sample_count: u8,
+    workers: usize,
     lab_evaluation: bool,
 ) -> Result<Value, String> {
     if !(1..=10_000).contains(&iterations) {
@@ -117,14 +121,24 @@ pub(super) fn measure_rollout(
     {
         return Err("rollout benchmark requires 1..8 samples, a seed for multiple samples and enough iterations".into());
     }
+    if !(1..=4.min(iterations as usize)).contains(&workers) {
+        return Err("rollout benchmark requires 1..4 workers and at least one iteration per worker".into());
+    }
     let seeds = (0..sample_count)
         .map(|index| sample_seed.map(|seed| seed.wrapping_add(u64::from(index))))
         .collect::<Vec<_>>();
     let mut root = NativeSession::compile(envelope).map_err(|error| error.to_string())?;
     let player = super::sequence_legality::player(&mut root, player_id)?;
     let budget = ExecutionBudget::default();
-    let before = root.semantic_state().map_err(|error| error.to_string())?;
-    let mut run = |sample_seed, sampling_time: &mut std::time::Duration| {
+    let snapshot = |session: &NativeSession| {
+        let envelope = session
+            .export_envelope()
+            .map_err(|error| error.to_string())?;
+        serde_json::to_vec(&envelope).map_err(|error| error.to_string())
+    };
+    let before = snapshot(&root)?;
+    let before_fingerprint = (root.world_state_fingerprint(), root.execution_fingerprint());
+    let run = |root: &mut NativeSession, sample_seed, sampling_time: &mut Duration| {
         let rollout = |worker: &mut NativeSession| {
             worker.rollout_game_turns_diagnostic(player, 2, 4096, &budget, false, lab_evaluation)
         };
@@ -140,32 +154,66 @@ pub(super) fn measure_rollout(
             *sampling_time += start.elapsed() - rollout_time;
             outcome
         } else {
-            rollout(&mut root)
+            rollout(root)
         };
         outcome
             .map_err(|error| error.to_string())?
             .ok_or_else(|| "rollout benchmark exhausted its node budget".to_owned())
     };
+    let mut warmup_sampling = Duration::ZERO;
     let expected = seeds
         .iter()
-        .map(|&seed| run(seed, &mut std::time::Duration::default()))
+        .map(|&seed| run(&mut root, seed, &mut warmup_sampling))
         .collect::<Result<Vec<_>, _>>()?;
-    let mut sampling_time = std::time::Duration::ZERO;
-    let start = Instant::now();
-    for index in 0..iterations as usize {
-        let sample = index % seeds.len();
-        let actual = black_box(run(seeds[sample], &mut sampling_time)?);
-        if actual != expected[sample] {
-            return Err("rollout benchmark diverged from its warmup".into());
+    let run_batch = |root: &mut NativeSession, shard: usize| {
+        let start = Instant::now();
+        let mut sampling_time = Duration::ZERO;
+        let iterations = iterations as usize;
+        for index in iterations * shard / workers..iterations * (shard + 1) / workers {
+            let sample = index % seeds.len();
+            let actual = black_box(run(root, seeds[sample], &mut sampling_time)?);
+            if actual != expected[sample] {
+                return Err("rollout benchmark diverged from its warmup".to_owned());
+            }
         }
-    }
-    let elapsed = start.elapsed();
-    let seconds = elapsed.as_secs_f64();
-    if root.semantic_state().map_err(|error| error.to_string())? != before {
-        return Err("rollout benchmark mutated its root state".into());
+        Ok((sampling_time, start.elapsed()))
+    };
+    let mut roots = Vec::with_capacity(workers);
+    roots.resize_with(workers - 1, || root.clone());
+    roots.push(root);
+    let start = Instant::now();
+    let (sampling_time, worker_time) = if workers == 1 {
+        run_batch(&mut roots[0], 0)?
+    } else {
+        std::thread::scope(|scope| {
+            let jobs = roots
+                .iter_mut()
+                .enumerate()
+                .map(|(shard, root)| scope.spawn(move || run_batch(root, shard)))
+                .collect::<Vec<_>>();
+            let mut total = (Duration::ZERO, Duration::ZERO);
+            for job in jobs {
+                let (sampling, elapsed) = job
+                    .join()
+                    .map_err(|_| "rollout benchmark worker panicked".to_owned())??;
+                total.0 += sampling;
+                total.1 += elapsed;
+            }
+            Ok::<_, String>(total)
+        })?
+    };
+    let seconds = start.elapsed().as_secs_f64();
+    for root in &mut roots {
+        if snapshot(root)? != before {
+            return Err("rollout benchmark mutated its root state".into());
+        }
+        if (root.world_state_fingerprint(), root.execution_fingerprint()) != before_fingerprint {
+            return Err("rollout benchmark changed its root fingerprint".into());
+        }
     }
     Ok(json!({
         "iterations": iterations,
+        "workers": workers,
         "turns": 2,
         "sample_seed": sample_seed,
         "lab_value": expected[0].lab_value,
@@ -175,8 +223,9 @@ pub(super) fn measure_rollout(
         })).collect::<Vec<_>>(),
         "seconds": seconds,
         "rollouts_per_second": f64::from(iterations) / seconds,
+        "worker_seconds": worker_time.as_secs_f64(),
         "sampling_and_restore_seconds": sampling_time.as_secs_f64(),
-        "remaining_seconds": (elapsed - sampling_time).as_secs_f64(),
+        "remaining_seconds": (worker_time - sampling_time).as_secs_f64(),
     }))
 }
 

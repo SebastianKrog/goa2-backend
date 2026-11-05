@@ -61,6 +61,11 @@ impl Symbols {
             + self.compiled.as_ref().map_or(0, |table| table.names.len())
             + self.shared.as_ref().map_or(0, |table| table.names.len())
     }
+    pub(crate) fn hash_local(&self, state: &mut impl std::hash::Hasher) {
+        use std::hash::Hash;
+        self.local.names.hash(state);
+    }
+
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
@@ -76,6 +81,25 @@ pub enum Datum {
     Object(Vec<(Symbol, Datum)>),
     Instance(u32),
 }
+impl std::hash::Hash for Datum {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        std::mem::discriminant(self).hash(state);
+        match self {
+            Self::Null => {}
+            Self::Bool(value) => value.hash(state),
+            Self::Int(value) => value.hash(state),
+            Self::Float(value) => {
+                // PartialEq treats both representations of zero as equal.
+                (if *value == 0.0 { 0 } else { value.to_bits() }).hash(state);
+            }
+            Self::Text(value) => value.hash(state),
+            Self::List(values) => values.hash(state),
+            Self::Object(fields) => fields.hash(state),
+            Self::Instance(value) => value.hash(state),
+        }
+    }
+}
+
 impl Datum {
     pub(crate) fn python_scalar_text(&self, symbols: &Symbols) -> Option<String> {
         Some(match self {
@@ -290,7 +314,7 @@ impl RegisterRead for Registers {
 }
 
 /// Missing and present-null values are different. Keys are resolved once at import.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Hash)]
 pub struct Registers {
     entries: Vec<(Symbol, Datum)>,
 }

@@ -795,7 +795,7 @@ coverage, full-simulation throughput and adversarial playing strength.
 
 ## 12. Completion checklist
 
-- [ ] Python oracle pinned to the legality-optimized revision and content export.
+- [x] Python oracle pinned to the legality-optimized revision and content export.
 - [ ] All declared maps, heroes, effects, phases and rules versions covered.
 - [ ] Batch/sequence legality, transition states and event order match Python.
 - [ ] Make/unmake, hashing, caches and parallel workers preserve independence.
@@ -812,7 +812,7 @@ coverage, full-simulation throughput and adversarial playing strength.
   expressly visible in know mode. Check that controlled teammates' permitted
   cards can affect joint plans, and that show mode starts without human input
   and publishes only allied bot commitments.
-- [ ] Two-game-turn reference horizon and evaluator preserved in parity benchmarks.
+- [x] Two-game-turn reference horizon and evaluator preserved in parity benchmarks.
 - [ ] Iterative search returns the best completed result within its real deadline.
 - [ ] Unsupported branches and stale roots trigger whole-decision fallback.
 - [ ] Full-simulation target measured honestly; minimax counters kept separate.
@@ -6892,3 +6892,430 @@ all 351 core tests and the paired recorded endpoint checks. It changed all
 four measured medians by less than 2% and moved the Magma and Ice boundary
 from 665 to 655/s. The experiment was reverted. The result points away from
 guard field access as a near-term throughput improvement.
+
+#### Sampling at a live resolution prompt
+
+A resolution-root sample must preserve the already revealed current and extra
+cards, their physical handles, the active actor, and the root request token.
+The planning installer removes hidden commitments and rebuilds hand and
+lifecycle rows. Calling that installer unchanged during resolution could
+invalidate references held by active effects, nested steps or the pending
+request. Extract the common physical-card update from the planning installer
+and give resolution its own validation and installation path.
+
+Start with prompts whose payload and continuation bindings are independent of
+the hidden hand. Preserve visible card handles, and use the observed current
+reveals and public upgrade evidence as constraints on the sampled remainder.
+Require the sampled world to present the same root owner, request token and
+offered choices. Prompts that expose or retain private physical cards need
+explicit observation and rebinding rules before they can use this path.
+Exercise same-seed resolution choices with two roots that differ only in
+unobserved hands, including a defense continuation before the next planning
+boundary. Check exact root restoration on interruption and after scoring.
+
+The experimental offline worker accepts `resolution_sample_seed` on
+`search_resolution`. It samples one world at an ordinary, uncontrolled
+action, defense or initiative prompt, preserves revealed current
+cards and the issued options, and restores the root after scoring. The root
+sample can be combined with a turn rollout and an independent
+`planning_sample_seed` for later planning epochs. Public upgrade evidence
+can constrain both samplers.
+A same-seed test with an unobserved card substitution preserved the result,
+depth, and node count. Python accepted the Rust-selected SKILL on a live
+Forgotten Island action prompt with the original request token.
+
+Worker smoke checks with root seed 39, future planning seed 71 and a
+two-turn horizon completed depth one on Forgotten Island and Magma and Ice
+with 38 and 40 nodes respectively. Python accepted both Rust selections
+against their original request tokens.
+
+A level-two Forgotten Island position also validated sampling directly at
+a team initiative tie. The imported tie-break frame retained its request
+token and team eligibility, and Python accepted the Rust-selected actor.
+
+The first supported active-effect family at a sampled resolution root is
+pre-action movement without finishing steps. The source and any linked card
+must be in revealed played or discarded slots. A live Forgotten Island
+position with Misa's Focus active passed the selected-action check in Python.
+
+Run the maintained verifier with `rollout_parity.py --sampled-resolution
+--all-maps --worker <worker>`. It validates the Rust-selected opening
+action and upgraded team tie on all six maps. The current iterate worker
+completed all twelve two-turn searches at depth one with 38–42 nodes each.
+Python checked the submitted choices against the original requests.
+
+The maintained verifier also runs the Forgotten Island Focus case at seed 29.
+With the same two-turn settings, it completed depth one in 107 nodes and
+Python accepted ATTACK. The Focus case uses this fixed map and seed because
+other opening continuations can leave additional effect families active.
+
+Resolution search also accepts an optional `resolution_sample_worlds` count
+from one to eight with `resolution_sample_seed`. Each root move is evaluated
+in the same sampled worlds. The search compares sums of exact per-world
+scores, shares a node and time budget, and only publishes an aggregate score
+after a move has completed across every world. The original one-world search
+remains the default. Use `--sample-count 3` with the sampled resolution verifier
+to validate the multi-world selection against the original Python request.
+
+The three-world verifier completed depth one on all six maps, covering six
+opening actions, six upgraded initiative ties and the Forgotten Island Focus
+case. Python accepted all 13 selected inputs. The ordinary prompts used
+108–120 search nodes, and Focus used 306.
+
+#### Roster-wide replay smoke checks
+
+Run the offline verifier with --roster-sweep-turns 12 to play nine first-legal
+Rust matchups covering all 33 registered heroes. The default maps are Forgotten
+Island and Magma and Ice. Add --all-maps for the full bundled map list.
+Python validates only the selected decisions and the final state of each replay.
+Seed 29 passed all 18 default cases and 2,580 decisions through round four.
+These fixed-policy walks exercise ordinary match interactions across the roster.
+Other policies, longer games and broader interaction coverage remain open.
+
+Seed 31 passed the 24-turn sweep across all six maps. Python validated 15,862
+selected Rust decisions and all 54 endpoints at round seven, turn one. None
+of these fixed-policy replays had reached game over by that cutoff.
+
+Add --sweep-policy sampled to exercise a seeded selection of legal planning
+commitments and resolution inputs. This includes optional second cards when
+the hero can play them. The seed controls the diagnostic policy as well as
+game setup. Both teams use that policy during this rule-validation sweep.
+
+The seed-37 sampled sweep passed all 54 map and roster cases through 12 turns.
+Python accepted all 7,590 selected decisions and matched every final state.
+
+The seed-37 sampled sweep also reached round 17 on the two reference maps.
+Python validated 13,449 selections and all 18 endpoints, including a focused
+rerun of the Wasp matchup after correcting the verifier to skip automatic
+passes. The 64-turn cutoff was reached before game over in every case.
+
+The sweep also accepts --sweep-team-size and --sweep-game-type. All 34
+1v1 quick games on the two reference maps matched Python over 13,506 decisions
+through 64 turns. All 30 4v4 games across six maps matched over 5,599 decisions
+through eight turns. Both sweeps reached their turn caps. Separate replay from
+recorded late-game positions validated all 16 selected terminal decisions and
+the winners on both reference maps. The preceding CLI suite passed all 12 tests.
+
+#### Parallel scoring across sampled resolution worlds
+
+The verifier matched serial and parallel replies across 13 prompts on six maps,
+including the selected move, score, depth and node count. Python accepted every
+selection. A preliminary iterate-build run alternated one and two workers for
+four worlds, eight requests per mode per prompt. On two pinned WSL CPUs, the
+median of per-position medians was 175.50 ms serial and 175.22 ms parallel.
+The exhaustive fixture suite was active on the same host. This shallow workload
+shows no meaningful end-to-end speedup. Serial remains the default.
+
+#### Recorded sampled rollout throughput
+
+The provisional paired release run compared the current rollback changes with
+the pre-occupancy-journal build. All six recorded replay endpoints matched.
+Rollback replay throughput changed by -5.8% to +3.8% across the six positions.
+The Magma and Ice round boundary moved from 624 to 626 replays/s.
+
+Full first-legal rollouts from those recorded positions rotated four seeds for
+1,000 iterations each and used the lab attack-range evaluator. All 24 states,
+decision counts and evaluator checks matched the untimed Python validation.
+Rust achieved 545–746 full rollouts/s. Magma and Ice round-boundary throughput
+was 578/s. Sampling and restoration accounted for 4.9–6.4%. The exhaustive
+fixture suite was active on the host, so repeat timing under idle conditions.
+The 1,000/s gate remains open.
+
+A 5,000-rollout profile of the recorded Magma and Ice round boundary mapped
+7,900 CPU samples to the release binary and shared libraries. Interpreter
+execution accounted for 9.3% of samples, arena field lookup 6.7% and literal
+materialization 3.0%. Combined card-collection synchronization was 3.7%.
+Unresolved libc frames accounted for 20.8%. These are self-time shares.
+
+Scored offline resolution now uses two sampled root worlds and applies forced
+choices directly. After separating 65 forced inputs, the eight-turn replays
+reported 57 fallbacks. Allowing attack-immunity effects with revealed source
+and linked cards and no finishing program lowered that count to 47, with all
+344 selected decisions still matching Python. The remaining diagnostic reports
+identify action restrictions, upgrades and movement destination prompts.
+
+Sampling now admits public action restrictions with revealed source bindings
+and ordinary movement selectors followed by a live move. The eight-turn
+replays still matched all 344 decisions and endpoints, with fallbacks down
+from 47 to 36. A three-world search at a Forgotten Island movement prompt
+matched serial and parallel results, and Python accepted the selected hex.
+
+Allowing public placement prevention and minion protection reduced the two
+reference maps to 14 fallbacks over their eight-turn replays. The six-map run
+matched all 12 replay endpoints and checked every selected decision against
+Python. Unsupported prompts now include mandatory upgrades and several
+card-specific movement, placement and repeat prompts.
+
+The root field index passed focused arena tests and all six paired replay
+endpoints. Its rollback replay rates ranged from -3.8% to +4.0% while the
+workspace suite was active. The experiment was removed because the paired
+results showed no consistent speed benefit.
+
+The arena now records first writes with reusable bitmaps for object and physical
+card slots. Six alternating 1,000-rollout release batches on Magma and Ice moved
+the median from 541 to 565/s (+4.6%), with matching sample counts and evaluations.
+The workspace suite was active on the host, so this is a provisional result.
+
+The sampled-resolution verifier also checked a 73-destination Fast Travel
+prompt on Forgotten Island. The three-world search visited 4,122 nodes with
+matching serial and parallel replies. Python accepted the selected destination.
+Fast Travel sampling requires any referenced source card to be a revealed
+current or extra card of the decision owner.
+
+The corrected full workspace run for commit d86f4d28 completed with 530 passing
+tests and no failures. It includes the exhaustive 17,347-case restoration run.
+
+Cleanup, upgrades and respawn now use nested typed-row journals in the same
+transaction as the arena. The remaining session fields retain a value snapshot.
+All 356 current core tests and the nested session rollback integration passed.
+Six paired replay endpoints matched. Round-boundary rollback medians improved
+from 831 to 904/s on Forgotten Island and 773 to 816/s on Magma and Ice. The
+other four positions ranged from -3.6% to +5.6%. Full sampled timing is separate.
+
+After the exhaustive suite completed, a four-seed, 1,000-iteration recorded
+sampled rollout run matched Python states, decision counts and lab evaluator
+values in all 24 cases. Rates ranged from 734 to 1,093/s. Forgotten Island
+round-boundary throughput was 844/s and Magma and Ice was 761/s. The latter
+remains below the 1,000/s acceptance target.
+
+Typed card and hero journals now reuse first-write bitmaps as well as the arena
+journal. All 356 core tests passed. Focused nested transition verification and
+paired release measurements are pending.
+
+The typed-row bitmaps passed nested rollback verification. Four alternating
+release batches per workload matched all six paired replay endpoints. The
+bitmap change moved rollback rates by -3.4% to +1.9%. The full sampled release
+run on this build matched all 24 Python state, count and evaluation checks.
+Rates were 860–1,183/s. The round boundaries ran at 932/s on Forgotten Island
+and 875/s on Magma and Ice. The throughput gate remains open.
+
+The incremental fingerprint now covers ordered entity positions and tile
+occupants. Spatial rollback restores the saved fingerprint and checks it against
+a full recomputation in debug builds. The existing nested spatial test checks
+both changed and restored positions. All 356 core tests passed. Card, effect,
+continuation and context keys are still required before enabling cache reuse.
+
+The dense-world diagnostic fingerprint now includes physical card rows,
+including their lifecycle, equality metadata and typed dynamic metadata.
+Card updates invalidate only affected rows. Nested rollback invalidates the
+restored rows even when a branch already computed its fingerprint. The
+recorded simulation benchmark checks the combined spatial, hero and card
+fingerprint after each replay batch. This key is scoped to a native root and
+its symbol table. Effects, pending continuations and execution context are
+still required for a search cache key.
+
+The diagnostic key also covers the ordered typed active-effect rows,
+including compiled behavior, mutable counters and native arena bindings.
+Effects are hashed when the diagnostic is read. The existing restore
+verification still checks the full envelope, including finishing steps stored
+in the object arena. The typed key does not yet cover those arena continuations,
+execution context or all other mutable world fields, so it remains diagnostic.
+
+The rollback benchmark now also verifies a separate typed execution
+fingerprint. It covers the stack and frame overrides, current request,
+request and step generation counters, context, arena payloads and physical
+overrides, and step-to-program bindings. The shared pending-step fixture
+checks that submitting a choice changes the fingerprint and that rollback
+restores it. The diagnostic scans arena storage and uses root-local IDs.
+A transposition key still needs complete mutable state coverage, a definition
+of equivalence across branches, and measurement of lookup cost and hit rate.
+
+Sampled multi-world resolution search now uses a bounded immediate-scoring
+pass before game-turn rollouts. It publishes a provisional score only after
+the same candidate has been evaluated in every sampled world. Warmup nodes
+count against the shared search budget. A terminal or horizon-reaching score
+is retained for that candidate and world. Completed rollout depths still take
+precedence. This improves the fallback when the first rollout cannot finish.
+
+Multi-world resolution now visits the best warmup move first, then starts each
+deeper iteration with the previous completed winner. Equal aggregate scores
+still favor the earlier move in the original legal order. The 13 Rust search
+tests passed. At a five-second budget with three sampled worlds, one and two
+workers returned identical replies for 15 prompts across all six maps. Python
+accepted all 15 Rust selections. Every prompt completed the requested first
+depth with a two-turn rollout score, including the 73-destination Fast Travel
+case. This run verifies decision legality and worker agreement on the sampled
+prompts.
+
+The sampled-resolution verifier can now exercise interrupted requests with
+`--verify-resolution-deadline`. It validates every returned move against
+the original Python prompt and reports setup deadlines separately from
+scored and unscored search fallbacks. Timing is measured at the caller and
+includes JSON and transport overhead.
+
+With an iterate worker, a 200 ms internal budget, three worlds, one and two
+workers, and three repetitions per prompt, 83 of 90 requests completed
+depth one. All six Fast Travel interruptions returned a scored candidate
+that Python accepted. Their end-to-end maxima were 210.74 ms and 209.99 ms
+for one and two workers respectively. The first cold request expired during
+setup and returned no move in 242.07 ms. The strict five-second verification
+still matched replies across worker counts and all 15 selected moves were
+legal. Cold preparation and caller-visible deadline accounting remain open.
+
+The offline worker now accepts an idempotent `prepare_search` request to
+initialize immutable rule catalogs and compiled primary programs before
+timed decisions. The verifier's `--prepare-search` option reports preparation
+separately. It took 151.53 ms on the iterate build. On the same 90-request
+six-map workload, 84 searches completed depth one and six Fast Travel searches
+returned scored deadline fallbacks. Python accepted all 90 moves. The first
+prepared decision took at most 53.48 ms across its single-worker repetitions.
+The worst Fast Travel reply took 210.10 ms end to end with a 200 ms internal
+budget. Caller-side deadline accounting remains open.
+
+The offline worker caller can now supply a monotonic decision deadline. It
+deducts envelope serialization time and an explicit transport reserve before
+sending Rust its remaining budget, and retires a stalled worker at the caller
+deadline. The sampled-resolution verifier enables this path with
+`--resolution-transport-reserve-ms`. In the prepared six-map run with a 200 ms
+caller budget and a 15 ms reserve, all 90 replies were within budget and all
+90 returned moves were legal. Six Fast Travel replies hit the internal search
+deadline and returned scored fallbacks. The slowest reply took 191.56 ms.
+The measurement starts with a prepared envelope and stops before oracle
+validation. Preparation, live game export, other workloads and real-time
+scheduling guarantees are outside that measurement.
+
+An inline single-choice buffer removed temporary allocations in fixed-policy
+resolution. Three alternating release runs per variant used 1,000 rollouts
+per recorded workload and four sampled worlds. Every run matched the Python
+endpoints, decision counts and evaluator checks. Median rates changed by
+-2.2% to +1.5% across six workloads. The experiment was removed because the
+changes did not show a consistent throughput gain. In the same measurements
+the baseline medians were 887/s and 797/s at the Forgotten Island and Magma
+and Ice round boundaries. The 1,000/s throughput gate remains open.
+
+A build-ID-checked release profile of the Magma and Ice round boundary
+collected 6,606 CPU samples. Interpreter execution accounted for 7.27% of
+self time, arena field lookup 6.39%, literal materialization 2.59%, symbol
+lookup 2.53%, and card collection synchronization and its comparison closure
+4.15% combined. The unresolved libc share was 22.28%.
+
+An arena experiment recorded individual field edits instead of cloning a
+whole object on its first field write. It passed nested rollback, including
+a committed child scope with a whole-dictionary clear. Three paired release
+runs matched Python endpoints, node counts and evaluator values. Median
+throughput changed by -1.68% to +1.90%, so the field-journal experiment was
+removed. The Magma and Ice round-boundary median moved from 837 to 853/s.
+
+Arena cycle validation now borrows existing inputs and visits object links
+only. Leaf objects need no traversal allocation. Read-only hot paths can also
+borrow fields instead of cloning values. Three alternating release runs per
+variant matched all Python endpoints, node counts and evaluator checks for
+four seeds on each of the six workloads. Median throughput improved by
+6.0–10.0%. Forgotten Island's round boundary rose from 920 to 995/s, and
+Magma and Ice's from 845 to 897/s. Five arena unit tests and the workspace
+check passed. The remaining sub-1,000/s workloads keep the throughput gate open.
+
+The recorded two-turn benchmark now supports one to four independent workers.
+Each worker owns its session and restores it after each rollout. All results
+match the serial per-seed warmup and the verifier checks the sampled states,
+decision counts and evaluations against Python outside the timer. Timing
+includes worker startup and all rollout work, with root import, cloning and
+post-run validation outside the timer. Worker-time sums are reported
+separately from elapsed wall time.
+
+On the i5-10400F WSL host, the release benchmark ran 3,001 iterations per
+position with four rotating seeds. One worker delivered 878–1,228 rollouts/s,
+two delivered 1,669–2,379/s, and four delivered 3,061–4,400/s across all six
+positions. Magma and Ice's round boundary measured 918, 1,669 and 3,158/s.
+The sampled throughput target is demonstrated on this corpus with two
+workers. This measures independent fixed-policy rollouts. The serial
+throughput gap, broader corpus and adversarial search gates remain open.
+On the separate 5,000-iteration Magma and Ice round-boundary run, peak
+process RSS was 140,828 KiB with one worker, 142,636 KiB with two and
+145,712 KiB with four. The four per-seed results were identical.
+
+The roster verifier now supports `--sweep-policy search`. Both teams use
+native sampled planning and resolution search, with the CLI decision budget.
+Python validates Rust's selections and endpoints. The verifier checks winner
+fields whenever a game reaches game over and prints fallback counts by team.
+
+A seed-29, 100 ms, four-turn quick-game sweep covered all 33 registered heroes
+in 18 matches on Forgotten Island and Magma and Ice. All 863 recorded Rust
+decisions and all endpoints matched Python. Each match reached its turn cap.
+There were 445 search fallbacks across per-hero planning and resolution
+decisions. The most actionable gaps include public effect handling
+(MovementZone, LosBlocker, MovementAura, AreaStat and StaticBarrier), card-specific
+prompts, and ordinary-hand sampling in some rosters. These are search coverage
+gaps even though fallback moves and rule execution matched in this run.
+
+Sampled resolution now admits MovementZone and LosBlocker effects with
+revealed source and linked cards and no finishing program. The guard checks
+the live arena's finishing lists because the dense world projection omits
+them. Three sampler tests passed, including the arena finishing regression.
+The same 18-match sweep again matched all 863 Python decision checks and
+endpoints. The iterate run logged 439 fallbacks against 445 in the earlier
+release run. MovementZone and LosBlocker no longer appeared among the
+reported leading reasons. The builds use different profiles, so the count
+difference is descriptive.
+
+The hidden-hand sampler now uses the printed starting pools for level-one
+Dodger, Min and Snorri when their public card evidence and upgrade checkpoints
+agree. Their nonstandard upgrade paths remain outside this reconstruction.
+Six loadout tests passed. The same 18-match, 100 ms iterate sweep reduced
+fallbacks from 439 to 333. All 863 decisions and final states matched Python.
+The sampled matches reached their four-turn caps.
+
+The sampled-resolution effect guard now also accepts public area-stat effects,
+movement auras, static barriers and petrification when their source and linked
+cards are revealed and the arena has no finishing program. Three focused
+sampler tests passed. On the same 18-match iterate sweep, fallbacks decreased
+from 333 to 291. All 861 recorded decisions and endpoints matched Python.
+Some effects are still rejected because their source or linked card is
+outside the supported public zones. Other remaining gaps are prompt-specific.
+
+Sampled resolution accepts the fixed color chooser and eight reviewed
+two-option numeric selectors used by printed card modes. Other numeric
+requests still require provenance review. The three sampler tests passed.
+The same 18-match iterate sweep reached all turn caps, matching 864 selected
+decisions and every final state against Python. It recorded 288 fallbacks,
+compared with 291 before the change. Some similarly labeled prompts are
+outside the supported selectors or still have unsupported effect provenance.
+
+Resolution sampling now treats an effect's revealed current or extra card as
+public provenance. Those physical slots already remain fixed across sampled
+worlds. Planning retains its previous provenance rules. Four focused sampler
+tests passed. The same 18-match iterate sweep matched all 861 selected
+decisions and final states against Python and recorded 285 fallbacks, down
+from 288. Other effect provenance fallbacks remain.
+
+Resolution sampling now accepts cardless passive effects anchored to a
+faceup, placed Smoke Bomb, Ice or Barrier token for the supported
+line-of-sight and area-stat behaviors. The anchor must match the effect
+scope. The existing finishing-step guard still applies. Five focused
+sampler tests passed, including a Smoke Bomb fixture that rejects a
+facedown anchor. The same 18-match iterate sweep recorded 274 fallbacks,
+down from 285. Python accepted all 860 selected decisions and matched all
+endpoints.
+
+Resolution sampling recognizes the acting viewer's own private hand and
+current slots when they supply an effect card. Other players' private
+cards are excluded. The five focused sampler tests passed, including the
+viewer boundary. Python accepted all 863 selections and matched all
+endpoints in the same 18-match sweep. It recorded 287 fallbacks, versus
+274 in the previous run, so this did not reduce the aggregate count.
+The new diagnostics identify missing source cards for the reported
+line-of-sight and area-stat effects. Their public token anchoring needs
+further investigation.
+
+Faceup public token effects now also survive sampled planning inside a
+resolution rollout. The token's live arena row must have an empty finishing
+list in both phases. Nine planning-command tests passed, including the
+faceup/facedown check in both phases. The same 18-match iterate sweep
+recorded 212 fallbacks, down from 287. Python accepted all 862 selected
+decisions and matched every endpoint. Missing source-card errors for the
+token effects no longer appeared among the reported leading reasons.
+
+Sampled resolution now accepts simple public token and turret placement
+selectors with range and occupancy filters when the next instruction
+consumes the selected hex. The Smoke Bomb fixture exercises the new gate.
+Nine planning-command tests passed. The same 18-match iterate sweep
+recorded 203 fallbacks, down from 212, and Python matched all 862 decisions
+and final states. Multi-token Glitch placement still uses fallback.
+
+Sampled resolution now accepts Glitch batch placement when the current
+selector and all batch slots use public range and empty-space filters.
+The selected hex must feed the matching token placement instruction.
+The recorded Unstable Timeline prompt and all ten planning-command tests
+passed. The same 18-match iterate sweep matched 865 decisions and every
+final state against Python, with 201 fallbacks. The subsequent Glitch
+target selection prompts still require separate review.

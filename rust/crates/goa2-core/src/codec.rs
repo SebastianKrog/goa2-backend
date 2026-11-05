@@ -32,7 +32,7 @@ pub struct Definition {
     pub fields: Map<String, Value>,
 }
 /// Python model equality includes this state although normal JSON omits it.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
 #[serde(deny_unknown_fields)]
 pub struct InstanceEquality {
     pub model: String,
@@ -55,7 +55,7 @@ pub enum ObjectPathPart {
     Key(String),
     Index(usize),
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum ObjectKind {
     List,

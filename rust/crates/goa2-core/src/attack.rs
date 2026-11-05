@@ -20,7 +20,7 @@ pub struct AttackSpec {
     pub damage_stat: Option<Stat>,
     pub range_stat: Option<Stat>,
 }
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Hash)]
 pub struct AttackBinding {
     pub key: Symbol,
     pub damage: i64,

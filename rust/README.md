@@ -483,6 +483,9 @@ Release Rust is **3.97–7.99× faster** than the frozen Python engine on six
 verified two-game-turn windows, including openings, round transitions and combat.
 These are fixed-decision serial replays, not minimax search or full-roster throughput.
 
+The following table records an earlier cross-language benchmark. The current
+runner times Rust only and uses Python for untimed rule validation.
+
 | Workload | Python simulations/s | Rust simulations/s | Rust speedup |
 | --- | ---: | ---: | ---: |
 | forgotten_island-opening | 23.9 | 149.5 | 6.25× |
@@ -542,7 +545,8 @@ PYTHONHASHSEED=0 PYTHONPATH=scripts/rust_oracle:src \
   --samples 5 --iterations 32
 ```
 
-Raw samples: [simulation-benchmark.json](artifacts/simulation-benchmark.json).
+The current runner writes to `artifacts/simulation-benchmark-rust-only.json` by
+default. [Original raw samples](artifacts/simulation-benchmark.json).
 Scoped verification: [validation record](artifacts/simulation-benchmark-final-validation.json).
 
 ## Build and test in WSL
@@ -579,8 +583,9 @@ sh rust/cargo-wsl.sh test --locked --profile iterate --workspace
 capped by available CPUs). Each worker owns one case and compares actual
 snapshots one operation at a time. Every case and operation still runs; thread
 panics fail the test. Test loaders buffer file reads, stream full cases, and
-filter named/subset cases before loading snapshots. The WSL wrapper defaults
-`RUST_TEST_THREADS` to 2; explicit environment or `--test-threads` arguments take
+filter named/subset cases before loading snapshots. The WSL wrapper defaults to
+two build jobs and two test threads. `CARGO_BUILD_JOBS` or Cargo `-j` overrides the
+build limit. Explicit `RUST_TEST_THREADS` or `--test-threads` arguments take
 precedence. For fully serial debugging, set both `RUST_TEST_THREADS=1` and
 `GOA2_ORACLE_WORKERS=1`. Avoid overlapping another build with a large test run.
 

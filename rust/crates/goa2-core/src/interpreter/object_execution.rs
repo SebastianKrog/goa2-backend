@@ -164,25 +164,9 @@ impl Clone for CopiedBindingJournal {
 }
 
 impl BoundObjects {
-    fn staged_clone(&self) -> Self {
-        let mut candidate = self.clone();
-        candidate.arena.inherit_staged_journal(&self.arena);
-        candidate
-            .copied_binding_undo
-            .0
-            .clone_from(&self.copied_binding_undo.0);
-        candidate
-    }
-
-    pub fn compile(source: &StateEnvelope) -> Result<Option<Self>> {
+    pub(super) fn compile_validated(source: &StateEnvelope) -> Result<Option<Self>> {
         if source.object_bindings.is_empty() {
             return Ok(None);
-        }
-        if !matches!(
-            source.validate().map_err(unsupported)?.phase,
-            Phase::Planning | Phase::Resolution | Phase::Cleanup | Phase::LevelUp | Phase::GameOver
-        ) {
-            return Err(unsupported("shared-object phase flow not yet bound"));
         }
         for step in source.state["execution_stack"]
             .as_array()
@@ -194,7 +178,7 @@ impl BoundObjects {
                 ));
             }
         }
-        let mut arena = ObjectArena::compile(source).map_err(unsupported)?;
+        let mut arena = ObjectArena::compile_validated(source).map_err(unsupported)?;
         for key in [
             "attempts",
             "attempt",
@@ -619,8 +603,15 @@ impl BoundObjects {
             } else if wire["type"] == "laugh" {
                 steps[index].instruction = Instruction::LiveLaugh;
             } else if wire["type"] == "reveal_hand_card" {
-                for key in ["revealer_id", "target_unit_id", "owner_id", "card_id", "tier_value",
-                    "rollback_reanchor_pending", "card_reveal"] {
+                for key in [
+                    "revealer_id",
+                    "target_unit_id",
+                    "owner_id",
+                    "card_id",
+                    "tier_value",
+                    "rollback_reanchor_pending",
+                    "card_reveal",
+                ] {
                     symbols.intern(key);
                 }
                 steps[index].instruction = Instruction::LiveRevealHandCard;
@@ -721,7 +712,11 @@ impl BoundObjects {
             } else if wire["type"] == "resolve_card" {
                 steps[index].instruction = Instruction::LiveCardAction;
             } else if wire["type"] == "razzle_mirrored_push" {
-                for key in ["razzle_mirror_dest", "Select an adjacent unit to push", "Choose push distance"] {
+                for key in [
+                    "razzle_mirror_dest",
+                    "Select an adjacent unit to push",
+                    "Choose push distance",
+                ] {
                     symbols.intern(key);
                 }
                 steps[index].instruction = Instruction::LiveMirrorPush;
@@ -1948,42 +1943,53 @@ impl NativeSession {
             } else {
                 None
             };
-            let cleanup_plan = if !skipped
+            if !skipped
                 && matches!(
                     self.steps[top_instruction].instruction,
                     Instruction::Flow(crate::turn::FlowStep::Cleanup)
-                ) {
-                Some(self.preflight_cleanup_bound(objects, top_object.unwrap())?)
-            } else {
-                None
-            };
-            let hero_respawn = if !skipped
+                )
+            {
+                result.events.extend(self.cleanup_bound(
+                    objects,
+                    top_object.ok_or_else(|| unsupported("live cleanup step missing"))?,
+                )?);
+                result.steps += 1;
+                continue;
+            }
+            if !skipped
                 && matches!(
                     self.steps[top_instruction].instruction,
                     Instruction::Flow(crate::turn::FlowStep::Respawn(_))
-                ) {
-                Some(self.preflight_hero_respawn_bound(objects, top_object.unwrap())?)
-            } else {
-                None
-            };
-            let round_plan = if !skipped
-                && matches!(
-                    self.steps[top_instruction].instruction,
-                    Instruction::Flow(
-                        crate::turn::FlowStep::Upgrades | crate::turn::FlowStep::Reset
-                    )
-                ) {
-                Some(self.preflight_round_transition_bound(
+                )
+            {
+                let (request, events) = self.hero_respawn_bound(
                     objects,
-                    top_object.unwrap(),
-                    matches!(
-                        self.steps[top_instruction].instruction,
-                        Instruction::Flow(crate::turn::FlowStep::Reset)
-                    ),
-                )?)
-            } else {
-                None
-            };
+                    top_object.ok_or_else(|| unsupported("live respawn step missing"))?,
+                )?;
+                result.events.extend(events);
+                result.steps += 1;
+                if let Some(request) = request {
+                    result.request = Some(request);
+                    return Ok(result);
+                }
+                continue;
+            }
+            if !skipped
+                && let Instruction::Flow(
+                    ref flow @ (crate::turn::FlowStep::Upgrades | crate::turn::FlowStep::Reset),
+                ) = self.steps[top_instruction].instruction
+            {
+                result.request = self.round_transition_bound(
+                    objects,
+                    top_object.ok_or_else(|| unsupported("live round transition missing"))?,
+                    matches!(flow, crate::turn::FlowStep::Reset),
+                )?;
+                result.steps += 1;
+                if result.request.is_some() {
+                    return Ok(result);
+                }
+                continue;
+            }
             let battle_plan = if !skipped {
                 if let Instruction::Battle(family) = self.steps[top_instruction].instruction.clone()
                 {
@@ -2601,7 +2607,9 @@ impl NativeSession {
                     request = self.laugh_bound(objects, id, &mut result.events)?;
                 }
                 Instruction::LiveRevealHandCard => {
-                    result.events.extend(self.reveal_hand_card_bound(objects, id)?);
+                    result
+                        .events
+                        .extend(self.reveal_hand_card_bound(objects, id)?);
                 }
                 Instruction::LiveCardGuess { reveal } => {
                     request = self.card_guess_bound(objects, id, *reveal, &mut result.events)?;
@@ -2645,7 +2653,9 @@ impl NativeSession {
                     .events
                     .extend(self.swap_deck_card_bound(objects, id)?),
                 Instruction::LiveResolvedCardSwap => {
-                    result.events.extend(self.swap_resolved_cards_bound(objects, id)?);
+                    result
+                        .events
+                        .extend(self.swap_resolved_cards_bound(objects, id)?);
                 }
                 Instruction::LiveCardSwap => self.swap_cards_bound(objects, id)?,
                 Instruction::LiveColorDiscard => {
@@ -2747,21 +2757,31 @@ impl NativeSession {
                 }
                 Instruction::LiveSetPiece => {
                     let value = |name| {
-                        self.symbols.lookup(name).and_then(|key| objects.arena.field(id, key))
+                        self.symbols
+                            .lookup(name)
+                            .and_then(|key| objects.arena.field(id, key))
                     };
                     let hero = self.truthy_symbol_bound(objects, value("hero_id"))?;
                     let mut piece = self.truthy_symbol_bound(objects, value("piece_id"))?;
                     if piece.is_none()
                         && let Some(key) = self.truthy_symbol_bound(objects, value("piece_key"))?
                     {
-                        piece = self.truthy_symbol_bound(objects, objects.arena.context_value(key))?;
+                        piece =
+                            self.truthy_symbol_bound(objects, objects.arena.context_value(key))?;
                     }
                     if let (Some(hero), Some(piece)) = (hero, piece) {
-                        if self.world.piece_ids(hero).any(|candidate| candidate == piece) {
-                            objects.arena.set_root(
-                                objects.phases.k(phases::Field::Piece),
-                                ObjectValue::Atom(Datum::Text(piece)),
-                            ).map_err(unsupported)?;
+                        if self
+                            .world
+                            .piece_ids(hero)
+                            .any(|candidate| candidate == piece)
+                        {
+                            objects
+                                .arena
+                                .set_root(
+                                    objects.phases.k(phases::Field::Piece),
+                                    ObjectValue::Atom(Datum::Text(piece)),
+                                )
+                                .map_err(unsupported)?;
                             self.world.acting_piece = Some(piece);
                         } else if mandatory {
                             self.abort_objects(objects)?;
@@ -2898,28 +2918,6 @@ impl NativeSession {
                         id,
                         battle_plan.ok_or_else(|| unsupported("arena battle plan missing"))?,
                     )?;
-                }
-                Instruction::Flow(crate::turn::FlowStep::Respawn(_)) => {
-                    let (next, events) = self.hero_respawn_bound(
-                        objects,
-                        hero_respawn.ok_or_else(|| unsupported("hero respawn plan missing"))?,
-                    );
-                    request = next;
-                    result.events.extend(events);
-                }
-                Instruction::Flow(crate::turn::FlowStep::Cleanup) => {
-                    result.events.extend(self.cleanup_bound(
-                        objects,
-                        cleanup_plan.ok_or_else(|| unsupported("cleanup transaction missing"))?,
-                    ));
-                }
-                Instruction::Flow(
-                    crate::turn::FlowStep::Upgrades | crate::turn::FlowStep::Reset,
-                ) => {
-                    request = self.round_transition_bound(
-                        objects,
-                        round_plan.ok_or_else(|| unsupported("round transition plan missing"))?,
-                    );
                 }
                 Instruction::Flow(crate::turn::FlowStep::Advance) => {
                     let ids = objects.phases.effect_ids(&objects.arena, id)?;
@@ -3144,26 +3142,82 @@ impl NativeSession {
                 _ => return Err(unsupported("unbound shared-object instruction")),
             }
             if let Some(request) = request {
-                let request = self.issue(&mut frame, request)?;
-                let token = match request.id {
-                    RequestToken::Imported(id) => ObjectValue::Atom(Datum::Text(id)),
-                    RequestToken::Generated(id) => ObjectValue::Request(id),
-                };
-                objects
-                    .arena
-                    .set_field(id, objects.request, token)
-                    .map_err(unsupported)?;
-                objects
-                    .arena
-                    .append(objects.stack, ObjectValue::Object(id))
-                    .map_err(unsupported)?;
-                self.stack.push(frame);
-                self.last_request = Some(request.clone());
-                result.request = Some(request);
+                result.request = Some(self.issue_bound_request(objects, id, frame, request)?);
                 return Ok(result);
             }
         }
         Ok(result)
+    }
+    /// Stage the typed session while journaling writes to the authoritative arena.
+    fn transition_bound<T>(
+        &mut self,
+        objects: &mut BoundObjects,
+        step: ObjectId,
+        apply: impl FnOnce(&mut Self, &mut BoundObjects, Frame) -> Result<T>,
+    ) -> Result<T> {
+        let mut candidate = self.clone();
+        candidate.world.inherit_row_undo(&self.world);
+        let parent_recording = objects.arena.is_recording();
+        let checkpoint = objects.arena.begin_rollback();
+        let readonly = objects.readonly.clone();
+        let programs = objects.programs.clone();
+        let copied_bindings = objects.copied_binding_undo.0.len();
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let mut frame = candidate
+                .stack
+                .pop()
+                .ok_or_else(|| unsupported("staged transition frame missing"))?;
+            if !matches!(objects.arena.list_pop(objects.stack).map_err(unsupported)?, Some(ObjectValue::Object(id)) if id == step)
+            {
+                return Err(unsupported("staged transition stack drift"));
+            }
+            frame.request = objects.token(step)?;
+            apply(&mut candidate, objects, frame)
+        }));
+        match result {
+            Ok(Ok(value)) => {
+                objects.arena.commit_rollback(checkpoint);
+                if !parent_recording {
+                    objects.copied_binding_undo.0.truncate(copied_bindings);
+                }
+                *self = candidate;
+                Ok(value)
+            }
+            other => {
+                objects.arena.rollback_to(checkpoint);
+                objects.readonly = readonly;
+                objects.programs = programs;
+                objects.restore_copied_bindings(copied_bindings);
+                match other {
+                    Ok(error) => error,
+                    Err(panic) => std::panic::resume_unwind(panic),
+                }
+            }
+        }
+    }
+    fn issue_bound_request(
+        &mut self,
+        objects: &mut BoundObjects,
+        id: ObjectId,
+        mut frame: Frame,
+        request: NativeRequest,
+    ) -> Result<NativeRequest> {
+        let request = self.issue(&mut frame, request)?;
+        let token = match request.id {
+            RequestToken::Imported(id) => ObjectValue::Atom(Datum::Text(id)),
+            RequestToken::Generated(id) => ObjectValue::Request(id),
+        };
+        objects
+            .arena
+            .set_field(id, objects.request, token)
+            .map_err(unsupported)?;
+        objects
+            .arena
+            .append(objects.stack, ObjectValue::Object(id))
+            .map_err(unsupported)?;
+        self.stack.push(frame);
+        self.last_request = Some(request.clone());
+        Ok(request)
     }
     fn abort_objects(&mut self, objects: &mut BoundObjects) -> Result<()> {
         let truthy = |field| {
@@ -3620,6 +3674,7 @@ mod rollback_tests {
                     max_depth: 64,
                     max_nodes: 10,
                     opponent_policy: OpponentPolicy::Adversarial,
+                    evaluation: Default::default(),
                 },
                 &budget,
             )
@@ -3635,6 +3690,7 @@ mod rollback_tests {
                     max_depth: 2,
                     max_nodes: 1,
                     opponent_policy: OpponentPolicy::Adversarial,
+                    evaluation: Default::default(),
                 },
                 &budget,
             )

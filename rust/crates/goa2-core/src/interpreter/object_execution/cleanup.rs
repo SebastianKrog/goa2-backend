@@ -1,4 +1,4 @@
-//! End-of-round cleanup is staged on an identity-preserving private arena.
+//! End-of-round cleanup preserves authoritative arena identities.
 use super::phases::Field;
 use super::*;
 use crate::{
@@ -7,10 +7,6 @@ use crate::{
     world::CardLifecycle,
 };
 
-pub(super) struct CleanupPlan {
-    session: Box<NativeSession>,
-    events: Vec<NativeEvent>,
-}
 impl NativeSession {
     pub(super) fn cleanup_key(&self, name: &str) -> Symbol {
         self.symbols.lookup(name).unwrap()
@@ -619,6 +615,7 @@ impl NativeSession {
                 .round
                 .checked_add(1)
                 .ok_or_else(|| unsupported("cleanup round overflow"))?;
+            self.world.combat.round = self.round.round;
             self.world.combat.turn = 1;
             objects
                 .arena
@@ -649,39 +646,14 @@ impl NativeSession {
         self.world.refresh_card_auras();
         Ok(events)
     }
-    pub(super) fn preflight_cleanup_bound(
-        &self,
-        objects: &BoundObjects,
-        step: ObjectId,
-    ) -> Result<CleanupPlan> {
-        let mut candidate = self.clone();
-        candidate.world.inherit_row_undo(&self.world);
-        let mut arena = objects.staged_clone();
-        let popped = arena.arena.list_pop(arena.stack).map_err(unsupported)?;
-        if !matches!(popped,Some(ObjectValue::Object(id)) if id==step) {
-            return Err(unsupported("cleanup staged stack drift"));
-        }
-        candidate
-            .stack
-            .pop()
-            .ok_or_else(|| unsupported("cleanup staged frame missing"))?;
-        candidate.objects = Some(arena);
-        let events = candidate
-            .with_live_objects(|session, objects| session.cleanup_direct_bound(objects))?;
-        Ok(CleanupPlan {
-            session: Box::new(candidate),
-            events,
-        })
-    }
     pub(super) fn cleanup_bound(
         &mut self,
         objects: &mut BoundObjects,
-        plan: CleanupPlan,
-    ) -> Vec<NativeEvent> {
-        let mut candidate = *plan.session;
-        *objects = candidate.objects.take().unwrap();
-        *self = candidate;
-        plan.events
+        step: ObjectId,
+    ) -> Result<Vec<NativeEvent>> {
+        self.transition_bound(objects, step, |candidate, objects, _| {
+            candidate.cleanup_direct_bound(objects)
+        })
     }
 }
 
@@ -715,6 +687,8 @@ mod tests {
         assert_eq!(worker.next_step, u64::MAX);
         let after = worker.export_envelope().unwrap();
         assert_eq!(after.state["phase"], "PLANNING");
+        assert_eq!(after.state["round"], worker.world.combat.round);
+        assert_eq!(after.state["turn"], worker.world.combat.turn);
         assert!(
             after.state["execution_context"]
                 .get("should_not_finish")

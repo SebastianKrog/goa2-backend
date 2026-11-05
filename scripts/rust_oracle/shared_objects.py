@@ -93,10 +93,12 @@ def capture(state, compact):
     )
 
 
-def export_state_with_shared_objects(state):
-    from state_codec import export_state_with_instances
+def export_state_with_shared_objects(state, *, instance_exporter=None):
+    if instance_exporter is None:
+        from state_codec import export_state_with_instances
 
-    envelope, _ = export_state_with_instances(state)
+        instance_exporter = export_state_with_instances
+    envelope, _ = instance_exporter(state)
     aliases, objects = capture(state, envelope["state"])
     if aliases:
         envelope["object_bindings"] = aliases

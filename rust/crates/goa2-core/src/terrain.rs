@@ -10,7 +10,19 @@ use std::collections::VecDeque;
 impl NativeWorld {
     /// `actor` is already resolved by the caller (including current-actor fallback).
     pub fn obstacle_for_actor(&self, hex: Hex, actor: Option<Symbol>) -> Result<bool, String> {
-        if self.obstacle(hex) {
+        let Some(index) = self.tile_index(hex) else {
+            return Ok(true);
+        };
+        self.obstacle_for_actor_at(hex, index, actor)
+    }
+
+    fn obstacle_for_actor_at(
+        &self,
+        hex: Hex,
+        index: usize,
+        actor: Option<Symbol>,
+    ) -> Result<bool, String> {
+        if self.obstacle_at(index) {
             return Ok(true);
         }
         let Some(actor) = actor.and_then(|id| self.entity(id)) else {
@@ -154,7 +166,8 @@ impl NativeWorld {
                 };
                 Ok(end != query.start
                     && (queued[index] || (query.ignore_obstacles && terminal[index]))
-                    && (query.ignore_obstacles || !self.obstacle_for_actor(end, actor)?))
+                    && (query.ignore_obstacles
+                        || !self.obstacle_for_actor_at(end, index, actor)?))
             })
             .collect()
     }
@@ -186,7 +199,7 @@ impl NativeWorld {
                 Ok(queued[index]
                     && (query.ignore_obstacles
                         || query.pass_through_obstacles
-                        || !self.obstacle_for_actor(end, actor)?))
+                        || !self.obstacle_for_actor_at(end, index, actor)?))
             })
             .collect()
     }
@@ -201,37 +214,43 @@ impl NativeWorld {
     ) -> Result<(Vec<bool>, Vec<bool>), String> {
         let mut queued = vec![false; self.tile_hexes().len()];
         let mut terminal = queued.clone();
-        if let Some(index) = self.tile_index(start) {
+        let start_index = self.tile_index(start);
+        if let Some(index) = start_index {
             queued[index] = true;
         }
-        let actor_units = actor.into_iter().collect::<Vec<_>>();
-        let units = units.unwrap_or(&actor_units);
-        let mut queue = VecDeque::from([(start, 0)]);
-        while let Some((hex, distance)) = queue.pop_front() {
+        let units = units.unwrap_or(actor.as_slice());
+        let mut queue = VecDeque::from([(start, start_index, 0)]);
+        while let Some((hex, index, distance)) = queue.pop_front() {
             if distance >= range {
                 continue;
             }
-            for next in hex.neighbors() {
+            let neighbors = hex.neighbors();
+            let indices = index.map_or_else(
+                || neighbors.map(|neighbor| self.tile_index(neighbor)),
+                |index| self.neighbor_indices(index),
+            );
+            for (next, index) in neighbors.into_iter().zip(indices) {
                 if !self.effect_connected(start, next, units)?
                     || !self.effect_connected(hex, next, units)?
                 {
                     continue;
                 }
-                let Some(index) = self.tile_index(next) else {
+                let Some(index) = index else {
                     continue;
                 };
-                terminal[index] = true;
-                if queued[index] {
+                // Topology depends on the edge, but obstacle and token
+                // passability are fixed for this tile within the traversal.
+                if std::mem::replace(&mut terminal[index], true) || queued[index] {
                     continue;
                 }
                 if !through
-                    && self.obstacle_for_actor(next, actor)?
+                    && self.obstacle_for_actor_at(next, index, actor)?
                     && !self.passable_token(next, moved)
                 {
                     continue;
                 }
                 queued[index] = true;
-                queue.push_back((next, distance + 1));
+                queue.push_back((next, Some(index), distance + 1));
             }
         }
         Ok((queued, terminal))

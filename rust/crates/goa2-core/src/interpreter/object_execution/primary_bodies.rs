@@ -248,8 +248,11 @@ impl PrimaryRules {
                     Some("topology_anchor") => StatefulPrimary::TopologyAnchor(rows("body")?),
                     Some("faceup_skills") => StatefulPrimary::FaceupSkills(rows("body")?),
                     Some("ignatia_coin") => StatefulPrimary::IgnatiaCoin([
-                        rows("blue")?, rows("orange")?, rows("equilibrium")?,
-                        rows("blue_ultimate")?, rows("orange_ultimate")?,
+                        rows("blue")?,
+                        rows("orange")?,
+                        rows("equilibrium")?,
+                        rows("blue_ultimate")?,
+                        rows("orange_ultimate")?,
                         rows("equilibrium_ultimate")?,
                     ]),
                     Some("ursafar_enraged") => StatefulPrimary::UrsafarEnraged {
@@ -784,11 +787,13 @@ impl NativeSession {
                                     .and_then(|hero| hero.ultimate)
                                     .and_then(|id| self.world.card(id))
                                     .is_some_and(|card| {
-                                        let definition = &self.world.definitions.cards[card.definition];
+                                        let definition =
+                                            &self.world.definitions.cards[card.definition];
                                         definition.printed_id == required
                                             && (self.symbols.name(required) != "twin_strike"
                                                 || (!card.facedown
-                                                    && card.lifecycle == crate::world::CardLifecycle::Passive
+                                                    && card.lifecycle
+                                                        == crate::world::CardLifecycle::Passive
                                                     && definition.effect == required))
                                     })
                             });
@@ -877,7 +882,9 @@ impl NativeSession {
                         variants[usize::from(choice)].clone()
                     }
                     StatefulPrimary::ActingPiece(recipes) => {
-                        let marker = self.symbols.lookup("template-razzle-piece")
+                        let marker = self
+                            .symbols
+                            .lookup("template-razzle-piece")
                             .ok_or_else(|| unsupported("acting-piece operand missing"))?;
                         texts.push((marker, self.world.resolved_actor(owner)));
                         recipes.clone()
@@ -886,32 +893,49 @@ impl NativeSession {
                         if let Some(anchor) = self.world.resolved_position(owner) {
                             let (q, r, s) = anchor.coordinates();
                             let coordinates = [("q", q), ("r", r), ("s", s)];
-                            let locations = objects.phases.root(&objects.arena, Field::Locations)?;
-                            let position = objects.arena.field(locations, owner)
-                                .or_else(|| objects.arena.field(locations, self.world.resolved_actor(owner)));
+                            let locations =
+                                objects.phases.root(&objects.arena, Field::Locations)?;
+                            let position = objects.arena.field(locations, owner).or_else(|| {
+                                objects
+                                    .arena
+                                    .field(locations, self.world.resolved_actor(owner))
+                            });
                             let Some(ObjectValue::Object(position)) = position else {
-                                return Err(unsupported("topology anchor missing from object graph"));
+                                return Err(unsupported(
+                                    "topology anchor missing from object graph",
+                                ));
                             };
-                            let anchor_field = self.symbols.lookup("isolated_hex")
+                            let anchor_field = self
+                                .symbols
+                                .lookup("isolated_hex")
                                 .ok_or_else(|| unsupported("topology anchor field missing"))?;
                             let mut recipes = recipes.clone();
                             for recipe in &mut recipes {
-                                if !matches!(self.steps[recipe.step.instruction].instruction,
-                                             Instruction::LiveCreateEffect) {
+                                if !matches!(
+                                    self.steps[recipe.step.instruction].instruction,
+                                    Instruction::LiveCreateEffect
+                                ) {
                                     continue;
                                 }
                                 let Datum::Object(fields) = &mut recipe.step.fields else {
                                     return Err(unsupported("topology effect fields missing"));
                                 };
-                                let axis = fields.iter().find_map(|(key, value)| {
-                                    match value {
-                                        Datum::Text(axis) if self.symbols.name(*key) == "split_axis" =>
-                                            Some(self.symbols.name(*axis)),
+                                let axis = fields
+                                    .iter()
+                                    .find_map(|(key, value)| match value {
+                                        Datum::Text(axis)
+                                            if self.symbols.name(*key) == "split_axis" =>
+                                        {
+                                            Some(self.symbols.name(*axis))
+                                        }
                                         _ => None,
-                                    }
-                                }).ok_or_else(|| unsupported("topology axis missing"))?;
-                                let split = coordinates.iter().find(|(key, _)| *key == axis)
-                                    .ok_or_else(|| unsupported("unknown topology axis"))?.1;
+                                    })
+                                    .ok_or_else(|| unsupported("topology axis missing"))?;
+                                let split = coordinates
+                                    .iter()
+                                    .find(|(key, _)| *key == axis)
+                                    .ok_or_else(|| unsupported("unknown topology axis"))?
+                                    .1;
                                 for (key, value) in fields {
                                     if self.symbols.name(*key) == "split_value" {
                                         *value = Datum::Int(i64::from(split));
@@ -946,10 +970,14 @@ impl NativeSession {
                         });
                         let hero = self.world.hero(owner).unwrap();
                         let ultimate = hero.level >= 8
-                            && hero.ultimate.and_then(|id| self.world.card(id)).is_some_and(|card| {
-                                self.symbols.name(self.world.definitions.cards[card.definition].printed_id)
-                                    == "chaos_incarnate"
-                            });
+                            && hero
+                                .ultimate
+                                .and_then(|id| self.world.card(id))
+                                .is_some_and(|card| {
+                                    self.symbols.name(
+                                        self.world.definitions.cards[card.definition].printed_id,
+                                    ) == "chaos_incarnate"
+                                });
                         let branch = if equilibrium {
                             2
                         } else {
@@ -1407,17 +1435,17 @@ impl NativeSession {
             Ok(())
         }
         if self.symbols.name(definition.effect) == "ransack" {
-            let supply = self.hero_model_bound(objects, owner)
-                .and_then(|model| {
-                    let field = self.symbols.lookup("piece_supply")?;
-                    objects.arena.field(model, field)
-                });
+            let supply = self.hero_model_bound(objects, owner).and_then(|model| {
+                let field = self.symbols.lookup("piece_supply")?;
+                objects.arena.field(model, field)
+            });
             let Some(ObjectValue::Atom(Datum::Int(supply))) = supply else {
                 return Err(unsupported("Ransack piece supply missing"));
             };
             // The attack and count are followed by one three-step group per
             // potential other piece, up to the printed cap of three.
-            plan.recipes.truncate(2 + 3 * (supply.clamp(1, 4) as usize - 1));
+            plan.recipes
+                .truncate(2 + 3 * (supply.clamp(1, 4) as usize - 1));
         }
         for (index, recipe) in plan.recipes.iter_mut().enumerate() {
             if matches!(mode, PrimaryMode::Passive { raw: true, .. }) {

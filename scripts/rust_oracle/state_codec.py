@@ -128,7 +128,20 @@ class InstanceEncoder:
 
 
 def export_state_with_instances(state):
-    manifest = verify_sources()
+    return _export_state_with_instances(state, verify_sources()["source_sha256"])
+
+
+def verified_instance_exporter():
+    """Verify the frozen checkout once for a single running oracle session."""
+    source_sha256 = verify_sources()["source_sha256"]
+
+    def export(state):
+        return _export_state_with_instances(state, source_sha256)
+
+    return export
+
+
+def _export_state_with_instances(state, source_sha256):
     plain = state.model_dump(mode="json")
     reject_reserved(plain)
     encoder = InstanceEncoder()
@@ -136,7 +149,7 @@ def export_state_with_instances(state):
     envelope = {
         "schema_version": 1,
         "oracle_revision": ORACLE_REVISION,
-        "source_sha256": manifest["source_sha256"],
+        "source_sha256": source_sha256,
         "rules_version": state.rules_version,
         "definitions": encoder.definitions,
         "instances": encoder.instances,

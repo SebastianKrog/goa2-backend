@@ -307,10 +307,17 @@ pub struct NativeWorld {
 }
 impl NativeWorld {
     pub fn compile(source: &StateEnvelope, symbols: &mut Symbols) -> Result<Self, String> {
+        source.validate()?;
+        Self::compile_validated(source, symbols)
+    }
+
+    pub(crate) fn compile_validated(
+        source: &StateEnvelope,
+        symbols: &mut Symbols,
+    ) -> Result<Self, String> {
         if !source.object_bindings.is_empty() {
             return Err("dense world shared-object bindings are not yet compiled".into());
         }
-        source.validate()?;
         let semantic = source.materialize()?;
         let mut entities = Vec::new();
         for (roster_name, team) in semantic["teams"]
@@ -1001,6 +1008,14 @@ impl NativeWorld {
     }
     pub(crate) fn tile_index(&self, hex: Hex) -> Option<usize> {
         self.definitions.geometry.id(hex).map(|id| id.index())
+    }
+    pub(crate) fn neighbor_indices(&self, index: usize) -> [Option<usize>; 6] {
+        self.definitions.geometry.neighbor_indices(index)
+    }
+    pub(crate) fn obstacle_at(&self, index: usize) -> bool {
+        self.definitions
+            .geometry
+            .obstacle_at(index, &self.occupancy)
     }
     pub fn on_map(&self, hex: Hex) -> bool {
         self.definitions.geometry.id(hex).is_some()

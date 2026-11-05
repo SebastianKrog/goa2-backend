@@ -172,13 +172,18 @@ fn apply(session: &mut NativeSession, operation: &Value) -> Value {
 
 #[test]
 fn every_shared_execution_boundary_restores_values_aliases_and_request_generations() {
-    use std::sync::atomic::{AtomicUsize, Ordering};
-    let operations = AtomicUsize::new(0);
     let checked = fixture_parallel::for_each_case(cases(), |case| {
         let mut session =
             NativeSession::compile(serde_json::from_value(case["envelope"].clone()).unwrap())
                 .unwrap();
-        for op in case["operations"].as_array().unwrap() {
+        let operations = case["operations"].as_array().unwrap();
+        assert_eq!(
+            operations.len(),
+            case["expected"].as_array().unwrap().len(),
+            "{} must have one expected record per operation",
+            case["name"]
+        );
+        for op in operations {
             let envelope = session.export_envelope().unwrap();
             let mut restored = NativeSession::compile(envelope.clone()).unwrap();
             // last_request is a transport convenience, not persisted semantics.
@@ -186,25 +191,21 @@ fn every_shared_execution_boundary_restores_values_aliases_and_request_generatio
                 request.id = restored.import_request_token(&session.request_token(request.id));
                 request
             });
-            assert_eq!(restored.export_envelope().unwrap().state, envelope.state);
-            assert_eq!(
-                restored.export_envelope().unwrap().board_keys,
-                envelope.board_keys
-            );
-            assert_eq!(
-                restored.export_envelope().unwrap().object_bindings,
-                envelope.object_bindings
-            );
+            {
+                let restored_envelope = restored.export_envelope().unwrap();
+                assert_eq!(restored_envelope.state, envelope.state);
+                assert_eq!(restored_envelope.board_keys, envelope.board_keys);
+                assert_eq!(restored_envelope.object_bindings, envelope.object_bindings);
+            }
+            drop(envelope);
             assert!(
                 apply(&mut session, op) == apply(&mut restored, op),
                 "{}: {op}",
                 case["name"]
             );
-            operations.fetch_add(1, Ordering::Relaxed);
         }
     });
-    assert_eq!(checked, 14255);
-    assert_eq!(operations.load(Ordering::Relaxed), 74472);
+    assert_eq!(checked, 17_347);
 }
 
 #[test]
@@ -964,23 +965,21 @@ fn deferred_turn_input_and_generation_state_are_private_between_workers() {
 }
 
 #[test]
-fn unbound_round_consumers_reject_before_popping_the_live_step_or_mutating_state() {
+fn round_end_consumers_advance_identically_after_restore() {
     let mut session =
         NativeSession::compile(source("object-execution-turn-boundary-no-effects-4")).unwrap();
     session.end_turn().unwrap();
     session.advance_prefix(1).unwrap();
     let before = session.export_envelope().unwrap();
     let mut restored = NativeSession::compile(before.clone()).unwrap();
-    for worker in [&mut session, &mut restored] {
-        assert!(
-            matches!(worker.advance(&ExecutionBudget::default()), Err(EngineError::Unsupported(message)) if message.contains("battle/cleanup"))
-        );
-        let after = worker.export_envelope().unwrap();
-        assert_eq!(
-            serde_json::to_value(after).unwrap(),
-            serde_json::to_value(&before).unwrap()
-        );
-    }
+    let operation = json!({"kind": "advance"});
+    assert!(apply(&mut session, &operation) == apply(&mut restored, &operation));
+    let after = session.export_envelope().unwrap();
+    assert_ne!(after.state, before.state);
+    assert_eq!(
+        serde_json::to_value(after).unwrap(),
+        serde_json::to_value(restored.export_envelope().unwrap()).unwrap()
+    );
 }
 
 #[test]

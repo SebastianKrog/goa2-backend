@@ -7,10 +7,6 @@ use crate::{
     world::CardLifecycle,
 };
 
-pub(super) struct RoundTransitionPlan {
-    session: Box<NativeSession>,
-    request: Option<NativeRequest>,
-}
 impl NativeSession {
     pub(super) fn sync_hero_items_bound(&mut self, objects: &BoundObjects) -> Result<()> {
         for (hero, model) in &objects.phases.heroes {
@@ -366,40 +362,18 @@ impl NativeSession {
             discard: false,
         }))
     }
-    pub(super) fn preflight_round_transition_bound(
-        &self,
-        objects: &BoundObjects,
-        step: ObjectId,
-        reset: bool,
-    ) -> Result<RoundTransitionPlan> {
-        let mut session = self.clone();
-        session.world.inherit_row_undo(&self.world);
-        let mut arena = objects.staged_clone();
-        if !matches!(arena.arena.list_pop(arena.stack).map_err(unsupported)?,Some(ObjectValue::Object(id)) if id==step)
-        {
-            return Err(unsupported("round transition staged stack drift"));
-        }
-        session
-            .stack
-            .pop()
-            .ok_or_else(|| unsupported("round transition frame missing"))?;
-        session.objects = Some(arena);
-        let request =
-            session.with_live_objects(|s, o| s.round_transition_direct_bound(o, step, reset))?;
-        Ok(RoundTransitionPlan {
-            session: Box::new(session),
-            request,
-        })
-    }
     pub(super) fn round_transition_bound(
         &mut self,
         objects: &mut BoundObjects,
-        plan: RoundTransitionPlan,
-    ) -> Option<NativeRequest> {
-        let mut session = *plan.session;
-        *objects = session.objects.take().unwrap();
-        *self = session;
-        plan.request
+        step: ObjectId,
+        reset: bool,
+    ) -> Result<Option<NativeRequest>> {
+        self.transition_bound(objects, step, |candidate, objects, frame| {
+            candidate
+                .round_transition_direct_bound(objects, step, reset)?
+                .map(|request| candidate.issue_bound_request(objects, step, frame, request))
+                .transpose()
+        })
     }
 }
 

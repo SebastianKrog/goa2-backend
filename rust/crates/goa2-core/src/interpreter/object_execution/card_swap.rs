@@ -23,7 +23,11 @@ impl NativeSession {
         objects: &mut BoundObjects,
         step: ObjectId,
     ) -> Result<Option<NativeEvent>> {
-        let text = |name| self.symbols.lookup(name).and_then(|key| objects.arena.field(step, key));
+        let text = |name| {
+            self.symbols
+                .lookup(name)
+                .and_then(|key| objects.arena.field(step, key))
+        };
         let context = |name| -> Result<Option<Symbol>> {
             let Some(key) = self.truthy_symbol_bound(objects, text(name))? else {
                 return Ok(None);
@@ -34,7 +38,8 @@ impl NativeSession {
             Some(target) => Some(target),
             None => context("hero_key")?,
         };
-        let (Some(target), Some(a), Some(b)) = (target, context("card_a_key")?, context("card_b_key")?)
+        let (Some(target), Some(a), Some(b)) =
+            (target, context("card_a_key")?, context("card_b_key")?)
         else {
             return Ok(None);
         };
@@ -45,11 +50,15 @@ impl NativeSession {
         let Some(model) = self.hero_model_bound(objects, target) else {
             return Ok(None);
         };
-        let Some(ObjectValue::Object(played)) = objects.arena.field(model, objects.phases.k(Field::Played))
+        let Some(ObjectValue::Object(played)) =
+            objects.arena.field(model, objects.phases.k(Field::Played))
         else {
             return Err(unsupported("resolved swap played list missing"));
         };
-        let cards = objects.arena.sequence(played).ok_or_else(|| unsupported("invalid played list"))?;
+        let cards = objects
+            .arena
+            .sequence(played)
+            .ok_or_else(|| unsupported("invalid played list"))?;
         let find = |printed| {
             cards.iter().enumerate().find_map(|(index, value)| {
                 let ObjectValue::Atom(Datum::Instance(id)) = value else {
@@ -67,15 +76,25 @@ impl NativeSession {
         self.world.normal_card(first.1).map_err(card_error)?;
         self.world.normal_card(second.1).map_err(card_error)?;
         for (slot, other) in [(first, second), (second, first)] {
-            objects.arena.set_index(played, slot.0, ObjectValue::Atom(Datum::Instance(other.1.0)))
+            objects
+                .arena
+                .set_index(
+                    played,
+                    slot.0,
+                    ObjectValue::Atom(Datum::Instance(other.1.0)),
+                )
                 .map_err(unsupported)?;
             self.swap_card_flags_bound(objects, slot.1, CardLifecycle::Resolved, other.2, other.3)?;
         }
         self.sync_card_collections_bound(objects)?;
         self.world.refresh_card_auras();
-        Ok(Some(NativeEvent::ResolvedCardsSwapped { actor: self.planning.actor, target, a, b }))
+        Ok(Some(NativeEvent::ResolvedCardsSwapped {
+            actor: self.planning.actor,
+            target,
+            a,
+            b,
+        }))
     }
-
 
     pub(super) fn swap_cards_bound(
         &mut self,

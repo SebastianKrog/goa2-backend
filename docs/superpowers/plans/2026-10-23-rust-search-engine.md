@@ -9,8 +9,23 @@ Date: 2026-10-23.
 
 Build a native Rust rules/simulation engine optimized for repeated legality
 queries and game-tree search. Use the legality-optimized Python backend as the
-rules oracle. Keep Python as the authoritative live game server and use Rust to
-propose actions, with Python validating the final submission.
+rules oracle only. Rust generates, ranks and searches candidates. Python
+checks rule behavior on selected decisions, sequences or game traces. The
+sole current deliverable is a correct, efficient search
+engine that can return useful decisions within its budget. Develop and verify
+it offline.
+
+1. **Engine acceptance.** Establish rules parity, legal best-so-far decisions,
+   hidden-information correctness and useful throughput and latency on the
+   reference workload and a diverse corpus.
+2. **Playing strength.** Once the engine passes those gates, compare and tune
+   search methods and parameters until the bot is a credible opponent.
+
+Layout Lab integration and server API integration are deferred outside this
+plan's completion gates. Any future work on live adapters, API endpoints,
+controller options, UI, or live storage and submission will be scoped
+separately. The local worker protocol and offline Python oracle remain tools
+for testing and measurement.
 
 The starting search will be iterative-deepening, team-aware minimax with
 alpha-beta pruning. Add an explicit simultaneous-planning layer and sample
@@ -33,8 +48,8 @@ Initial constraints:
 - Use no neural network, model runtime or training dependency.
 - Keep all inner-loop rules, move generation and evaluation in Rust. Python calls
   per node or per simulated decision would undermine the design.
-- Do not restart the lab, change its selected bot or replace the live backend
-  while implementing or benchmarking. Integration is an explicit later step.
+- Keep implementation and benchmarks offline. Defer Layout Lab and server API
+  integration until the engine and playing-strength work is accepted.
 - Prefer WSL for builds, tests, benchmarks and worker execution; keep artifacts
   on its Linux filesystem when practical. Exclude NN/model/training tests.
 - Initially add the workspace inside `goa2-backend-bots`; do not create another
@@ -278,10 +293,9 @@ Classify each boundary by its actual decision owner:
 - Chance: genuine rule randomness with known probabilities.
 - Automatic: no player decision; execute the rules directly.
 
-Make the team/controller model explicit. The current Python ISMCTS folds other
-heroes into an environment policy; adversarial minimax intentionally changes
-that behavior. Rules parity does not require the new bot to choose the same
-move as ISMCTS. Preserve a fixed-policy compatibility mode for benchmarks.
+Make the team/controller model explicit. Preserve a fixed Rust continuation
+policy for reproducible benchmarks. Verify the resulting actions and rule
+transitions with Python.
 
 Iterate over **completed game-turn horizons**, initially one then the full
 reference two turns, before attempting deeper levels. Intermediate card/action
@@ -306,8 +320,10 @@ available to the bot.
 
 The Rust session can project player-scoped facts using stable printed card IDs.
 It includes public hero resources, positions, and reveals plus the requesting
-hero's own cards. Other heroes' hand sizes, card identities, and commitment
-buffers are excluded. A source-pinned catalog now enumerates ordinary upgrade
+hero's own cards. It includes each hero's public hand count, as Python does.
+Other heroes' card identities and commitment buffers are excluded. The
+ordinary planning sampler rejects a reconstructed pool smaller than the
+public count and still considers unrevealed choices in the joint epoch. A source-pinned catalog now enumerates ordinary upgrade
 paths and filters them by public items and card reveals. Nonstandard hero
 provenance stays unavailable. Seeded ordinary planning hands are reconstructed
 from the sampled path and public played/discarded cards. Facedown cards in those
@@ -323,10 +339,112 @@ order. The bounded pure maximin evaluator now scores supplied team and opponent
 plans on one sampled world through native resolution. It reports complete
 rows and evaluated cells. Native generation can cap the joint action sets
 and reports their uncapped sizes. The requesting hero's choices vary first.
-Aggregation across worlds and broader world reconstruction remain open.
+Scoped planning can aggregate across worlds. Broader world reconstruction
+remains open.
+
+Joint planning can also complete an already open second-card slot. In that
+case first_card is the next card to submit, or null to finish planning, and
+second_card is null. The existing first commitment is preserved.
+
+#### Public evidence and upgrade batches
+
+The sampled-planning CLI accepts optional per-hero upgrade_checkpoints. Each
+entry supplies a completed level and cumulative ordinary card-item totals
+in Attack, Defense, Movement, Initiative, Range, Radius order. The CLI also
+accepts public_upgrade_batches with the hero, revision, and before/after
+checkpoints. Replay orders merged records by revision, ignores exact
+duplicates and rejects conflicting records or impossible chronology. Both
+worker paths use the replayed totals as constraints. The offline runner
+captures completed batches from Python's public reveal snapshots and passes
+them into subsequent searches. It tracks standard-provenance heroes from
+level one, and abandons cumulative inference if a reveal is missed or the
+public delta is inconsistent. The recorder can save and restore a versioned
+JSON checkpoint bound to a game ID, including the public baseline for an
+unrevealed batch. The verifier reloads mid-batch and after reveal. Live
+capture and storage wiring remain open.
+
+
+The upgraded rollout verifier uses Python's level-award logic and submits
+legal 3-to-6 and 1-to-8 batches through the simultaneous upgrade prompt.
+The latter includes six card choices and the automatic ultimate unlock.
+Across all six bundled maps, aggregate evidence replay with duplicates
+produced the same Rust plan as direct checkpoints. Python accepted each
+plan. The split 3-to-6 case also exercises out-of-order history.
+
+1. Keep a replayable public evidence stream per hero, ordered by game event or
+   observation revision. Record level and visible item totals before and after
+   each completed upgrade batch, public card reveals, and changes in visible
+   played, resolved and discard slots. Include public hand size and facedown
+   slot counts where the rules expose them. Carry this evidence across rounds,
+   reconnects and saved checkpoints. If observation begins midgame, start from
+   all hypotheses consistent with the public snapshot.
+2. Extend each surviving loadout once per level crossed, using the observed
+   before and after levels as the bounds. Three-level batches are expected in
+   play, and the same algorithm handles larger legal batches up to the level
+   cap. Apply each crossed level's rules, including ultimate unlocks, and
+   filter the histories against the aggregate public item change. For example,
+   a level 3 to 6 jump crosses levels 4, 5 and 6. If all three rewards become
+   visible together, keep every legal assignment consistent with the totals.
+   Narrow the assignment when an intermediate checkpoint or a later reveal
+   distinguishes the histories. Account separately for publicly attributable
+   item gains from effects or abilities.
+3. Apply visible card identities as constraints on ownership as well as zone
+   membership. A revealed Tier II card can prove a historical upgrade even
+   after a Tier III replacement. A card currently visible in a played or
+   discard slot constrains the pool and is unavailable in hand. Use those
+   constraints even when a reveal-history entry is missing. Handle known
+   returns, swaps and other card changes according to their rules. Preserve
+   uncertainty when evidence is missing or provenance is unsupported.
+4. Cache the resulting beliefs by public evidence revision. Keep upgrade
+   histories distinguishable when they constrain later deductions. Group
+   equivalent current card pools for search and define their sampling weights
+   explicitly. Separate uncertainty about card ownership, current hand
+   membership and facedown commitments. Use a uniquely inferred pool
+   directly and sample only the unresolved facts. On contradictory evidence,
+   surface the inconsistency and use a documented public-only fallback.
+
+#### Team knowledge modes
+
+Every bot in every mode knows the full static card catalog for all heroes,
+including printed effects, upgrade pairs and item rewards. Use one of four
+mutually exclusive modes per team.
+
+| Mode | Information and planning behavior |
+| --- | --- |
+| **True rules** | Each bot sees its own private cards and public evidence. Allied choices and hands follow standard visibility. |
+| **Coordinated** | Same-team bots share exact hands and commitments. Search chooses a joint plan for those bots. Allied humans' facedown choices remain uncertain. |
+| **Coordinated + show** | Coordinated bots show their committed choices to allied humans before public reveal. Start search without waiting for human choices and model those choices as uncertain. This is the preferred mode for interactive play. |
+| **Coordinated + know same-team humans** | Coordinated bots can see allied humans' committed cards before public reveal. Treat those commitments as fixed inputs and optimize the bots' joint plan around them. An allied human's uncommitted hand stays private. This mode has the most information for team play. |
+
+Opponents' private cards stay outside the observation in all modes. Sharing
+with humans is limited to the show mode. Build the search observation at a
+trusted boundary from the public evidence and the mode's explicitly permitted
+private facts. Give the planner control only over bot slots. In know mode,
+handle uncommitted humans with a bounded wait or an uncertain-choice policy.
+Key search results by observation revision and revalidate if an allowed
+commitment is withdrawn or replaced. Keep the mode and evidence revision in
+cache keys so knowledge cannot cross modes, teams or viewers.
+
+The sampled-planning CLI accepts an optional bot_team object with mode and
+bot_ids for trusted callers. Scoped planning searches bot commitments against
+uncertain replies and returns only bot commitments. Optional worlds selects
+one to eight equally weighted worlds from the request seed. The planner uses
+the same worlds for every candidate and maximizes the mean of the per-world
+worst evaluated replies. A row is eligible for scoring only when all capped
+replies have been evaluated in every sampled world. Scoped planning can
+prepare worlds and score a candidate across them with one to four workers.
+Workers share a deadline and draw nodes from one atomic cap. A worker can
+use nodes other worlds leave unused. Scores merge in seed order, and only
+fully evaluated candidates are eligible. The trusted worker
+operation show_bot_commitments projects committed printed card IDs for an
+allied human viewer in show mode. Verify this projection offline with a
+trusted roster. Authentication, live revalidation and UI delivery belong
+to deferred integration.
+
+#### Search and verification
 
 1. Build the root observation from public facts and the acting hero's permitted
-   private information. Preserve teammate secrecy where Python does.
+   private information under the configured team knowledge mode.
 2. Sample consistent worlds from card/loadout provenance, public reveals,
    upgrades and known commitments. Use the same world sample set across root
    alternatives to reduce comparison noise.
@@ -345,9 +463,17 @@ Aggregation across worlds and broader world reconstruction remain open.
    incomplete matrix as an exact minimax value.
 7. Track strategy fusion: independently optimal continuation in each sampled
    world can assume knowledge the actual player lacks. Share policies across
-   indistinguishable information sets where supported, compare against the
-   existing ISMCTS baseline, and retain an information-set search option if the
-   determinized minimax policy plays worse despite greater speed.
+   indistinguishable information sets where supported. Compare a Rust
+   information-set policy with determinized minimax in Rust-only play tests
+   if strategy fusion limits playing strength.
+
+Resolution search accepts an optional planning_sample_seed for a turn rollout.
+At each future planning epoch it reconstructs ordinary hidden hands from the
+branch's public state and keeps the perspective hero's hand. The seed is
+stable across alternatives at the same epoch. The same optional public
+upgrade batches or checkpoints used for planning search can constrain those
+rollouts. This option samples future planning only. Resolution decisions before that boundary still use the
+imported state, and unsupported hand provenance rejects the search.
 
 A minimum over adversarial actions is different from an expectation over belief
 samples. Define any risk-sensitive aggregation separately. Rule chance,
@@ -361,11 +487,31 @@ initial native heuristic ranking. Check a monotonic deadline and cancellation
 flag at bounded node/step intervals, including inside long automatic sequences.
 Reserve time for transport, final Python validation and submission.
 
+The diagnostic worker starts the deadline when it receives a complete request
+line. JSON decoding, upgrade replay and native root import consume that budget.
+Native import checks the deadline on entry and exit. The Python diagnostic
+client can bound a complete exchange, including pipe I/O. On timeout it
+terminates and retires the directly launched worker so a partial response
+cannot be reused. The scoped oracle run uses a 12-second outer budget for
+a 10-second native request. The live adapter still needs to reserve its own
+time for final Python validation and submission.
+
 Publish progress only after a coherent unit completes: a root alternative across
 the required world samples, or a whole search depth. Preserve the best fully
 completed result. A partially evaluated branch must not overwrite it simply
 because its provisional score is high. Return completed depth, sample coverage,
 principal variation, node counts, deadline status and fallback reason.
+
+Scoped planning prepares a fallback from the live controlled slots before
+sampling hidden worlds. A deadline or cancellation during world preparation
+returns that unscored fallback with prepared and requested world counts.
+The diagnostic Python caller continues to use its own first-legal fallback
+when no native score was completed.
+
+Resolution search reports whether it solved the tree, completed the requested
+depth, reached the node limit or deadline, or was cancelled. The stop reason
+is separate from score kind and completed depth. An interrupted iteration can
+still return the earlier completed result or a scored fallback.
 
 On unsupported rules, incompatible content, engine mismatch or worker failure,
 fall back for the **whole root decision** to the existing validated Python path.
@@ -402,6 +548,12 @@ Path-dependent guards, repetition history and remaining step budgets must be
 represented or verified before reuse. Bound cache memory; never store interrupted
 searches as exact values. A cache hit cannot bypass legality, expiry, advancement
 limits or deadlines, and cannot invent completed-iteration counts.
+
+The search requests accept an optional evaluation field. material_position is
+the existing default. lab_attack_range_v1 uses the verified lab evaluator
+throughout native search, including immediate fallbacks and rollout leaves.
+Nonterminal scores use a fixed-point scale of 999,999 so alpha-beta comparisons
+stay integral and terminal wins and losses retain priority.
 
 ## 8. Python oracle and differential validation
 
@@ -445,19 +597,28 @@ add generated games and explicit boundary cases. Include:
   actual hidden cards while preserving the player's observation must not change
   the bot's inputs or seeded policy merely by reading server-private state.
 
-For each supported fixture, compare legal action sets and canonical order,
-legal/illegal batch verdicts, first sequence failure, post-action state and event
-order. Randomly walk both engines with the same canonical actions and explicit
-rule randomness. On mismatch, save the smallest seed/state/sequence as a permanent
-regression before continuing the port.
+For search-only changes, generate candidates in Rust and send selected actions
+or sequences to Python for rule validation. Use focused accepted-choice checks
+when they cover the risk, and complete game or boundary replays when state,
+event order, or cumulative behavior matters. Batch validation where it reduces
+oracle overhead. Keep Python out of the search loop and skip exhaustive Python
+move enumeration in routine search verification. Time only Rust in performance
+benchmarks and compare playing strength only against Rust opponents. Earlier
+cross-language timings below are historical.
 
-Add exhaustive tiny-board action enumeration and finite-tree minimax versus
-alpha-beta tests. Add make/unmake round trips, incremental-hash recomputation,
+When Rust rule execution or move generation changes, expand differential
+coverage around the affected rules. Use targeted action-set comparisons only
+when checking that generation includes all required choices. Compare verdicts,
+first sequence failure, post-action state and event order as relevant. Save
+the smallest reproducer for any mismatch.
+
+Use exhaustive tiny-board enumeration and finite-tree minimax versus
+alpha-beta tests within Rust. Add make/unmake round trips, incremental-hash recomputation,
 TT-on/off equivalence, cache invalidation, deadline/cancellation and worker
 isolation tests. Python's current passing suite is a source of fixtures and
 expected semantics, not a test suite Rust automatically inherits.
 
-## 9. Integration and parallel execution
+## 9. Offline verification and parallel execution
 
 Start with a persistent Rust worker process and a versioned request protocol.
 Load immutable definitions once; send one root observation/world-sampling request
@@ -465,10 +626,91 @@ and return a canonical action plus diagnostics. Use JSON at this outer boundary
 first, never in the search loop. Profile before considering a Python extension
 or binary transport. Do not spawn a new process for each simulated decision.
 
-The Python adapter verifies root identity, actual current player/request and final
-action legality before submitting through the existing backend path. Detect stale
-roots and cancel obsolete searches. Expose the new bot as an explicit optional
-choice only after shadow-mode parity; do not change the default bot silently.
+The offline harness verifies root identity, the current player and prompt,
+and final action legality against Python. Exercise stale roots, cancellation,
+worker failures and fallback with local fixtures. These checks require no
+running lab or server API.
+
+The offline Python planning validator rejects stale revisions, unauthorized
+heroes, physical cards outside the searched hand and results without a
+completed score. It checks the complete decision prefix with Python sequence
+legality. The offline resolution validator also requires the imported live
+prompt token, an eligible bot responder, and a legal selection. The live
+caller must supply trusted ownership and revisions and hold the state stable
+through validation and submission.
+
+The offline rollout verifier's shadow mode submits real planning and
+resolution snapshots to a persistent worker and checks returned moves with
+Python. A separate first-legal control run verifies the shadow observer did
+not change play. Four-turn runs on Forgotten Island and Magma and Ice
+validated 8 planning and 75 resolution recommendations without fallback.
+The diagnostic uses a two-second native and four-second transport budget.
+Live opt-in remains separate.
+
+The opt-in native play diagnostic applies validated recommendations through
+the Python engine, using the same first-legal fallback for a rejected result.
+With a two-turn rollout horizon it applied 8 planning and 76 resolution
+recommendations over four turns on each of the same two maps, with no
+fallback. One resolution choice differed from Python's first option. This
+exercises submission and advancement offline. Playing-strength comparison
+remains open.
+
+With future-planning sampling enabled, the same offline play run again
+validated all 84 recommendations without fallback. The iterate build's
+end-to-end resolution latency was 224–241 ms p50 and 276–315 ms p95 across
+the two maps (38 decisions each). Planning was 253–277 ms p50 and 318–491 ms
+p95 (four decisions each). These timings include Python envelope export and
+its oracle source verification, worker request and response, and final
+Python validation. Submission, scheduling and full live latency remain
+unmeasured.
+
+Verifying the frozen sources once per offline run preserves per-state lossless
+export checks. On 12 alternating pairs for one Magma and Ice opening, identical
+envelopes took 78.1 ms with per-export verification and 42.2 ms with a verified
+export session. The four-turn sampled play rerun validated all 84 decisions.
+Resolution p50 was 192–208 ms and planning p50 was 221–230 ms.
+
+In the historical versus-Simple smoke test, Arien's team used native search
+with lab_attack_range_v1 and the opposing team used the pinned Python
+heuristic. That heuristic also handled native fallback in those runs. Both four-turn games reached
+round 2 after 16 native planning and 41 native resolution choices with no
+fallback. This is a matchup integration check. Longer side-swapped games,
+complete resolution information masking and comparison with non-neural
+ISMCTS remain open.
+
+The side-swapped Simple matchup exposed team-addressed prompts beyond
+initiative ties. Search, choice generation and input validation now use
+the same ownership check for team addresses. Twelve-turn games on both
+maps with Rust on each team reached round 4 with 96 validated native
+planning and 236 resolution choices and zero fallback. All four games
+were still in progress at the cutoff with six lives per team.
+
+Historical benchmark before Python was restricted to rules validation.
+The matchup runner also supported non-neural Python ISMCTS. Four side-swapped
+four-turn games used the same lab evaluator, two-turn horizon and configured
+350 ms search budget. Rust applied 32 planning and 79 resolution choices
+without fallback. These are search budgets, with export and validation
+outside the native timer and total native latency reported separately. All
+games were unfinished with equal lives at the cutoff. This verifies the
+comparison path without establishing relative strength.
+
+The current verifier no longer runs Python opponents or times Python
+rollouts. Earlier matchup and paired-timing measurements are historical.
+The current offline Python path validates or replays rule transitions.
+
+The offline_match worker operation runs both policies and the entire game
+transition loop in Rust. A depth-zero policy is the fixed first-legal baseline.
+Four side-swapped four-turn smoke matches on Forgotten Island and Magma and Ice
+reached the next round with zero fallback. The search candidate used depth one,
+a two-turn continuation, the lab evaluator, a 4,096-node cap and a one-second
+deadline. All matches remained undecided. This verifies the runner, with
+full-game strength evaluation deferred until engine acceptance.
+
+The match worker can export its chosen commitments, resolution selections
+and final state for untimed Python replay. Four side-swapped 12-turn runs
+on the two smoke-test maps validated 513 planning batches and resolution
+inputs in total. Python selected no moves in these replays and reached
+the same final states.
 
 Parallelize independent worlds/root alternatives after serial parity and budget
 handling are stable. Each worker owns mutable state, undo log, arenas and initially
@@ -494,15 +736,14 @@ Measure these separately:
 | Minimax nodes/leaves/s | Clearly defined native search expansion/evaluation counts, not simulations |
 | Decision latency/quality | Root import, sampling, search, worker overhead, final Python validation; p50/p95 and fallback rate |
 
-A native compatibility-rollout benchmark must execute the same two-turn rules,
-reference evaluator and policy semantics as Python. Use fixed seeded random
-streams for comparisons. Recorded action/RNG tapes may help differential testing,
-but a benchmark that merely replays preselected actions excludes policy work
-and cannot establish the full-simulation target.
+Time complete Rust rollouts under a declared two-turn horizon, evaluator and
+continuation policy. Include sampling, candidate generation and policy work.
+Use fixed seeds and validate representative actions or replays in Python
+outside the timer. Record action or RNG tapes for validation where useful.
 
-First reproduce the saved 1,000-iteration workload without a deadline in both
-engines. Then run a fixed diverse corpus, reporting per-position results and slow
-percentiles rather than only an opening-position average. Include dense combat,
+Reproduce the saved 1,000-iteration workload in Rust if the saved position is
+available. Then run a fixed diverse corpus, reporting per-position results
+and slow percentiles rather than only an opening-position average. Include dense combat,
 planning, effects-heavy and multi-lane positions. Report cache hits separately;
 do not count incomplete, zero-horizon or fabricated repeated visits as completed
 simulations. Reference settings cannot be shortened to pass a timing gate.
@@ -510,14 +751,29 @@ simulations. Reference settings cannot be shortened to pass a timing gate.
 Success requires demonstrated 1,000 full two-turn simulations/s on the declared
 reference workload, plus disclosed corpus performance and unchanged semantics.
 If the broader corpus misses the target, document the remaining gap and keep the
-performance work incomplete. Separately assess alpha-beta decision quality at
-fixed wall time against Simple and the current non-neural ISMCTS; engine speed
-and playing strength are independent acceptance gates.
+performance work incomplete.
+
+### Playing-strength tuning after engine acceptance
+
+Use the verified simulator and accepted engine configuration as the control.
+Compare search methods and tune depth, turn horizon, world count, action-set
+width, move ordering, opponent and continuation policy, evaluation weights,
+and time allocation. Treat the two-turn reference configuration as a fixed
+parity and performance benchmark. Candidate playing configurations may vary.
+
+Compare Rust search configurations against a fixed Rust baseline at fixed
+wall-clock decision budgets. Use paired, side-swapped games across seeds,
+maps and rosters, including difficult midgame positions. Use Python solely
+to validate selected decisions or replay rule outcomes. Report completed-game outcomes, move
+quality on reviewed positions, fallback rate and decision latency. Set the
+strength acceptance threshold before evaluating the final candidate and
+confirm the chosen settings on held-out games. Short smoke games verify
+execution only.
 
 ## 11. Implementation milestones
 
 Each milestone produces reviewable code, fixtures and recorded measurements.
-Correctness gates precede replacing Python behavior.
+Engine correctness and efficiency gates precede playing-strength tuning.
 
 | Milestone | Deliverables | Exit gate |
 | --- | --- | --- |
@@ -529,8 +785,8 @@ Correctness gates precede replacing Python behavior.
 | 5. Serial iterative search | Reference evaluation; fixed-policy compatibility benchmark; team-aware alpha-beta; deadlines | Exhaustive-tree/TT equivalence; completed best-so-far result; no hidden budget bypass |
 | 6. Hidden/simultaneous planning | Observation exporter; consistent beliefs; planning epochs; tested maximin/matrix policy | No-leakage and simultaneous-choice tests; supported planning/second-card games |
 | 7. Full rule coverage | All heroes/maps/effects and declared rules versions; minimized regressions | No unsupported transition reachable for the advertised coverage; full parity corpus passes |
-| 8. Parallelism and tuning | Worker-local execution; measured allocation/layout/ordering improvements | Deterministic serial baseline retained; real throughput/latency improvement; bounded memory |
-| 9. Lab integration | Optional Rust bot adapter; shadow mode; Python final legality check; fallback telemetry | End-to-end games, stale-root/deadline/failure tests; explicit enablement only |
+| 8. Parallelism and engine performance | Worker-local execution; measured allocation/layout/ordering improvements | Deterministic serial baseline retained; real throughput/latency improvement; bounded memory |
+| 9. Playing strength | Compare and tune search methods and parameters offline | Credible play under the agreed budget, with results against a fixed Rust baseline and held-out validation |
 
 Milestones 3â€“6 can use a declared small roster for development, but do not declare
 the engine complete from a special-case Arien/Brogan opening or exclude difficult
@@ -545,12 +801,23 @@ coverage, full-simulation throughput and adversarial playing strength.
 - [ ] Make/unmake, hashing, caches and parallel workers preserve independence.
 - [ ] Actual decision ownership and consecutive same-team choices handled.
 - [ ] Hidden information and simultaneous planning treated explicitly and tested.
+- [ ] Public upgrade batches and reveals survive replay and reconnect. Test
+  single gains, two-level batches, a 3-to-6 jump, and the largest legal batch.
+  Verify ambiguous assignments survive aggregate evidence and narrow when
+  new evidence arrives. Cover effect-derived items,
+  reveals that collapse a pool, and resolved/discarded cards without history.
+- [ ] Test all four knowledge modes at the offline observation and worker boundaries.
+  Swapping hidden human or opponent cards with public evidence held fixed must
+  preserve same-seed, same-budget choices unless the changed commitment is
+  expressly visible in know mode. Check that controlled teammates' permitted
+  cards can affect joint plans, and that show mode starts without human input
+  and publishes only allied bot commitments.
 - [ ] Two-game-turn reference horizon and evaluator preserved in parity benchmarks.
 - [ ] Iterative search returns the best completed result within its real deadline.
 - [ ] Unsupported branches and stale roots trigger whole-decision fallback.
 - [ ] Full-simulation target measured honestly; minimax counters kept separate.
-- [ ] Playing strength evaluated at fixed time without neural models.
-- [ ] Optional integration validated without silently replacing the live lab bot.
+- [ ] After engine acceptance, select and validate playing settings at fixed
+  decision budgets using Rust-only opponents and a fixed Rust baseline.
 
 ## Algorithm references
 
@@ -562,8 +829,7 @@ correctness and strength gates above.
 - Cowling, Powley and Whitehouse, [Information Set Monte Carlo Tree Search](https://eprints.whiterose.ac.uk/id/eprint/75048/1/CowlingPowleyWhitehouse2012.pdf)
   (2012): primary treatment of hidden information, simultaneous moves and
   determinization/strategy-fusion limitations. This motivates the information
-  boundary and comparative ISMCTS gate; it does not establish that alpha-beta
-  will be stronger for GoA2.
+  boundary and informs comparison of Rust search methods.
 
 
 ## Implementation progress: ordinary combat closure
@@ -6118,9 +6384,9 @@ Next verification/implementation priorities after this family:
 - [ ] Verify current defense, passive, filter and world interactions against the
   frozen Python engine across the full roster. Catalog coverage alone does not
   prove those interactions or complete-game parity.
-- [x] Establish a fair Rust/Python two-turn simulation benchmark with imports,
-  protocol JSON and snapshot export outside the timed region; report cloning and
-  advancement separately before claiming a search speedup.
+- [x] Establish a native two-turn simulation benchmark with imports, protocol
+  JSON and snapshot export outside the timed region. Report Rust cloning and
+  advancement separately and use Python only to establish the expected result.
 - [ ] Keep the original compact-state/make-unmake, hashing/evaluation, team-aware
   iterative search, hidden/simultaneous planning, parallelism, integration and
   1,000 complete two-game-turn simulations/second requirements intact.
@@ -6368,3 +6634,261 @@ remain open.
 Snorri's Inscribe the Runes brings reviewed primary coverage to 231/596 faces.
 Its source-derived live recipe matches Python over seven card-text operations
 and 23 normal card-action operations, including ordered batches and auto-fill.
+
+#### Sampled release rollout baseline
+
+A release run on one i5-10400F CPU under WSL used 128 repetitions per
+position, game seed 29, sample seed 39, a two-global-turn horizon, first-legal
+continuation and the lab-attack-range-v1 evaluator. Eight sampled openings and
+midround positions covered Forgotten Island and Magma and Ice with level-one
+and upgraded rosters. Rust matched Python's final state, decision count and
+evaluator in all eight. Rates were 705–877 Rust and 32–51 Python rollouts/s.
+The four unsampled controls ran at 515–898 Rust and 30–46 Python rollouts/s.
+
+This baseline repeats a fixed sample per position. It measures matched
+diagnostic rollouts. The diverse-policy, latency, strength and 1,000
+rollouts/s gates remain open. The release executable was built from
+9f7d080f plus the working changes and has SHA-256
+4f3c1f629804bb45b67bd1885a4e5e29cad803807179b00a06b2343fe2ae738a.
+The lab evaluator source hash is
+c89203f8bfbefec63e13c3426c42cdba27fc401b0884efb38b3adb1eaac753b3.
+
+The timed sampling wrapper (observation, hand reconstruction, installation
+and rollback) accounts for 4.4–5.9% across the same eight release positions.
+The rerun matched Python on all eight and measured 729–870 Rust rollouts/s.
+A separate release profile of 4,000 sampled Magma and Ice openings captured
+4,378 user-space self samples. The largest named Rust entries were
+run_objects at 7.4% and ObjectArena::field at 5.5%. Card-list traversal and
+collection synchronization also appear among the leading entries. libc
+accounts for 25.7%, grouped at library level. These are self samples and
+cannot attribute that library time to a caller. The local profile and request
+are retained under the WSL benchmark cache. Prioritize rule execution and
+collection synchronization over further sampling optimizations for this workload.
+
+#### Reuse unchanged card collections
+
+Card projection synchronization compares the live arena list against the
+typed row and reuses unchanged vectors. It still inspects every live handle,
+including aliased lists, and refreshes auras. Unchanged hero rows also avoid
+an undo-journal write. All 348 core tests passed.
+
+On one pinned CPU, five alternating pairs of 512 release rollouts per
+binary and position showed median gains of 11.4–23.9%. Sampled openings and
+upgraded midround positions rose from 767–864 to 885–1,051 rollouts/s.
+Unsampled round boundaries rose from 520–564 to 579–663 rollouts/s.
+Decision counts and lab evaluator values matched between binaries in all
+six positions. This first-legal workload establishes a speedup at identical
+settings. The full diverse-position throughput target remains open.
+
+#### Dense board coordinate lookup
+
+A round-end profile from Magma and Ice recorded 5,550 user-space self
+samples. Hex hashing accounted for 5.9% and BoardGeometry::obstacle for
+3.8%. Compact boards now use a flat axial lookup bounded to four cells per
+tile. Sparse boards keep the hash lookup. Tile IDs, holes and duplicate
+validation are preserved. All four geometry tests and 283,752 pinned Python
+movement destination comparisons passed.
+
+The same six-position paired release benchmark improved round-end throughput
+from 637 to 769 rollouts/s on Forgotten Island and from 580 to 678 on Magma
+and Ice. Sampled positions changed by -2.3% to +9.6%, with matching evaluator
+values and decision counts. The round-end positions remain below the 1,000
+rollouts/s target.
+
+A follow-up tried adopting the field vector directly when building fresh arena
+dictionaries. All seven focused arena tests passed. The same paired release
+workload returned changes between -4.8% and +4.7%, with round-end changes of
+-1.6% and +1.7%. The optimization was reverted because it offered no consistent
+benefit. The raw paired rates are in the local WSL benchmark cache.
+
+#### Scoped planning worker scaling
+
+The release worker benchmark used four sampled worlds, four rows and replies
+per world, one search depth, and a two-global-turn continuation. Five
+interleaved repetitions per configuration on four physical i5-10400F cores
+compared one, two and four workers. The four opening and midround positions
+on Forgotten Island and Magma and Ice returned identical commitments,
+scores, coverage and node counts at every worker count. Python verified
+the winning plans. Median request latency including transport ranged from
+350–429 ms with one worker, 247–294 ms with two and 214–244 ms with four.
+Four workers were 1.63–1.92x faster than one. The generous test budget let
+all rows finish. Shared budget behavior across multiple live games remains
+unmeasured.
+
+#### Single validation per native root import
+
+NativeSession validates the incoming envelope once. Its private arena,
+planning, and world constructors consume the validated input or its derived
+projection. Standalone public constructors still validate their own inputs.
+Sixteen alternating import-and-evaluate requests per binary and opening
+measured 146.5 to 124.6 ms on Forgotten Island and 159.2 to 129.6 ms on Magma
+and Ice with the iterate build. Both binaries returned identical evaluations.
+Sampled and upgraded rollout state parity passed across all six maps.
+
+A borrowed typed-world projection avoided cloning the complete source
+envelope. It passed all six maps' sampled and upgraded rollout checks, but
+the same paired opening benchmark moved from 125.0 to 128.8 ms on
+Forgotten Island and 127.1 to 124.2 ms on Magma and Ice. The variant was
+reverted because the measured workload showed no consistent latency benefit.
+
+#### Rotating hidden-world rollout samples
+
+The release benchmark can rotate through up to eight reproducible seeds and
+check the native state, node count and evaluator against Python for each.
+On one pinned i5-10400F CPU under WSL, 1,000 two-turn first-legal rollouts per
+position rotated seeds 39–42. Forgotten Island's opening ran at 1,021 Rust
+versus 53 Python rollouts/s. The upgraded Magma and Ice turn-two position
+ran at 1,093 Rust versus 33 Python rollouts/s. Both matched the Python end
+states, decision counts and lab evaluator across all four samples. Root
+import and warmup were outside the timed loop. These are generated
+positions and a diagnostic policy. The original recorded search workload
+and broader coverage gate remain open.
+
+#### Round-end rollout coverage
+
+The release benchmark now checks seeded hidden-hand rollouts across round
+closure as well as at turns one and two. On one pinned WSL CPU, the current
+build ran 500 two-turn rollouts per position across all six bundled maps with
+the Arien/Brogan versus Tigerclaw/Sabina roster. Sampled rates were 960–1,098/s
+on turn one, 1,065–1,155/s on turn two, and 681–808/s on turn four. All 72
+sampled end states matched the untimed Python rule replay. Unsampled checks
+matched at both horizons for all six openings and round ends.
+
+Sampling and restoring the hidden world accounted for 3.5–4.0% of turn-four
+time. Profile round closure and advancement before optimizing the sampler for
+this workload. The 1,000/s gate remains open across the full target corpus.
+
+A 6,000-rollout Forgotten Island perf sample found arena object-field vector
+copying at 5.6% of round-end CPU samples and object-field vector drops at 2.5%.
+Cleanup and round transitions stage full arena copies to preserve atomicity.
+The profile showed where copies occur in aggregate. The installed perf build
+could not resolve the sampled caller stacks.
+
+An arena-wide copy-on-write experiment passed all 351 core tests. Across
+three alternating 750-rollout batches per build, median round-end throughput
+rose from 765 to 843/s on Forgotten Island and 722 to 802/s on Magma and Ice.
+Opening throughput fell from 1,100 to 1,036/s and from 965 to 915/s. The
+experiment was reverted. Scope the next attempt to staged transition copies
+so ordinary steps keep their current fast path.
+
+#### Rust-selected replay with a second roster
+
+The replay driver accepts a dedicated four-hero roster with
+`--rust-replay-turns 6 --replay-roster Emmitt Min Misa Wasp`.
+At the default game seed 29, five turns pass on Forgotten Island and
+Magma and Ice in both policy assignments (235 decisions total, with matching
+final states). At six turns, Forgotten Island diverges at trace index 65
+(round 2, turn 2) with the candidate on the first team. Python offers Misa
+an optional one-space pre-action movement prompt, while the Rust trace
+submits CONFIRM. The divergence also reproduces on the pre-copy-on-write
+release worker. Inspect the native action continuation and Misa's movement
+effect before attributing the difference to either one.
+
+The no-upgrade cleanup branch advanced the arena and round state but left the
+combat round stale. Importing the same action prompt reconstructed the combat
+clock, which explained why the isolated replay produced Misa's movement prompt.
+Cleanup now advances both clocks, with a regression assertion for the typed
+combat clock. Seven focused cleanup tests passed. The rebuilt iterate worker
+matched Python through twelve turns across all six maps and both policy
+assignments, validating 1,749 Rust decisions and all twelve final states.
+
+The offline verifier now accepts the worker's full 64-turn horizon and labels
+the endpoint as a turn boundary or game over. Nine 2v2 rosters cover all 33
+standard heroes through twelve turns on Forgotten Island and Magma and Ice,
+with both policy assignments. Gydion/Xargatha versus Cutter/Hanu also passed
+64-turn replays on both maps and in both assignments, covering 3,094 Rust
+decisions and matching final states at round 17, turn 1. These matches reached
+the turn cap. Coverage of the hero roster here establishes that each hero
+participated in accepted-choice replay. Card and terminal-state coverage are
+tracked separately.
+
+The offline verifier's `--replay-terminal` mode reconstructs both recorded
+Hanu late-game positions four input decisions before their reference endings.
+Rust selects the remaining decisions with both policy assignments. Python
+validates and replays those decisions and checks the entire terminal state,
+team winner and individual winner fields. All sixteen decisions passed.
+Forgotten Island ended in a Blue win and Magma and Ice in a Red win.
+
+#### Current recorded two-turn throughput
+
+The current release worker matched Python's untimed reference endpoints for
+all six fixed Hanu replay windows, with identical clone and rollback results
+and unchanged roots. Five samples of 500 iterations per mode on one WSL CPU
+produced these median Rust simulations per second.
+
+| Window | Clone | Rollback |
+| --- | ---: | ---: |
+| Forgotten Island opening | 960 | 1,143 |
+| Forgotten Island round boundary | 719 | 788 |
+| Forgotten Island combat | 852 | 983 |
+| Magma and Ice opening | 848 | 1,049 |
+| Magma and Ice round boundary | 386 | 404 |
+| Magma and Ice combat | 801 | 970 |
+
+Magma and Ice's round boundary is the slowest recorded case. It advances
+through 26 input requests and 20 events, versus 22 requests and 14 events on
+Forgotten Island. Advancement accounted for roughly 2.45 ms of its 2.48 ms
+rollback run, so profile this exact trace before attempting another arena
+layout change. The recorded throughput gate remains open.
+
+#### Recorded round-boundary profile
+
+A pinned 999 Hz user-CPU profile of 3,000 rollback simulations per recorded
+round boundary collected 3,890 samples on Forgotten Island and 7,416 on Magma
+and Ice. Arena field-vector clone and drop routines accounted for 9.1% and
+20.7% of samples respectively. BoundObjects cloning itself accounted for
+1.0% and 3.6%. The profiles measure self time, and the unresolved libc samples
+remain unattributed.
+
+The reference instruction stream contains one cleanup and no upgrade or reset
+steps on Forgotten Island. Magma and Ice contains one cleanup, two upgrade
+steps, one reset and one defeat. Each successful Rust cleanup, upgrade or reset
+currently stages a full arena copy. Prioritize that upgrade/reset path in the
+transaction work, and use the recorded Magma and Ice window as the benchmark.
+
+Upgrade resolution and round reset now use a nested arena journal instead of
+cloning the arena. The typed session remains staged. On success the arena
+undo entries are retained for any enclosing rollback. On error the arena and
+copied bindings are restored. Request publication is inside the transaction.
+All 351 core tests passed. Three alternating 500-replay release batches per
+build measured a median 410 to 567 simulations/s for the recorded Magma and
+Ice round boundary (+38%). Both builds matched Python's endpoint, counts
+and root invariants on the two openings and round boundaries. The other
+three medians moved by at most 3%. Cleanup and respawn still use staged
+arena copies, and the 1,000/s recorded throughput gate remains open.
+
+Cleanup and hero respawn now share the upgrade/reset transaction, removing
+the last full-arena staging helper. The typed session is still staged to
+preserve atomicity. Three alternating 500-replay release batches per build
+measured median rollback throughput of 814 to 999/s on Forgotten Island's
+round boundary and 565 to 648/s on Magma and Ice. Opening medians changed by
+less than 2%. The paired endpoints, counts and root invariants matched the
+reference. All 351 core tests passed. The rebuilt release worker also passed
+the 16 terminal decisions and all 1,749 decisions in the six-map Emmitt/Min
+versus Misa/Wasp replay. The recorded throughput gate remains open.
+
+A fresh 5,000-replay profile after the arena changes put field-vector clone
+and drop at 8.5% of 7,734 Magma and Ice samples, down from 20.7%. Hex lookup
+was 5.4%, obstacle evaluation 2.7%, and the reachability result loop 2.5%.
+Movement traversal now checks obstacle and token passability only on the
+first topologically connected approach to each tile, while retaining the
+edge-specific connectivity checks. It also borrows the actor fallback slice.
+All 17 focused movement tests and paired recorded endpoint checks passed.
+Median rates across four paired positions moved by less than 2%, so this
+change does not establish a throughput gain. Magma and Ice remains below
+the recorded throughput gate.
+
+Stateful movement now carries tile indices through the queue and uses the
+board's precomputed adjacency and indexed obstacle bits. Off-board origins
+still resolve coordinates directly, and topology checks retain their original
+order and coordinate pairs. All 17 movement tests, four geometry tests and
+72 seeded rollout endpoint checks passed. Three alternating release batches
+per build moved the Magma and Ice round-boundary median from 655 to 671/s.
+The other three paired medians varied by about 2% in either direction, so
+the result establishes only a small gain on the slow recorded position.
+
+A single-pass live guard read and borrowed context-value experiment passed
+all 351 core tests and the paired recorded endpoint checks. It changed all
+four measured medians by less than 2% and moved the Magma and Ice boundary
+from 665 to 655/s. The experiment was reverted. The result points away from
+guard field access as a near-term throughput improvement.

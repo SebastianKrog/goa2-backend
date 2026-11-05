@@ -105,43 +105,62 @@ pub(super) fn measure_rollout(
     player_id: String,
     iterations: u32,
     sample_seed: Option<u64>,
+    sample_count: u8,
     lab_evaluation: bool,
 ) -> Result<Value, String> {
     if !(1..=10_000).contains(&iterations) {
         return Err("rollout benchmark requires iterations in 1..10000".into());
     }
+    if !(1..=8).contains(&sample_count)
+        || u32::from(sample_count) > iterations
+        || (sample_seed.is_none() && sample_count != 1)
+    {
+        return Err("rollout benchmark requires 1..8 samples, a seed for multiple samples and enough iterations".into());
+    }
+    let seeds = (0..sample_count)
+        .map(|index| sample_seed.map(|seed| seed.wrapping_add(u64::from(index))))
+        .collect::<Vec<_>>();
     let mut root = NativeSession::compile(envelope).map_err(|error| error.to_string())?;
     let player = super::sequence_legality::player(&mut root, player_id)?;
     let budget = ExecutionBudget::default();
     let before = root.semantic_state().map_err(|error| error.to_string())?;
-    let mut run = || {
-        let rollout = if let Some(seed) = sample_seed {
-            root.with_sampled_planning(player, seed, |sampled| {
-                sampled.rollout_game_turns_diagnostic(
-                    player,
-                    2,
-                    4096,
-                    &budget,
-                    false,
-                    lab_evaluation,
-                )
-            })
-        } else {
-            root.rollout_game_turns_diagnostic(player, 2, 4096, &budget, false, lab_evaluation)
+    let mut run = |sample_seed, sampling_time: &mut std::time::Duration| {
+        let rollout = |worker: &mut NativeSession| {
+            worker.rollout_game_turns_diagnostic(player, 2, 4096, &budget, false, lab_evaluation)
         };
-        rollout
+        let outcome = if let Some(seed) = sample_seed {
+            let start = Instant::now();
+            let mut rollout_time = std::time::Duration::ZERO;
+            let outcome = root.with_sampled_planning(player, seed, |sampled| {
+                let start = Instant::now();
+                let outcome = rollout(sampled);
+                rollout_time = start.elapsed();
+                outcome
+            });
+            *sampling_time += start.elapsed() - rollout_time;
+            outcome
+        } else {
+            rollout(&mut root)
+        };
+        outcome
             .map_err(|error| error.to_string())?
             .ok_or_else(|| "rollout benchmark exhausted its node budget".to_owned())
     };
-    let expected = run()?;
+    let expected = seeds
+        .iter()
+        .map(|&seed| run(seed, &mut std::time::Duration::default()))
+        .collect::<Result<Vec<_>, _>>()?;
+    let mut sampling_time = std::time::Duration::ZERO;
     let start = Instant::now();
-    for _ in 0..iterations {
-        let actual = black_box(run()?);
-        if actual != expected {
+    for index in 0..iterations as usize {
+        let sample = index % seeds.len();
+        let actual = black_box(run(seeds[sample], &mut sampling_time)?);
+        if actual != expected[sample] {
             return Err("rollout benchmark diverged from its warmup".into());
         }
     }
-    let seconds = start.elapsed().as_secs_f64();
+    let elapsed = start.elapsed();
+    let seconds = elapsed.as_secs_f64();
     if root.semantic_state().map_err(|error| error.to_string())? != before {
         return Err("rollout benchmark mutated its root state".into());
     }
@@ -149,10 +168,15 @@ pub(super) fn measure_rollout(
         "iterations": iterations,
         "turns": 2,
         "sample_seed": sample_seed,
-        "lab_value": expected.lab_value,
-        "nodes_per_iteration": expected.nodes,
+        "lab_value": expected[0].lab_value,
+        "nodes_per_iteration": expected[0].nodes,
+        "sample_results": seeds.iter().zip(&expected).map(|(seed, result)| json!({
+            "seed": seed, "nodes": result.nodes, "lab_value": result.lab_value,
+        })).collect::<Vec<_>>(),
         "seconds": seconds,
         "rollouts_per_second": f64::from(iterations) / seconds,
+        "sampling_and_restore_seconds": sampling_time.as_secs_f64(),
+        "remaining_seconds": (elapsed - sampling_time).as_secs_f64(),
     }))
 }
 

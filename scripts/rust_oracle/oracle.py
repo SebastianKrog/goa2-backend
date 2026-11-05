@@ -18,6 +18,7 @@ import subprocess
 import sys
 import tarfile
 import time
+from concurrent.futures import ThreadPoolExecutor, wait
 from importlib.metadata import version
 from pathlib import Path
 
@@ -198,6 +199,10 @@ def movement_corpus():
     return {**payload, "corpus_sha256": digest(payload)}
 
 
+class WorkerUnavailable(RuntimeError):
+    """Transport or protocol failure. The worker cannot accept another request."""
+
+
 class Worker:
     def __init__(self, command):
         self.process = subprocess.Popen(
@@ -209,32 +214,74 @@ class Worker:
             bufsize=1,
         )
         self.counter = 0
+        self._retired = False
 
-    def request(self, operation, **fields):
+    def request(self, operation, *, timeout=None, **fields):
+        """Send one request. Transport failures retire the worker."""
+        if self._retired:
+            raise WorkerUnavailable("worker was retired")
+        if timeout is not None and not 0 < timeout < float("inf"):
+            raise ValueError("worker timeout must be positive and finite")
         self.counter += 1
-        request = {"schema_version": 1, "id": self.counter, "operation": operation, **fields}
-        self.process.stdin.write(canonical(request) + "\n")
-        self.process.stdin.flush()
-        line = self.process.stdout.readline()
-        if not line:
-            raise RuntimeError(f"worker exited early ({self.process.poll()})")
-        response = json.loads(line)
-        if response.get("id") != self.counter or response.get("schema_version") != 1:
-            raise ValueError(f"worker response identity mismatch: {response}")
-        if not response.get("ok"):
-            raise RuntimeError(f"worker rejected request: {response}")
+        request_id = self.counter
+        request = {"schema_version": 1, "id": request_id, "operation": operation, **fields}
+        packet = canonical(request) + "\n"
+        try:
+            if timeout is None:
+                return self._exchange(request_id, packet)
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                exchange = executor.submit(self._exchange, request_id, packet)
+                if not wait((exchange,), timeout=timeout).done:
+                    self._retire()
+                    raise TimeoutError(f"worker timed out during {operation}")
+                return exchange.result()
+        except WorkerUnavailable:
+            self._retire()
+            raise
+
+    def _retire(self):
+        self._retired = True
+        if self.process.poll() is None:
+            self.process.kill()
+        self.process.wait()
+
+    def _exchange(self, request_id, packet):
+        try:
+            self.process.stdin.write(packet)
+            self.process.stdin.flush()
+            line = self.process.stdout.readline()
+            if not line:
+                raise WorkerUnavailable("worker exited without a response")
+            response = json.loads(line)
+        except (OSError, UnicodeError, json.JSONDecodeError) as error:
+            raise WorkerUnavailable("worker response transport failed") from error
+        if (
+            not isinstance(response, dict)
+            or response.get("id") != request_id
+            or response.get("schema_version") != 1
+            or type(response.get("ok")) is not bool
+            or ("result" if response["ok"] else "error") not in response
+        ):
+            raise WorkerUnavailable("worker response does not match the request protocol")
+        if not response["ok"]:
+            raise RuntimeError(f"worker rejected request: {response['error']}")
         return response["result"]
 
     def close(self):
-        self.process.stdin.close()
+        try:
+            self.process.stdin.close()
+        except OSError:
+            if not self._retired:
+                raise
         try:
             code = self.process.wait(timeout=10)
+            if code and not self._retired:
+                raise RuntimeError(f"worker failed: exit {code}")
         except subprocess.TimeoutExpired:
-            self.process.kill()
-            self.process.wait()
+            self._retire()
             raise
-        if code:
-            raise RuntimeError(f"worker failed: exit {code}")
+        finally:
+            self.process.stdout.close()
 
 
 def verify_corpus(path, command):

@@ -84,7 +84,8 @@ impl Recipe {
             let binding: crate::codec::ObjectBinding = serde_json::from_value(value.clone())
                 .map_err(|error| unsupported(error.to_string()))?;
             if binding.paths.is_empty()
-                || (binding.deepcopy_shared && binding.kind != ObjectKind::FrozenModel) {
+                || (binding.deepcopy_shared && binding.kind != ObjectKind::FrozenModel)
+            {
                 return Err(unsupported("invalid source recipe binding"));
             }
             let typed = |path: &[ObjectPathPart], symbols: &mut Symbols| {
@@ -860,7 +861,9 @@ impl NativeSession {
                 .map_err(unsupported)?;
         }
         if let Some((field, anchor)) = recipe.topology_anchor {
-            objects.arena.set_field(step, field, ObjectValue::Object(anchor))
+            objects
+                .arena
+                .set_field(step, field, ObjectValue::Object(anchor))
                 .map_err(unsupported)?;
         }
         self.bind_body_program_bound(objects, step, recipe.step.instruction)?;

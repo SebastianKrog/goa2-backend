@@ -9,6 +9,7 @@ use goa2_core::interpreter::{EngineError, ExecutionBudget, NativeSession};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::io::{self, BufRead, Write};
+use std::time::Instant;
 #[cfg(test)]
 #[path = "../../../test-support/parallel.rs"]
 mod fixture_parallel;
@@ -98,8 +99,13 @@ enum Operation {
         player_id: String,
         max_depth: u8,
         max_nodes: usize,
+        #[serde(default)]
+        evaluation: goa2_core::interpreter::SearchEvaluation,
         time_ms: u64,
         rollout_turns: Option<u8>,
+        planning_sample_seed: Option<u64>,
+        public_upgrade_batches: Option<Vec<goa2_core::interpreter::PublicUpgradeBatch>>,
+        upgrade_checkpoints: Option<UpgradeCheckpoints>,
         #[serde(default)]
         opponent_policy: goa2_core::interpreter::OpponentPolicy,
     },
@@ -110,9 +116,20 @@ enum Operation {
         cap: usize,
         max_depth: u8,
         max_nodes: usize,
+        #[serde(default)]
+        evaluation: goa2_core::interpreter::SearchEvaluation,
         time_ms: u64,
         rollout_turns: Option<u8>,
         workers: Option<usize>,
+        bot_team: Option<resolution_search::BotTeam>,
+        public_upgrade_batches: Option<Vec<goa2_core::interpreter::PublicUpgradeBatch>>,
+        upgrade_checkpoints: Option<UpgradeCheckpoints>,
+    },
+    ShowBotCommitments {
+        envelope: StateEnvelope,
+        viewer_id: String,
+        bot_ids: Vec<String>,
+        mode: goa2_core::interpreter::TeamKnowledgeMode,
     },
     RolloutGameTurns {
         envelope: StateEnvelope,
@@ -128,11 +145,20 @@ enum Operation {
         envelope: StateEnvelope,
         sequences: Vec<Vec<sequence_legality::WireMove>>,
     },
+    OfflineMatch {
+        envelope: StateEnvelope,
+        turns: u8,
+        seed: u64,
+        #[serde(default)]
+        capture_trace: bool,
+        policies: [goa2_core::interpreter::OfflinePolicy; 2],
+    },
     RolloutBench {
         envelope: StateEnvelope,
         player_id: String,
         iterations: u32,
         sample_seed: Option<u64>,
+        sample_count: Option<u8>,
         #[serde(default)]
         lab_evaluation: bool,
     },
@@ -166,8 +192,25 @@ enum Operation {
         stateful: bool,
     },
 }
+type UpgradeCheckpoints =
+    std::collections::BTreeMap<String, Vec<goa2_core::interpreter::UpgradeCheckpoint>>;
+
+fn resolve_upgrade_evidence(
+    checkpoints: Option<UpgradeCheckpoints>,
+    batches: Option<Vec<goa2_core::interpreter::PublicUpgradeBatch>>,
+) -> Result<Option<UpgradeCheckpoints>, String> {
+    match (checkpoints, batches) {
+        (Some(_), Some(_)) => Err("provide checkpoints or public upgrade batches".into()),
+        (None, Some(batches)) => goa2_core::interpreter::replay_public_upgrade_batches(&batches)
+            .map(Some)
+            .map_err(|error| error.to_string()),
+        (checkpoints, None) => Ok(checkpoints),
+    }
+}
+
 fn execute(
     request: Request,
+    started: Instant,
     board: &mut Option<(BoardGeometry, goa2_core::geometry::Occupancy)>,
 ) -> Result<Value, String> {
     if request.schema_version != 1 {
@@ -177,21 +220,37 @@ fn execute(
         Operation::Capabilities => Ok(
             json!({"plain_fast_travel":true,"unit_selection_traces":true,"acting_piece_traces":true,"action_recipes":true,"fast_travel_zones":true,"planning_phase_traces":true,"card_models":true,"scalar_stats":true,"native_step_traces":true,"streamed_step_traces":true,"state_codec":true,"sequence_legality":true,"resolution_search":true,"plain_board_movement":true,"stateful_plain_movement":true,"game_transitions":false,"search":false,"rules_versions":[]}),
         ),
-        Operation::HeuristicInput { envelope, player_id } => {
-            let mut session = NativeSession::compile(envelope).map_err(|error| error.to_string())?;
+        Operation::HeuristicInput {
+            envelope,
+            player_id,
+        } => {
+            let mut session =
+                NativeSession::compile(envelope).map_err(|error| error.to_string())?;
             let player = sequence_legality::player(&mut session, player_id)?;
-            session.advance_to_decision(&ExecutionBudget::default()).map_err(|error| error.to_string())?;
-            let choice = session.heuristic_input_choice(player).map_err(|error| error.to_string())?;
+            session
+                .advance_to_decision(&ExecutionBudget::default())
+                .map_err(|error| error.to_string())?;
+            let choice = session
+                .heuristic_input_choice(player)
+                .map_err(|error| error.to_string())?;
             let selection = match choice {
-                Some(goa2_core::interpreter::DecisionMove::Input { selection, .. }) => session.selection_json(&selection),
+                Some(goa2_core::interpreter::DecisionMove::Input { selection, .. }) => {
+                    session.selection_json(&selection)
+                }
                 _ => Value::Null,
             };
             Ok(json!({"selection": selection}))
         }
-        Operation::EvaluateLabAttackRange { envelope, player_id } => {
-            let mut session = NativeSession::compile(envelope).map_err(|error| error.to_string())?;
+        Operation::EvaluateLabAttackRange {
+            envelope,
+            player_id,
+        } => {
+            let mut session =
+                NativeSession::compile(envelope).map_err(|error| error.to_string())?;
             let player = sequence_legality::player(&mut session, player_id)?;
-            let value = session.evaluate_lab_attack_range(player).map_err(|error| error.to_string())?;
+            let value = session
+                .evaluate_lab_attack_range(player)
+                .map_err(|error| error.to_string())?;
             Ok(json!({"recipe_id": "lab-attack-range-v1", "value": value}))
         }
         Operation::SearchResolution {
@@ -199,20 +258,38 @@ fn execute(
             player_id,
             max_depth,
             max_nodes,
+            evaluation,
             time_ms,
             rollout_turns,
+            planning_sample_seed,
+            public_upgrade_batches,
+            upgrade_checkpoints,
             opponent_policy,
-        } => resolution_search::search(
-            envelope,
-            player_id,
-            time_ms,
-            rollout_turns,
-            goa2_core::interpreter::SearchLimits {
-                max_depth,
-                max_nodes,
-                opponent_policy,
-            },
-        ),
+        } => {
+            let budget = resolution_search::time_budget(started, time_ms)?;
+            let checkpoints =
+                resolve_upgrade_evidence(upgrade_checkpoints, public_upgrade_batches)?;
+            if checkpoints.is_some() && (planning_sample_seed.is_none() || rollout_turns.is_none())
+            {
+                return Err("resolution upgrade evidence requires sampled turn rollouts".into());
+            }
+            resolution_search::search(
+                envelope,
+                player_id,
+                budget,
+                rollout_turns,
+                planning_sample_seed.map(|seed| goa2_core::interpreter::PlanningRolloutSample {
+                    seed,
+                    upgrade_checkpoints: checkpoints.as_ref(),
+                }),
+                goa2_core::interpreter::SearchLimits {
+                    max_depth,
+                    max_nodes,
+                    opponent_policy,
+                    evaluation,
+                },
+            )
+        }
         Operation::SearchSampledPlanning {
             envelope,
             player_id,
@@ -220,25 +297,54 @@ fn execute(
             cap,
             max_depth,
             max_nodes,
+            evaluation,
             time_ms,
             rollout_turns,
             workers,
-        } => resolution_search::sampled_planning(
+            upgrade_checkpoints,
+            public_upgrade_batches,
+            bot_team,
+        } => {
+            let budget = resolution_search::time_budget(started, time_ms)?;
+            let upgrade_checkpoints =
+                resolve_upgrade_evidence(upgrade_checkpoints, public_upgrade_batches)?;
+            resolution_search::sampled_planning(
+                envelope,
+                player_id,
+                bot_team,
+                (seed, cap),
+                budget,
+                goa2_core::interpreter::PlanningSearchOptions {
+                    rollout_turns,
+                    workers: workers.unwrap_or(1),
+                    upgrade_checkpoints: upgrade_checkpoints.as_ref(),
+                },
+                goa2_core::interpreter::SearchLimits {
+                    max_depth,
+                    max_nodes,
+                    opponent_policy: goa2_core::interpreter::OpponentPolicy::Adversarial,
+                    evaluation,
+                },
+            )
+        }
+        Operation::ShowBotCommitments {
             envelope,
-            player_id,
-            seed,
-            cap,
-            time_ms,
-            goa2_core::interpreter::PlanningSearchOptions {
-                rollout_turns,
-                workers: workers.unwrap_or(1),
-            },
-            goa2_core::interpreter::SearchLimits {
-                max_depth,
-                max_nodes,
-                opponent_policy: goa2_core::interpreter::OpponentPolicy::Adversarial,
-            },
-        ),
+            viewer_id,
+            bot_ids,
+            mode,
+        } => {
+            let mut session =
+                NativeSession::compile(envelope).map_err(|error| error.to_string())?;
+            let viewer = sequence_legality::player(&mut session, viewer_id)?;
+            let bots = bot_ids
+                .into_iter()
+                .map(|id| sequence_legality::player(&mut session, id))
+                .collect::<Result<Vec<_>, _>>()?;
+            let commitments = session
+                .shown_bot_commitments(viewer, &bots, mode)
+                .map_err(|error| error.to_string())?;
+            Ok(json!({ "commitments": commitments }))
+        }
         Operation::RolloutGameTurns {
             envelope,
             player_id,
@@ -247,18 +353,48 @@ fn execute(
             time_ms,
             capture_state,
             sample_seed,
-        } => resolution_search::rollout(envelope, player_id, turns, max_nodes, time_ms, capture_state, sample_seed),
+        } => resolution_search::rollout(
+            envelope,
+            player_id,
+            turns,
+            max_nodes,
+            resolution_search::time_budget(started, time_ms)?,
+            capture_state,
+            sample_seed,
+        ),
         Operation::CheckSequences {
             envelope,
             sequences,
         } => sequence_legality::check(envelope, sequences),
+        Operation::OfflineMatch {
+            envelope,
+            turns,
+            seed,
+            policies,
+            capture_trace,
+        } => {
+            let mut session =
+                NativeSession::compile(envelope).map_err(|error| error.to_string())?;
+            let result = session
+                .play_offline_match(turns, seed, policies, capture_trace)
+                .map_err(|error| error.to_string())?;
+            serde_json::to_value(result).map_err(|error| error.to_string())
+        }
         Operation::RolloutBench {
             envelope,
             player_id,
             iterations,
             sample_seed,
+            sample_count,
             lab_evaluation,
-        } => simulation_bench::measure_rollout(envelope, player_id, iterations, sample_seed, lab_evaluation),
+        } => simulation_bench::measure_rollout(
+            envelope,
+            player_id,
+            iterations,
+            sample_seed,
+            sample_count.unwrap_or(1),
+            lab_evaluation,
+        ),
         Operation::SimulationBench {
             envelope,
             operations,
@@ -571,6 +707,7 @@ fn main() -> io::Result<()> {
     let mut out = io::BufWriter::new(io::stdout().lock());
     for line in io::stdin().lock().lines() {
         let line = line?;
+        let started = Instant::now();
         let response = match serde_json::from_str::<Request>(&line) {
             Ok(Request {
                 schema_version: 1,
@@ -586,7 +723,7 @@ fn main() -> io::Result<()> {
             }
             Ok(request) => {
                 let id = request.id.clone();
-                match execute(request, &mut board) {
+                match execute(request, started, &mut board) {
                     Ok(result) => json!({"schema_version":1,"id":id,"ok":true,"result":result}),
                     Err(error) => json!({"schema_version":1,"id":id,"ok":false,"error":error}),
                 }
@@ -605,6 +742,31 @@ fn main() -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn search_rejects_a_budget_already_spent_on_request_setup() {
+        let (envelope, _) = stream_case();
+        let request = Request {
+            schema_version: 1,
+            id: json!(1),
+            operation: Operation::SearchResolution {
+                envelope,
+                player_id: "hero_arien".into(),
+                max_depth: 1,
+                max_nodes: 16,
+                time_ms: 1,
+                rollout_turns: None,
+                planning_sample_seed: None,
+                public_upgrade_batches: None,
+                upgrade_checkpoints: None,
+                opponent_policy: Default::default(),
+                evaluation: Default::default(),
+            },
+        };
+        let started = Instant::now() - std::time::Duration::from_secs(1);
+        let error = execute(request, started, &mut None).unwrap_err();
+        assert_eq!(error, "search deadline reached during request setup");
+    }
+
     fn stream_case() -> (StateEnvelope, Vec<Value>) {
         let base =
             std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures"));
@@ -706,12 +868,12 @@ mod tests {
             json!({"schema_version":1,"id":1,"operation":"load_board","tiles":[]}),
         )
         .unwrap();
-        execute(request, &mut board).unwrap();
+        execute(request, Instant::now(), &mut board).unwrap();
         let bad = serde_json::from_value(
             json!({"schema_version":99,"id":2,"operation":"load_board","tiles":[]}),
         )
         .unwrap();
-        assert!(execute(bad, &mut board).is_err());
+        assert!(execute(bad, Instant::now(), &mut board).is_err());
         assert!(board.is_some());
     }
 }

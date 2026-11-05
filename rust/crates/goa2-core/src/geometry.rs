@@ -108,10 +108,77 @@ pub struct TileSpec {
 #[derive(Clone, Debug)]
 pub struct BoardGeometry {
     hexes: Vec<Hex>,
-    lookup: HashMap<Hex, HexId>,
+    lookup: HexLookup,
     adjacent: Vec<[Option<HexId>; 6]>,
     terrain: BitSet,
 }
+#[derive(Clone, Debug)]
+enum HexLookup {
+    Dense {
+        min_q: i32,
+        min_r: i32,
+        width: usize,
+        height: usize,
+        cells: Vec<Option<HexId>>,
+    },
+    Sparse(HashMap<Hex, HexId>),
+}
+
+impl HexLookup {
+    fn compile(sparse: HashMap<Hex, HexId>) -> Self {
+        let Some(&first) = sparse.keys().next() else {
+            return Self::Sparse(sparse);
+        };
+        let (mut min_q, mut max_q, mut min_r, mut max_r) = (first.q, first.q, first.r, first.r);
+        for hex in sparse.keys() {
+            min_q = min_q.min(hex.q);
+            max_q = max_q.max(hex.q);
+            min_r = min_r.min(hex.r);
+            max_r = max_r.max(hex.r);
+        }
+        let width = (max_q - min_q) as usize + 1;
+        let height = (max_r - min_r) as usize + 1;
+        // Bound memory for valid but widely separated coordinates.
+        let Some(area) = width
+            .checked_mul(height)
+            .filter(|&area| area <= sparse.len().saturating_mul(4))
+        else {
+            return Self::Sparse(sparse);
+        };
+        let mut cells = vec![None; area];
+        for (hex, id) in sparse {
+            cells[(hex.r - min_r) as usize * width + (hex.q - min_q) as usize] = Some(id);
+        }
+        Self::Dense {
+            min_q,
+            min_r,
+            width,
+            height,
+            cells,
+        }
+    }
+
+    fn get(&self, hex: Hex) -> Option<HexId> {
+        match self {
+            Self::Dense {
+                min_q,
+                min_r,
+                width,
+                height,
+                cells,
+            } => {
+                let q = (hex.q - min_q) as usize;
+                let r = (hex.r - min_r) as usize;
+                if q >= *width || r >= *height {
+                    return None;
+                }
+                cells[r * width + q]
+            }
+            Self::Sparse(cells) => cells.get(&hex).copied(),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Occupancy {
     occupied: BitSet,
@@ -144,10 +211,11 @@ impl BoardGeometry {
                 occupied.insert(i);
             }
         }
+        let lookup = HexLookup::compile(lookup);
         let hexes: Vec<_> = tiles.iter().map(|t| t.hex).collect();
         let adjacent = hexes
             .iter()
-            .map(|h| h.neighbors().map(|n| lookup.get(&n).copied()))
+            .map(|h| h.neighbors().map(|n| lookup.get(n)))
             .collect();
         Ok((
             Self {
@@ -160,16 +228,21 @@ impl BoardGeometry {
         ))
     }
     pub fn id(&self, hex: Hex) -> Option<HexId> {
-        self.lookup.get(&hex).copied()
+        self.lookup.get(hex)
+    }
+    pub(crate) fn neighbor_indices(&self, index: usize) -> [Option<usize>; 6] {
+        self.adjacent[index].map(|id| id.map(HexId::index))
+    }
+    pub(crate) fn obstacle_at(&self, index: usize, occupancy: &Occupancy) -> bool {
+        self.terrain.contains(index) || occupancy.occupied.contains(index)
     }
     pub fn terrain(&self, hex: Hex) -> bool {
         self.id(hex)
             .is_some_and(|id| self.terrain.contains(id.index()))
     }
     pub fn obstacle(&self, hex: Hex, occupancy: &Occupancy) -> bool {
-        self.id(hex).is_none_or(|id| {
-            self.terrain.contains(id.index()) || occupancy.occupied.contains(id.index())
-        })
+        self.id(hex)
+            .is_none_or(|id| self.obstacle_at(id.index(), occupancy))
     }
     /// Stateful topology's plain case: intermediate spaces must exist on map,
     /// even when terrain/occupants can be crossed. Landing remains obstacle-free.
@@ -322,6 +395,37 @@ mod tests {
     fn h(q: i32) -> Hex {
         Hex::new(q, -q, 0).unwrap()
     }
+    #[test]
+    fn coordinate_lookup_preserves_holes_input_order_and_sparse_bounds() {
+        let tiles = |coordinates: &[i32]| {
+            coordinates
+                .iter()
+                .map(|&q| TileSpec {
+                    hex: h(q),
+                    terrain: false,
+                    occupied: false,
+                })
+                .collect::<Vec<_>>()
+        };
+        let mut dense_tiles = tiles(&[0, -2, 1]);
+        dense_tiles.push(TileSpec {
+            hex: Hex::new(0, 1, -1).unwrap(),
+            terrain: false,
+            occupied: false,
+        });
+        let (dense, _) = BoardGeometry::compile(&dense_tiles).unwrap();
+        let (sparse, _) = BoardGeometry::compile(&tiles(&[1_000_000_000, -1_000_000_000])).unwrap();
+        assert!(matches!(dense.lookup, HexLookup::Dense { .. }));
+        assert!(matches!(sparse.lookup, HexLookup::Sparse(_)));
+        assert_eq!(dense.id(h(-2)).unwrap().index(), 1);
+        assert_eq!(dense.id(h(-1)), None);
+        assert_eq!(dense.id(h(-3)), None);
+        assert_eq!(dense.id(h(2)), None);
+        assert_eq!(sparse.id(h(-1_000_000_000)).unwrap().index(), 1);
+        assert_eq!(sparse.id(h(0)), None);
+        assert!(BoardGeometry::compile(&tiles(&[1, 1])).is_err());
+    }
+
     #[test]
     fn destination_and_intermediate_obstacles_differ_and_mutations_apply() {
         let tiles: Vec<_> = (0..4)

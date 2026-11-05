@@ -176,30 +176,30 @@ impl Planning {
         {
             return Err("planning diagnostics require an empty planning/resolution stack".into());
         }
-        let mut planning = Self::compile_flow(source, symbols)?;
+        let mut planning = Self::compile_flow(source, header.phase, symbols)?;
         planning.executing = false;
         Ok(planning)
     }
     pub(crate) fn compile_flow(
         source: &StateEnvelope,
+        phase: Phase,
         symbols: &mut Symbols,
     ) -> std::result::Result<Self, String> {
-        source.validate()?;
         if source.state["active_effects"]
             .as_array()
             .is_none_or(|v| !v.is_empty())
         {
             return Err("planning active-effect closure not compiled".into());
         }
-        Self::compile_effect_boundary(source, symbols)
+        Self::compile_effect_boundary(source, phase, symbols)
     }
     /// Parse bookkeeping for the bounded effect-aware resolution interpreter.
     /// Callers must reject all unported phase, gameplay and input consumers.
     pub(crate) fn compile_effect_boundary(
         source: &StateEnvelope,
+        phase: Phase,
         symbols: &mut Symbols,
     ) -> std::result::Result<Self, String> {
-        let header = source.validate()?;
         let state = &source.state;
         let mut pending = Vec::new();
         for (hero, card) in state["pending_inputs"]
@@ -260,7 +260,7 @@ impl Planning {
             two_card_effects,
             executing: true,
             end_turn: false,
-            phase: header.phase,
+            phase,
             pending,
             second,
             done,
@@ -282,6 +282,18 @@ impl Planning {
                         .contains(&world.definitions.cards[c.definition].effect)
                 })
         })
+    }
+    pub(crate) fn committed_cards(&self, hero: Symbol) -> (Option<CardId>, Option<CardId>) {
+        (
+            self.pending
+                .iter()
+                .find(|(id, _)| *id == hero)
+                .and_then(|(_, card)| *card),
+            self.second
+                .iter()
+                .find(|(id, _)| *id == hero)
+                .map(|(_, card)| *card),
+        )
     }
     fn open(&self, world: &NativeWorld, hero: Symbol) -> bool {
         self.pending.iter().any(|(h, c)| *h == hero && c.is_some())

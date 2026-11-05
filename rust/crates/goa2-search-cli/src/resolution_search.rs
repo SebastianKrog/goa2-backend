@@ -1,7 +1,8 @@
 use goa2_core::{
     codec::StateEnvelope,
     interpreter::{
-        DecisionMove, ExecutionBudget, NativeSession, PlanningSearchOptions, SearchLimits,
+        BotPlanningScope, DecisionMove, ExecutionBudget, NativeSession, PlanningRolloutSample,
+        PlanningSearchOptions, SearchLimits, TeamKnowledgeMode,
     },
 };
 use serde_json::{Value, json};
@@ -10,18 +11,24 @@ use std::time::{Duration, Instant};
 pub(super) fn search(
     envelope: StateEnvelope,
     player_id: String,
-    time_ms: u64,
+    budget: ExecutionBudget<'_>,
     rollout_turns: Option<u8>,
+    planning_sample: Option<PlanningRolloutSample<'_>>,
     limits: SearchLimits,
 ) -> Result<Value, String> {
-    let mut session = NativeSession::compile(envelope).map_err(|error| error.to_string())?;
+    let mut session = compile_with_budget(envelope, &budget)?;
     let player = super::sequence_legality::player(&mut session, player_id.clone())?;
-    let budget = time_budget(time_ms)?;
     session
         .advance_to_decision(&budget)
         .map_err(|error| error.to_string())?;
     let result = session
-        .search_resolution_with_turn_rollout(player, limits, rollout_turns, &budget)
+        .search_resolution_with_sampled_turn_rollout(
+            player,
+            limits,
+            rollout_turns,
+            planning_sample,
+            &budget,
+        )
         .map_err(|error| error.to_string())?;
     let DecisionMove::Input {
         request: Some(token),
@@ -42,18 +49,41 @@ pub(super) fn search(
         "score_kind": result.score_kind,
         "completed_depth": result.completed_depth,
         "resolved": result.resolved,
+        "stop": result.stop,
         "nodes": result.nodes,
     }))
 }
 
-fn time_budget(time_ms: u64) -> Result<ExecutionBudget<'static>, String> {
+pub(super) fn time_budget(
+    started: Instant,
+    time_ms: u64,
+) -> Result<ExecutionBudget<'static>, String> {
     if !(1..=60_000).contains(&time_ms) {
-        return Err("resolution search requires time_ms in 1..60000".into());
+        return Err("search requires time_ms in 1..60000".into());
     }
     Ok(ExecutionBudget {
-        deadline: Some(Instant::now() + Duration::from_millis(time_ms)),
+        deadline: Some(started + Duration::from_millis(time_ms)),
         ..ExecutionBudget::default()
     })
+}
+
+fn compile_with_budget(
+    envelope: StateEnvelope,
+    budget: &ExecutionBudget<'_>,
+) -> Result<NativeSession, String> {
+    let check_deadline = || {
+        if budget
+            .deadline
+            .is_some_and(|deadline| Instant::now() >= deadline)
+        {
+            return Err("search deadline reached during request setup".to_string());
+        }
+        Ok(())
+    };
+    check_deadline()?;
+    let session = NativeSession::compile(envelope).map_err(|error| error.to_string())?;
+    check_deadline()?;
+    Ok(session)
 }
 
 pub(super) fn rollout(
@@ -61,13 +91,12 @@ pub(super) fn rollout(
     player_id: String,
     turns: u8,
     max_nodes: usize,
-    time_ms: u64,
+    budget: ExecutionBudget<'_>,
     capture_state: bool,
     sample_seed: Option<u64>,
 ) -> Result<Value, String> {
-    let mut session = NativeSession::compile(envelope).map_err(|error| error.to_string())?;
+    let mut session = compile_with_budget(envelope, &budget)?;
     let player = super::sequence_legality::player(&mut session, player_id)?;
-    let budget = time_budget(time_ms)?;
     let run = |worker: &mut NativeSession| {
         worker.rollout_game_turns_diagnostic(
             player,
@@ -97,18 +126,77 @@ pub(super) fn rollout(
     })
 }
 
+#[derive(serde::Deserialize)]
+pub(super) struct BotTeam {
+    mode: TeamKnowledgeMode,
+    bot_ids: Vec<String>,
+    worlds: Option<usize>,
+}
+
 pub(super) fn sampled_planning(
     envelope: StateEnvelope,
     player_id: String,
-    seed: u64,
-    cap: usize,
-    time_ms: u64,
-    options: PlanningSearchOptions,
+    bot_team: Option<BotTeam>,
+    (seed, cap): (u64, usize),
+    budget: ExecutionBudget<'_>,
+    options: PlanningSearchOptions<'_>,
     limits: SearchLimits,
 ) -> Result<Value, String> {
-    let mut session = NativeSession::compile(envelope).map_err(|error| error.to_string())?;
+    let mut session = compile_with_budget(envelope, &budget)?;
     let player = super::sequence_legality::player(&mut session, player_id.clone())?;
-    let budget = time_budget(time_ms)?;
+    if let Some(BotTeam {
+        mode,
+        bot_ids,
+        worlds,
+    }) = bot_team
+    {
+        let bots = bot_ids
+            .iter()
+            .map(|id| super::sequence_legality::player(&mut session, id.clone()))
+            .collect::<Result<Vec<_>, _>>()?;
+        let result = session
+            .search_bot_team_planning(
+                player,
+                BotPlanningScope {
+                    bots: &bots,
+                    mode,
+                    worlds: worlds.unwrap_or(1),
+                    seed,
+                },
+                cap,
+                limits,
+                options,
+                &budget,
+            )
+            .map_err(|error| error.to_string())?;
+        let commitments = result
+            .commitments
+            .iter()
+            .map(|commitment| {
+                let id = bots
+                    .iter()
+                    .position(|&bot| bot == commitment.hero)
+                    .map(|index| &bot_ids[index])
+                    .ok_or("search returned a commitment outside the bot roster")?;
+                Ok(json!({
+                    "player_id": id,
+                    "first_card": commitment.first.map(|card| card.0),
+                    "second_card": commitment.second.map(|card| card.0),
+                }))
+            })
+            .collect::<Result<Vec<_>, &str>>()?;
+        return Ok(json!({
+            "commitments": commitments,
+            "requested_worlds": result.requested_worlds,
+            "prepared_worlds": result.prepared_worlds,
+            "score": result.matrix.score,
+            "completed_rows": result.matrix.completed_rows,
+            "pruned_rows": result.matrix.pruned_rows,
+            "evaluated_cells": result.matrix.evaluated_cells,
+            "total_cells": result.matrix.total_cells,
+            "nodes": result.matrix.nodes,
+        }));
+    }
     let result = session
         .search_sampled_planning_with_options(player, seed, cap, limits, options, &budget)
         .map_err(|error| error.to_string())?;

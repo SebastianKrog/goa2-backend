@@ -332,7 +332,9 @@ impl NativeSession {
         let Some(actor) = self.planning.actor else {
             return Ok(None);
         };
-        if objects.arena.field(step, objects.pending)
+        if objects
+            .arena
+            .field(step, objects.pending)
             .is_some_and(|value| objects.arena.truthy(&value))
         {
             if matches!(objects.selected(step, self.selection_key),
@@ -340,11 +342,17 @@ impl NativeSession {
             {
                 let output = self.passive_text_bound(objects, step, Field::Output)?;
                 let passive = self.phase_step(objects, "passive")?;
-                objects.arena.set_field(
-                    passive, objects.phases.k(Field::Trigger),
-                    ObjectValue::Atom(Datum::Text(objects.phases.k(Field::AfterLaugh))),
-                ).map_err(unsupported)?;
-                objects.arena.set_context(output, ObjectValue::Atom(Datum::Bool(true)))
+                objects
+                    .arena
+                    .set_field(
+                        passive,
+                        objects.phases.k(Field::Trigger),
+                        ObjectValue::Atom(Datum::Text(objects.phases.k(Field::AfterLaugh))),
+                    )
+                    .map_err(unsupported)?;
+                objects
+                    .arena
+                    .set_context(output, ObjectValue::Atom(Datum::Bool(true)))
                     .map_err(unsupported)?;
                 events.push(NativeEvent::HeroLaughed(actor));
                 self.push_live_steps_bound(objects, &[passive])?;

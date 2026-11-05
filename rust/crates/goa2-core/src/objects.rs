@@ -214,14 +214,20 @@ impl ObjectArena {
         self.journal.recorded = checkpoint.parent_recorded;
     }
 
-    pub(crate) fn is_recording(&self) -> bool {
-        self.journal.existing_objects.is_some()
+    pub(crate) fn commit_rollback(&mut self, checkpoint: ArenaCheckpoint) {
+        self.journal.existing_objects = checkpoint.parent_existing_objects;
+        if checkpoint.parent_existing_objects.is_some() {
+            // Keep the child's undo entries so the enclosing rollback can
+            // reverse the committed writes in order.
+            self.journal.recorded.extend(checkpoint.parent_recorded);
+        } else {
+            self.journal.entries.truncate(checkpoint.entry_count);
+            self.journal.recorded = checkpoint.parent_recorded;
+        }
     }
 
-    pub(crate) fn inherit_staged_journal(&mut self, source: &Self) {
-        self.journal.entries.clone_from(&source.journal.entries);
-        self.journal.recorded.clone_from(&source.journal.recorded);
-        self.journal.existing_objects = source.journal.existing_objects;
+    pub(crate) fn is_recording(&self) -> bool {
+        self.journal.existing_objects.is_some()
     }
 
     fn object_mut(&mut self, id: ObjectId) -> &mut Object {
@@ -255,6 +261,10 @@ impl ObjectArena {
 
     pub fn compile(source: &StateEnvelope) -> Result<Self, String> {
         source.validate()?;
+        Self::compile_validated(source)
+    }
+
+    pub(crate) fn compile_validated(source: &StateEnvelope) -> Result<Self, String> {
         let mut arena = Self {
             symbols: Arc::new(Symbols::default()),
             objects: Vec::new(),
@@ -1117,10 +1127,12 @@ impl ObjectArena {
                 let Contents::Fields(fields) = &self.objects[id.0].contents else {
                     return Err("set target must have fields".into());
                 };
-                if matches!(
-                    self.objects[id.0].kind,
-                    ObjectKind::Model | ObjectKind::Step
-                ) && !fields.iter().any(|(k, _)| k == key)
+                let index = fields.iter().position(|(field, _)| field == key);
+                if index.is_none()
+                    && matches!(
+                        self.objects[id.0].kind,
+                        ObjectKind::Model | ObjectKind::Step
+                    )
                 {
                     return Err("model field does not exist".into());
                 }
@@ -1129,8 +1141,8 @@ impl ObjectArena {
                 let Contents::Fields(fields) = &mut self.object_mut(id).contents else {
                     unreachable!()
                 };
-                if let Some((_, item)) = fields.iter_mut().find(|(k, _)| k == key) {
-                    *item = value;
+                if let Some(index) = index {
+                    fields[index].1 = value;
                 } else {
                     fields.push((*key, value));
                 }

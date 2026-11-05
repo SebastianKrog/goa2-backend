@@ -1,24 +1,15 @@
-"""Matched two-turn simulation timing with import/export outside the clocks.
-
-Both engines copy a fixed root and execute identical verified decisions. Python
-copies the state and its physical-card references with one deepcopy memo. Rust
-uses NativeSession::clone. Normal cyclic GC remains enabled in Python. No server
-or neural runtime is involved. Results measure serial replay, not minimax search.
-"""
+"""Time native two-turn replays against untimed Python rule validation."""
 
 from __future__ import annotations
 
 import argparse
 import copy
-import gc
 import hashlib
 import json
 import os
 import platform
 import statistics
-import sys
 from pathlib import Path
-from time import perf_counter
 
 from object_execution_traces import ObjectTraceNormalizer
 from oracle import ROOT, Worker, digest, verify_sources
@@ -264,44 +255,6 @@ def workloads(case):
     raise AssertionError("verified game did not supply all two-turn windows")
 
 
-def python_sample(workload, iterations):
-    root, physical = workload["state"], workload["physical"]
-    commands = decode(workload["operations"])
-    before = snapshot(root, workload["originals"])
-    probe, refs = copy.deepcopy((root, physical))
-    counts = PythonRunner(probe, refs).run(commands)
-    assert (
-        counts == workload["counts"]
-        and snapshot(probe, workload["originals"]) == workload["expected"]
-    )
-    del probe, refs
-    gc.collect()
-    clone_seconds = advance_seconds = cleanup_seconds = 0.0
-    wall = perf_counter()
-    for _ in range(iterations):
-        start = perf_counter()
-        working, refs = copy.deepcopy((root, physical))
-        clone_seconds += perf_counter() - start
-        start = perf_counter()
-        got = PythonRunner(working, refs).run(commands)
-        advance_seconds += perf_counter() - start
-        assert got == counts
-        start = perf_counter()
-        del working, refs
-        cleanup_seconds += perf_counter() - start
-    total_seconds = perf_counter() - wall
-    assert snapshot(root, workload["originals"]) == before
-    return dict(
-        iterations=iterations,
-        clone_seconds=clone_seconds,
-        advance_seconds=advance_seconds,
-        cleanup_seconds=cleanup_seconds,
-        total_seconds=total_seconds,
-        counts=counts,
-        root_unchanged=True,
-    )
-
-
 def summarize(samples):
     keys = ("clone_seconds", "advance_seconds", "cleanup_seconds", "total_seconds")
     result = {
@@ -319,8 +272,6 @@ def summarize(samples):
 
 
 def benchmark(worker_command, *, samples=5, iterations=8, compare_rollback=False):
-    if not gc.isenabled():
-        raise ValueError("benchmark requires normal Python cyclic GC")
     manifest = verify_sources()
     corpus = ROOT / "rust/tests/fixtures/complete-games-hanu.json"
     index, identity = read_index(corpus)
@@ -330,44 +281,41 @@ def benchmark(worker_command, *, samples=5, iterations=8, compare_rollback=False
         for entry in index["cases"]:
             case = read_case(corpus, entry)
             for workload in workloads(case):
-                languages = {"python": [], "rust": []}
+                modes = {"rust": []}
                 if compare_rollback:
-                    languages["rust_rollback"] = []
-                order = tuple(languages)
+                    modes["rust_rollback"] = []
+                order = tuple(modes)
                 for sample in range(samples):
                     offset = sample % len(order)
-                    for language in order[offset:] + order[:offset]:
-                        if language == "python":
-                            result = python_sample(workload, iterations)
-                        else:
-                            result = worker.request(
-                                "simulation_bench",
-                                envelope=workload["envelope"],
-                                operations=workload["operations"],
-                                iterations=iterations,
-                                **({"rollback": True} if language == "rust_rollback" else {}),
-                            )
-                            actual = canonical_set_fields(
-                                ObjectTraceNormalizer().record(result.pop("validation_record"))
-                            )
-                            if actual != workload["expected"]:
-                                path = ROOT / "rust/artifacts/simulation-bench-mismatch.json"
-                                path.write_text(
-                                    json.dumps(
-                                        dict(
-                                            name=workload["name"],
-                                            expected=workload["expected"],
-                                            actual=actual,
-                                        ),
-                                        indent=2,
-                                    )
+                    for mode in order[offset:] + order[:offset]:
+                        result = worker.request(
+                            "simulation_bench",
+                            envelope=workload["envelope"],
+                            operations=workload["operations"],
+                            iterations=iterations,
+                            **({"rollback": True} if mode == "rust_rollback" else {}),
+                        )
+                        actual = canonical_set_fields(
+                            ObjectTraceNormalizer().record(result.pop("validation_record"))
+                        )
+                        if actual != workload["expected"]:
+                            path = ROOT / "rust/artifacts/simulation-bench-mismatch.json"
+                            path.write_text(
+                                json.dumps(
+                                    dict(
+                                        name=workload["name"],
+                                        expected=workload["expected"],
+                                        actual=actual,
+                                    ),
+                                    indent=2,
                                 )
-                                raise AssertionError(f"benchmark endpoint mismatch: {path}")
-                            assert (
-                                result["counts"] == workload["counts"] and result["root_unchanged"]
                             )
-                        languages[language].append(result)
-                summary = {language: summarize(values) for language, values in languages.items()}
+                            raise AssertionError(f"benchmark endpoint mismatch: {path}")
+                        assert (
+                            result["counts"] == workload["counts"] and result["root_unchanged"]
+                        )
+                        modes[mode].append(result)
+                summary = {mode: summarize(values) for mode, values in modes.items()}
                 row = {
                     key: workload[key]
                     for key in (
@@ -384,26 +332,22 @@ def benchmark(worker_command, *, samples=5, iterations=8, compare_rollback=False
                     counts=workload["counts"],
                     command_sha256=digest(workload["operations"]),
                     results=summary,
-                    rust_over_python_speedup=summary["python"]["total_seconds"]
-                    / summary["rust"]["total_seconds"],
-                    samples=languages,
+                    samples=modes,
                 )
                 rows.append(row)
                 print(
                     json.dumps(
-                        {key: row[key] for key in ("name", "results", "rust_over_python_speedup")}
+                        {key: row[key] for key in ("name", "results")}
                     ),
                     flush=True,
                 )
     finally:
         worker.close()
     return dict(
-        schema_version=1,
+        schema_version=2,
         source_sha256=manifest["source_sha256"],
         corpus_sha256=identity,
-        python=sys.version,
         platform=platform.platform(),
-        gc_enabled=gc.isenabled(),
         cpu_affinity=sorted(os.sched_getaffinity(0)),
         samples_per_workload=samples,
         iterations_per_sample=iterations,
@@ -411,7 +355,6 @@ def benchmark(worker_command, *, samples=5, iterations=8, compare_rollback=False
         setup_json_export_comparison_excluded_from_clocks=True,
         typed_inputs_prepared_before_clocks=True,
         endpoint_set_normalization="Only declared Board Zone.hexes sets; identity paths are rejected",
-        python_gc="Full collection before each sample is untimed; automatic GC stays enabled inside samples",
         turn_semantics="Two global game turns, resolving all heroes; not two individual hero actions",
         workloads=rows,
     )
@@ -424,7 +367,7 @@ def main():
     parser.add_argument("--iterations", type=int, default=8)
     parser.add_argument("--compare-rollback", action="store_true")
     parser.add_argument(
-        "--output", type=Path, default=ROOT / "rust/artifacts/simulation-benchmark.json"
+        "--output", type=Path, default=ROOT / "rust/artifacts/simulation-benchmark-rust-only.json"
     )
     args = parser.parse_args()
     if os.environ.get("PYTHONHASHSEED") != "0":

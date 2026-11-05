@@ -21,16 +21,23 @@ use crate::{
 mod loadout;
 mod object_execution;
 mod observation;
-pub use loadout::{LoadoutHypothesis, SampledHand};
+mod offline_match;
+pub use loadout::{
+    LoadoutHypothesis, PublicUpgradeBatch, SampledHand, UpgradeCheckpoint,
+    replay_public_upgrade_batches,
+};
+pub use offline_match::{OfflineMatch, OfflinePolicy};
 mod search;
-pub use observation::{HeroObservation, PlayerObservation, PrivateCards, PublicCard};
+pub use observation::{
+    BotTeamObservation, HeroObservation, PlayerObservation, PrivateCards, PublicCard,
+    TeamKnowledgeMode, VisibleCommitment,
+};
 mod sequences;
 pub use object_execution::LiveEffectExpiry;
 pub use search::{
-    GameTurnRollout,
-    JointPlans, OpponentPolicy, PlanningSearch, PlanningSearchOptions, ResolutionScoreKind, ResolutionSearch,
-    SampledPlanningSearch,
-    SearchLimits,
+    BotPlanningScope, BotTeamPlanningSearch, GameTurnRollout, JointPlans, OpponentPolicy,
+    PlanningRolloutSample, PlanningSearch, PlanningSearchOptions, ResolutionScoreKind,
+    ResolutionSearch, ResolutionStop, SampledPlanningSearch, SearchEvaluation, SearchLimits,
 };
 pub use sequences::{DecisionMove, PlanningCommitment, SequenceBatch, SequenceVerdict};
 
@@ -742,9 +749,22 @@ pub enum NativeEvent {
         attempt: i64,
     },
     HeroLaughed(Symbol),
-    HeroPieceRemoved { owner: Symbol, piece: Symbol, from: Option<Hex> },
-    HeroPieceSpawned { owner: Symbol, piece: Symbol, to: Hex },
-    ResolvedCardsSwapped { actor: Option<Symbol>, target: Symbol, a: Symbol, b: Symbol },
+    HeroPieceRemoved {
+        owner: Symbol,
+        piece: Symbol,
+        from: Option<Hex>,
+    },
+    HeroPieceSpawned {
+        owner: Symbol,
+        piece: Symbol,
+        to: Hex,
+    },
+    ResolvedCardsSwapped {
+        actor: Option<Symbol>,
+        target: Symbol,
+        a: Symbol,
+        b: Symbol,
+    },
     HandCardRevealed {
         actor: Option<Symbol>,
         target: Symbol,
@@ -999,7 +1019,7 @@ impl NativeSession {
         ) {
             return Err(unsupported("phase flow not yet compiled"));
         }
-        let mut objects = object_execution::BoundObjects::compile(&source)?;
+        let mut objects = object_execution::BoundObjects::compile_validated(&source)?;
         let raw = &source.state;
         let has_effects = raw["active_effects"]
             .as_array()
@@ -1090,9 +1110,9 @@ impl NativeSession {
         symbols.intern("system");
         let coordinates = ["q", "r", "s"].map(|name| symbols.intern(name));
         let planning = if has_effects {
-            crate::planning::Planning::compile_effect_boundary(&source, &mut symbols)
+            crate::planning::Planning::compile_effect_boundary(&source, header.phase, &mut symbols)
         } else {
-            crate::planning::Planning::compile_flow(&source, &mut symbols)
+            crate::planning::Planning::compile_flow(&source, header.phase, &mut symbols)
         }
         .map_err(unsupported)?;
         let team = match raw["tie_breaker_team"].as_str() {
@@ -1192,13 +1212,13 @@ impl NativeSession {
         } else {
             None
         };
-        // This projection is read-only in the closed arena instruction set.
         // Mutable context and steps remain authoritative only in the arena.
         let world_source = objects
             .as_ref()
             .map(|_| object_execution::world_projection(&source));
-        let world = NativeWorld::compile(world_source.as_ref().unwrap_or(&source), &mut symbols)
-            .map_err(unsupported)?;
+        let world =
+            NativeWorld::compile_validated(world_source.as_ref().unwrap_or(&source), &mut symbols)
+                .map_err(unsupported)?;
         // Projectile selection is a dependency of a possible on-block body,
         // not of every defense window. Do not compile unreachable targeting.
         if steps.iter().any(|s| {
@@ -6346,7 +6366,12 @@ impl NativeSession {
                 json!({"event_type":"CARD_SELECTED_FOR_GUESS","actor_id":actor.map(|id|self.symbols.name(id)),
                     "target_id":self.symbols.name(*victim),"from_hex":null,"to_hex":null,"metadata":{"attempt":attempt}})
             }
-            NativeEvent::ResolvedCardsSwapped { actor, target, a, b } => json!({
+            NativeEvent::ResolvedCardsSwapped {
+                actor,
+                target,
+                a,
+                b,
+            } => json!({
                 "event_type":"RESOLVED_CARDS_SWAPPED",
                 "actor_id":actor.map(|id|self.symbols.name(id)),
                 "target_id":self.symbols.name(*target), "from_hex":null, "to_hex":null,
@@ -6366,8 +6391,16 @@ impl NativeSession {
                 "event_type":"HERO_LAUGHED", "actor_id":self.symbols.name(*actor),
                 "target_id":null, "from_hex":null, "to_hex":null, "metadata":{}
             }),
-            NativeEvent::HandCardRevealed { actor, target, owner, card, name, color, tier, tier_value } =>
-                json!({"event_type":"CARD_REVEALED",
+            NativeEvent::HandCardRevealed {
+                actor,
+                target,
+                owner,
+                card,
+                name,
+                color,
+                tier,
+                tier_value,
+            } => json!({"event_type":"CARD_REVEALED",
                     "actor_id":actor.map(|id|self.symbols.name(id)),
                     "target_id":self.symbols.name(*target),"from_hex":null,"to_hex":null,
                     "metadata":{"owner_id":self.symbols.name(*owner),

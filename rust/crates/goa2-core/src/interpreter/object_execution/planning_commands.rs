@@ -1,14 +1,76 @@
 //! Live planning commands preserve source collection replacement and aliasing.
+use super::super::{TeamKnowledgeMode, UpgradeCheckpoint};
 use super::phases::Field;
 use super::*;
 use crate::cards::CardId;
+use std::collections::BTreeMap;
+
+struct PlanningHandSample {
+    hero: Symbol,
+    hand: super::super::SampledHand,
+    fixed: [Option<CardId>; 2],
+}
 
 impl NativeSession {
+    pub(in crate::interpreter) fn observed_planning_cards(
+        &self,
+        hero: Symbol,
+    ) -> Result<(Option<CardId>, Option<CardId>)> {
+        let Some(objects) = &self.objects else {
+            return Ok(self.planning.committed_cards(hero));
+        };
+        let card = |field| {
+            let collection = objects.phases.root(&objects.arena, field)?;
+            match objects.arena.field(collection, hero) {
+                Some(ObjectValue::Atom(Datum::Instance(id))) => Ok(Some(CardId(id))),
+                None | Some(ObjectValue::Atom(Datum::Null)) => Ok(None),
+                _ => Err(unsupported("invalid planning commitment binding")),
+            }
+        };
+        Ok((card(Field::Pending)?, card(Field::Second)?))
+    }
+
     /// Fork a clean planning boundary with all other ordinary hands sampled.
     /// The returned worker leaves other heroes uncommitted so a joint planning
     /// policy can select their moves from the same pre-reveal state.
     pub fn sampled_planning_world(&self, player: Symbol, seed: u64) -> Result<Self> {
-        let samples = self.planning_samples(player, seed)?;
+        self.sampled_planning_world_with_checkpoints(player, seed, None)
+    }
+
+    pub(in crate::interpreter) fn sampled_planning_world_with_checkpoints(
+        &self,
+        player: Symbol,
+        seed: u64,
+        checkpoints: Option<&BTreeMap<String, Vec<UpgradeCheckpoint>>>,
+    ) -> Result<Self> {
+        let samples = self.planning_samples(player, seed, checkpoints, &[], &[])?;
+        let mut worker = self.clone();
+        worker.install_planning_samples(samples)?;
+        Ok(worker)
+    }
+
+    /// Sample an ordinary planning world while preserving exact bot cards
+    /// authorized by the team mode. The roster comes from trusted integration.
+    pub fn sampled_bot_team_world(
+        &self,
+        player: Symbol,
+        bots: &[Symbol],
+        mode: TeamKnowledgeMode,
+        seed: u64,
+        checkpoints: Option<&BTreeMap<String, Vec<UpgradeCheckpoint>>>,
+    ) -> Result<Self> {
+        let view = self.bot_team_observation(player, bots, mode)?;
+        let preserved = view
+            .allied_bots
+            .iter()
+            .filter_map(|hero| self.symbols.lookup(&hero.hero))
+            .collect::<Vec<_>>();
+        let known = view
+            .allied_human_commitments
+            .iter()
+            .filter_map(|row| self.symbols.lookup(&row.hero))
+            .collect::<Vec<_>>();
+        let samples = self.planning_samples(player, seed, checkpoints, &preserved, &known)?;
         let mut worker = self.clone();
         worker.install_planning_samples(samples)?;
         Ok(worker)
@@ -21,7 +83,17 @@ impl NativeSession {
         seed: u64,
         operation: impl FnOnce(&mut Self) -> Result<T>,
     ) -> Result<T> {
-        let samples = self.planning_samples(player, seed)?;
+        self.with_sampled_planning_checkpoints(player, seed, None, operation)
+    }
+
+    pub(in crate::interpreter) fn with_sampled_planning_checkpoints<T>(
+        &mut self,
+        player: Symbol,
+        seed: u64,
+        checkpoints: Option<&BTreeMap<String, Vec<UpgradeCheckpoint>>>,
+        operation: impl FnOnce(&mut Self) -> Result<T>,
+    ) -> Result<T> {
+        let samples = self.planning_samples(player, seed, checkpoints, &[], &[])?;
         self.with_rollback(|worker| {
             worker.install_planning_samples(samples)?;
             operation(worker)
@@ -32,8 +104,19 @@ impl NativeSession {
         &self,
         player: Symbol,
         seed: u64,
-    ) -> Result<Vec<(Symbol, super::super::SampledHand)>> {
-        let observation = self.player_observation(player)?;
+        checkpoints: Option<&BTreeMap<String, Vec<UpgradeCheckpoint>>>,
+        preserved: &[Symbol],
+        known: &[Symbol],
+    ) -> Result<Vec<PlanningHandSample>> {
+        let mut observation = self.player_observation(player)?;
+        if checkpoints.is_some_and(|rows| {
+            rows.keys()
+                .any(|id| !observation.heroes.iter().any(|hero| hero.id == *id))
+        }) {
+            return Err(EngineError::InvalidInput(
+                "upgrade checkpoints name an unknown hero".into(),
+            ));
+        }
         if self.planning.phase != Phase::Planning {
             return Err(unsupported("sampled worlds require planning"));
         }
@@ -61,30 +144,54 @@ impl NativeSession {
         }
         let mut samples = Vec::new();
         for (index, hero) in self.world.heroes.iter().enumerate() {
-            if hero.id == player {
+            if hero.id == player || preserved.contains(&hero.id) {
                 continue;
             }
-            let public = &observation.heroes[index];
+            let public = &mut observation.heroes[index];
             if !hero.spells.is_empty() || !public.revealed_current.is_empty() {
                 return Err(unsupported(
                     "sampled world requires ordinary cards without current reveals",
                 ));
             }
-            let sample = observation
-                .sample_planning_hand(&public.id, seed.wrapping_add(index as u64))?
+            let fixed = if known.contains(&hero.id) {
+                let (first, second) = self.observed_planning_cards(hero.id)?;
+                [first, second]
+            } else {
+                [None, None]
+            };
+            for card in fixed.iter().flatten() {
+                let row = self
+                    .world
+                    .card(*card)
+                    .ok_or_else(|| unsupported("known commitment card is missing"))?;
+                let printed = self.world.definitions.cards[row.definition].printed_id;
+                public
+                    .revealed_current
+                    .push(self.symbols.name(printed).to_owned());
+            }
+            let id = public.id.clone();
+            let hand = observation
+                .sample_planning_hand_with_checkpoints(
+                    &id,
+                    seed.wrapping_add(index as u64),
+                    checkpoints
+                        .and_then(|rows| rows.get(&id))
+                        .map_or(&[], Vec::as_slice),
+                )?
                 .ok_or_else(|| unsupported("no consistent ordinary planning hand"))?;
-            samples.push((hero.id, sample));
+            samples.push(PlanningHandSample {
+                hero: hero.id,
+                hand,
+                fixed,
+            });
         }
         Ok(samples)
     }
 
-    fn install_planning_samples(
-        &mut self,
-        samples: Vec<(Symbol, super::super::SampledHand)>,
-    ) -> Result<()> {
+    fn install_planning_samples(&mut self, samples: Vec<PlanningHandSample>) -> Result<()> {
         self.with_live_objects(|session, objects| {
-            for (hero, sample) in samples {
-                session.install_sampled_hand(objects, hero, &sample)?;
+            for sample in samples {
+                session.install_sampled_hand(objects, sample.hero, &sample.hand, sample.fixed)?;
             }
             session.sync_card_collections_bound(objects)?;
             session.world.refresh_card_auras();
@@ -98,26 +205,29 @@ impl NativeSession {
         objects: &mut BoundObjects,
         hero: Symbol,
         sample: &super::super::SampledHand,
+        fixed: [Option<CardId>; 2],
     ) -> Result<()> {
         use crate::world::CardLifecycle;
         let model = self
             .hero_model_bound(objects, hero)
             .ok_or_else(|| unsupported("sampled hero model missing"))?;
-        let pending = objects.phases.root(&objects.arena, Field::Pending)?;
-        while matches!(
-            objects.arena.field(pending, hero),
-            Some(ObjectValue::Atom(Datum::Instance(_)))
-        ) {
-            self.uncommit_card_bound(objects, hero)?;
-        }
-        if objects.arena.field(pending, hero).is_some() {
-            objects
-                .arena
-                .apply(&crate::objects::Mutation::Delete {
-                    target: crate::objects::Target::Object(pending),
-                    key: hero,
-                })
-                .map_err(unsupported)?;
+        if fixed[0].is_none() {
+            let pending = objects.phases.root(&objects.arena, Field::Pending)?;
+            while matches!(
+                objects.arena.field(pending, hero),
+                Some(ObjectValue::Atom(Datum::Instance(_)))
+            ) {
+                self.uncommit_card_bound(objects, hero)?;
+            }
+            if objects.arena.field(pending, hero).is_some() {
+                objects
+                    .arena
+                    .apply(&crate::objects::Mutation::Delete {
+                        target: crate::objects::Target::Object(pending),
+                        key: hero,
+                    })
+                    .map_err(unsupported)?;
+            }
         }
         let hand = self.planning_hand_bound(objects, model)?;
         let deck = self.hero_card_list_bound(objects, model, Field::Deck)?;
@@ -131,6 +241,7 @@ impl NativeSession {
             .flatten()
             .chain(&row.discard)
             .copied()
+            .chain(fixed.into_iter().flatten())
             .collect::<Vec<_>>();
         if public_cards.iter().any(|card| !deck.contains(&Some(*card))) {
             return Err(unsupported(
@@ -189,6 +300,7 @@ impl NativeSession {
         &self,
         objects: &BoundObjects,
         hero: Symbol,
+        limit: usize,
     ) -> Result<Vec<super::super::DecisionMove>> {
         use super::super::DecisionMove;
         if self.planning.phase != Phase::Planning
@@ -218,11 +330,25 @@ impl NativeSession {
                 return Ok(Vec::new());
             }
         }
-        let hand = self.hero_card_list_bound(objects, model, Field::Hand)?;
+        let hand = self.hero_card_values_bound(objects, model, Field::Hand)?;
         let mut choices = Vec::new();
-        for card in hand.iter().flatten().copied() {
+        for value in hand {
+            let ObjectValue::Atom(Datum::Instance(id)) = value else {
+                return Err(unsupported(
+                    "planning physical-card collection binding missing",
+                ));
+            };
+            let card = CardId(*id);
+            if self.world.card(card).is_none() {
+                return Err(unsupported(
+                    "planning physical-card collection binding missing",
+                ));
+            }
             if self.world.normal_card(card).is_ok() {
                 choices.push(DecisionMove::Card { hero, card });
+                if choices.len() == limit {
+                    return Ok(choices);
+                }
             }
         }
         if first.is_some() {
@@ -239,6 +365,15 @@ impl NativeSession {
         model: ObjectId,
         field: Field,
     ) -> Result<Vec<Option<CardId>>> {
+        self.decode_hero_cards(self.hero_card_values_bound(objects, model, field)?, field)
+    }
+
+    fn hero_card_values_bound<'a>(
+        &self,
+        objects: &'a BoundObjects,
+        model: ObjectId,
+        field: Field,
+    ) -> Result<&'a [ObjectValue]> {
         let Some(ObjectValue::Object(list)) = objects.arena.field(model, objects.phases.k(field))
         else {
             return Err(unsupported("planning card collection missing"));
@@ -246,7 +381,15 @@ impl NativeSession {
         objects
             .arena
             .sequence(list)
-            .ok_or_else(|| unsupported("planning cards must be a list"))?
+            .ok_or_else(|| unsupported("planning cards must be a list"))
+    }
+
+    fn decode_hero_cards(
+        &self,
+        values: &[ObjectValue],
+        field: Field,
+    ) -> Result<Vec<Option<CardId>>> {
+        values
             .iter()
             .map(|value| match value {
                 ObjectValue::Atom(Datum::Instance(card))
@@ -261,37 +404,81 @@ impl NativeSession {
             })
             .collect()
     }
-    // An in-place list edit can affect another hero or another collection role.
-    // Refresh every derived collection from the live handles, never serialized JSON.
+    // Inspect live handles even when lists share identities across heroes and
+    // roles. Unchanged contents can reuse the typed projection.
     pub(super) fn sync_card_collections_bound(&mut self, objects: &BoundObjects) -> Result<()> {
         for &(hero, model) in &objects.phases.heroes {
             let index = self
                 .world
-                .heroes
-                .iter()
-                .position(|row| row.id == hero)
+                .hero_index(hero)
                 .ok_or_else(|| unsupported("planning hero cache missing"))?;
-            let deck = self.hero_card_list_bound(objects, model, Field::Deck)?;
-            let hand = self.hero_card_list_bound(objects, model, Field::Hand)?;
-            let discard = self.hero_card_list_bound(objects, model, Field::Discard)?;
-            let spells = self.hero_card_list_bound(objects, model, Field::Spells)?;
-            let played = self.hero_card_list_bound(objects, model, Field::Played)?;
+            let row = &self.world.heroes[index];
+            let update = |field, old: &[CardId]| -> Result<Option<Vec<CardId>>> {
+                let values = self.hero_card_values_bound(objects, model, field)?;
+                if values.len() == old.len()
+                    && values.iter().zip(old).all(|(value, card)| {
+                        matches!(value, ObjectValue::Atom(Datum::Instance(id)) if *id == card.0)
+                    })
+                {
+                    return Ok(None);
+                }
+                Ok(Some(
+                    self.decode_hero_cards(values, field)?
+                        .into_iter()
+                        .flatten()
+                        .collect(),
+                ))
+            };
+            let deck = update(Field::Deck, &row.deck)?;
+            let hand = update(Field::Hand, &row.hand)?;
+            let discard = update(Field::Discard, &row.discard)?;
+            let spells = update(Field::Spells, &row.spells)?;
+            let values = self.hero_card_values_bound(objects, model, Field::Played)?;
+            let played = if values.len() == row.played.len()
+                && values
+                    .iter()
+                    .zip(&row.played)
+                    .all(|(value, card)| match (value, card) {
+                        (ObjectValue::Atom(Datum::Instance(id)), Some(card)) => *id == card.0,
+                        (ObjectValue::Atom(Datum::Null), None) => true,
+                        _ => false,
+                    }) {
+                None
+            } else {
+                Some(self.decode_hero_cards(values, Field::Played)?)
+            };
             let current = self.model_card_bound(objects, model, Field::Current)?;
             let extra = self.model_card_bound(objects, model, Field::Extra)?;
             let ultimate = self.model_card_bound(objects, model, Field::Ultimate)?;
-            let row = &mut self.world.heroes[index];
-            row.deck.clear();
-            row.deck.extend(deck.into_iter().flatten());
-            row.hand.clear();
-            row.hand.extend(hand.into_iter().flatten());
-            row.discard.clear();
-            row.discard.extend(discard.into_iter().flatten());
-            row.spells.clear();
-            row.spells.extend(spells.into_iter().flatten());
-            row.played = played;
-            row.current = current;
-            row.extra = extra;
-            row.ultimate = ultimate;
+            if deck.is_some()
+                || hand.is_some()
+                || discard.is_some()
+                || spells.is_some()
+                || played.is_some()
+                || current != row.current
+                || extra != row.extra
+                || ultimate != row.ultimate
+            {
+                let row = &mut self.world.heroes[index];
+                if let Some(deck) = deck {
+                    row.deck = deck;
+                }
+                if let Some(hand) = hand {
+                    row.hand = hand;
+                }
+                if let Some(discard) = discard {
+                    row.discard = discard;
+                }
+                if let Some(spells) = spells {
+                    row.spells = spells;
+                }
+                if let Some(played) = played {
+                    row.played = played;
+                }
+                row.current = current;
+                row.extra = extra;
+                row.ultimate = ultimate;
+            }
         }
         self.world.refresh_card_auras();
         Ok(())

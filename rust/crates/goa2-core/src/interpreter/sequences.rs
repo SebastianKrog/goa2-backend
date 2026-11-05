@@ -1,5 +1,8 @@
 //! Shared-prefix legality checks on a worker-local live session.
-use super::{EngineError, ExecutionBudget, NativeSession, RequestChoices, RequestToken, Result};
+use super::{
+    EngineError, ExecutionBudget, NativeRequest, NativeSession, RequestChoices, RequestToken,
+    Result,
+};
 use crate::{
     cards::CardId,
     codec::Phase,
@@ -26,6 +29,8 @@ pub enum DecisionMove {
 }
 
 /// A complete choice for one hero before a simultaneous planning reveal.
+/// For an open second-card slot, first is the next card (or None to finish)
+/// and second is always None.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PlanningCommitment {
     pub hero: Symbol,
@@ -76,11 +81,7 @@ impl NativeSession {
                 }
                 continue;
             }
-            if choices.contains(&DecisionMove::FinishPlanning { hero: hero.id }) {
-                return Err(invalid(
-                    "joint commitments require a fresh or closed planning slot",
-                ));
-            }
+            let second_slot = choices.contains(&DecisionMove::FinishPlanning { hero: hero.id });
             let commitment = matches
                 .next()
                 .ok_or_else(|| invalid("joint choice is missing an open hero"))?;
@@ -92,13 +93,15 @@ impl NativeSession {
                     hero: hero.id,
                     card,
                 },
+                None if second_slot => DecisionMove::FinishPlanning { hero: hero.id },
                 None => DecisionMove::Pass { hero: hero.id },
             };
             if !choices.contains(&first) {
                 return Err(invalid("first commitment is not a legal planning choice"));
             }
             if let Some(second) = commitment.second
-                && (commitment.first.is_none()
+                && (second_slot
+                    || commitment.first.is_none()
                     || commitment.first == Some(second)
                     || !self.planning.two_cards(&self.world, hero.id)
                     || !choices.contains(&DecisionMove::Card {
@@ -137,6 +140,8 @@ impl NativeSession {
                 ) {
                     self.finish_planning(commitment.hero)?;
                 }
+            } else if self.observed_planning_cards(commitment.hero)?.0.is_some() {
+                self.finish_planning(commitment.hero)?;
             } else {
                 self.pass_planning(commitment.hero)?;
             }
@@ -151,12 +156,38 @@ impl NativeSession {
 
     /// Enumerate meaningful live planning decisions in hand order.
     pub fn planning_choices(&self, hero: Symbol) -> Result<Vec<DecisionMove>> {
+        self.planning_choices_up_to(hero, usize::MAX)
+    }
+
+    fn planning_choices_up_to(&self, hero: Symbol, limit: usize) -> Result<Vec<DecisionMove>> {
         let objects = self.objects.as_ref().ok_or_else(|| {
             EngineError::Unsupported(
                 "planning choice generation requires live object bindings".into(),
             )
         })?;
-        self.planning_choices_bound(objects, hero)
+        self.planning_choices_bound(objects, hero, limit)
+    }
+
+    pub(super) fn first_planning_commitment(
+        &self,
+        hero: Symbol,
+    ) -> Result<Option<PlanningCommitment>> {
+        let choices = self.planning_choices_up_to(hero, 1)?;
+        let first = match choices.first() {
+            Some(DecisionMove::Card { card, .. }) => Some(*card),
+            Some(DecisionMove::Pass { .. } | DecisionMove::FinishPlanning { .. }) => None,
+            None => return Ok(None),
+            _ => {
+                return Err(EngineError::Unsupported(
+                    "unexpected planning choice".into(),
+                ));
+            }
+        };
+        Ok(Some(PlanningCommitment {
+            hero,
+            first,
+            second: None,
+        }))
     }
 
     /// Enumerate a player's current resolution inputs in native option order.
@@ -173,6 +204,43 @@ impl NativeSession {
         Ok(self.resolution_choices_up_to(player, 1)?.pop())
     }
 
+    /// Distinguish a forced input from a branch without materializing every
+    /// destination. A duplicated prefix does not prove the input is forced.
+    pub(super) fn resolution_branch_probe(&mut self, player: Symbol) -> Result<Vec<DecisionMove>> {
+        let choices = self.resolution_choices_up_to(player, 2)?;
+        if choices.len() == 2
+            || self
+                .last_request
+                .as_ref()
+                .is_none_or(|request| matches!(request.choices, RequestChoices::ConfirmAction))
+        {
+            Ok(choices)
+        } else {
+            self.resolution_choices(player)
+        }
+    }
+
+    pub(super) fn resolution_request_addresses(
+        &self,
+        request: &NativeRequest,
+        player: Symbol,
+    ) -> bool {
+        let Some(hero) = self.world.hero(player).filter(|hero| hero.id == player) else {
+            return false;
+        };
+        match &request.choices {
+            RequestChoices::Actors { team, .. } => hero.team == *team,
+            RequestChoices::Upgrades(players) => players.iter().any(|row| row.hero == player),
+            _ => self
+                .symbols
+                .name(request.owner)
+                .strip_prefix("team:")
+                .map_or(request.owner == player, |team| {
+                    team == self.symbols.name(hero.team)
+                }),
+        }
+    }
+
     fn resolution_choices_up_to(
         &mut self,
         player: Symbol,
@@ -187,15 +255,7 @@ impl NativeSession {
         let Some(request) = &self.last_request else {
             return Ok(Vec::new());
         };
-        let addressed = match &request.choices {
-            RequestChoices::Actors { team, .. } => self
-                .world
-                .hero(player)
-                .is_some_and(|hero| hero.team == *team),
-            RequestChoices::Upgrades(players) => players.iter().any(|row| row.hero == player),
-            _ => request.owner == player,
-        };
-        if !addressed {
+        if !self.resolution_request_addresses(request, player) {
             return Ok(Vec::new());
         }
 
@@ -255,9 +315,11 @@ impl NativeSession {
                     .take(limit)
                     .map(|(distance, _)| Typed(Datum::Int(*distance)))
                     .collect(),
-                RequestChoices::Numbers { values, .. } => {
-                    values.iter().map(|n| Typed(Datum::Int(*n))).collect()
-                }
+                RequestChoices::Numbers { values, .. } => values
+                    .iter()
+                    .take(limit)
+                    .map(|n| Typed(Datum::Int(*n)))
+                    .collect(),
                 RequestChoices::Mines(paths) => (0..paths.len().min(limit))
                     .map(|index| Typed(Datum::Int(index as i64)))
                     .collect(),
@@ -525,20 +587,11 @@ impl NativeSession {
         if token.is_some_and(|token| token != request.id) {
             return Err(invalid("stale input request"));
         }
-        let addressed = match &request.choices {
-            RequestChoices::Actors { team, .. } => self
-                .world
-                .hero(player)
-                .is_some_and(|hero| hero.team == *team),
-            RequestChoices::Upgrades(players) => {
-                players.iter().any(|row| row.hero == player)
-                    && matches!(selection, Datum::Object(fields) if fields.iter().any(|(key, value)| {
-                        self.symbols.lookup("hero_id") == Some(*key) && *value == Datum::Text(player)
-                    }))
-            }
-            _ => request.owner == player,
-        };
-        if !addressed {
+        let upgrade_hero_matches = !matches!(request.choices, RequestChoices::Upgrades(_))
+            || matches!(selection, Datum::Object(fields) if fields.iter().any(|(key, value)| {
+                self.symbols.lookup("hero_id") == Some(*key) && *value == Datum::Text(player)
+            }));
+        if !upgrade_hero_matches || !self.resolution_request_addresses(request, player) {
             return Err(invalid("input is addressed to another player"));
         }
         if matches!(request.choices, RequestChoices::Upgrades(_)) {

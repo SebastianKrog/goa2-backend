@@ -128,7 +128,8 @@ impl NativeSession {
             )?),
             "adjacent_to_token_in_range_filter" => UnitFilter::AdjacentToken {
                 kind: self.passive_text_bound(objects, object, Field::TokenType)?,
-                max_range: self.spatial_int_bound(objects, object, Field::MaxRange)?
+                max_range: self
+                    .spatial_int_bound(objects, object, Field::MaxRange)?
                     .ok_or_else(|| unsupported("token range missing"))?,
             },
             "adjacency_to_context_filter" => UnitFilter::AdjacentContext(self.passive_text_bound(

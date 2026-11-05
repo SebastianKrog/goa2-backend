@@ -2,11 +2,6 @@
 use super::phases::Field;
 use super::*;
 
-pub(super) struct HeroRespawnPlan {
-    session: Box<NativeSession>,
-    request: Option<NativeRequest>,
-    events: Vec<NativeEvent>,
-}
 impl NativeSession {
     fn hero_respawn_direct_bound(
         &mut self,
@@ -102,40 +97,18 @@ impl NativeSession {
             Vec::new(),
         ))
     }
-    pub(super) fn preflight_hero_respawn_bound(
-        &self,
-        objects: &BoundObjects,
-        step: ObjectId,
-    ) -> Result<HeroRespawnPlan> {
-        let mut session = self.clone();
-        session.world.inherit_row_undo(&self.world);
-        let mut arena = objects.staged_clone();
-        if !matches!(arena.arena.list_pop(arena.stack).map_err(unsupported)?,Some(ObjectValue::Object(id)) if id==step)
-        {
-            return Err(unsupported("hero respawn staged stack drift"));
-        }
-        session
-            .stack
-            .pop()
-            .ok_or_else(|| unsupported("hero respawn frame missing"))?;
-        session.objects = Some(arena);
-        let (request, events) =
-            session.with_live_objects(|s, o| s.hero_respawn_direct_bound(o, step))?;
-        Ok(HeroRespawnPlan {
-            session: Box::new(session),
-            request,
-            events,
-        })
-    }
     pub(super) fn hero_respawn_bound(
         &mut self,
         objects: &mut BoundObjects,
-        plan: HeroRespawnPlan,
-    ) -> (Option<NativeRequest>, Vec<NativeEvent>) {
-        let mut session = *plan.session;
-        *objects = session.objects.take().unwrap();
-        *self = session;
-        (plan.request, plan.events)
+        step: ObjectId,
+    ) -> Result<(Option<NativeRequest>, Vec<NativeEvent>)> {
+        self.transition_bound(objects, step, |candidate, objects, frame| {
+            let (request, events) = candidate.hero_respawn_direct_bound(objects, step)?;
+            let request = request
+                .map(|request| candidate.issue_bound_request(objects, step, frame, request))
+                .transpose()?;
+            Ok((request, events))
+        })
     }
 }
 

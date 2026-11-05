@@ -8046,6 +8046,40 @@ def python_move(move, envelope):
     return DecisionMove(**fields)
 
 
+def verify_live_resolution(worker, root):
+    from resolution_validation import validate_resolution
+
+    state = copy.deepcopy(root)
+    prompt = process_stack(state).input_request
+    envelope, _ = export_state_with_shared_objects(state)
+    result = worker.request(
+        "search_resolution", timeout=12, envelope=envelope,
+        player_id="hero_arien", time_ms=10_000, max_depth=1, max_nodes=16,
+    )
+    options = dict(
+        player_id="hero_arien", controlled_ids={"hero_arien"},
+        searched_revision=1, live_revision=1,
+    )
+    move = validate_resolution(state, prompt, result, **options)
+    assert move.request_id == prompt.id
+
+    cases = [
+        (result, {"live_revision": 2}, "stale resolution result"),
+        (result, {"controlled_ids": set()}, "resolution player is not an eligible bot"),
+        (dict(result, decision=dict(result["decision"], request_id="stale")), {},
+         "resolution result does not match the live prompt"),
+        (dict(result, decision=dict(result["decision"], selection=99)), {},
+         "Python rejected the resolution move"),
+    ]
+    for response, changes, expected in cases:
+        try:
+            validate_resolution(state, prompt, response, **(options | changes))
+        except ValueError as error:
+            assert str(error) == expected
+        else:
+            raise AssertionError(f"expected rejection: {expected}")
+
+
 def verify(command):
     verify_sources()
     worker = Worker(command)
@@ -8063,6 +8097,8 @@ def verify(command):
             actual = [(row["legal"], row["checked"], row["failed_at"]) for row in native["results"]]
             if actual != expected:
                 raise AssertionError(f"{name}: expected {expected}, got {actual}")
+            if name == "two-number-requests":
+                verify_live_resolution(worker, state)
             if name == "rune-inscription":
                 operations = [
                     {"kind": "advance"},

@@ -6,10 +6,10 @@ use std::sync::{
 
 fn workers() -> usize {
     let requested = std::env::var("GOA2_ORACLE_WORKERS").ok().map_or(4, |raw| {
-        let count: usize = raw.parse().expect("GOA2_ORACLE_WORKERS must be 1..=4");
+        let count: usize = raw.parse().expect("GOA2_ORACLE_WORKERS must be 1..=8");
         assert!(
-            (1..=4).contains(&count),
-            "GOA2_ORACLE_WORKERS must be 1..=4"
+            (1..=8).contains(&count),
+            "GOA2_ORACLE_WORKERS must be 1..=8"
         );
         count
     });

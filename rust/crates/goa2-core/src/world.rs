@@ -307,18 +307,18 @@ pub struct NativeWorld {
 }
 impl NativeWorld {
     pub fn compile(source: &StateEnvelope, symbols: &mut Symbols) -> Result<Self, String> {
-        source.validate()?;
-        Self::compile_validated(source, symbols)
-    }
-
-    pub(crate) fn compile_validated(
-        source: &StateEnvelope,
-        symbols: &mut Symbols,
-    ) -> Result<Self, String> {
+        let (_, expanded) = source.expand_for_restore()?;
         if !source.object_bindings.is_empty() {
             return Err("dense world shared-object bindings are not yet compiled".into());
         }
-        let semantic = source.materialize()?;
+        Self::compile_expanded(source, &expanded, symbols)
+    }
+
+    pub(crate) fn compile_expanded(
+        source: &StateEnvelope,
+        semantic: &Value,
+        symbols: &mut Symbols,
+    ) -> Result<Self, String> {
         let mut entities = Vec::new();
         for (roster_name, team) in semantic["teams"]
             .as_object()
@@ -575,8 +575,8 @@ impl NativeWorld {
                 serde_json::from_value(hex.clone()).map_err(|e| e.to_string())?,
             ));
         }
-        let history = crate::history::CardHistory::compile(&semantic, symbols)?;
-        let combat = crate::combat::CombatState::compile(&semantic, symbols)?;
+        let history = crate::history::CardHistory::compile(semantic, symbols)?;
+        let combat = crate::combat::CombatState::compile(semantic, symbols)?;
         let battle_zones = semantic["battle_zones"]
             .as_object()
             .ok_or("battle zones missing")?

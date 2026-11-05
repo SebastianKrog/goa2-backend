@@ -624,13 +624,30 @@ enum Instruction {
     },
 }
 #[derive(Clone, Debug)]
-struct CompiledStep {
+struct CompiledStep(Arc<StepProgram>);
+
+#[derive(Clone, Debug)]
+struct StepProgram {
     primary_template: bool,
     conditions: Conditions,
     instruction: Instruction,
     wire: Value,
     initial: Frame,
 }
+impl std::ops::Deref for CompiledStep {
+    type Target = StepProgram;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl std::ops::DerefMut for CompiledStep {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        Arc::make_mut(&mut self.0)
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Team {
     Red,
@@ -1012,20 +1029,26 @@ pub struct NativeSession {
 }
 impl NativeSession {
     pub fn compile(source: StateEnvelope) -> Result<Self> {
-        let header = source.validate().map_err(unsupported)?;
+        let (phase, mut expanded) = source.expand_for_restore().map_err(unsupported)?;
         if !matches!(
-            header.phase,
+            phase,
             Phase::Planning | Phase::Resolution | Phase::Cleanup | Phase::LevelUp | Phase::GameOver
         ) {
             return Err(unsupported("phase flow not yet compiled"));
         }
-        let mut objects = object_execution::BoundObjects::compile_validated(&source)?;
+        let primary = (!source.object_bindings.is_empty())
+            .then(object_execution::shared_primary_programs)
+            .transpose()?;
+        let mut objects = object_execution::BoundObjects::compile_validated(
+            &source,
+            primary.map_or_else(Symbols::default, |programs| programs.symbols.clone()),
+        )?;
         let raw = &source.state;
         let has_effects = raw["active_effects"]
             .as_array()
             .is_some_and(|v| !v.is_empty());
         let effect_steps_only = matches!(
-            header.phase,
+            phase,
             Phase::Planning | Phase::Resolution | Phase::Cleanup | Phase::LevelUp
         ) && raw["execution_stack"].as_array().is_some_and(|stack| {
             stack.iter().all(|step| {
@@ -1090,7 +1113,7 @@ impl NativeSession {
                     ))
             })
         });
-        let inert_terminal = header.phase == Phase::GameOver
+        let inert_terminal = phase == Phase::GameOver
             && raw["execution_stack"]
                 .as_array()
                 .is_some_and(|stack| stack.is_empty());
@@ -1110,9 +1133,9 @@ impl NativeSession {
         symbols.intern("system");
         let coordinates = ["q", "r", "s"].map(|name| symbols.intern(name));
         let planning = if has_effects {
-            crate::planning::Planning::compile_effect_boundary(&source, header.phase, &mut symbols)
+            crate::planning::Planning::compile_effect_boundary(&source, phase, &mut symbols)
         } else {
-            crate::planning::Planning::compile_flow(&source, header.phase, &mut symbols)
+            crate::planning::Planning::compile_flow(&source, phase, &mut symbols)
         }
         .map_err(unsupported)?;
         let team = match raw["tie_breaker_team"].as_str() {
@@ -1146,7 +1169,9 @@ impl NativeSession {
                 ));
             }
         }
-        let mut steps = Vec::new();
+        // Primary programs occupy the same prefix in every arena-backed session.
+        // Live continuations are appended and can patch templates via copy-on-write.
+        let mut steps = primary.map_or_else(Vec::new, |programs| programs.steps.clone());
         let mut stack = Vec::new();
         for (index, wire) in raw["execution_stack"]
             .as_array()
@@ -1168,9 +1193,9 @@ impl NativeSession {
             }
             stack.push(frame);
         }
-        if let Some(objects) = &mut objects {
+        if let (Some(objects), Some(primary)) = (&mut objects, primary) {
             objects.bind_stored_programs(&source, &mut steps, &mut symbols)?;
-            objects.compile_scheduler(&mut steps, &mut symbols)?;
+            objects.compile_scheduler(&mut steps, &mut symbols, primary)?;
         }
         if objects.is_none()
             && steps
@@ -1188,7 +1213,7 @@ impl NativeSession {
             )
         });
         let has_flow = objects.is_none()
-            && ((!has_effects && header.phase == Phase::Planning)
+            && ((!has_effects && phase == Phase::Planning)
                 || steps
                     .iter()
                     .any(|step| matches!(step.instruction, Instruction::Flow(_))));
@@ -1212,13 +1237,18 @@ impl NativeSession {
         } else {
             None
         };
-        // Mutable context and steps remain authoritative only in the arena.
-        let world_source = objects
-            .as_ref()
-            .map(|_| object_execution::world_projection(&source));
+        // The arena owns pending execution for shared-object sessions. The
+        // world only needs the active effects without their finishing programs.
+        if objects.is_some()
+            && let Some(effects) = expanded["active_effects"].as_array_mut()
+        {
+            for effect in effects {
+                effect["finishing_steps"] = json!([]);
+            }
+        }
         let world =
-            NativeWorld::compile_validated(world_source.as_ref().unwrap_or(&source), &mut symbols)
-                .map_err(unsupported)?;
+            NativeWorld::compile_expanded(&source, &expanded, &mut symbols).map_err(unsupported)?;
+        drop(expanded);
         // Projectile selection is a dependency of a possible on-block body,
         // not of every defense window. Do not compile unreachable targeting.
         if steps.iter().any(|s| {
@@ -1260,7 +1290,9 @@ impl NativeSession {
             };
             let reflect = projectile("reflect_projectiles", false)?;
             let deflect = projectile("deflect_projectiles", true)?;
-            for step in &mut steps {
+            for step in steps.iter_mut().filter(|step| {
+                matches!(step.instruction, Instruction::DefenseText { on_block: true, .. })
+            }) {
                 if let Instruction::DefenseText {
                     on_block: true,
                     program,
@@ -1353,7 +1385,10 @@ impl NativeSession {
                 &mut steps,
                 &mut symbols,
             )?;
-            for step in &mut steps {
+            for step in steps
+                .iter_mut()
+                .filter(|step| matches!(step.instruction, Instruction::Defeat { .. }))
+            {
                 if let Instruction::Defeat { protection, .. } = &mut step.instruction {
                     *protection = Some(program);
                 }
@@ -1636,7 +1671,7 @@ impl NativeSession {
         if objects.is_some() {
             // Live pending payloads belong only to arena step objects. Avoid
             // retaining/cloning a stale aggregate in immutable frame templates.
-            for step in &mut steps {
+            for step in steps.iter_mut().filter(|step| step.initial.pending.is_some()) {
                 step.initial.pending = None;
             }
         }
@@ -7825,13 +7860,13 @@ fn compile_step(
             .transpose()?
             .unwrap_or_default(),
     };
-    steps.push(CompiledStep {
+    steps.push(CompiledStep(Arc::new(StepProgram {
         primary_template: false,
         conditions,
         instruction,
         wire: raw.clone(),
         initial,
-    });
+    })));
     Ok(id)
 }
 

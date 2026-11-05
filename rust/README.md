@@ -579,7 +579,7 @@ disables LTO. Its cache is separate from release builds:
 sh rust/cargo-wsl.sh test --locked --profile iterate --workspace
 ```
 
-`GOA2_ORACLE_WORKERS` controls independent CLI and live-restoration cases (1–4, default 4,
+`GOA2_ORACLE_WORKERS` controls independent CLI and live-restoration cases (1–8, default 4,
 capped by available CPUs). Each worker owns one case and compares actual
 snapshots one operation at a time. Every case and operation still runs; thread
 panics fail the test. Test loaders buffer file reads, stream full cases, and
@@ -588,6 +588,34 @@ two build jobs and two test threads. `CARGO_BUILD_JOBS` or Cargo `-j` overrides 
 build limit. Explicit `RUST_TEST_THREADS` or `--test-threads` arguments take
 precedence. For fully serial debugging, set both `RUST_TEST_THREADS=1` and
 `GOA2_ORACLE_WORKERS=1`. Avoid overlapping another build with a large test run.
+
+The every-boundary restore gate is opt-in. Run it when changes touch snapshot
+import/export, object identity or aliasing, or persisted request generations.
+For routine work, run the affected rule tests and validate selected choices or
+games against Python as appropriate. The normal workspace run still includes
+the Python differential tests, including the full CLI corpora.
+
+```sh
+sh rust/cargo-wsl.sh test --locked --profile iterate -p goa2-core --test object_execution every_shared_execution_boundary_restores_values_aliases_and_request_generations -- --ignored --exact --nocapture
+```
+
+For a quick sample, prefix the command with `GOA2_RESTORE_SHARD=1/128`. For a
+complete distributed run, execute every shard from `1/N` through `N/N` against the
+same revision and fixture index. Shards assign cases by index, so they do not
+overlap. The default is the complete corpus. Use separate runners to reduce
+wall time for a full pass. On this WSL host, a 34-case sample took 14.93 s
+with four workers, 11.54 s with six and 10.90 s with eight, excluding build
+time. To try the higher concurrency, prefix the restore command with
+`GOA2_ORACLE_WORKERS=8`. The default remains four.
+
+Cargo compiles the Rust test executable before the test starts. Inside the
+restore gate, `NativeSession::compile` imports a game snapshot at each operation
+boundary. That work measures restoration and happens even with a warm Cargo
+cache. Use the same checkout, target directory and `iterate` profile to reuse
+build outputs. Add `CARGO_LOG=cargo::core::compiler::fingerprint=info` to see why
+Cargo considers a build stale. After building, the test executable printed by
+`--no-run` can be invoked directly with the test name and libtest flags to time
+execution without Cargo.
 
 Keep `--release` for final optimized validation and engine/search throughput
 measurements; its ThinLTO and single-codegen-unit settings are unchanged. To

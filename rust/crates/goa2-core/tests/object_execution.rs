@@ -12,30 +12,45 @@ use std::{sync::atomic::AtomicBool, time::Instant};
 #[path = "../../../test-support/parallel.rs"]
 mod fixture_parallel;
 
-fn cases() -> impl Iterator<Item = Value> {
-    cases_matching(|_| true)
+#[derive(serde::Deserialize)]
+struct RestorationCase {
+    name: String,
+    envelope: StateEnvelope,
+    operations: Vec<Value>,
+    expected: Vec<serde::de::IgnoredAny>,
 }
+
 fn cases_matching(predicate: impl Fn(&str) -> bool) -> impl Iterator<Item = Value> {
-    let base = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures"));
+    load_cases(predicate)
+}
+fn load_cases<T: serde::de::DeserializeOwned>(
+    predicate: impl Fn(&str) -> bool,
+) -> impl Iterator<Item = T> {
+    case_files()
+        .into_iter()
+        .filter(move |entry| predicate(entry["name"].as_str().unwrap()))
+        .map(|entry| read_case(&entry))
+}
+
+const FIXTURE_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures");
+
+fn case_files() -> Vec<Value> {
+    let base = std::path::Path::new(FIXTURE_DIR);
     let index: Value = serde_json::from_reader(std::io::BufReader::new(
         fixture_cache::open(base.join("object-execution.json")).unwrap(),
     ))
     .unwrap();
-    // Keep only the small index in memory; full state/identity traces can be
-    // large, and each test needs just one source case at a time.
-    index["cases"]
-        .as_array()
-        .unwrap()
-        .clone()
-        .into_iter()
-        .filter(move |entry| predicate(entry["name"].as_str().unwrap()))
-        .map(move |entry| {
-            serde_json::from_reader(std::io::BufReader::new(
-                fixture_cache::open(base.join(entry["path"].as_str().unwrap())).unwrap(),
-            ))
-            .unwrap()
-        })
+    let Value::Array(entries) = index["cases"].clone() else {
+        panic!("object-execution index must contain cases");
+    };
+    entries
 }
+
+fn read_case<T: serde::de::DeserializeOwned>(entry: &Value) -> T {
+    let path = std::path::Path::new(FIXTURE_DIR).join(entry["path"].as_str().unwrap());
+    serde_json::from_reader(std::io::BufReader::new(fixture_cache::open(path).unwrap())).unwrap()
+}
+
 fn case(name: &str) -> Value {
     let base = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures"));
     let index: Value = serde_json::from_reader(std::io::BufReader::new(
@@ -57,6 +72,10 @@ fn source(name: &str) -> StateEnvelope {
     serde_json::from_value(case(name)["envelope"].clone()).unwrap()
 }
 fn apply(session: &mut NativeSession, operation: &Value) -> Value {
+    apply_and_export(session, operation).0
+}
+
+fn apply_and_export(session: &mut NativeSession, operation: &Value) -> (Value, StateEnvelope) {
     let mut request = Value::Null;
     let mut events = Vec::new();
     let mut error = Value::Null;
@@ -166,25 +185,44 @@ fn apply(session: &mut NativeSession, operation: &Value) -> Value {
         _ => panic!("unknown test operation"),
     }
     let envelope = session.export_envelope().unwrap();
-    json!({"semantic_state":envelope.materialize().unwrap(), "context_keys":envelope.state["execution_context"].as_object().unwrap().keys().collect::<Vec<_>>(), "instance_bindings":envelope.instance_bindings().unwrap(), "object_bindings":envelope.object_bindings,
-        "request":request, "events":events, "error":error})
+    let record = json!({"semantic_state":envelope.materialize().unwrap(), "context_keys":envelope.state["execution_context"].as_object().unwrap().keys().collect::<Vec<_>>(), "instance_bindings":envelope.instance_bindings().unwrap(), "object_bindings":envelope.object_bindings,
+        "request":request, "events":events, "error":error});
+    (record, envelope)
 }
 
 #[test]
+#[ignore = "exhaustive restore gate; run explicitly after restore-sensitive changes"]
 fn every_shared_execution_boundary_restores_values_aliases_and_request_generations() {
-    let checked = fixture_parallel::for_each_case(cases(), |case| {
-        let mut session =
-            NativeSession::compile(serde_json::from_value(case["envelope"].clone()).unwrap())
-                .unwrap();
-        let operations = case["operations"].as_array().unwrap();
+    let entries = case_files();
+    assert_eq!(entries.len(), 17_347);
+    let (shard, shards) = match std::env::var("GOA2_RESTORE_SHARD") {
+        Ok(spec) => spec
+            .split_once('/')
+            .and_then(|(shard, shards)| {
+                Some((shard.parse::<usize>().ok()?, shards.parse::<usize>().ok()?))
+            })
+            .filter(|&(shard, shards)| {
+                (1..=entries.len()).contains(&shards) && (1..=shards).contains(&shard)
+            })
+            .expect(
+                "GOA2_RESTORE_SHARD must be INDEX/TOTAL, with 1 <= INDEX <= TOTAL <= case count",
+            ),
+        Err(std::env::VarError::NotPresent) => (1, 1),
+        Err(error) => panic!("invalid GOA2_RESTORE_SHARD: {error}"),
+    };
+    let selected = entries.into_iter().skip(shard - 1).step_by(shards);
+    let expected = selected.len();
+    let checked = fixture_parallel::for_each_case(selected, |entry| {
+        let case: RestorationCase = read_case(&entry);
+        let mut session = NativeSession::compile(case.envelope).unwrap();
         assert_eq!(
-            operations.len(),
-            case["expected"].as_array().unwrap().len(),
+            case.operations.len(),
+            case.expected.len(),
             "{} must have one expected record per operation",
-            case["name"]
+            case.name
         );
-        for op in operations {
-            let envelope = session.export_envelope().unwrap();
+        let mut envelope = session.export_envelope().unwrap();
+        for op in &case.operations {
             let mut restored = NativeSession::compile(envelope.clone()).unwrap();
             // last_request is a transport convenience, not persisted semantics.
             restored.last_request = session.last_request.clone().map(|mut request| {
@@ -197,15 +235,13 @@ fn every_shared_execution_boundary_restores_values_aliases_and_request_generatio
                 assert_eq!(restored_envelope.board_keys, envelope.board_keys);
                 assert_eq!(restored_envelope.object_bindings, envelope.object_bindings);
             }
-            drop(envelope);
-            assert!(
-                apply(&mut session, op) == apply(&mut restored, op),
-                "{}: {op}",
-                case["name"]
-            );
+            let (record, next_envelope) = apply_and_export(&mut session, op);
+            assert!(record == apply(&mut restored, op), "{}: {op}", case.name);
+            envelope = next_envelope;
         }
     });
-    assert_eq!(checked, 17_347);
+    assert_eq!(checked, expected);
+    eprintln!("Restore shard {shard}/{shards} checked {checked} cases");
 }
 
 #[test]

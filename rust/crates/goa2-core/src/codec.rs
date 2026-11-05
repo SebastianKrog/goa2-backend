@@ -146,6 +146,33 @@ pub struct StateHeader {
 }
 impl StateEnvelope {
     pub fn validate(&self) -> Result<StateHeader, String> {
+        let expanded = self.validated_expansion()?;
+        let header: StateHeader = serde_json::from_value(expanded).map_err(|e| e.to_string())?;
+        self.check_header_rules(header.rules_version)?;
+        Ok(header)
+    }
+
+    pub(crate) fn expand_for_restore(&self) -> Result<(Phase, Value), String> {
+        let expanded = self.validated_expansion()?;
+        let phase = Phase::deserialize(&expanded["phase"]).map_err(|e| e.to_string())?;
+        for field in ["round", "turn"] {
+            u32::deserialize(&expanded[field]).map_err(|e| format!("invalid {field}: {e}"))?;
+        }
+        self.check_header_rules(
+            u32::deserialize(&expanded["rules_version"]).map_err(|e| e.to_string())?,
+        )?;
+        if !expanded["execution_stack"].is_array() {
+            return Err("invalid execution stack".into());
+        }
+        for field in ["execution_context", "board", "teams"] {
+            if !expanded[field].is_object() {
+                return Err(format!("invalid {field}"));
+            }
+        }
+        Ok((phase, expanded))
+    }
+
+    fn validated_expansion(&self) -> Result<Value, String> {
         if self.schema_version != 1
             || self.oracle_revision != ORACLE_REVISION
             || self.rules_version != 9
@@ -206,12 +233,14 @@ impl StateEnvelope {
             }
         }
         self.validate_object_bindings()?;
-        let expanded = self.materialize()?;
-        let header: StateHeader = serde_json::from_value(expanded).map_err(|e| e.to_string())?;
-        if header.rules_version != self.rules_version {
+        self.materialize()
+    }
+
+    fn check_header_rules(&self, rules_version: u32) -> Result<(), String> {
+        if rules_version != self.rules_version {
             return Err("state/header rules version mismatch".into());
         }
-        Ok(header)
+        Ok(())
     }
     /// Visible physical identity topology, independent of table allocation order.
     /// Diagnostic/export only; never used while advancing game rules.

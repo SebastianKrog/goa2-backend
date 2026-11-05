@@ -12,10 +12,17 @@ struct SymbolTable {
 
 #[derive(Clone, Debug, Default)]
 pub struct Symbols {
+    shared: Option<Arc<SymbolTable>>,
     compiled: Option<Arc<SymbolTable>>,
     local: SymbolTable,
 }
 impl Symbols {
+    /// Reserve stable IDs for the process-wide rule programs.
+    pub(crate) fn freeze_shared(&mut self) {
+        debug_assert!(self.shared.is_none() && self.compiled.is_none());
+        self.shared = Some(Arc::new(std::mem::take(&mut self.local)));
+    }
+
     /// Share the compiled prefix while keeping subsequent inserts branch-local.
     pub(crate) fn freeze_compiled(&mut self) {
         debug_assert!(self.compiled.is_none());
@@ -32,13 +39,14 @@ impl Symbols {
         id
     }
     pub fn name(&self, id: Symbol) -> &str {
-        if let Some(compiled) = &self.compiled {
-            if id.0 < compiled.names.len() {
-                return &compiled.names[id.0];
+        let mut index = id.0;
+        for table in [&self.shared, &self.compiled].into_iter().flatten() {
+            if index < table.names.len() {
+                return &table.names[index];
             }
-            return &self.local.names[id.0 - compiled.names.len()];
+            index -= table.names.len();
         }
-        &self.local.names[id.0]
+        &self.local.names[index]
     }
     pub fn lookup(&self, name: &str) -> Option<Symbol> {
         self.local
@@ -46,9 +54,12 @@ impl Symbols {
             .get(name)
             .copied()
             .or_else(|| self.compiled.as_ref()?.ids.get(name).copied())
+            .or_else(|| self.shared.as_ref()?.ids.get(name).copied())
     }
     pub fn len(&self) -> usize {
-        self.local.names.len() + self.compiled.as_ref().map_or(0, |base| base.names.len())
+        self.local.names.len()
+            + self.compiled.as_ref().map_or(0, |table| table.names.len())
+            + self.shared.as_ref().map_or(0, |table| table.names.len())
     }
     pub fn is_empty(&self) -> bool {
         self.len() == 0

@@ -261,12 +261,15 @@ impl ObjectArena {
 
     pub fn compile(source: &StateEnvelope) -> Result<Self, String> {
         source.validate()?;
-        Self::compile_validated(source)
+        Self::compile_validated(source, Symbols::default())
     }
 
-    pub(crate) fn compile_validated(source: &StateEnvelope) -> Result<Self, String> {
+    pub(crate) fn compile_validated(
+        source: &StateEnvelope,
+        symbols: Symbols,
+    ) -> Result<Self, String> {
         let mut arena = Self {
-            symbols: Arc::new(Symbols::default()),
+            symbols: Arc::new(symbols),
             objects: Vec::new(),
             aliases: Vec::new(),
             board_keys: None,

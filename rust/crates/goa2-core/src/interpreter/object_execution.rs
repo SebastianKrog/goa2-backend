@@ -163,8 +163,31 @@ impl Clone for CopiedBindingJournal {
     }
 }
 
+pub(super) struct SharedPrimaryPrograms {
+    pub symbols: Symbols,
+    pub steps: Vec<CompiledStep>,
+    rules: Arc<primary_bodies::PrimaryRules>,
+}
+
+pub(super) fn shared_primary_programs() -> Result<&'static SharedPrimaryPrograms> {
+    static PROGRAMS: std::sync::OnceLock<Result<SharedPrimaryPrograms>> = std::sync::OnceLock::new();
+    PROGRAMS
+        .get_or_init(|| {
+            let mut symbols = Symbols::default();
+            let mut steps = Vec::new();
+            let rules = Arc::new(primary_bodies::PrimaryRules::compile(&mut steps, &mut symbols)?);
+            symbols.freeze_shared();
+            Ok(SharedPrimaryPrograms { symbols, steps, rules })
+        })
+        .as_ref()
+        .map_err(Clone::clone)
+}
+
 impl BoundObjects {
-    pub(super) fn compile_validated(source: &StateEnvelope) -> Result<Option<Self>> {
+    pub(super) fn compile_validated(
+        source: &StateEnvelope,
+        symbols: Symbols,
+    ) -> Result<Option<Self>> {
         if source.object_bindings.is_empty() {
             return Ok(None);
         }
@@ -178,7 +201,7 @@ impl BoundObjects {
                 ));
             }
         }
-        let mut arena = ObjectArena::compile_validated(source).map_err(unsupported)?;
+        let mut arena = ObjectArena::compile_validated(source, symbols).map_err(unsupported)?;
         for key in [
             "attempts",
             "attempt",
@@ -828,6 +851,7 @@ impl BoundObjects {
         &mut self,
         steps: &mut Vec<CompiledStep>,
         symbols: &mut Symbols,
+        primary: &SharedPrimaryPrograms,
     ) -> Result<()> {
         let mut recipe = |name: &str| -> Result<StepRecipe> {
             let mut wire = combat_template(match name {
@@ -927,7 +951,7 @@ impl BoundObjects {
             .collect::<Result<Vec<_>>>()?,
             passive_bodies: passive_bodies::BodyRules::compile(steps, symbols)?,
             defense_bodies: Arc::new(defense_bodies::DefenseRules::compile(steps, symbols)?),
-            primary_bodies: Arc::new(primary_bodies::PrimaryRules::compile(steps, symbols)?),
+            primary_bodies: primary.rules.clone(),
             action_bodies: Arc::new(card_actions::ActionBindings::compile(steps, symbols)?),
             journey_finishing: journey::compile_finishing(steps, symbols)?,
             step_id: symbols.intern("step_id"),
@@ -1374,20 +1398,6 @@ impl BoundObjects {
 
 /// Derived ownership/controller and effect/card-lifecycle lookup projection.
 /// Mutable stored step payloads belong exclusively to the authoritative arena.
-pub(super) fn world_projection(source: &StateEnvelope) -> StateEnvelope {
-    let mut projection = source.clone();
-    projection.object_bindings.clear();
-    projection.board_keys = None;
-    projection.state["execution_context"] = json!({});
-    projection.state["execution_stack"] = json!([]);
-    if let Some(effects) = projection.state["active_effects"].as_array_mut() {
-        for effect in effects {
-            effect["finishing_steps"] = json!([]);
-        }
-    }
-    projection
-}
-
 impl NativeSession {
     /// Explore an operation and restore the complete native session on exit.
     ///

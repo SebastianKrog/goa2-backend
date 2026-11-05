@@ -7,6 +7,7 @@ use crate::{
     cards::HeroRecord,
     codec::Phase,
     data::Symbol,
+    geometry::Hex,
     world::{ActionKind, EntityKind, MinionKind},
 };
 
@@ -779,6 +780,7 @@ impl NativeSession {
             turn_cutoff,
             controlled: partition.controlled,
             shared_nodes: partition.shared_nodes,
+            guard_hidden: false,
             planning_sample: None,
         };
         let mut joint = Vec::new();
@@ -864,12 +866,8 @@ impl NativeSession {
     ) -> Result<ResolutionSearch> {
         budget.check(0)?;
         self.with_sampled_resolution(player, sample, |worker| {
-            worker.search_resolution_with_sampled_turn_rollout(
-                player,
-                limits,
-                rollout_turns,
-                planning_sample,
-                budget,
+            worker.search_resolution_inner(
+                player, limits, rollout_turns, planning_sample, budget, true,
             )
         })
     }
@@ -910,7 +908,8 @@ impl NativeSession {
             .hero(player)
             .ok_or_else(|| EngineError::InvalidInput("search player is not a hero".into()))?
             .team;
-        let moves = self.resolution_choices(player)?;
+        let mut moves = self.resolution_choices(player)?;
+        self.order_movement_roots(player, &mut moves);
         let mut result = ResolutionSearch {
             decision: moves
                 .first()
@@ -937,6 +936,7 @@ impl NativeSession {
             turn_cutoff,
             controlled: None,
             shared_nodes: (workers > 1).then_some(&shared_nodes),
+            guard_hidden: true,
             planning_sample,
         };
         let mut sampled = match self.sampled_resolution_workers(player, sample, worlds, budget) {
@@ -1115,6 +1115,20 @@ impl NativeSession {
         planning_sample: Option<PlanningRolloutSample<'_>>,
         budget: &ExecutionBudget<'_>,
     ) -> Result<ResolutionSearch> {
+        self.search_resolution_inner(
+            player, limits, rollout_turns, planning_sample, budget, false,
+        )
+    }
+
+    fn search_resolution_inner(
+        &mut self,
+        player: Symbol,
+        limits: SearchLimits,
+        rollout_turns: Option<u8>,
+        planning_sample: Option<PlanningRolloutSample<'_>>,
+        budget: &ExecutionBudget<'_>,
+        guard_hidden: bool,
+    ) -> Result<ResolutionSearch> {
         let turn_cutoff = self.search_turn_cutoff(rollout_turns)?;
         if limits.max_depth == 0 || limits.max_depth > 64 || limits.max_nodes == 0 {
             return Err(EngineError::InvalidInput(
@@ -1126,7 +1140,8 @@ impl NativeSession {
             .hero(player)
             .ok_or_else(|| EngineError::InvalidInput("search player is not a hero".into()))?
             .team;
-        let moves = self.resolution_choices(player)?;
+        let mut moves = self.resolution_choices(player)?;
+        self.order_movement_roots(player, &mut moves);
         let fallback = moves.first().ok_or_else(|| {
             EngineError::InvalidInput("no live resolution move for this player".into())
         })?;
@@ -1151,6 +1166,7 @@ impl NativeSession {
                 turn_cutoff,
                 controlled: None,
                 shared_nodes: None,
+                guard_hidden,
                 planning_sample,
             };
             let mut preferred = 0;
@@ -1249,12 +1265,80 @@ impl NativeSession {
             turn_cutoff: None,
             controlled: None,
             shared_nodes: None,
+            guard_hidden: false,
             planning_sample: None,
         };
         self.with_rollback(|worker| {
             worker.advance_to_decision(budget)?;
             search.rollout(worker, cutoff, capture_state, lab_evaluation)
         })
+    }
+
+    fn order_movement_roots(&self, player: Symbol, moves: &mut [DecisionMove]) {
+        if moves.len() < 3 {
+            return;
+        }
+        let Some(actor) = self.movement_root_actor() else { return };
+        let Some(hero) = self.world.hero(actor).filter(|hero| hero.id == player) else {
+            return;
+        };
+        let mut enemy_heroes = Vec::new();
+        let mut enemy_minions = Vec::new();
+        for &(id, hex) in &self.world.locations {
+            let Some(entity) = self.world.entity(id) else { continue };
+            if entity.team.is_some_and(|team| team != hero.team) {
+                match entity.kind {
+                    EntityKind::Hero | EntityKind::Piece => enemy_heroes.push(hex),
+                    EntityKind::Minion => enemy_minions.push(hex),
+                    _ => {}
+                }
+            }
+        }
+        if enemy_heroes.is_empty() && enemy_minions.is_empty() {
+            return;
+        }
+        let destination = |decision: &DecisionMove| match decision {
+            DecisionMove::Input { selection: selection @ super::Datum::Object(_), .. } => {
+                super::datum_hex(selection, &self.symbols, self.coordinates).ok()
+            }
+            _ => None,
+        };
+        let nearest = |hex: Hex, enemies: &[Hex]| {
+            enemies.iter().map(|&enemy| hex.distance(enemy)).min()
+        };
+        let distances = moves.iter().filter_map(|decision| {
+            let hex = destination(decision)?;
+            Some((hex, nearest(hex, &enemy_minions), nearest(hex, &enemy_heroes)))
+        }).collect::<Vec<_>>();
+        let mut approach_minion = Vec::new();
+        let mut approach_hero = Vec::new();
+        let mut retreat = Vec::new();
+        for (hex, minion, hero) in distances {
+            if let Some(distance) = minion {
+                approach_minion.push((hex, distance));
+            }
+            if let Some(distance) = hero {
+                approach_hero.push((hex, distance));
+            }
+            if let Some(distance) = minion.into_iter().chain(hero).min() {
+                retreat.push((hex, distance));
+            }
+        }
+        approach_minion.sort_by_key(|&(_, distance)| distance);
+        approach_hero.sort_by_key(|&(_, distance)| distance);
+        retreat.sort_by_key(|&(_, distance)| std::cmp::Reverse(distance));
+        let mut priority = std::collections::HashMap::with_capacity(retreat.len());
+        for rank in 0..retreat.len() {
+            for lane in [&approach_minion, &approach_hero, &retreat] {
+                if let Some(&(hex, _)) = lane.get(rank) {
+                    let next = priority.len();
+                    priority.entry(hex).or_insert(next);
+                }
+            }
+        }
+        moves.sort_by_cached_key(|decision| {
+            destination(decision).and_then(|hex| priority.get(&hex).copied()).unwrap_or(usize::MAX)
+        });
     }
 
     fn search_turn_cutoff(&self, turns: Option<u8>) -> Result<Option<i128>> {
@@ -1512,6 +1596,7 @@ struct Search<'a, 'b> {
     controlled: Option<&'a [Symbol]>,
     shared_nodes: Option<&'a AtomicUsize>,
     planning_sample: Option<PlanningRolloutSample<'a>>,
+    guard_hidden: bool,
 }
 
 struct Iteration {
@@ -1716,8 +1801,26 @@ impl Search<'_, '_> {
         };
         worker.submit(token, selection)?;
         worker.last_request = None;
-        worker.advance_to_decision(self.budget)?;
+        self.advance(worker)?;
         Ok(true)
+    }
+
+    fn advance(&self, worker: &mut NativeSession) -> Result<()> {
+        if !self.guard_hidden {
+            return worker.advance_to_decision(self.budget);
+        }
+        let mut remaining = self.budget.max_steps.min(1000);
+        while worker.last_request.is_none()
+            && !matches!(worker.planning.phase, Phase::Planning | Phase::LevelUp | Phase::GameOver)
+        {
+            let budget = ExecutionBudget { max_steps: remaining, ..*self.budget };
+            let advance = worker.advance_search_objects(&budget, self.player)?;
+            if advance.steps == 0 {
+                break;
+            }
+            remaining -= advance.steps;
+        }
+        Ok(())
     }
 
     fn rollout(
@@ -1727,9 +1830,16 @@ impl Search<'_, '_> {
         capture_state: bool,
         lab_evaluation: bool,
     ) -> Result<Option<GameTurnRollout>> {
+        let mut sampling_boundary = false;
         loop {
             self.budget.check(0)?;
-            if worker.planning.phase == Phase::GameOver || worker.search_turn_index() >= cutoff {
+            if worker.planning.phase == Phase::GameOver
+                || worker.search_turn_index() >= cutoff
+                || sampling_boundary
+                || (self.guard_hidden && worker.last_request.is_none()
+                    && (worker.planning.phase == Phase::LevelUp
+                        || (worker.planning.phase != Phase::Planning && !worker.stack.is_empty())))
+            {
                 return Ok(Some(GameTurnRollout {
                     score: self.score(worker)?,
                     nodes: self.nodes,
@@ -1751,15 +1861,24 @@ impl Search<'_, '_> {
                 }
                 if let Some(sample) = self.planning_sample {
                     let epoch_seed = sample.seed.wrapping_add(worker.search_turn_index() as u64);
-                    return worker.with_sampled_planning_checkpoints(
+                    let mut entered_sample = false;
+                    let result = worker.with_sampled_planning_checkpoints(
                         self.player,
                         epoch_seed,
                         sample.upgrade_checkpoints,
                         |sampled| {
+                            entered_sample = true;
                             self.rollout_planning(sampled)?;
                             self.rollout(sampled, cutoff, capture_state, lab_evaluation)
                         },
                     );
+                    if self.guard_hidden && !entered_sample
+                        && matches!(result, Err(EngineError::Unsupported(_)))
+                    {
+                        sampling_boundary = true;
+                        continue;
+                    }
+                    return result;
                 }
                 self.rollout_planning(worker)?;
                 continue;
@@ -1784,7 +1903,7 @@ impl Search<'_, '_> {
             }
         }
         worker.apply_joint_planning_ordered(&commitments)?;
-        worker.advance_to_decision(self.budget)?;
+        self.advance(worker)?;
         Ok(())
     }
 
@@ -1951,6 +2070,7 @@ mod tests {
             turn_cutoff: None,
             controlled: None,
             shared_nodes: None,
+            guard_hidden: false,
             planning_sample: None,
         };
         let expected =
@@ -1987,6 +2107,7 @@ mod tests {
             turn_cutoff: None,
             controlled: None,
             shared_nodes: None,
+            guard_hidden: false,
             planning_sample: None,
         };
         let mut cache = [None];
@@ -2060,6 +2181,43 @@ mod tests {
         assert_eq!(i128::from(two.round) * 4 + i128::from(two.turn), origin + 2);
         assert!(two.nodes > one.nodes);
         assert_eq!(worker.semantic_state().unwrap(), before);
+    }
+
+    #[test]
+    fn movement_root_order_explores_approaches_and_retreats() {
+        let fixture = super::super::object_execution::fixture_case(
+            "object-execution-live-movement-sequence-base-plain-normal",
+        );
+        let mut root =
+            NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
+                .unwrap();
+        root.advance_prefix(1).unwrap();
+        root.advance_prefix(1).unwrap();
+        let (owner, team) = root.search_player().unwrap().unwrap();
+        let original = root.resolution_choices(owner).unwrap();
+        assert!(original.len() >= 3);
+        let mut ordered = original.clone();
+        root.order_movement_roots(owner, &mut ordered);
+        assert_eq!(ordered.len(), original.len());
+        assert!(original.iter().all(|choice| ordered.contains(choice)));
+        let distance = |choice: &DecisionMove, kinds: &[EntityKind]| {
+            let DecisionMove::Input { selection, .. } = choice else { return None };
+            let hex = super::super::datum_hex(selection, &root.symbols, root.coordinates).ok()?;
+            root.world.locations.iter().filter_map(|&(id, enemy)| {
+                let entity = root.world.entity(id)?;
+                (entity.team.is_some_and(|owner| owner != team) && kinds.contains(&entity.kind))
+                    .then_some(hex.distance(enemy))
+            }).min()
+        };
+        for kinds in [&[EntityKind::Minion][..], &[EntityKind::Hero, EntityKind::Piece][..]] {
+            let closest = original.iter().filter_map(|choice| distance(choice, kinds)).min();
+            assert!(closest.is_some());
+            assert!(ordered[..3].iter().any(|choice| distance(choice, kinds) == closest));
+        }
+        let threats = [EntityKind::Minion, EntityKind::Hero, EntityKind::Piece];
+        let farthest = original.iter().filter_map(|choice| distance(choice, &threats)).max();
+        assert!(farthest.is_some());
+        assert!(ordered[..3].iter().any(|choice| distance(choice, &threats) == farthest));
     }
 
     #[test]
@@ -2543,6 +2701,7 @@ mod tests {
             turn_cutoff: None,
             controlled: None,
             shared_nodes: None,
+            guard_hidden: false,
             planning_sample: None,
         };
         worker
@@ -2789,6 +2948,7 @@ mod tests {
             turn_cutoff: None,
             controlled: None,
             shared_nodes: None,
+            guard_hidden: false,
             planning_sample: None,
         };
         let before = worker.semantic_state().unwrap();
@@ -2839,6 +2999,7 @@ mod tests {
             turn_cutoff: None,
             controlled: None,
             shared_nodes: None,
+            guard_hidden: false,
             planning_sample: None,
         };
         let limited = search

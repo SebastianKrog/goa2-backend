@@ -138,51 +138,55 @@ impl NativeSession {
             .collect()
     }
 
+    pub(super) fn search_step_reads_concealed_state(
+        &self,
+        objects: &BoundObjects,
+        instruction: usize,
+        step: Option<ObjectId>,
+        viewer: Symbol,
+    ) -> Result<bool> {
+        use crate::turn::FlowStep;
+        Ok(match &self.steps[instruction].instruction {
+            // Upgrade choices are simultaneous and the ordinary hand sampler
+            // cannot reconstruct other players' pending selections.
+            Instruction::Flow(FlowStep::Upgrades) => true,
+            Instruction::LiveTriggerMines => {
+                let step = step.ok_or_else(|| unsupported("live mine trigger missing"))?;
+                self.trigger_reads_concealed_mine_bound(objects, step, viewer)?
+            }
+            Instruction::LiveCardGuess { .. } => true,
+            // Bushido can put a card back into a public slot face down.
+            // Its printed identity is unavailable even to the slot owner.
+            Instruction::LiveCardSelect | Instruction::LiveCardSwap
+            | Instruction::LiveResolvedCardSwap | Instruction::LiveDeckCardSwap
+            | Instruction::LiveRetrieve | Instruction::LiveDiscard
+            | Instruction::LiveColorDiscard => self.world.heroes.iter().any(|hero| {
+                hero.played.iter().flatten().chain(&hero.discard)
+                    .any(|id| self.world.card(*id).is_some_and(|card| card.facedown))
+            }),
+            _ => false,
+        })
+    }
+
     fn resolution_samples(
         &self,
         player: Symbol,
         sample: super::super::PlanningRolloutSample<'_>,
         seeds: &[u64],
     ) -> Result<Vec<Vec<PlanningHandSample>>> {
-        let supported = self.last_request.as_ref().is_some_and(|request| {
-            self.resolution_request_addresses(request, player)
-                && request.controlled.is_none()
-                && self.stack.last().is_some_and(|frame| {
-                    match (&request.choices, &self.steps[frame.instruction].instruction) {
-                        (RequestChoices::Action(_), Instruction::LiveCardAction)
-                        | (RequestChoices::Defense(_), Instruction::LiveReaction)
-                        | (RequestChoices::CardColors(_), Instruction::LiveChooseCardColor)
-                        | (
-                            RequestChoices::ConfirmAction,
-                            Instruction::Flow(crate::turn::FlowStep::Confirm(_)),
-                        )
-                        | (
-                            RequestChoices::Actors { .. },
-                            Instruction::Flow(
-                                crate::turn::FlowStep::Next | crate::turn::FlowStep::Tie(_),
-                            ),
-                        ) => true,
-                        (RequestChoices::Hexes(_), Instruction::LiveHexSelect) => {
-                            !request.discard
-                                && frame.object.is_some_and(|step| {
-                                    self.is_public_board_selector(step, player)
-                                })
-                        }
-                        (RequestChoices::Numbers { values, .. }, Instruction::Number { .. }) => {
-                            !request.discard
-                                && values == &[1, 2]
-                                && frame.object.is_some_and(|step| {
-                                    self.is_public_number_selector(step)
-                                })
-                        }
-                        _ => false,
-                    }
-                })
-        });
-        if self.planning.phase != Phase::Resolution || !supported {
-            return Err(unsupported(
-                "resolution sampling requires a supported public resolution prompt",
-            ));
+        if self.planning.phase != Phase::Resolution
+            || self.last_request.as_ref().is_none_or(|request| {
+                !self.resolution_request_addresses(request, player)
+            })
+        {
+            return Err(unsupported("resolution sampling requires a live resolution prompt for the player"));
+        }
+        if let (Some(objects), Some(frame)) = (&self.objects, self.stack.last())
+            && self.search_step_reads_concealed_state(
+                objects, frame.instruction, frame.object, player,
+            )?
+        {
+            return Err(unsupported("resolution sampling cannot reconstruct this concealed choice"));
         }
         let observation = self.player_observation(player)?;
         self.validate_sampled_resolution_effects()?;
@@ -201,11 +205,10 @@ impl NativeSession {
                 continue;
             }
             let protected = [hero.current, hero.extra];
-            if !hero.spells.is_empty()
-                || protected
-                    .iter()
-                    .flatten()
-                    .any(|id| self.world.card(*id).is_none_or(|card| card.facedown))
+            // Prepared spells are tracked separately from ordinary cards and
+            // are reconstructible from the roster and public casting history.
+            if protected.iter().flatten()
+                .any(|id| self.world.card(*id).is_none_or(|card| card.facedown))
             {
                 return Err(unsupported(
                     "resolution sampling requires revealed ordinary current cards",
@@ -234,131 +237,40 @@ impl NativeSession {
         Ok(samples)
     }
 
-    fn is_public_number_selector(&self, step: ObjectId) -> bool {
-        let Some(objects) = &self.objects else {
-            return false;
+    pub(in crate::interpreter) fn movement_root_actor(&self) -> Option<Symbol> {
+        let request = self.last_request.as_ref()?;
+        if !matches!(request.choices, RequestChoices::Hexes(_)) || request.discard {
+            return None;
+        }
+        let objects = self.objects.as_ref()?;
+        let mut stack = self.stack.iter().rev();
+        let selector = stack.next()?;
+        if !matches!(self.steps[selector.instruction].instruction, Instruction::LiveHexSelect) {
+            return None;
+        }
+        let next = stack.next()?;
+        let movement = match self.steps[next.instruction].instruction {
+            Instruction::LiveMove => true,
+            Instruction::LiveTravel { sequence: false } => false,
+            _ => return None,
         };
-        // These printed modes always offer the same two choices. Other
-        // numeric requests can depend on private cards or saved operands.
-        self.passive_text_bound(objects, step, Field::Output)
-            .is_ok_and(|output| {
-                matches!(
-                    self.symbols.name(output),
-                    "trap_choice" | "fg_choice" | "coin_choice" | "charge_choice"
-                        | "plank_choice" | "soar_choice" | "melee_choice" | "design_choice"
-                )
+        let step = next.object?;
+        if self.passive_text_bound(objects, selector.object?, Field::Output).ok()?
+            != self.passive_text_bound(objects, step, Field::DestinationKey).ok()?
+        {
+            return None;
+        }
+        let text = |field| self.passive_optional_text_bound(objects, step, field).ok().flatten();
+        let unit = text(Field::UnitId).filter(|id| !self.symbols.name(*id).is_empty())
+            .or_else(|| {
+                if !movement {
+                    return None;
+                }
+                let key = text(Field::UnitKey)?;
+                objects.symbol_from_context(key, &self.symbols).ok().flatten()
             })
-    }
-
-    fn is_public_board_selector(&self, step: ObjectId, player: Symbol) -> bool {
-        let Some(next) = self.stack.iter().rev().nth(1) else {
-            return false;
-        };
-        let instruction = &self.steps[next.instruction].instruction;
-        let travel = matches!(instruction, Instruction::LiveTravel { sequence: false });
-        let placement = matches!(
-            instruction,
-            Instruction::LiveTokenPlace | Instruction::LiveTurret { remove: false }
-        );
-        if !travel && !placement && !matches!(instruction, Instruction::LiveMove) {
-            return false;
-        }
-        let Some(objects) = &self.objects else {
-            return false;
-        };
-        let Some(ObjectValue::Object(filters)) =
-            objects.arena.field(step, objects.phases.k(Field::Filters))
-        else {
-            return false;
-        };
-        let Some(filters) = objects.arena.sequence(filters) else {
-            return false;
-        };
-        let mut kinds = filters.iter().map(|filter| {
-            let ObjectValue::Object(filter) = filter else {
-                return None;
-            };
-            match objects
-                .arena
-                .field(*filter, objects.phases.k(Field::FilterType))
-            {
-                Some(ObjectValue::Atom(Datum::Text(kind))) => Some(self.symbols.name(kind)),
-                _ => None,
-            }
-        });
-        if placement {
-            let Some(continuation) = next.object else {
-                return false;
-            };
-            let Ok(output) = self.passive_text_bound(objects, step, Field::Output) else {
-                return false;
-            };
-            let token = self.passive_text_bound(objects, continuation, Field::TokenType)
-                .ok().map(|kind| self.symbols.name(kind));
-            let public_token = matches!(instruction, Instruction::LiveTurret { remove: false })
-                || matches!(token, Some("smoke_bomb" | "tree" | "pyro" | "glitch"));
-            if !public_token || !self.passive_text_bound(objects, continuation, Field::HexKey)
-                .is_ok_and(|input| input == output)
-            {
-                return false;
-            }
-            if token == Some("glitch")
-                && kinds.clone().next_back() == Some(Some("hex_batch_completable_filter"))
-                && let Some(ObjectValue::Object(batch)) = filters.last()
-            {
-                use crate::spatial::HexFilter;
-
-                kinds.next_back();
-                return kinds.next_back() == Some(Some("occupied_filter"))
-                    && kinds.next() == Some(Some("range_filter"))
-                    && kinds.all(|kind| kind == Some("range_filter"))
-                    && self.batch_slots_bound(objects, *batch).is_ok_and(|slots| {
-                        !slots.is_empty() && slots.iter().all(|slot| {
-                            matches!(slot.split_last(), Some((HexFilter::Obstacle { wanted: false, .. }, ranges))
-                                if !ranges.is_empty() && ranges.iter().all(|filter| matches!(filter, HexFilter::Range { .. })))
-                        })
-                    });
-            }
-            return kinds.next() == Some(Some("range_filter"))
-                && kinds.next() == Some(Some("occupied_filter"))
-                && kinds.next().is_none();
-        }
-        if travel {
-            let ([ObjectValue::Object(filter)], Some(continuation)) = (filters, next.object) else {
-                return false;
-            };
-            let keys = &objects.phases;
-            let ordinary_source =
-                |object| match objects.arena.field(object, keys.k(Field::SourceCard)) {
-                    None | Some(ObjectValue::Atom(Datum::Null)) => true,
-                    Some(ObjectValue::Atom(Datum::Text(source))) => {
-                        self.world.hero(player).is_some_and(|hero| {
-                            [hero.current, hero.extra].into_iter().flatten().any(|id| {
-                                self.world.card(id).is_some_and(|card| {
-                                    !card.facedown
-                                        && self.world.definitions.cards[card.definition].printed_id
-                                            == source
-                                })
-                            })
-                        })
-                    }
-                    _ => false,
-                };
-            return matches!(
-                objects.arena.field(*filter, keys.k(Field::FilterType)),
-                Some(ObjectValue::Atom(Datum::Text(kind)))
-                    if self.symbols.name(kind) == "fast_travel_destination_filter"
-            ) && ordinary_source(*filter)
-                && ordinary_source(continuation);
-        }
-        kinds.next() == Some(Some("occupied_filter"))
-            && kinds.next() == Some(Some("movement_path_filter"))
-            && kinds.all(|kind| {
-                matches!(
-                    kind,
-                    Some("in_straight_line_filter" | "straight_line_path_filter" | "range_filter")
-                )
-            })
+            .or(self.planning.actor)?;
+        Some(self.world.resolved_actor(unit))
     }
 
     fn with_installed_resolution_samples<T>(
@@ -369,6 +281,8 @@ impl NativeSession {
     ) -> Result<T> {
         self.with_rollback(|worker| {
             let root_choices = worker.resolution_choices(player)?;
+            let request = worker.last_request.clone()
+                .ok_or_else(|| unsupported("sampled resolution root request missing"))?;
             worker.with_live_objects(|session, objects| {
                 for sample in samples {
                     session.replace_sampled_hand(
@@ -383,9 +297,23 @@ impl NativeSession {
                 objects.readonly.take();
                 Ok(())
             })?;
-            if worker.resolution_choices(player)? != root_choices {
-                return Err(unsupported("sampled resolution changed the root choices"));
-            }
+            // A cached request survives hand replacement. Regenerate it to
+            // validate the actual rules, including filters on public prompts.
+            worker.with_rollback(|probe| {
+                probe.advance_objects(&ExecutionBudget::default(), Some(1), false)?;
+                let unchanged = probe.last_request.as_ref().is_some_and(|generated| {
+                    generated.id == request.id
+                        && generated.owner == request.owner
+                        && generated.controlled == request.controlled
+                        && generated.prompt == request.prompt
+                        && generated.can_skip == request.can_skip
+                        && generated.discard == request.discard
+                });
+                if !unchanged || probe.resolution_choices(player)? != root_choices {
+                    return Err(unsupported("sampled resolution changed the root choices"));
+                }
+                Ok(())
+            })?;
             operation(worker)
         })
     }
@@ -1248,16 +1176,74 @@ mod tests {
     use super::*;
 
     #[test]
-    fn sampled_resolution_accepts_public_glitch_batch_placement() {
-        let fixture = fixture_case("object-execution-token-batch-card-unstable_timeline-False-first");
+    fn sampled_glitch_handoff_preserves_choices_after_hidden_hand_changes() {
+        let fixture = fixture_case("object-execution-defense-body-unstable_timeline-text-first");
         let mut root =
             NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
                 .unwrap();
-        root.advance_prefix(1).unwrap();
-        let request = root.advance_prefix(1).unwrap().request.unwrap();
-        assert_eq!(root.symbols.name(request.prompt), "Place glitch token 1/2");
-        let step = root.stack.last().unwrap().object.unwrap();
-        assert!(root.is_public_board_selector(step, request.owner));
+        let mut checked = 0;
+        for operation in fixture["operations"].as_array().unwrap().iter().take(20) {
+            if operation["kind"] == "input" {
+                let request = root.last_request.as_ref().unwrap().id;
+                let selection = root.import_selection(&operation["selection"]).unwrap();
+                root.submit(request, selection).unwrap();
+                continue;
+            }
+            let Some(request) = root.advance_prefix(1).unwrap().request else {
+                continue;
+            };
+            if !matches!(request.choices, RequestChoices::Units { .. }) {
+                continue;
+            }
+            let before = root.semantic_state().unwrap();
+            let view = root.player_observation(request.owner).unwrap();
+            let sample = super::super::PlanningRolloutSample {
+                seed: 39,
+                upgrade_checkpoints: None,
+            };
+            let legal = root.resolution_choices(request.owner).unwrap();
+            let searched = root.search_resolution_in_sampled_world(
+                request.owner,
+                sample,
+                super::super::SearchLimits {
+                    max_depth: 2,
+                    max_nodes: 64,
+                    opponent_policy: super::super::OpponentPolicy::Adversarial,
+                    evaluation: super::super::SearchEvaluation::MaterialPosition,
+                },
+                &ExecutionBudget::default(),
+            ).unwrap();
+            assert!(legal.contains(&searched.decision));
+            assert!(searched.nodes > 0);
+
+            // Level-one hands are uniquely determined. Perturb a different
+            // hero's concealed hand explicitly to test the prompt dependency.
+            let mut samples = root.resolution_samples(request.owner, sample, &[39])
+                .unwrap().remove(0);
+            let hidden = samples.iter_mut()
+                .find(|row| root.symbols.name(row.hero) == "hero_swift").unwrap();
+            let hero = hidden.hero;
+            let old_hand = root.world.hero(hero).unwrap().hand.clone();
+            let replacement = root.with_live_objects(|session, objects| {
+                let model = session.hero_model_bound(objects, hero).unwrap();
+                let deck = session.hero_card_list_bound(objects, model, Field::Deck)?;
+                Ok(deck.into_iter().flatten().find_map(|card| {
+                    let id = session.printed_observation_card(card).unwrap();
+                    (!old_hand.contains(&card) && !hidden.fixed.contains(&Some(card))
+                        && !hidden.hand.cards.contains(&id)).then_some(id)
+                }).unwrap())
+            }).unwrap();
+            hidden.hand.cards[0] = replacement;
+            root.with_installed_resolution_samples(request.owner, samples, |worker| {
+                assert!(worker.world.hero(hero).unwrap().hand.iter()
+                    .any(|card| !old_hand.contains(card)));
+                assert_eq!(worker.player_observation(request.owner)?, view);
+                Ok(())
+            }).unwrap();
+            assert_eq!(root.semantic_state().unwrap(), before);
+            checked += 1;
+        }
+        assert_eq!(checked, 2);
     }
 
     #[test]
@@ -1268,8 +1254,6 @@ mod tests {
                 .unwrap();
         root.advance_prefix(1).unwrap();
         let request = root.advance_prefix(1).unwrap().request.unwrap();
-        let step = root.stack.last().unwrap().object.unwrap();
-        assert!(root.is_public_board_selector(step, request.owner));
         let selection = root.import_selection(&fixture["operations"][2]["selection"]).unwrap();
         root.submit(request.id, selection).unwrap();
         for _ in 0..4 {

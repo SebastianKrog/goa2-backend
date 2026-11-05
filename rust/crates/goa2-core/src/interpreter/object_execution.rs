@@ -1513,18 +1513,29 @@ impl NativeSession {
         include_request: bool,
     ) -> Result<AdvanceResult> {
         let mut result = self.with_live_objects(|session, objects| {
-            session.run_objects(objects, budget, stop_after)
+            session.run_objects(objects, budget, stop_after, None)
         })?;
         if include_request {
             result.request = self.last_request.clone();
         }
         Ok(result)
     }
+    pub(super) fn advance_search_objects(
+        &mut self,
+        budget: &ExecutionBudget<'_>,
+        viewer: Symbol,
+    ) -> Result<AdvanceResult> {
+        self.with_live_objects(|session, objects| {
+            session.run_objects(objects, budget, None, Some(viewer))
+        })
+    }
+
     fn run_objects(
         &mut self,
         objects: &mut BoundObjects,
         budget: &ExecutionBudget<'_>,
         stop_after: Option<usize>,
+        search_viewer: Option<Symbol>,
     ) -> Result<AdvanceResult> {
         let mut result = AdvanceResult::default();
         if self.planning.phase == Phase::GameOver {
@@ -1582,6 +1593,14 @@ impl NativeSession {
                             .context_value(key)
                             .is_some_and(|value| !matches!(value, ObjectValue::Atom(Datum::Null)))
                     });
+            if let Some(viewer) = search_viewer
+                && !skipped
+                && self.search_step_reads_concealed_state(
+                    objects, top_instruction, top_object, viewer,
+                )?
+            {
+                return Ok(result);
+            }
             let top_mandatory = match top_object.and_then(|id| {
                 objects
                     .arena

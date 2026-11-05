@@ -208,20 +208,7 @@ impl NativeSession {
     ) -> Result<MineTriggerPlan> {
         let ids_key = self.mine_key_bound(objects, step, Field::MinesKey)?;
         let victim_key = self.mine_key_bound(objects, step, Field::VictimKey)?;
-        let ids = match objects
-            .arena
-            .field(step, objects.phases.k(Field::MinesLiteral))
-        {
-            None | Some(ObjectValue::Atom(Datum::Null)) => match objects
-                .arena
-                .context_value(ids_key)
-                .filter(|v| objects.arena.truthy(v))
-            {
-                None => Vec::new(),
-                Some(value) => self.mine_symbols_bound(objects, value)?,
-            },
-            Some(value) => self.mine_symbols_bound(objects, value)?,
-        };
+        let ids = self.mine_trigger_ids_bound(objects, step, ids_key)?;
         let mut victim = None;
         if !ids.is_empty() {
             victim = self.truthy_symbol_bound(
@@ -257,6 +244,46 @@ impl NativeSession {
             victim_key,
         })
     }
+    fn mine_trigger_ids_bound(
+        &self,
+        objects: &BoundObjects,
+        step: ObjectId,
+        ids_key: Symbol,
+    ) -> Result<Vec<Symbol>> {
+        match objects
+            .arena
+            .field(step, objects.phases.k(Field::MinesLiteral))
+        {
+            None | Some(ObjectValue::Atom(Datum::Null)) => match objects
+                .arena
+                .context_value(ids_key)
+                .filter(|v| objects.arena.truthy(v))
+            {
+                None => Ok(Vec::new()),
+                Some(value) => self.mine_symbols_bound(objects, value),
+            },
+            Some(value) => self.mine_symbols_bound(objects, value),
+        }
+    }
+
+    pub(super) fn trigger_reads_concealed_mine_bound(
+        &self,
+        objects: &BoundObjects,
+        step: ObjectId,
+        viewer: Symbol,
+    ) -> Result<bool> {
+        let key = self.mine_key_bound(objects, step, Field::MinesKey)?;
+        for id in self.mine_trigger_ids_bound(objects, step, key)? {
+            if self.world.position(id).is_some()
+                && self.world.entity(id).is_some_and(|entity| entity.owner != Some(viewer))
+                && !self.token_is_public_bound(objects, id)?
+            {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
     pub(super) fn preflight_remove_spatial_bound(
         &self,
         objects: &BoundObjects,
@@ -422,6 +449,20 @@ mod tests {
         let case = fixture_case(&format!("object-execution-{name}"));
         NativeSession::compile(serde_json::from_value(case["envelope"].clone()).unwrap()).unwrap()
     }
+    #[test]
+    fn sampled_search_stops_before_an_opponents_concealed_mine() {
+        let mut root = session("mines-trigger-ordered");
+        let viewer = root.symbols.lookup("hero_arien").unwrap();
+        let before = root.semantic_state().unwrap();
+        let result = root.advance_search_objects(&ExecutionBudget::default(), viewer).unwrap();
+        assert_eq!(result.steps, 0);
+        assert_eq!(root.semantic_state().unwrap(), before);
+
+        // The underlying game rules still trigger the mine normally.
+        assert_eq!(root.advance_prefix(1).unwrap().steps, 1);
+        assert_ne!(root.semantic_state().unwrap(), before);
+    }
+
     #[test]
     fn mine_choice_workers_keep_pending_and_selected_lists_private() {
         let mut root = session("mines-choice-one-dud-first");

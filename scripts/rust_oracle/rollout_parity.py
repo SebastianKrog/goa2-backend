@@ -289,9 +289,10 @@ def verify_rust_match_replay(
                 f"{stats['planning']} planning and {stats['resolution']} resolution decisions "
                 f"({stats.get('forced', 0)} forced)"
             )
-            reasons = stats.get("resolution_fallbacks", {})
-            for reason, frequency in sorted(reasons.items(), key=lambda row: (-row[1], row[0]))[:3]:
-                print(f"    {frequency} × {reason}")
+            for phase in ("planning", "resolution"):
+                reasons = stats.get(f"{phase}_fallbacks", {})
+                for reason, frequency in sorted(reasons.items(), key=lambda row: (-row[1], row[0])):
+                    print(f"    {frequency} × {phase}: {reason}")
 
 
 def verify_greedy_search(worker, map_id, root, decision_ms, *, comparison="cards"):

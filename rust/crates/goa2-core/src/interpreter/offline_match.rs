@@ -50,6 +50,8 @@ pub struct OfflinePolicyStats {
     fallback: usize,
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     resolution_fallbacks: BTreeMap<String, usize>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    planning_fallbacks: BTreeMap<String, usize>,
 }
 
 #[derive(serde::Serialize)]
@@ -174,11 +176,23 @@ impl NativeSession {
                             &policy.budget(),
                         ) {
                             Ok(result) if result.matrix.score.is_some() => result.commitments[0],
-                            Ok(_) | Err(EngineError::Unsupported(_) | EngineError::Deadline) => {
-                                stats[index].fallback += 1;
+                            other => {
+                                let reason = match other {
+                                    Ok(result) if result.prepared_worlds < result.requested_worlds => {
+                                        "interrupted while preparing sampled worlds".into()
+                                    }
+                                    Ok(_) => "no scored planning row".into(),
+                                    Err(EngineError::Unsupported(reason)) => reason,
+                                    Err(EngineError::Deadline) => "search deadline".into(),
+                                    Err(error) => return Err(error),
+                                };
+                                let stats = &mut stats[index];
+                                stats.fallback += 1;
+                                if capture_trace {
+                                    *stats.planning_fallbacks.entry(reason).or_default() += 1;
+                                }
                                 fallback
                             }
-                            Err(error) => return Err(error),
                         }
                     };
                     joint.push(plan);

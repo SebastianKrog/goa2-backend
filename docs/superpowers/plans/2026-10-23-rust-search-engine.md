@@ -601,6 +601,170 @@ All 374 Rust core tests passed. The 18-match six-map QUICK roster sweep at
 100 ms per decision replayed 865 Rust decisions in Python and reported 90
 fallbacks. This run checks legality and final-state parity.
 
+A wider four-turn QUICK search sweep on commit 51913de6 ran 54 matches
+across the six bundled maps at 300 ms per decision. Python replayed all
+2,564 Rust decisions and matched each final state. The sweep reported
+201 fallbacks. The leading logged resolution reasons were unsupported
+Enraged effects (36), inconsistent sampled Takahide hands (21),
+after-cards-played effects (13), and phase or prompt ownership (12).
+The old report omitted planning reasons and only listed the three
+most frequent resolution reasons per team. The offline match diagnostics
+now expose planning reasons and the sweep prints the full breakdown by
+phase, so future runs can account for all fallbacks.
+
+The two-map repeat reported 77 fallbacks, including 24 from the
+standard Enraged marker. Resolution sampling now accepts that
+round-long marker when it has no token or granted passive and still
+requires known source and linked cards and empty finishing steps.
+The repeated 18-match sweep matched Python for 869 decisions, removed
+all Enraged-specific fallbacks, and reduced the total to 61. Eight
+PreDiscard fallbacks appeared in the changed lines of play. All four
+focused sampled-resolution tests passed.
+
+The planning fallbacks came from the spellbook guard. Gydion starts
+the tested QUICK matchup with 22 spellbook cards and five ordinary
+cards in hand. The sampler now leaves the spellbook and spell
+lifecycle intact and samples only ordinary cards. Publicly revealed
+current cards still trigger the existing planning guard. In the
+18-match two-map repeat, planning fallbacks dropped from 24 to zero
+and total fallbacks from 61 to 41. Python matched all 870 replayed
+decisions and final states.
+
+Takahide's sampler now models the three cycling golds from the
+generated catalog. Before the ultimate, one gold is outside the deck.
+A publicly visible gold occupies that slot. When the slot is in the
+hidden hand, the sampler chooses among possible golds and uses the
+known starting gold during opening planning. At level eight the pool
+contains all three golds and excludes Bushido. Facedown played or
+discarded slots still require separate provenance. The sampler does
+not yet track the full gold-swap history. All seven loadout tests
+passed. The 18-match sweep matched Python for 867 decisions and
+eliminated the 17 inconsistent Takahide-hand fallbacks. The total
+fell from 41 to 24.
+
+Resolution sampling now preserves PreDiscard effects. Trigger checks
+use the public board and hand count, and resulting discard choices use
+the sampled hand. Source-card visibility and live finishing-step checks
+still apply. All four focused tests passed, including the finishing-step
+rejection for PreDiscard. The two-map sweep again matched all 867
+decisions in Python. It removed all eight PreDiscard fallbacks, reducing
+the total from 24 to 16.
+
+Equilibrium uses the same sampling guard as the Enraged round marker:
+the relevant cards must be known and the effect must have no live
+finishing steps. The 18-match repeat matched all 867 decisions in
+Python and eliminated six Equilibrium fallbacks, leaving ten. Four
+involve after-cards-played effects with deferred programs. The other
+six occur on upgrade or battle-cleanup prompts outside the current
+resolution sampling entry point.
+
+Battle cleanup prompts now enter the sampled resolution search when
+a battle instruction owns the request. The hand sampler uses the exact
+post-reveal hand count in cleanup and checks that sampling preserves
+the root choices. The focused hand-count test passed. The 18-match
+repeat matched 867 Python decisions and removed both battle-cleanup
+fallbacks. The remaining eight split evenly between mandatory upgrades
+and deferred after-cards-played effects.
+
+Resolution sampling now supports the three known deferred color-discard
+effects when their source card is visible. It validates the stored
+target/discard step sequence and rejects pending input before retaining
+the program. The 18-match repeat matched all 867 decisions in Python.
+The four after-cards-played fallbacks disappeared. All four remaining
+fallbacks were mandatory upgrade prompts.
+
+Mandatory upgrade prompts now use bounded immediate scoring of the
+acting hero's issued choices. The evaluator uses printed initiative,
+action values, and the paired item reward, with a small defense-item
+preference. It reads no other hero's submitted upgrade and retains
+its best scored legal choice if interrupted. The node-limit test
+passed and confirmed that the root state was preserved. The first
+18-match repeat with the evaluator had zero fallbacks and matched
+all 867 decisions in Python. Multi-upgrade and next-turn lookahead
+across sampled worlds remain open. The immediate weights are
+provisional and have no playing-strength claim.
+
+The optimized worker repeated the wider 54-match, six-map QUICK
+sweep at 300 ms per decision with the same four-turn horizon, seed
+29, and roster grouping as the 201-fallback baseline. Python matched
+all 2,567 decisions and final states. The sweep reported zero
+fallbacks. This covers these four-turn games and leaves later-round,
+concealed-slot, and playing-strength gates open.
+
+The 12-turn, 18-match follow-up on Forgotten Island and Magma and Ice
+reached round four and matched Python for all 2,674 decisions. It
+reported 318 fallbacks, chiefly when reconstructing Min, Snorri, and
+Dodger after upgrades. Gydion's active Shield was also rejected because
+its face-up spell source lives in the separate spell collection. The
+observation now records known spells independently of ordinary hand
+cards, allowing that source to validate. The repeat matched the same
+2,674 decisions and reduced fallbacks from 318 to 281, eliminating all
+37 attack-immunity anchor failures. Upgraded nonstandard heroes remain
+the largest gap in this workload.
+
+Dodger now uses ordinary upgrade paths above level one and filters
+them by visible cards and item totals. Extra Attack items are allowed
+at level eight, when his ultimate can grant them. Other stats still
+require an exact match. All seven loadout tests passed. The 12-turn,
+18-match repeat matched 2680 Python decisions and eliminated all 61
+Dodger hand-reconstruction fallbacks. It reported 209 fallbacks overall.
+Snorri's item swaps still need a separate provenance model.
+
+Min now reconstructs ordinary upgrades and allows Perfect Self to
+convert eligible retired Tier II cards into items. It filters those
+hypotheses by exact public item totals and visible cards. All eight
+loadout tests passed. The 12-turn, 18-match repeat matched 2686
+decisions in Python and reported 120 total fallbacks, with no Min
+hand-reconstruction fallbacks. Exact historical conversion events are
+not yet fed into the sampler.
+
+Snorri now reconstructs upgraded hands from ordinary paths. For his
+team, a public Ancestral Grace reveal allows both orientations of an
+upgraded pair in historical evidence. Current visible cards and item
+totals still constrain the loadout. Where a swap could have occurred,
+historical checkpoints constrain item count because their stat mix may
+have changed. Exact swap timing and recipients are not yet recorded.
+All nine loadout tests passed. The 18-match, 12-turn replay matched
+2679 Python decisions, removed the Snorri hand-reconstruction fallbacks,
+and reported 44 fallbacks overall.
+
+A replay audit of the later-round Forgotten Island Takahide matchup
+found facedown golds in played slots at 28 resolution and two planning
+boundaries. This confirms that the remaining Takahide failures require
+sampling the slot identity as well as the hand. Preserve the slot's
+public lifecycle and rebind the sampled gold consistently before
+searching effects that inspect played cards.
+
+Reverse Time now passes effect validation as a public next-turn
+initiative modifier when its card is visible and no finishing steps
+are stored. The 18-match, 12-turn repeat matched 2677 decisions in
+Python and eliminated the six reversed-initiative fallbacks. Total
+fallbacks dropped from 44 to 38.
+
+Sampled hands can now carry a separate gold identity for Takahide's
+single facedown played slot before level eight. The worker changes
+the slot binding and card lifecycles, rejects live effect references,
+and checks the legal root choices. All nine loadout tests passed.
+The 18-match replay matched 2674 decisions in Python, with one fallback
+and no inconsistent Takahide hand failures. This covers sampled
+heroes with one hidden played gold. Hidden discard slots and
+sampling a concealed slot for a hero whose hand is otherwise
+preserved still need coverage.
+
+Warning Shot and Treetop Sentinel now use the validated public
+target-and-discard sequence in sampled resolution. The sampler checks
+the source card, exact step types, and absence of pending input.
+All four sampled-resolution tests passed. The 18-match, 12-turn repeat
+matched 2674 decisions in Python and reported 0 fallbacks. The
+replayed Warning Shot case was the last fallback from the previous
+run. Other delayed programs still require separate validation.
+
+The single concealed-gold sampler now also handles a facedown discard
+slot, preserving its discard lifecycle. All nine loadout tests passed,
+including a check that the same evidence produces the same sampled
+gold and hand for either slot. Sampling a concealed slot for a hero
+whose hand is otherwise preserved remains open.
+
 ## 2. Reference implementation and baseline
 
 The following checked-out code is the oracle boundary, rather than the older

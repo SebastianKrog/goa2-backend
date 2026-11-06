@@ -931,6 +931,9 @@ impl NativeSession {
         planning_sample: Option<PlanningRolloutSample<'_>>,
         budget: &ExecutionBudget<'_>,
     ) -> Result<ResolutionSearch> {
+        if self.planning.phase == Phase::LevelUp {
+            return self.search_resolution_inner(player, limits, rollout_turns, None, budget, true);
+        }
         budget.check(0)?;
         self.with_sampled_resolution(player, sample, |worker| {
             worker.search_resolution_inner(
@@ -957,6 +960,9 @@ impl NativeSession {
             return Err(EngineError::InvalidInput(
                 "sampled search requires 1..8 worlds, up to four workers (at most one per world), depth 1..64 and a positive node limit".into(),
             ));
+        }
+        if self.planning.phase == Phase::LevelUp {
+            return self.search_resolution_inner(player, limits, rollout_turns, None, budget, true);
         }
         if worlds == 1 {
             return self.search_sampled_resolution_with_turn_rollout(
@@ -1187,6 +1193,108 @@ impl NativeSession {
         )
     }
 
+    /// Score only the acting hero's issued choices. Other heroes may
+    /// already have submitted upgrades that are still private.
+    fn search_upgrade_choices(
+        &mut self,
+        player: Symbol,
+        limits: SearchLimits,
+        budget: &ExecutionBudget<'_>,
+    ) -> Result<ResolutionSearch> {
+        let moves = self.resolution_choices(player)?;
+        let row = self
+            .last_request
+            .as_ref()
+            .and_then(|request| {
+                if let RequestChoices::Upgrades(players) = &request.choices {
+                    players.iter().find(|row| row.hero == player)
+                } else {
+                    None
+                }
+            })
+            .ok_or_else(|| {
+                EngineError::InvalidInput("no live upgrade choice for this hero".into())
+            })?;
+        let mut result = ResolutionSearch {
+            decision: moves
+                .first()
+                .ok_or_else(|| {
+                    EngineError::InvalidInput("no live upgrade choice for this hero".into())
+                })?
+                .clone(),
+            score: None,
+            score_kind: None,
+            completed_depth: 0,
+            resolved: false,
+            stop: ResolutionStop::DepthLimit,
+            nodes: 0,
+        };
+        if row
+            .options
+            .iter()
+            .map(|option| option.pair.len())
+            .sum::<usize>()
+            != moves.len()
+        {
+            return Err(EngineError::Unsupported(
+                "upgrade menu and moves disagree".into(),
+            ));
+        }
+        let definition = |id| {
+            self.world
+                .card(id)
+                .map(|card| &self.world.definitions.cards[card.definition])
+                .ok_or_else(|| EngineError::Unsupported("upgrade card missing".into()))
+        };
+        for (decision, (option, chosen)) in moves.into_iter().zip(
+            row.options
+                .iter()
+                .flat_map(|option| option.pair.iter().map(move |chosen| (option, *chosen))),
+        ) {
+            if result.nodes >= limits.max_nodes {
+                result.stop = ResolutionStop::NodeLimit;
+                return Ok(result);
+            }
+            match budget.check(0) {
+                Err(EngineError::Deadline) => {
+                    result.stop = ResolutionStop::Deadline;
+                    return Ok(result);
+                }
+                Err(EngineError::Cancelled) => {
+                    result.stop = ResolutionStop::Cancelled;
+                    return Ok(result);
+                }
+                other => other?,
+            }
+            let card = definition(chosen)?;
+            let mut score = i128::from(card.initiative)
+                + i128::from(card.primary_value.unwrap_or(0))
+                + card
+                    .secondary
+                    .iter()
+                    .map(|(_, value)| i128::from(*value))
+                    .sum::<i128>();
+            if let Some(sibling) = option.pair.iter().find(|&&id| id != chosen)
+                && let Some(item) = definition(*sibling)?.item
+            {
+                score += if item == crate::stats::Stat::Defense {
+                    2
+                } else {
+                    1
+                };
+            }
+            let score = score.clamp(i128::from(i64::MIN), i128::from(i64::MAX)) as i64;
+            result.nodes += 1;
+            if result.score.is_none_or(|best| score > best) {
+                result.decision = decision;
+                result.score = Some(score);
+                result.score_kind = Some(ResolutionScoreKind::Immediate);
+            }
+        }
+        result.completed_depth = 1;
+        Ok(result)
+    }
+
     fn search_resolution_inner(
         &mut self,
         player: Symbol,
@@ -1201,6 +1309,9 @@ impl NativeSession {
             return Err(EngineError::InvalidInput(
                 "search requires depth 1..64 and a positive node limit".into(),
             ));
+        }
+        if self.planning.phase == Phase::LevelUp {
+            return self.search_upgrade_choices(player, limits, budget);
         }
         let team = self
             .world
@@ -2319,6 +2430,40 @@ mod tests {
         let farthest = original.iter().filter_map(|choice| distance(choice, &threats)).max();
         assert!(farthest.is_some());
         assert!(ordered[..3].iter().any(|choice| distance(choice, &threats) == farthest));
+    }
+
+    #[test]
+    fn mandatory_upgrade_search_retains_a_scored_legal_choice_at_the_node_limit() {
+        let fixture = super::super::object_execution::fixture_case(
+            "object-execution-cleanup-live-level-gold-3",
+        );
+        let mut session = NativeSession::compile(
+            serde_json::from_value(fixture["envelope"].clone()).unwrap(),
+        )
+        .unwrap();
+        session.advance_prefix(1).unwrap();
+        session.advance_prefix(1).unwrap().request.unwrap();
+        let (player, _) = session.search_player().unwrap().unwrap();
+        let legal = session.resolution_choices(player).unwrap();
+        assert!(legal.len() > 1);
+        let before = session.semantic_state().unwrap();
+        let result = session
+            .search_resolution(
+                player,
+                SearchLimits {
+                    max_depth: 1,
+                    max_nodes: 1,
+                    opponent_policy: OpponentPolicy::Adversarial,
+                    evaluation: SearchEvaluation::MaterialPosition,
+                },
+                &ExecutionBudget::default(),
+            )
+            .unwrap();
+        assert_eq!(result.stop, ResolutionStop::NodeLimit);
+        assert_eq!(result.nodes, 1);
+        assert_eq!(result.score_kind, Some(ResolutionScoreKind::Immediate));
+        assert!(legal.contains(&result.decision));
+        assert_eq!(session.semantic_state().unwrap(), before);
     }
 
     #[test]

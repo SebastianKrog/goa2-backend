@@ -32,6 +32,10 @@ def export():
                 and card.tier.value in {"I", "II", "III"}
             ],
         }
+        if name == "Takahide":
+            heroes[name]["cyclic_golds"] = sorted(
+                str(card.id) for card in hero.deck if card.color and card.color.value == "GOLD"
+            )
     cases = []
     for name in ("Arien", "Brogan", "Hanu", "Gydion"):
         hero = HeroRegistry.get(name)

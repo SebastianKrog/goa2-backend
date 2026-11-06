@@ -108,6 +108,8 @@ struct StaticCard {
 struct StaticHero {
     standard: bool,
     starting: Vec<String>,
+    #[serde(default)]
+    cyclic_golds: Vec<String>,
     cards: Vec<StaticCard>,
 }
 
@@ -137,12 +139,19 @@ fn catalog() -> Result<&'static Catalog> {
         .map_err(|reason| EngineError::Unsupported(reason.clone()))
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum HiddenGoldSlot {
+    Played(usize),
+    Discard(usize),
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct SampledHand {
     pub hero: String,
     pub cards: Vec<String>,
     pub loadout: LoadoutHypothesis,
     pub(crate) retired: Vec<String>,
+    pub(crate) hidden_gold: Option<(HiddenGoldSlot, String)>,
 }
 
 pub(super) fn sample_index(seed: u64, len: usize) -> usize {
@@ -181,7 +190,7 @@ impl PlayerObservation {
         seed: u64,
         checkpoints: &[UpgradeCheckpoint],
     ) -> Result<Option<SampledHand>> {
-        if self.phase != crate::codec::Phase::Resolution {
+        if !matches!(self.phase, crate::codec::Phase::Resolution | crate::codec::Phase::Cleanup) {
             return Ok(None);
         }
         self.sample_ordinary_hand(hero_id, seed, checkpoints)
@@ -204,7 +213,7 @@ impl PlayerObservation {
         seeds: impl Iterator<Item = u64>,
         checkpoints: &[UpgradeCheckpoint],
     ) -> Result<Option<Vec<SampledHand>>> {
-        if self.phase != crate::codec::Phase::Resolution {
+        if !matches!(self.phase, crate::codec::Phase::Resolution | crate::codec::Phase::Cleanup) {
             return Ok(None);
         }
         Ok(self
@@ -224,9 +233,6 @@ impl PlayerObservation {
             return Err(EngineError::InvalidInput("unknown observed hero".into()));
         };
         let zones = hero.played.iter().chain(&hero.discarded);
-        if zones.clone().any(|card| matches!(card, PublicCard::Hidden)) {
-            return Ok(None);
-        }
         let Some(definition) = catalog()?.heroes.get(&hero.name) else {
             return Ok(None);
         };
@@ -237,6 +243,29 @@ impl PlayerObservation {
             })
             .chain(&hero.revealed_current)
             .collect::<BTreeSet<_>>();
+        let public_golds = definition
+            .cyclic_golds
+            .iter()
+            .filter(|id| unavailable.contains(id))
+            .count();
+        if !definition.cyclic_golds.is_empty() && hero.level < 8 && public_golds > 1 {
+            return Ok(None);
+        }
+        let hidden_slots = |cards: &[PublicCard], slot: fn(usize) -> HiddenGoldSlot| {
+            cards.iter().enumerate()
+                .filter_map(move |(index, card)| matches!(card, PublicCard::Hidden).then(|| slot(index)))
+                .collect::<Vec<_>>()
+        };
+        let mut hidden = hidden_slots(&hero.played, HiddenGoldSlot::Played)
+            .into_iter()
+            .chain(hidden_slots(&hero.discarded, HiddenGoldSlot::Discard));
+        let hidden_gold_slot = hidden.next();
+        if hidden_gold_slot.is_some()
+            && (definition.cyclic_golds.is_empty() || hero.level >= 8
+                || public_golds != 0 || hidden.next().is_some())
+        {
+            return Ok(None);
+        }
         let loadouts = if !definition.standard && hero.level == 1 {
             // These heroes have nonstandard upgrade provenance. At level one
             // the printed starting pool is sufficient if the evidence agrees.
@@ -273,7 +302,10 @@ impl PlayerObservation {
                 .starting
                 .iter()
                 .filter(|id| {
-                    !definition
+                    !definition.cyclic_golds.contains(id)
+                        && !(hero.level >= 8 && !definition.cyclic_golds.is_empty()
+                            && id.as_str() == "bushido")
+                        && !definition
                         .cards
                         .iter()
                         .any(|card| card.id == **id && upgraded.contains(&card.color.index()))
@@ -282,10 +314,31 @@ impl PlayerObservation {
                 .filter(|id| !unavailable.contains(id))
                 .cloned()
                 .collect::<Vec<_>>();
+            let mut hidden_gold = None;
+            if hero.level >= 8 {
+                cards.extend(
+                    definition.cyclic_golds.iter().filter(|id| !unavailable.contains(id)).cloned()
+                );
+            } else if public_golds == 0 && !definition.cyclic_golds.is_empty() {
+                let gold = if self.phase == crate::codec::Phase::Planning
+                    && self.round == 1 && self.turn == 1
+                {
+                    definition.starting.iter().find(|id| definition.cyclic_golds.contains(id))?
+                } else {
+                    &definition.cyclic_golds[sample_index(
+                        seed ^ 0x81f2b1aa727ea991, definition.cyclic_golds.len()
+                    )]
+                };
+                if let Some(slot) = hidden_gold_slot {
+                    hidden_gold = Some((slot, gold.clone()));
+                } else {
+                    cards.push(gold.clone());
+                }
+            }
             // The reconstructed pool still includes unrevealed commitments.
             // Only the count is public and can rule out an impossible pool.
             if cards.len() < hero.hand_size
-                || (self.phase == crate::codec::Phase::Resolution && cards.len() != hero.hand_size)
+                || (self.phase != crate::codec::Phase::Planning && cards.len() != hero.hand_size)
             {
                 return None;
             }
@@ -308,6 +361,7 @@ impl PlayerObservation {
                 cards,
                 loadout: loadout.clone(),
                 retired,
+                hidden_gold,
             })
         }))
     }
@@ -329,7 +383,7 @@ impl PlayerObservation {
         let Some(definition) = catalog()?
             .heroes
             .get(&hero.name)
-            .filter(|hero| hero.standard)
+            .filter(|definition| definition.standard || matches!(hero.name.as_str(), "Dodger" | "Min" | "Snorri"))
         else {
             return Ok(None);
         };
@@ -350,7 +404,19 @@ impl PlayerObservation {
                 "invalid public upgrade checkpoints".into(),
             ));
         }
-        let Some(mut candidates) = enumerate(definition, hero.level, &reveals, checkpoints) else {
+        let swaps_possible = self.heroes.iter().any(|ally| {
+            ally.team == hero.team && ally.name == "Snorri" && (
+                self.revealed_cards.iter().any(|(owner, id)| {
+                    *owner == ally.id && id == "ancestral_grace"
+                }) || ally.revealed_current.iter().any(|id| id == "ancestral_grace")
+                    || ally.played.iter().chain(&ally.discarded).any(|card| {
+                        matches!(card, PublicCard::Revealed(id) if id == "ancestral_grace")
+                    })
+            )
+        });
+        let Some(mut candidates) = enumerate(
+            definition, hero.level, &reveals, checkpoints, swaps_possible,
+        ) else {
             return Ok(None);
         };
         let visible = hero
@@ -376,15 +442,34 @@ impl PlayerObservation {
                 }
             })
         });
+        if hero.name == "Min" {
+            let compatible = candidates
+                .into_iter()
+                .flat_map(|row| min_item_conversions(row, definition))
+                .filter(|row| items_match(row, definition, &hero.items, false, None))
+                .collect::<BTreeSet<_>>();
+            return Ok(Some(compatible.into_iter().collect()));
+        }
         for extra in [false, true] {
             let filtered = candidates
                 .iter()
-                .filter(|row| items_match(row, definition, &hero.items, extra))
+                .filter(|row| {
+                    items_match(
+                        row,
+                        definition,
+                        &hero.items,
+                        extra && hero.name != "Snorri",
+                        (hero.name == "Dodger").then_some(hero.level),
+                    )
+                })
                 .cloned()
                 .collect::<Vec<_>>();
             if !filtered.is_empty() {
                 return Ok(Some(filtered));
             }
+        }
+        if matches!(hero.name.as_str(), "Dodger" | "Snorri") {
+            return Ok(Some(Vec::new()));
         }
         Ok(Some(candidates))
     }
@@ -395,6 +480,7 @@ fn enumerate(
     level: i64,
     reveals: &[&str],
     checkpoints: &[UpgradeCheckpoint],
+    swaps_possible: bool,
 ) -> Option<Vec<LoadoutHypothesis>> {
     if !(1..=8).contains(&level) {
         return None;
@@ -424,7 +510,14 @@ fn enumerate(
                         counts[stat.index()] += 1;
                     }
                 }
-                counts == point.card_items
+                if swaps_possible {
+                    // A swap preserves the number of items, but can change
+                    // which stat was recorded at an earlier upgrade batch.
+                    point.card_items.into_iter().try_fold(0i64, i64::checked_add)
+                        == Some(counts.iter().sum())
+                } else {
+                    counts == point.card_items
+                }
             })
     };
     states.retain(|(_, items)| matches_checkpoints(0, items));
@@ -479,6 +572,9 @@ fn enumerate(
             else {
                 return true;
             };
+            if swaps_possible && card.tier > 1 {
+                return hero.cards[active[card.color.index()]].tier >= card.tier;
+            }
             match card.tier {
                 2 => by_tier[card.color.index()][1]
                     .iter()
@@ -508,7 +604,42 @@ fn enumerate(
     Some(results.into_iter().collect())
 }
 
-fn items_match(row: &LoadoutHypothesis, hero: &StaticHero, public: &[i64; 6], extra: bool) -> bool {
+// Perfect Self can turn a retired Tier II card into an item.
+// Each color has at most one such card from its ordinary upgrade path.
+fn min_item_conversions(row: LoadoutHypothesis, definition: &StaticHero) -> Vec<LoadoutHypothesis> {
+    if !row.active_card_ids.iter().any(|id| id == "perfect_self") {
+        return vec![row];
+    }
+    let eligible = definition.cards.iter().filter(|card| {
+        card.tier == 2
+            && card.item.is_some()
+            && !row.item_card_ids.contains(&card.id)
+            && definition.cards.iter().any(|active| {
+                active.tier == 3
+                    && active.color.index() == card.color.index()
+                    && row.active_card_ids.contains(&active.id)
+            })
+    });
+    let mut variants = vec![row.clone()];
+    for card in eligible {
+        let count = variants.len();
+        for index in 0..count {
+            let mut converted = variants[index].clone();
+            let slot = converted.item_card_ids.binary_search(&card.id).unwrap_err();
+            converted.item_card_ids.insert(slot, card.id.clone());
+            variants.push(converted);
+        }
+    }
+    variants
+}
+
+fn items_match(
+    row: &LoadoutHypothesis,
+    hero: &StaticHero,
+    public: &[i64; 6],
+    extra: bool,
+    dodger_level: Option<i64>,
+) -> bool {
     let mut counts = [0; 6];
     for card in hero
         .cards
@@ -518,6 +649,15 @@ fn items_match(row: &LoadoutHypothesis, hero: &StaticHero, public: &[i64; 6], ex
         if let Some(item) = card.item {
             counts[item.index()] += 1;
         }
+    }
+    if let Some(level) = dodger_level {
+        return counts.iter().zip(public).enumerate().all(|(index, (count, wanted))| {
+            if extra && level >= 8 && index == Stat::Attack.index() {
+                count <= wanted
+            } else {
+                count == wanted
+            }
+        });
     }
     if extra {
         counts
@@ -566,6 +706,13 @@ mod tests {
             .unwrap();
         assert_eq!(sample.cards.len(), view.heroes[1].hand_size);
         assert!(!sample.cards.contains(&revealed));
+        view.phase = crate::codec::Phase::Cleanup;
+        assert_eq!(
+            view.sample_resolution_hand_with_checkpoints(&hero_id, 39, &[])
+                .unwrap()
+                .unwrap(),
+            sample
+        );
         view.heroes[1].hand_size -= 1;
         assert!(
             view.sample_resolution_hand_with_checkpoints(&hero_id, 39, &[])
@@ -575,7 +722,106 @@ mod tests {
     }
 
     #[test]
-    fn nonstandard_hero_samples_only_a_consistent_starting_pool() {
+    fn takahide_samples_exactly_one_gold_before_the_ultimate() {
+        let fixture =
+            super::super::object_execution::fixture_case("object-execution-card-planning-cycle");
+        let session = super::super::NativeSession::compile(
+            serde_json::from_value(fixture["envelope"].clone()).unwrap(),
+        )
+        .unwrap();
+        let mut view = session.player_observation(session.world.heroes[0].id).unwrap();
+        view.phase = crate::codec::Phase::Resolution;
+        view.revealed_cards.clear();
+        let hero = &mut view.heroes[1];
+        hero.name = "Takahide".into();
+        hero.level = 1;
+        hero.items = [0; 6];
+        hero.hand_size = 5;
+        hero.played.clear();
+        hero.discarded.clear();
+        hero.revealed_current.clear();
+        let id = hero.id.clone();
+        let golds = &catalog().unwrap().heroes["Takahide"].cyclic_golds;
+        let mut seen = BTreeSet::new();
+        for seed in 0..32 {
+            let sample = view
+                .sample_resolution_hand_with_checkpoints(&id, seed, &[])
+                .unwrap()
+                .unwrap();
+            let sampled: Vec<_> = sample.cards.into_iter().filter(|id| golds.contains(id)).collect();
+            assert_eq!(sampled.len(), 1);
+            seen.extend(sampled);
+        }
+        assert_eq!(seen.len(), 3);
+
+        view.heroes[1].revealed_current.push("sting_like_a_bee".into());
+        view.heroes[1].hand_size = 4;
+        let sample = view
+            .sample_resolution_hand_with_checkpoints(&id, 0, &[])
+            .unwrap()
+            .unwrap();
+        assert!(sample.cards.iter().all(|id| !golds.contains(id)));
+
+        view.heroes[1].played.push(PublicCard::Hidden);
+        assert!(view.sample_resolution_hand_with_checkpoints(&id, 0, &[]).unwrap().is_none());
+
+        view.heroes[1].revealed_current.clear();
+        let sample = view
+            .sample_resolution_hand_with_checkpoints(&id, 0, &[])
+            .unwrap()
+            .unwrap();
+        assert_eq!(sample.cards.len(), 4);
+        assert!(sample.cards.iter().all(|id| !golds.contains(id)));
+        let (slot, gold) = sample.hidden_gold.unwrap();
+        assert_eq!(slot, HiddenGoldSlot::Played(0));
+        assert!(golds.contains(&gold));
+
+        view.heroes[1].played.clear();
+        view.heroes[1].discarded.push(PublicCard::Hidden);
+        let discarded = view
+            .sample_resolution_hand_with_checkpoints(&id, 0, &[])
+            .unwrap()
+            .unwrap();
+        assert_eq!(discarded.cards, sample.cards);
+        assert_eq!(discarded.hidden_gold, Some((HiddenGoldSlot::Discard(0), gold)));
+    }
+
+    #[test]
+    fn item_swap_evidence_allows_both_cards_from_an_upgraded_pair_to_have_been_seen() {
+        let hero = &catalog().unwrap().heroes["Snorri"];
+        let reveals = ["runic_hammer", "runecaster"];
+        assert!(enumerate(hero, 2, &reveals, &[], false).unwrap().is_empty());
+        let swapped = enumerate(hero, 2, &reveals, &[], true).unwrap();
+        assert_eq!(swapped.len(), 2);
+        for row in swapped {
+            assert_eq!(row.active_card_ids.len(), 1);
+            assert_eq!(row.item_card_ids.len(), 1);
+            assert_ne!(row.active_card_ids, row.item_card_ids);
+        }
+    }
+
+    #[test]
+    fn min_item_conversion_requires_perfect_self_and_a_retired_tier_two() {
+        let min = &catalog().unwrap().heroes["Min"];
+        let mut row = LoadoutHypothesis {
+            active_card_ids: vec!["perfect_self".into(), "viper_stance".into()],
+            item_card_ids: vec!["ruse".into(), "tiger_stance".into(), "vanish".into()],
+        };
+        let variants = min_item_conversions(row.clone(), min);
+        assert_eq!(variants.len(), 2);
+        assert_eq!(variants[0], row);
+        assert_eq!(
+            variants[1].item_card_ids,
+            ["inner_strength", "ruse", "tiger_stance", "vanish"]
+        );
+
+        row.active_card_ids[0] = "ruse".into();
+        row.item_card_ids[0] = "perfect_self".into();
+        assert_eq!(min_item_conversions(row.clone(), min), [row]);
+    }
+
+    #[test]
+    fn dodger_sampling_respects_reveals_and_card_items() {
         let fixture =
             super::super::object_execution::fixture_case("object-execution-card-planning-cycle");
         let session = super::super::NativeSession::compile(
@@ -601,6 +847,16 @@ mod tests {
         view.revealed_cards.clear();
         view.heroes[1].level = 2;
         assert!(view.sample_resolution_hand_with_checkpoints(&id, 39, &[]).unwrap().is_none());
+
+        view.heroes[1].items[Stat::Defense.index()] = 1;
+        view.heroes[1].revealed_current = vec!["finger_of_death".into()];
+        view.heroes[1].hand_size = 3;
+        let upgraded = view
+            .sample_resolution_hand_with_checkpoints(&id, 39, &[])
+            .unwrap()
+            .unwrap();
+        assert_eq!(upgraded.loadout.item_card_ids, ["burning_skull"]);
+        assert_eq!(upgraded.cards, ["death_trap", "dread_razor", "shield_of_decay"]);
     }
 
     #[test]
@@ -702,10 +958,10 @@ mod tests {
             card_items: items(2),
         };
         // Level one to four supplies only a combined three-upgrade total.
-        assert_eq!(enumerate(hero, 4, &[], &[level_four]).unwrap().len(), 2);
-        let aggregate = enumerate(hero, 5, &[], &[level_five]).unwrap();
+        assert_eq!(enumerate(hero, 4, &[], &[level_four], false).unwrap().len(), 2);
+        let aggregate = enumerate(hero, 5, &[], &[level_five], false).unwrap();
         assert_eq!(aggregate.len(), 4);
-        let observed = enumerate(hero, 5, &[], &[level_four, level_five]).unwrap();
+        let observed = enumerate(hero, 5, &[], &[level_four, level_five], false).unwrap();
         assert!(!observed.is_empty() && observed.len() < aggregate.len());
         assert!(
             observed
@@ -720,7 +976,8 @@ mod tests {
                 &[UpgradeCheckpoint {
                     level: 4,
                     card_items: [0; 6]
-                }]
+                }],
+                false,
             )
             .unwrap()
             .is_empty()
@@ -738,13 +995,13 @@ mod tests {
         for case in cases {
             let hero = &catalog().unwrap().heroes[&case.hero];
             let reveals = case.reveals.iter().map(String::as_str).collect::<Vec<_>>();
-            let mut result = enumerate(hero, case.level, &reveals, &[]).unwrap();
+            let mut result = enumerate(hero, case.level, &reveals, &[], false).unwrap();
             if let Some(items) = case.items {
                 let mut public = [0; 6];
                 for (name, value) in items {
                     public[Stat::parse(&name).unwrap().index()] = value;
                 }
-                result.retain(|row| items_match(row, hero, &public, case.extra));
+                result.retain(|row| items_match(row, hero, &public, case.extra, None));
             }
             assert_eq!(result, case.expected, "{} level {}", case.hero, case.level);
         }

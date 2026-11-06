@@ -232,7 +232,7 @@ impl NativeSession {
         self.sync_effect_card_flags(objects, &before)
     }
 
-    fn swap_card_flags_bound(
+    pub(super) fn swap_card_flags_bound(
         &mut self,
         objects: &mut BoundObjects,
         card: CardId,

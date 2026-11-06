@@ -1,5 +1,5 @@
 //! Live planning commands preserve source collection replacement and aliasing.
-use super::super::{TeamKnowledgeMode, UpgradeCheckpoint};
+use super::super::{TeamKnowledgeMode, UpgradeCheckpoint, loadout::HiddenGoldSlot};
 use super::phases::Field;
 use super::*;
 use crate::cards::CardId;
@@ -201,7 +201,14 @@ impl NativeSession {
         sample: super::super::PlanningRolloutSample<'_>,
         seeds: &[u64],
     ) -> Result<Vec<Vec<PlanningHandSample>>> {
-        if self.planning.phase != Phase::Resolution
+        let cleanup_battle = self.planning.phase == Phase::Cleanup
+            && self.stack.last().is_some_and(|frame| {
+                matches!(
+                    self.steps[frame.instruction].instruction,
+                    Instruction::Battle(_)
+                )
+            });
+        if !(self.planning.phase == Phase::Resolution || cleanup_battle)
             || self.last_request.as_ref().is_none_or(|request| {
                 !self.resolution_request_addresses(request, player)
             })
@@ -372,11 +379,13 @@ impl NativeSession {
                 continue;
             }
             let public = &mut observation.heroes[index];
-            if !hero.spells.is_empty() || !public.revealed_current.is_empty() {
+            if !public.revealed_current.is_empty() {
                 return Err(unsupported(
-                    "sampled world requires ordinary cards without current reveals",
+                    "sampled planning requires no publicly revealed current cards",
                 ));
             }
+            // Prepared spells are public with perfect memory. Keep the
+            // spellbook and sample only the ordinary hand.
             let fixed = if known.contains(&hero.id) {
                 let (first, second) = self.observed_planning_cards(hero.id)?;
                 [first, second]
@@ -433,9 +442,42 @@ impl NativeSession {
             let kind = self.symbols.name(effect.definition.kind);
             let action_restriction = kind == "target_prevention"
                 && !behavior.restrictions.is_empty();
+            // These round markers record performed cards. Source-card
+            // visibility and live finishing steps are checked separately.
+            let round_marker = matches!(kind, "enraged" | "equilibrium")
+                && effect.duration == crate::effects::Duration::ThisRound
+                && effect.token.is_none()
+                && effect.granted_passive.is_none();
+            // Reverse Time changes public initiative ordering next turn.
+            let reverse_time = kind == "reversed_initiative"
+                && effect.duration == crate::effects::Duration::NextTurn
+                && effect.token.is_none()
+                && effect.granted_passive.is_none()
+                && effect.card.is_some_and(|card| self.symbols.name(card) == "reverse_time");
+            let public_color_trigger = kind == "after_cards_played_trigger"
+                && effect.duration == crate::effects::Duration::NextTurn
+                && effect.token.is_none()
+                && effect.granted_passive.is_none()
+                && effect.scope_origin == Some(effect.source)
+                && effect.card.is_some_and(|card| {
+                    matches!(
+                        self.symbols.name(card),
+                        "imbue_doubt" | "time_to_reconsider" | "an_illusion_of_choice"
+                    )
+                });
+            let sentinel = (kind == "delayed_trigger"
+                && effect.duration == crate::effects::Duration::ThisTurn
+                && effect.token.is_none()
+                && effect.granted_passive.is_none())
+                .then(|| effect.card.map(|card| self.symbols.name(card)))
+                .flatten()
+                .filter(|card| matches!(*card, "warning_shot" | "treetop_sentinel"));
+            // Pre-discard triggers use the public board and hand count.
+            // Any resulting discard choice runs against the sampled hand.
             let public = matches!(
                 behavior.kind,
                 Kind::PreMovement
+                    | Kind::PreDiscard
                     | Kind::AttackImmunity
                     | Kind::PlacementPrevention
                     | Kind::MinionProtection
@@ -445,7 +487,7 @@ impl NativeSession {
                     | Kind::MovementAura
                     | Kind::StaticBarrier
                     | Kind::Petrify
-            ) || action_restriction;
+            ) || action_restriction || round_marker || reverse_time || public_color_trigger || sentinel.is_some();
             if !public {
                 return Err(unsupported(format!(
                     "resolution sampling does not support {:?} effect {kind}",
@@ -455,6 +497,36 @@ impl NativeSession {
             // The dense projection omits finishing programs for arena sessions.
             // These programs can still retain references to hidden objects.
             let finishing = objects.finishing_list(node)?;
+            if public_color_trigger || sentinel.is_some() {
+                // The stored steps target public units and then use the
+                // sampled hand for any discard. Require the expected program.
+                let steps = objects.steps_in_list(finishing)?;
+                let valid_count = if public_color_trigger {
+                    matches!(steps.len(), 2 | 4)
+                } else {
+                    steps.len() == 2
+                };
+                if valid_count && steps.iter().enumerate().all(|(index, step)| {
+                    objects.program(*step).is_some_and(|instruction| {
+                        let instruction = &self.steps[instruction].instruction;
+                        if index % 2 == 0 {
+                            matches!(instruction, Instruction::LiveUnitSelect)
+                        } else {
+                            match sentinel {
+                                Some("warning_shot") => matches!(instruction, Instruction::LiveForceDiscard),
+                                Some("treetop_sentinel") => matches!(instruction, Instruction::LiveDiscardOrDefeat),
+                                _ => matches!(instruction, Instruction::LiveColorDiscard),
+                            }
+                        }
+                    }) && matches!(
+                        objects.arena.field_ref(*step, objects.pending),
+                        None | Some(ObjectValue::Atom(Datum::Null))
+                    )
+                }) {
+                    continue;
+                }
+                return Err(unsupported("unexpected deferred discard program"));
+            }
             if objects.arena.sequence(finishing).is_some_and(|steps| !steps.is_empty()) {
                 return Err(unsupported(format!(
                     "resolution sampling does not support finishing steps on {kind}",
@@ -507,7 +579,8 @@ impl NativeSession {
                 public.is_some_and(|hero| {
                     // Resolution sampling preserves both revealed current
                     // slots as fixed physical cards.
-                    (observation.phase == Phase::Resolution
+                    hero.known_spells.iter().any(|spell| spell == id)
+                        || (matches!(observation.phase, Phase::Resolution | Phase::Cleanup)
                         && (hero.revealed_current.iter().any(|current| current == id)
                             || (hero.id == observation.private.hero
                                 && observation.private.hand.iter()
@@ -577,6 +650,65 @@ impl NativeSession {
         self.replace_sampled_hand(objects, hero, sample, fixed)
     }
 
+    fn bind_sampled_gold(
+        &mut self,
+        objects: &mut BoundObjects,
+        hero: Symbol,
+        slot: HiddenGoldSlot,
+        printed: &str,
+    ) -> Result<()> {
+        use crate::world::CardLifecycle;
+        let row = self.world.hero(hero).ok_or_else(|| unsupported("sampled hero missing"))?;
+        let (field, index, lifecycle, old) = match slot {
+            HiddenGoldSlot::Played(index) => (
+                Field::Played, index, CardLifecycle::Resolved, row.played.get(index).copied().flatten(),
+            ),
+            HiddenGoldSlot::Discard(index) => (
+                Field::Discard, index, CardLifecycle::Discard, row.discard.get(index).copied(),
+            ),
+        };
+        let old = old.ok_or_else(|| unsupported("sampled gold slot missing"))?;
+        let previous = self.world.card(old).ok_or_else(|| unsupported("sampled gold missing"))?;
+        if !previous.facedown || previous.lifecycle != lifecycle
+            || self.symbols.name(self.world.definitions.cards[previous.definition].color
+                .ok_or_else(|| unsupported("played card color missing"))?) != "GOLD"
+        {
+            return Err(unsupported("sampled slot is not a facedown gold in the expected lifecycle"));
+        }
+        let played = previous.played_this_round;
+        let old_printed = self.world.definitions.cards[previous.definition].printed_id;
+        let chosen = row.deck.iter().copied().find(|id| {
+            self.world.card(*id).is_some_and(|card| {
+                self.symbols.name(self.world.definitions.cards[card.definition].printed_id) == printed
+            })
+        }).ok_or_else(|| unsupported("sampled gold absent from deck"))?;
+        let chosen_card = self.world.card(chosen).unwrap();
+        let chosen_printed = self.world.definitions.cards[chosen_card.definition].printed_id;
+        if self.world.effects.instances.iter().any(|effect| {
+            [effect.card, effect.linked_card].into_iter().flatten()
+                .any(|card| card == old_printed || card == chosen_printed)
+        }) {
+            return Err(unsupported("sampled facedown gold has a live effect reference"));
+        }
+        if chosen == old {
+            return Ok(());
+        }
+        if chosen_card.lifecycle != CardLifecycle::Deck {
+            return Err(unsupported("sampled gold is not in the deck"));
+        }
+        let model = self.hero_model_bound(objects, hero)
+            .ok_or_else(|| unsupported("sampled hero model missing"))?;
+        let Some(ObjectValue::Object(list)) = objects.arena.field(model, objects.phases.k(field))
+        else {
+            return Err(unsupported("sampled gold collection missing"));
+        };
+        objects.arena.set_index(list, index, ObjectValue::Atom(Datum::Instance(chosen.0)))
+            .map_err(unsupported)?;
+        self.swap_card_flags_bound(objects, chosen, lifecycle, true, played)?;
+        self.swap_card_flags_bound(objects, old, CardLifecycle::Deck, false, false)?;
+        self.sync_card_collections_bound(objects)
+    }
+
     /// Rebuild only the sampled hand and lifecycle rows. Cards in public
     /// zones and protected current slots retain their physical identity.
     fn replace_sampled_hand(
@@ -587,6 +719,9 @@ impl NativeSession {
         protected: [Option<CardId>; 2],
     ) -> Result<()> {
         use crate::world::CardLifecycle;
+        if let Some((slot, printed)) = &sample.hidden_gold {
+            self.bind_sampled_gold(objects, hero, *slot, printed)?;
+        }
         let model = self
             .hero_model_bound(objects, hero)
             .ok_or_else(|| unsupported("sampled hero model missing"))?;
@@ -618,9 +753,11 @@ impl NativeSession {
                 .world
                 .card(card)
                 .ok_or_else(|| unsupported("sampled card missing"))?;
-            let id = self
-                .symbols
-                .name(self.world.definitions.cards[row.definition].printed_id);
+            let definition = &self.world.definitions.cards[row.definition];
+            if definition.spell {
+                continue;
+            }
+            let id = self.symbols.name(definition.printed_id);
             let (state, wire) = if sample.cards.iter().any(|value| value == id) {
                 selected.push(card);
                 (CardLifecycle::Hand, "HAND")
@@ -1415,6 +1552,7 @@ mod tests {
                 .unwrap();
         use crate::effect_rules::Kind;
         for kind in [
+            Kind::PreDiscard,
             Kind::MovementZone,
             Kind::LosBlocker,
             Kind::AreaStat,

@@ -34,6 +34,7 @@ pub struct HeroObservation {
     pub played: Vec<PublicCard>,
     pub discarded: Vec<PublicCard>,
     pub revealed_current: Vec<String>,
+    pub known_spells: Vec<String>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -308,6 +309,14 @@ impl NativeSession {
                             .into_iter()
                             .flatten()
                             .filter(|id| self.world.card(*id).is_some_and(|card| !card.facedown))
+                            .map(printed)
+                            .collect::<Result<_>>()?,
+                        known_spells: row.spells
+                            .iter()
+                            .copied()
+                            .filter(|id| self.world.card(*id).is_some_and(|card| {
+                                !card.facedown && self.world.definitions.cards[card.definition].spell
+                            }))
                             .map(printed)
                             .collect::<Result<_>>()?,
                     })
@@ -621,6 +630,7 @@ mod tests {
                             cards: sample.cards.clone(),
                             loadout: sample.loadout.clone(),
                             retired: sample.retired.clone(),
+                            hidden_gold: None,
                         })
                     );
                     observed

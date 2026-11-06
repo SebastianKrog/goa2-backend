@@ -16,13 +16,13 @@ pub struct RoundState {
     pub reveal: Vec<(Symbol, Vec<(Stat, i64)>)>,
     pool: Vec<(Symbol, bool)>,
 }
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug, Hash, PartialEq)]
 pub struct UpgradeOption {
     pub color: Symbol,
     pub tier: Symbol,
     pub pair: Vec<CardId>,
 }
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug, Hash, PartialEq)]
 pub struct UpgradePlayer {
     pub hero: Symbol,
     pub remaining: i64,

@@ -53,6 +53,11 @@ mod phase_closure_tests;
 mod phases;
 mod placement;
 mod planning_commands;
+
+pub(crate) use planning_commands::CardSyncProfile;
+pub(super) fn with_card_sync_profile<T>(run: impl FnOnce() -> T) -> (T, CardSyncProfile) {
+    planning_commands::with_card_sync_profile(run)
+}
 mod pre_action;
 mod primary_bodies;
 
@@ -1520,6 +1525,67 @@ impl NativeSession {
         }
         Ok(result)
     }
+    pub(super) fn pending_attack_target(&self) -> bool {
+        use phases::Field;
+        let Some(objects) = &self.objects else { return false };
+        if !self.last_request.as_ref().is_some_and(|request| {
+            matches!(request.choices, RequestChoices::Units { .. })
+        }) {
+            return false;
+        }
+        let mut frames = self.stack.iter().rev();
+        let Some(selector) = frames.next() else { return false };
+        if !matches!(self.steps[selector.instruction].instruction, Instruction::LiveUnitSelect) {
+            return false;
+        }
+        let Some(selector) = selector.object else { return false };
+        let Ok(output) = self.passive_text_bound(objects, selector, Field::Output) else {
+            return false;
+        };
+        frames.find_map(|frame| {
+            let key = match self.steps[frame.instruction].instruction {
+                Instruction::LiveCombatResolve => Field::TargetKey,
+                Instruction::LiveAttackSequence => Field::AttackTargetKey,
+                _ => return None,
+            };
+            Some(frame.object.is_some_and(|step| {
+                self.passive_text_bound(objects, step, key).ok() == Some(output)
+            }))
+        }).unwrap_or(false)
+    }
+
+    pub(super) fn pending_token_swap(&self) -> bool {
+        use phases::Field;
+
+        let Some(objects) = &self.objects else { return false };
+        let Some(request) = &self.last_request else { return false };
+        let RequestChoices::Units { tokens: true, values } = &request.choices else {
+            return false;
+        };
+        if !values.iter().any(|(id, _)| self.world.entity(*id)
+            .is_some_and(|entity| entity.kind == crate::world::EntityKind::Token))
+        {
+            return false;
+        }
+        let mut frames = self.stack.iter().rev();
+        let Some(selector) = frames.next() else { return false };
+        let Some(swap) = frames.next() else { return false };
+        if !matches!(self.steps[selector.instruction].instruction, Instruction::LiveUnitSelect)
+            || !matches!(self.steps[swap.instruction].instruction, Instruction::LiveSwap)
+        {
+            return false;
+        }
+        let (Some(selector), Some(swap)) = (selector.object, swap.object) else {
+            return false;
+        };
+        let Ok(output) = self.passive_text_bound(objects, selector, Field::Output) else {
+            return false;
+        };
+        [Field::UnitAKey, Field::UnitBKey].into_iter().any(|key| {
+            self.passive_optional_text_bound(objects, swap, key).ok().flatten() == Some(output)
+        })
+    }
+
     pub(super) fn advance_search_objects(
         &mut self,
         budget: &ExecutionBudget<'_>,
@@ -3528,22 +3594,21 @@ impl NativeSession {
         objects: &mut BoundObjects,
         steps: &[ObjectId],
     ) -> Result<()> {
-        let frames = steps
-            .iter()
-            .map(|object| {
-                let instruction = objects
-                    .program(*object)
-                    .ok_or_else(|| unsupported("stored step program is not compiled"))?;
-                let mut frame = self.steps[instruction].initial.clone();
-                frame.object = Some(*object);
-                frame.pending = None;
-                Ok(frame)
-            })
-            .collect::<Result<Vec<_>>>()?;
-        for frame in frames.into_iter().rev() {
+        // Validate the batch before appending any frame. The common
+        // single-step case validates as it goes and needs just one lookup.
+        if steps.len() > 1 && steps.iter().any(|object| objects.program(*object).is_none()) {
+            return Err(unsupported("stored step program is not compiled"));
+        }
+        for &object in steps.iter().rev() {
+            let instruction = objects
+                .program(object)
+                .ok_or_else(|| unsupported("stored step program is not compiled"))?;
+            let mut frame = self.steps[instruction].initial.clone();
+            frame.object = Some(object);
+            frame.pending = None;
             objects
                 .arena
-                .append(objects.stack, ObjectValue::Object(frame.object.unwrap()))
+                .append(objects.stack, ObjectValue::Object(object))
                 .map_err(unsupported)?;
             self.stack.push(frame);
         }

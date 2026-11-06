@@ -106,7 +106,7 @@ struct PhysicalCopy {
 }
 #[derive(Clone, Debug)]
 enum ArenaUndo {
-    Object(ObjectId, Object),
+    Object(ObjectId, Arc<Object>),
     ListAppend(ObjectId),
     ListRemove(ObjectId, usize, ObjectValue),
     ListReplace(ObjectId, usize, ObjectValue),
@@ -170,10 +170,113 @@ impl Drop for ArenaRollback<'_> {
     }
 }
 
+// Forks share pages of handles. The undo journal still records individual
+// object edits, and the page layout has no effect on IDs or execution hashes.
+#[derive(Clone, Default)]
+struct ObjectPages {
+    pages: Vec<Arc<Vec<Arc<Object>>>>,
+    revisions: Vec<u64>,
+    revision: u64,
+    len: usize,
+}
+
+impl std::fmt::Debug for ObjectPages {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.pages.fmt(formatter)
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct ObjectPageStamp {
+    page: usize,
+    revision: u64,
+}
+
+impl ObjectPages {
+    const PAGE_LEN: usize = 32;
+
+    fn len(&self) -> usize {
+        self.len
+    }
+
+    fn get(&self, index: usize) -> Option<&Arc<Object>> {
+        self.pages
+            .get(index / Self::PAGE_LEN)?
+            .get(index % Self::PAGE_LEN)
+    }
+
+    fn touch(&mut self, page: usize) {
+        self.revision = self.revision.checked_add(1).expect("arena revision exhausted");
+        self.revisions[page] = self.revision;
+    }
+
+    fn push(&mut self, object: Arc<Object>) {
+        if self.len % Self::PAGE_LEN == 0 {
+            self.pages
+                .push(Arc::new(Vec::with_capacity(Self::PAGE_LEN)));
+            self.revisions.push(0);
+        }
+        self.touch(self.pages.len() - 1);
+        Arc::make_mut(self.pages.last_mut().unwrap()).push(object);
+        self.len += 1;
+    }
+
+    fn truncate(&mut self, len: usize) {
+        if len >= self.len {
+            return;
+        }
+        let pages = len.div_ceil(Self::PAGE_LEN);
+        self.pages.truncate(pages);
+        self.revisions.truncate(pages);
+        let tail = len % Self::PAGE_LEN;
+        if tail != 0 && self.pages.last().unwrap().len() > tail {
+            self.touch(pages - 1);
+            Arc::make_mut(self.pages.last_mut().unwrap()).truncate(tail);
+        }
+        self.len = len;
+    }
+}
+
+impl std::ops::Index<usize> for ObjectPages {
+    type Output = Arc<Object>;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.pages[index / Self::PAGE_LEN][index % Self::PAGE_LEN]
+    }
+}
+
+impl std::ops::IndexMut<usize> for ObjectPages {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        let page = index / Self::PAGE_LEN;
+        self.touch(page);
+        &mut Arc::make_mut(&mut self.pages[page])[index % Self::PAGE_LEN]
+    }
+}
+
+impl std::hash::Hash for ObjectPages {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.len.hash(state);
+        for object in self.pages.iter().flat_map(|page| page.iter()) {
+            object.hash(state);
+        }
+    }
+}
+
+#[cfg(test)]
+impl FromIterator<Arc<Object>> for ObjectPages {
+    fn from_iter<T: IntoIterator<Item = Arc<Object>>>(iter: T) -> Self {
+        let mut pages = Self::default();
+        for object in iter {
+            pages.push(object);
+        }
+        pages
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct ObjectArena {
     pub(crate) symbols: Arc<Symbols>,
-    objects: Vec<Object>,
+    objects: ObjectPages,
     aliases: Vec<ObjectId>,
     board_keys: Option<Vec<(crate::geometry::Hex, ObjectId)>>,
     root: ObjectValue,
@@ -285,7 +388,7 @@ impl ObjectArena {
                 .entries
                 .push(ArenaUndo::Object(id, self.objects[id.0].clone()));
         }
-        &mut self.objects[id.0]
+        Arc::make_mut(&mut self.objects[id.0])
     }
 
     fn records_list_edit(&self, id: ObjectId) -> bool {
@@ -296,7 +399,7 @@ impl ObjectArena {
     }
 
     fn list_items_mut(&mut self, id: ObjectId) -> &mut Vec<ObjectValue> {
-        let Contents::List(values) = &mut self.objects[id.0].contents else {
+        let Contents::List(values) = &mut Arc::make_mut(&mut self.objects[id.0]).contents else {
             unreachable!("validated list binding");
         };
         values
@@ -325,7 +428,7 @@ impl ObjectArena {
     ) -> Result<Self, String> {
         let mut arena = Self {
             symbols: Arc::new(symbols),
-            objects: Vec::new(),
+            objects: ObjectPages::default(),
             aliases: Vec::new(),
             board_keys: None,
             root: ObjectValue::Atom(Datum::Null),
@@ -439,12 +542,12 @@ impl ObjectArena {
                 |(_, kind, _)| kind,
             );
             let id = ObjectId(self.objects.len());
-            self.objects.push(Object {
+            self.objects.push(Arc::new(Object {
                 kind,
                 tracked: binding.is_some(),
                 deepcopy_shared: binding.is_some_and(|(_, _, shared)| shared),
                 contents: Contents::List(Vec::new()),
-            });
+            }));
             if let Some((index, _, _)) = binding {
                 shared[index] = Some(id);
             }
@@ -470,7 +573,7 @@ impl ObjectArena {
                 }
                 _ => unreachable!(),
             };
-            self.objects[id.0].contents = contents;
+            Arc::make_mut(&mut self.objects[id.0]).contents = contents;
             Ok(ObjectValue::Object(id))
         } else {
             Ok(ObjectValue::Atom(Datum::from_json(
@@ -533,12 +636,12 @@ impl ObjectArena {
 
     fn allocate_contents(&mut self, kind: ObjectKind, contents: Contents) -> ObjectValue {
         let id = ObjectId(self.objects.len());
-        self.objects.push(Object {
+        self.objects.push(Arc::new(Object {
             kind,
             tracked: true,
             deepcopy_shared: false,
             contents,
-        });
+        }));
         ObjectValue::Object(id)
     }
     fn input(&mut self, value: &Input) -> Result<ObjectValue, String> {
@@ -679,6 +782,18 @@ impl ObjectArena {
         }
         protected
     }
+    pub(crate) fn page_stamp(&self, object: ObjectId) -> Option<ObjectPageStamp> {
+        let page = object.0 / ObjectPages::PAGE_LEN;
+        Some(ObjectPageStamp {
+            page,
+            revision: *self.objects.revisions.get(page)?,
+        })
+    }
+
+    pub(crate) fn matches_page_stamp(&self, stamp: ObjectPageStamp) -> bool {
+        self.objects.revisions.get(stamp.page) == Some(&stamp.revision)
+    }
+
     pub fn sequence(&self, object: ObjectId) -> Option<&[ObjectValue]> {
         match &self.objects.get(object.0)?.contents {
             Contents::List(values) => Some(values),
@@ -745,14 +860,14 @@ impl ObjectArena {
                 }
                 let original = self.objects[id.0].clone();
                 let copy = ObjectId(self.objects.len());
-                self.objects.push(Object {
+                self.objects.push(Arc::new(Object {
                     kind: original.kind,
                     tracked: original.tracked,
                     deepcopy_shared: original.deepcopy_shared,
                     contents: Contents::List(Vec::new()),
-                });
+                }));
                 objects.insert(*id, copy);
-                let contents = match original.contents {
+                let contents = match &original.contents {
                     Contents::List(values) => Contents::List(
                         values
                             .iter()
@@ -768,7 +883,7 @@ impl ObjectArena {
                             .collect::<Result<_, String>>()?,
                     ),
                 };
-                self.objects[copy.0].contents = contents;
+                Arc::make_mut(&mut self.objects[copy.0]).contents = contents;
                 ObjectValue::Object(copy)
             }
             value => value.clone(),
@@ -847,7 +962,7 @@ impl ObjectArena {
         let ObjectValue::Object(id) = self.list(values) else {
             unreachable!()
         };
-        self.objects[id.0].tracked = false;
+        Arc::make_mut(&mut self.objects[id.0]).tracked = false;
         ObjectValue::Object(id)
     }
     pub(crate) fn frozen_model(
@@ -858,7 +973,7 @@ impl ObjectArena {
         let ObjectValue::Object(id) = value else {
             unreachable!()
         };
-        self.objects[id.0].kind = ObjectKind::FrozenModel;
+        Arc::make_mut(&mut self.objects[id.0]).kind = ObjectKind::FrozenModel;
         Ok(ObjectValue::Object(id))
     }
     /// Explicitly immutable source models (Hex) return themselves from deepcopy.
@@ -871,17 +986,17 @@ impl ObjectArena {
         let ObjectValue::Object(id) = value else {
             unreachable!()
         };
-        self.objects[id.0].deepcopy_shared = true;
+        Arc::make_mut(&mut self.objects[id.0]).deepcopy_shared = true;
         Ok(ObjectValue::Object(id))
     }
     pub(crate) fn list(&mut self, values: Vec<ObjectValue>) -> ObjectValue {
         let id = ObjectId(self.objects.len());
-        self.objects.push(Object {
+        self.objects.push(Arc::new(Object {
             kind: ObjectKind::List,
             tracked: true,
             deepcopy_shared: false,
             contents: Contents::List(values),
-        });
+        }));
         ObjectValue::Object(id)
     }
     /// A cache payload only: authoritative identity remains in the arena graph.
@@ -949,7 +1064,7 @@ impl ObjectArena {
         if self.reaches(&value, object) {
             return Err("aggregate cycle".into());
         }
-        let Contents::List(items) = &mut self.objects[object.0].contents else {
+        let Contents::List(items) = &mut Arc::make_mut(&mut self.objects[object.0]).contents else {
             return Err("indexed assignment requires a list".into());
         };
         let target = items
@@ -1031,7 +1146,7 @@ impl ObjectArena {
         if !matches!(self.objects[id.0].contents, Contents::Fields(_)) {
             return Err("step recipe must have fields".into());
         }
-        self.objects[id.0].kind = ObjectKind::Step;
+        Arc::make_mut(&mut self.objects[id.0]).kind = ObjectKind::Step;
         Ok(id)
     }
     pub(crate) fn step_substituting_value(
@@ -1046,7 +1161,7 @@ impl ObjectArena {
         if !matches!(self.objects[id.0].contents, Contents::Fields(_)) {
             return Err("step recipe must have fields".into());
         }
-        self.objects[id.0].kind = ObjectKind::Step;
+        Arc::make_mut(&mut self.objects[id.0]).kind = ObjectKind::Step;
         Ok(id)
     }
     pub(crate) fn recipe_object(
@@ -1730,7 +1845,10 @@ mod protection_tests {
                 object(ObjectKind::List, list(&[12])),
                 object(ObjectKind::List, list(&[6])),
                 object(ObjectKind::List, list(&[])),
-            ],
+            ]
+            .into_iter()
+            .map(Arc::new)
+            .collect(),
             aliases: Vec::new(),
             board_keys: None,
             root: ObjectValue::Object(ObjectId(0)),
@@ -1742,6 +1860,41 @@ mod protection_tests {
             journal: ArenaJournal::default(),
         }
     }
+    #[test]
+    fn forked_arena_pages_survive_nested_rollback_across_page_boundaries() {
+        let mut arena = graph();
+        let template = arena.objects[0].clone();
+        for _ in arena.objects.len()..ObjectPages::PAGE_LEN - 1 {
+            arena.objects.push(template.clone());
+        }
+        let slot = ObjectId(ObjectPages::PAGE_LEN - 2);
+        let hash = |arena: &ObjectArena| {
+            use std::hash::{DefaultHasher, Hasher};
+            let mut state = DefaultHasher::new();
+            arena.hash_execution(&mut state);
+            state.finish()
+        };
+        let original = hash(&arena);
+
+        let fork = arena.with_rollback(|arena| {
+            arena.object_mut(slot).tracked = false;
+            arena.objects.push(template.clone());
+            let checkpoint = arena.begin_rollback();
+            arena.object_mut(slot).deepcopy_shared = true;
+            arena.objects.push(template);
+            arena.commit_rollback(checkpoint);
+            arena.clone()
+        });
+
+        assert_eq!(hash(&arena), original);
+        assert!(arena.objects[slot.0].tracked);
+        assert!(!fork.objects[slot.0].tracked);
+        assert!(fork.objects[slot.0].deepcopy_shared);
+        assert_eq!(fork.objects.len(), ObjectPages::PAGE_LEN + 1);
+        assert!(arena.objects.get(ObjectPages::PAGE_LEN - 1).is_none());
+        assert!(fork.objects.get(ObjectPages::PAGE_LEN).is_some());
+    }
+
     #[test]
     fn nested_arena_rollback_restores_aliases_order_and_physical_copies() {
         let mut arena = graph();

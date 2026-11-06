@@ -179,7 +179,7 @@ impl HexLookup {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Occupancy {
     occupied: BitSet,
 }

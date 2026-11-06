@@ -27,11 +27,11 @@ controller options, UI, or live storage and submission will be scoped
 separately. The local worker protocol and offline Python oracle remain tools
 for testing and measurement.
 
-The starting search will be iterative-deepening, team-aware minimax with
-alpha-beta pruning. Add an explicit simultaneous-planning layer and sample
-hidden worlds from the acting player's available information. Separate the
-rules engine from the search algorithm so minimax, fixed-policy rollouts and a
-future information-set search can use the same verified simulator.
+The reference search uses iterative deepening, team-aware minimax,
+simultaneous planning and sampled hidden worlds. The greedy and position-first
+methods below use the same Rust simulator and legal move generation.
+The next milestone is to test, profile, and optimize those methods before
+expanding the search further.
 
 The long-term throughput goal remains **1,000 complete two-game-turn simulations
 per second** on the user's machine. Alpha-beta nodes/second, legality queries,
@@ -54,6 +54,552 @@ Initial constraints:
   on its Linux filesystem when practical. Exclude NN/model/training tests.
 - Initially add the workspace inside `goa2-backend-bots`; do not create another
   fork or modify the regular backend checkout as part of this plan.
+
+### Next milestone — greedy card-order search
+
+Find a sensible sequence of card plays and actions against opponents who hold
+and spend their weakest defense cards first. Optimize the existing game
+evaluation for one hero, or jointly for the heroes on a coordinated team.
+Search a sequence of turns so the value of keeping a card for later can affect
+the first commitment. Start with the existing horizon and measure how much
+additional depth fits the decision budget.
+
+Use a fixed opponent policy in this offline search mode.
+
+| Decision | Opponent policy |
+| --- | --- |
+| Upgrade | Prefer a legal defense item whenever one is offered. |
+| Commit a card | Among legal commitments, choose from the cards with the lowest effective defense. Rank Block and other primary defense cards above ordinary cards regardless of the printed value. |
+| Act on the committed card | Always choose Hold. |
+| Discard | Choose from the currently eligible cards with the lowest effective defense, using the same priority for primary defense cards. |
+| Other choices | Skip when legal. For a mandatory choice, use a seeded random legal option. Keep these choices independently explorable, including Min's mine placements and Takahide's card choice. |
+
+Treat tied lowest-defense cards as eligible alternatives. Start with seeded
+tie-breaking and replay the same seeds across candidate plans so random
+opponent choices can be compared fairly. If a defense upgrade is unavailable,
+use the ordinary skip-or-random rule over the legal options.
+
+Assume enemy hands are known in this mode. Let the simulator search every
+legal prompt, including choices involving mines, Takahide's facedown card and
+unrevealed upgrades. Use defense and primary-defense status to rank enemy
+cards. The Rust rules engine still uses the full card and board state to
+determine legality and resolve effects. This mode deliberately uses full
+information and is a separate offline search policy.
+
+Implement and verify the fixed policy first, then search controlled card
+orders and actions against it. Reuse the current evaluation and record the
+best legal sequence found within the budget. Check policy behavior for ties,
+primary defense, mandatory choices and Hold availability. Use Rust-generated
+decisions and traces to validate rules against Python. Measure decision
+latency, completed sequences and score against a fixed legal card order.
+
+The offline worker now exposes `search_greedy` with a fixed-card-order
+baseline. Run `rollout_parity.py --greedy-search --all-maps` to replay the
+winning traces in Python and compare final states. At 4,096 nodes and a
+two-turn horizon, Python verified 451 steps across 24 traces on six maps.
+Flexible card ordering tied the fixed baseline in eleven of twelve comparisons
+and scored one point lower for the coordinated team on Forgotten Island.
+End-to-end times for flexible ordering were 159–230 ms in this run. Keep that
+case as a benchmark for improving the allocation of search work across plans.
+
+### Following milestone — defer upgrades until they matter
+
+Search across the Level Up and Planning boundary. Carry the legal upgrade
+combinations forward as alternatives so the search can compare promising
+first plays before committing to a complete upgrade path.
+
+- Build a dynamic hand from the legal post-upgrade hands. A current card is
+  eligible if at least one legal path keeps it. An upgrade card is eligible
+  if at least one legal path puts it in hand. Cards that must leave the hand
+  are unavailable.
+- When the search commits a card, retain only the upgrade paths that make
+  that play legal. Derive subsequent card options from those surviving paths.
+  Keep the paths correlated across later decisions so a sequence never
+  combines cards from mutually exclusive upgrades.
+- Resolve the upgrade earlier when it can affect a rule, decision, or score.
+  An item bonus that changes initiative or defense is one example. Defer the
+  rest while their effects are equivalent for the decisions being searched.
+
+For example, on a level 1 to 2 branch, playing a Tier I card rules out any
+upgrade path that replaces that card. If an upgrade is mandatory, it must
+then come from the remaining legal choices. Playing a Tier II card instead
+keeps only paths that obtain that card, removing any competing Tier II
+choice that requires the same upgrade. Use the same representation for
+multi-level jumps, preserving dependencies between upgrade choices.
+
+Deferral changes the order in which search explores decisions. When returning
+a plan, materialize one compatible upgrade path and replay the real sequence
+with Level Up before Planning. Verify on small cases that deferred search
+offers the same legal first plays and preserves the same playable sequences
+as explicitly enumerating the upgrade paths. Use Rust for the comparison and
+Python to validate representative concrete sequences. Measure how many
+upgrade branches can stay deferred and what that saves in decision time.
+
+The first implementation groups controlled first plays across concrete upgrade
+paths discovered under rollback. Discovery uses at most a quarter of the
+remaining node budget. Search materializes each compatible path before
+scoring the continuation, so rule changes from items and upgrade hooks use
+their real values. Lazy discovery and sharing work between compatible paths
+remain open. On two maps, `rollout_parity.py --greedy-upgrades` replayed 88
+steps across eager and deferred plans with matching Python final states.
+The modes tied on score on both maps at 4,096 nodes. Deferred search completed
+fewer sequences in both comparisons, so the run does not establish a
+throughput improvement.
+
+The current traversal starts from a candidate first card. It considers
+retained cards and obtainable upgrades in the same order, independent of
+whether the card is newly acquired. It prunes upgrades that would retire
+the chosen card, and on the final level-up it prunes choices that leave the
+required upgrade card in the deck. Position-first search groups the discovered
+routes across compatible hands. The simulator materializes each compatible
+path before resolving the play, where item and hand changes can affect the
+rules. Sharing upgrade prefixes between card candidates and carrying
+equivalent paths across multiple plays remain open.
+
+The card-constrained `--greedy-upgrades` run matched Python final states
+across 132 steps in six traces. At 4,096 nodes, position-first search scored
+12 points above eager upgrade search on Forgotten Island and tied on Magma
+and Ice. It explored more destination groups than the streamed traversal
+and spent more nodes on upgrade discovery.
+
+Position-first search now carries compatible upgrade alternatives together
+through the first play. Each physical state validates the same decision
+independently. Different menus, board positions, or scores produce separate
+branches. The round-boundary oracle replay verified 132 steps across six
+traces, including 350 and 352 shared decisions on the two maps. The shared
+mode took about 1.1–1.2 seconds per position-first search at 4,096 nodes,
+above the preceding implementation. The shared frontier now also batches
+compatible routes at the next Planning phase and groups their legal card
+commitments. Each commitment retains only the states that can make it.
+The chosen trace retains its original upgrade inputs.
+
+A three-turn round-boundary replay checked the next Planning phase after
+the upgrade on both maps. At 16,384 nodes it exercised 37 and 40 shared
+commitments from distinct upgrade histories, and Python matched the final
+states after 32 steps on each map. The new cases completed four and eleven
+full sequences, so the deeper allocation still needs tuning.
+
+### Third milestone — score positioning across action types
+
+Extend the position scoring used for regular movement and fast travel to
+primary skills, primary movement, and attacks that cause movement. Reuse
+the same scoring for moves, placements, swaps, pushes, pulls, and other
+effects that change where heroes stand. Rank legal choices at each prompt
+so the search explores promising positions sooner, while keeping alternatives
+available for deeper search.
+
+- Score the position change for every affected hero from the searching
+  player's or team's perspective. Add improvements for allies and subtract
+  improvements for enemies. A swap between opposing heroes contributes both
+  position changes.
+- Use the resulting board to assess attack opportunities against enemy
+  heroes and minions, exposure to enemy threats, and nearby friendly support.
+  Explore both closing distance and creating space. Keep actual combat
+  outcomes, including kills, in the existing evaluation when an attack also
+  moves units.
+- Give a token's location positional value when the rules let a hero swap
+  with that token. Evaluate it as a potential position for that hero and
+  account for who chooses the destination. A token placement creates an
+  option, so credit it separately from an actual relocation. Apply the
+  token's own rules and effects for other tokens.
+
+Use Rust's legal choices and simulated outcomes to verify the ordering.
+Compare ordinary movement, a swap that moves both teams, an enemy push or
+pull, an attack with displacement, and placements with and without a swap
+option. Check that early candidate ordering improves the plans found under
+the same budget and leaves room to tune the scoring weights later.
+
+Greedy search now orders a bounded set of legal prompts by probing their
+resulting board under rollback. Probes use at most one eighth of the node
+budget. When the next prompt directly feeds a token swap, a short lookahead
+credits the destination under the policy of the hero who chooses it.
+Placements with an intervening decision still depend on deeper search.
+At 4,096 nodes, `rollout_parity.py --greedy-position --all-maps` verified
+452 decisions across 24 traces against Python final states. Ordering improved
+the score in two of twelve comparisons and tied in the other ten.
+
+### Fourth milestone — search positions across card choices
+
+Organize the search around positions the hero could reach across all legal
+card and action choices. Include movement and fast travel, primary skills
+that relocate the hero, and attacks that move the hero. Include secondary
+movement when it is a legal action on the chosen card. Where upgrades are
+still deferred, include reachable positions from any card supported by a
+surviving upgrade path.
+
+Group routes that reach the same position so the search can rank the
+destination once and then compare the ways to reach it. Keep each route
+linked to its card, action, compatible upgrade paths, and required choices.
+Preserve differences in initiative, remaining hand, attack results, tokens,
+and the positions of other units. When the endpoint depends on an opponent's
+choice or a later outcome, carry the possible outcomes through the search.
+Only merge routes when their resulting states and remaining choices are
+equivalent for the search.
+
+Interleave destination groups and actions that leave the hero in place in
+one candidate order. An attack, a stationary skill, or Hold can be the
+strongest play. A skill that moves an enemy while the hero stays put still
+gets the positional score from the third milestone. Use the same evaluation
+and decision budget for both kinds of action, and retain a concrete legal
+card and action sequence for the chosen result.
+
+Compare this position-first ordering with card-first ordering at the same
+budget. Check positions reachable through multiple cards, a destination
+reachable only after an upgrade, and cases where staying put wins. Measure
+whether grouping improves the best legal plan found and reduces repeated work.
+
+The offline worker now offers `position_first` as an opt-in search mode for
+Planning roots. It scouts the first turn under a shared budget, then searches
+the strongest concrete route from each destination group before revisiting
+that group. Stationary outcomes participate in the same ordering. Card-first
+search uses the remaining budget. When search reaches Level Up, the same
+destination frontier draws from compatible deferred upgrade paths. Routes
+carry their concrete upgrade inputs so replay applies items and hand changes
+before committing cards. Discovery remains bounded and samples a subset
+when many upgrade paths are available.
+
+At 4,096 nodes, `rollout_parity.py --greedy-routes --all-maps` replayed 455
+steps across 24 traces and matched Python final states. Position-first
+ordering improved two of twelve scores and tied the other ten.
+
+The round-boundary comparison with `rollout_parity.py --greedy-upgrades`
+verified 132 steps across six traces with matching Python final states.
+Position-first search found 26 upgraded destination groups on Forgotten
+Island and 22 on Magma and Ice. At 4,096 nodes it improved the score by 12
+points on Forgotten Island and tied on Magma and Ice.
+
+Position-first upgrade search interleaves witnesses from different first
+cards. An independently legal secondary movement action or destination can
+keep multiple card and upgrade witnesses on the same choice frontier. Primary
+effects retain their card-specific menus. Different boards or scores split
+the alternatives when they arise. The round-boundary replay exercised 127
+and 103 cross-card movement choices at 4,096 nodes and matched both Python
+final states. Movement traversal and state transitions still run per witness.
+Sharing those calculations requires checking which rule inputs are equivalent.
+
+### Fifth milestone — refine and optimize greedy search
+
+Score positioning across minion pushes using the resulting board. A push
+can change which minions either side can attack, where heroes have friendly
+support, and which threats or routes open up even when the heroes stay put.
+Use the existing positional evaluation for both sides and keep battle and
+material outcomes in the game evaluation.
+
+Add a few predictable responses to the greedy opponent policy. Assume an
+enemy takes a legal attack against an adjacent hero or defeats a minion
+when a legal action can do so. Check the actual card, range, and target
+rules before assuming either response. If both responses are available,
+test both with a small branch budget. Use the original Hold policy when
+neither applies, and keep the original greedy policy as the comparison
+baseline.
+
+Use these responses to check whether a promising plan survives an obvious
+punish, such as ending next to an enemy who can attack or leaving a minion
+open to defeat. Profile the added work, reuse equivalent legal continuations,
+and keep the response checks bounded. Compare plan quality, decision latency,
+and completed sequences under the same budget on positions with and without
+a minion push or an immediate attack opportunity.
+
+The offline worker offers opt-in `tactical_replies`. It checks ordinary
+legal attacks with explicit target prompts, considers up to two adjacent
+controlled heroes and two enemy-minion defeat opportunities, and uses the
+most damaging immediate result for the controlled side. Tactical probes
+consume at most one sixteenth of the node budget. Focused Rust fixtures
+verify that the policy selects and defeats a legal minion through an attack
+macro and that a lane push changes the position score at an unchanged hero
+hex. The lane-push score uses the resulting board and is signed for each side.
+
+At 4,096 nodes, `rollout_parity.py --greedy-tactics --all-maps` verified 454
+steps across 24 traces with matching Python final states. The two policies
+tied on score in all twelve opening comparisons. This run establishes replay
+parity and measures probe cost. It does not establish a playing-strength gain.
+
+The attack probe now carries its verified target into the same search branch.
+Search validates the target against the live menu before using it and skips
+the second target simulation. A Forgotten Island close-contact case with an
+enemy attack already committed exercised this reuse for both control scopes.
+Python matched all four final states from the Hold and tactical comparison.
+The tactical cases used two probes and reused one target per search.
+
+The optimization pass uses copy-on-write arena objects, typed decision
+grouping, one constrained upgrade-prefix traversal for position-first search,
+up to eight retained route states per frontier, and a first-pass budget for
+different destinations. The arena already detached rollback journals when
+cloning. All 374 Rust core tests passed and both oracle replay suites matched
+Python final states. The 4,096-node round-boundary cases cut upgrade discovery
+from 795/782 steps to 173/172 and completed 241/187 sequences instead of
+70/65. Two warmed runs took 0.27–0.62 seconds across the cases. The Forgotten
+Island score dropped from 1740 to 1729 and Magma and Ice stayed at 1728.
+The opening benchmark exercised eight direct route resumes per position-first
+search. Search quality under the new budget allocation still needs tuning.
+
+### Next milestone — validate and optimize the new search methods
+
+Establish what the current greedy, position-first, deferred-upgrade,
+cross-card movement, and tactical-reply methods cost and where they help.
+Keep representative roots, seeds, evaluation, and worker settings fixed.
+Measure both equal-node and equal-time runs on a small board and full maps.
+Use Python to validate chosen moves and representative traces. Compare
+search quality between Rust configurations.
+
+1. **Verify where alternatives stay together or split.** Cover ordinary
+   movement and Fast Travel across colors and tiers, a destination only
+   one card can reach, a differing initiative that has no material effect,
+   and a differing initiative that changes legality or the outcome. Include
+   multi-level upgrades, a later card choice that narrows the surviving
+   hands, stationary skills and Hold, and tactical replies involving minions.
+   Replay the winning concrete paths and check rollback.
+2. **Attribute time and memory costs.** Measure upgrade-prefix discovery,
+   witness creation and copying, movement traversal, decision grouping,
+   per-witness transitions, route replay and resume, and tactical probes.
+   Record counts, elapsed time, peak memory, completed sequences, best
+   score, and the time to the first complete plan. Separate worker warm-up
+   and transport from search time. Record how often alternatives remain
+   grouped, split, or reach the same outcome by different orders.
+3. **Reduce the measured bottlenecks.** Start with work the search still
+   repeats across witnesses. Share movement or Fast Travel reachability
+   only when the relevant rule inputs agree, including effective movement
+   parameters, occupancy, topology, and applicable effects. Reuse equivalent
+   transitions only when the relevant reads agree. Keep the card and upgrade
+   assignments correlated and retain a concrete replay witness. Profile
+   retained-state and replay tradeoffs before increasing frontier size.
+4. **Verify the gains at the same budget.** Re-run parity and compare
+   wall time, memory, completed sequences, and best scores after each
+   substantive change. Report regressions as well as gains, especially
+   cases where better coverage or throughput yields a weaker plan. Keep
+   position-first search in the comparison and use the results to decide
+   where to spend the remaining optimization effort.
+
+Greedy search now reuses ordinary movement traversal within one search
+when geometry, start, effective range, obstacle mode, occupancy, and
+passable-token locations agree. Dynamic topology and obstacle effects bypass
+the cache. Destination checks still run for each witness. The cache holds
+at most 128 traversals. The warmed `--greedy-movement-cache` comparison
+at 4,096 nodes produced identical scores, node counts, and traces with reuse
+enabled and disabled. Five-run medians went from 239.3 to 229.8 ms on
+Forgotten Island and from 254.0 to 249.6 ms on Magma and Ice. The cached
+runs reported 890/14 and 785/15 hits/misses. Fast Travel now shares full-board destination masks after checking each
+witness's card-specific action legality. The search keeps at most 64 masks
+keyed by geometry, origin zone, team, occupancy, and blockers. Dynamic
+topology and obstacles bypass reuse. The combined cache comparison matched
+scores, node counts, and Python-replayed traces. Fast Travel recorded
+294 and 329 hits after two misses on each map. All six focused travel tests
+passed, including invalidation when the board changes. Sharing full rule
+transitions remains open.
+
+The worker now supports opt-in phase timings. Use
+`rollout_parity.py --greedy-upgrades --profile-greedy --prepare-search`.
+On the two three-turn position-first cases, search took 819 and 829 ms.
+Rules advancement took 445 and 477 ms, explicit witness copies took 106
+and 92 ms, and choice grouping took 27 and 25 ms. Route replay accounted
+for 76 and 63 ms, including advancement already counted above. The first
+complete plans arrived after 79 and 97 ms. Python matched every final state.
+These timings put repeated rules advancement ahead of grouping as the
+next target. Peak resident memory and finer rule-step costs remain unmeasured.
+
+An allocation-free card-aura refresh trial also removed the second lookup
+of each resolved card. Seven alternating warmed pairs at 16,384 nodes
+returned identical search results and matched Python replay on both maps.
+Median search time was 853 to 844 ms on Forgotten Island and 1,110 to
+2,235 ms on Magma and Ice. Median time to the first complete plan was
+82 to 88 ms and 111 to 236 ms, respectively. The trial was reverted.
+A build-ID-checked WSL CPU profile of ten 16,384-node searches per map
+sampled the restored build at 499 Hz. Forgotten Island and Magma and Ice
+recorded 8,755 and 4,723 user-CPU samples. Session cloning and destruction
+of the arena's object-handle vector together took 11.0% and 12.8% of self
+samples. Card-collection synchronization and its list comparison took
+5.4% and 5.8%. The rules loop itself took 7.5% and 5.8%, excluding its
+callees. A further 28% and 25% landed in libc and remain unattributed.
+These are sampling percentages across the worker, including startup and
+transport. They cannot be added to the phase wall-clock measurements.
+
+The original arena cloned a flat vector of reference-counted handles
+for each retained witness. The comparison shares handle pages across forks,
+with copy-on-write for changed pages, against the flat vector. Check
+append, truncation, nested rollback, and witness replay before keeping the
+change. Measure whether faster forks offset page copying on writes and
+whether peak worker memory improves. For card synchronization, measure how
+often lists are unchanged before attempting to skip comparisons. Any reuse
+must account for aliased lists, arena rollback, and independent typed-row
+updates.
+
+A trial with 32-handle pages compiled and returned identical fixed-node
+search results on both maps, including Python replay. In the first
+seven-pair comparison, Forgotten Island search fell from 875 to 786 ms
+and explicit session cloning fell from 113 to 46 ms. Magma and Ice
+search rose from 1,252 to 2,259 ms while cloning fell from 129 to 108 ms.
+Peak resident memory across both maps fell from 148,216 to 146,992 KiB.
+Reversing worker order reversed the Magma and Ice result. Both builds
+also shifted between fast and slow runs in a separate fresh-worker test.
+Across four alternating fresh-worker pairs per map, the median paired
+change in explicit clone time was −59% on Forgotten Island and −58% on
+Magma and Ice. Median paired worker CPU changed by −19% and −5%. One pair
+per map favored the flat arena by more than 30% in worker CPU, so the
+end-to-end estimates are noisy. First-plan latency changed by a median
+of −1% and +5%. Keep the paged representation for its consistent
+fork savings while treating overall speedup as provisional. All six
+focused arena tests passed, including a fork retained across a page
+boundary through nested rollback. Fixed-node outputs and Python replay
+matched throughout. The boundary-restore gate also passed shard 1/256
+(68 fixture cases, 69.5 s).
+
+The opt-in greedy profile now counts completed card synchronizations.
+At three turns and 16,384 nodes, Forgotten Island compared 1,808,880
+lists across 90,444 calls and changed 13,618 lists. Magma and Ice compared
+1,853,660 lists across 92,683 calls and changed 16,699. More than 99%
+of lists matched the typed projection on each map. All eight winning
+traces from the instrumented run matched Python. Test whether a cheap
+validation stamp on both the bound model/list and its typed projection
+can skip the repeated reads. Keep scalar card and aura synchronization
+independent until their mutation paths are covered.
+
+The first validation-stamp trial uses arena page revisions to cover the
+hero model and its five card-list bindings. A page edit invalidates every
+hero and role sharing that page. Typed hero mutation or rollback clears
+the corresponding row's stamp. Cache state is worker-local and excluded
+from execution hashes. The greedy profile now counts skipped hero rows
+separately from lists actually compared. Verify the skip rate and compare
+fixed-node outputs, worker CPU time, and fork cost before retaining it.
+Page co-location can cause conservative misses. The initial 16,384-node
+runs compared 326,610 lists on Forgotten Island and 612,020 on Magma
+and Ice, down 82% and 67%. The number of changed lists stayed at 13,618
+and 16,699. All eight instrumented traces matched Python replay.
+These counts show the shortcut fires often. An equal-time comparison
+also measures nodes and completed plans at 500 and 1,000 ms to check
+whether the saved comparisons improve useful work under a deadline.
+
+The isolated four-pair fixed-node A/B used the same paged arena in both
+workers and changed only the card-sync stamps. At 16,384 nodes the median
+search time went from 715 to 674 ms on Forgotten Island and from 748 to
+730 ms on Magma and Ice. Median worker CPU went from 750 to 705 ms and
+790 to 770 ms. The entire search response, excluding profile counters,
+matched for all pairs, and Python matched the selected trace on both
+maps. Keep the stamps. The first-plan pass also passed all eight fixed-node
+Python replay cases across eager, deferred, and position-first search.
+
+An initial equal-time stress run used a one-million-node ceiling to
+make time the binding constraint. At 500 ms neither worker produced a
+complete plan on either map. At 1,000 ms the trial median was five
+complete plans on Forgotten Island versus zero for the baseline.
+Both medians were zero on Magma and Ice. The run overlapped the core
+integration suite, so use these counts as a deadline failure case rather
+than a speed estimate. Large node ceilings let position-first discovery
+spend a proportional share of the budget enumerating first-turn routes
+before following them. Add a bounded pass to find and retain a complete
+legal incumbent before bulk route discovery, then keep the position-first
+search for improvement. Verify this under a time limit as well as a node
+limit.
+
+Position-first search now spends up to one eighth of the node allowance,
+capped at 128 nodes, looking for the first complete line before collecting
+routes. The pass uses the same legal choices and opponent policy, skips
+deferred route discovery and position probes, and stops at the first scored
+plan. It shares the main deadline and node budget and rolls its speculative
+state back before the remaining search. Allowances below 256 nodes go
+directly to the original traversal. The card-sync alias and typed-row
+invalidation test passed before this change.
+
+The optimized build and focused two-turn replay test passed. In the
+four-pair, one-million-node deadline comparison, the 500 ms budget
+returned a complete plan on all four runs on each map after seeding.
+Before seeding the counts were three of four on Forgotten Island and
+one of four on Magma and Ice. Median time inside search to the first
+complete plan was 2.3 and 3.2 ms after seeding, compared with 420 and
+297 ms among successful baseline runs. At 1,000 ms both builds returned
+a complete plan on all runs and the best scores matched on both maps.
+One seeded 500 ms Forgotten Island result scored 1,728 while the three
+successful baseline results scored 1,741. All returned plans matched
+Python replay. These deadline runs verify the earlier availability of
+a plan on these roots and leave search quality at larger scale open.
+
+The same optimized worker passed 24 greedy replays with
+`--greedy-upgrades --profile-greedy --prepare-search --all-maps`. On
+each bundled map the three-turn first-plan pass found a complete line
+in 30 nodes and 1.35–1.60 ms inside search. This uses one roster and
+one upgraded root per map.
+
+The recorded Hanu workload also matched Python at all six opening,
+round-boundary, and combat roots with eight seeds per root. With
+`--recorded-rollouts --bench-iterations 1024 --sample-count 8
+--rollout-workers 4`, throughput was 2,718–3,820 complete two-turn
+rollouts/s. The separate 256-iteration single-worker run used one seed
+and reached 801–1,053 rollouts/s. This verifies four-worker throughput
+on the recorded workload. The single-worker round-boundary and combat
+roots remain below 1,000/s. Sampling and restore used 4.0–5.4% of
+worker time, so prioritize the rules path for further throughput gains.
+These are rollout rates and do not measure search strength.
+
+The build-ID-checked Forgotten Island combat profile collected 6,416
+CPU samples. The rules loop accounted for 10.0% of self samples, arena
+mutation for 2.3%, page copy-on-write for 1.9%, cycle checks for 1.5%,
+and card synchronization for 1.5%. Libc accounted for 22.6% and needs
+caller attribution. A trial that removed duplicate list binding reads
+on card-sync misses matched all 48 Python rollout states but moved
+the five-pair median from 805 to 807 rollouts/s, within the observed
+variation. Reverted the trial. Profile rules-loop and allocator callers
+before making further small changes to card synchronization.
+
+WSL's perf build lacks DWARF unwinding, so a separate iterate worker
+built with frame pointers was used for a build-ID-checked caller capture.
+It recovered Rust callers for all 681 libc samples out of 3,247 total.
+Battle preflight accounted for 70 direct libc samples. Collecting and
+dropping temporary stored-step frames accounted for 54 direct samples.
+The trial queues frames directly after validating every program binding,
+preserving reverse stack order. Single-step queues validate the binding
+once. On the pinned combat workload, five alternating pairs of 1,000
+rollouts gave medians of 806 and 835 rollouts/s (+3.5%). The trial was
+faster in all five pairs and the Rust sample results matched. All 48
+Python replay states matched across the recorded roots. Keep the direct
+queue and investigate the battle preflight clone next.
+
+A read-only minion battle trial used live world rows with the arena's
+decoded zone bindings and skipped the preview clone for that step.
+Mutating battle steps still cloned. All 48 recorded rollout states
+matched Python, but the five-pair combat median moved from 843 to
+838 rollouts/s. Reverted the trial. To narrow the clone cost further,
+separate Check, Minions, Push, Casualties, and Displace in the profile
+before changing the mutating preflight paths.
+
+A temporary clone counter on the 5,000-rollout Forgotten Island combat
+workload attributed all 39,936 recorded preview clones to Check, taking
+248 ms to construct. Check now scans triggers against the live arena
+zone bindings before creating a preview. It returns immediately for
+empty triggers and single-lane maps. Triggered multi-lane checks share
+the existing mutating resolver and still use a preview. The five-pair
+median improved from 833 to 892 rollouts/s (+7.0%), with matching Rust
+benchmark results and all 48 sampled rollout states matching Python.
+The dedicated Rust restoration test passed 267 battle cases and
+1,446 operations, and the CLI records matched the pre-optimization
+worker for every operation. The Python object-aware normalizer also
+matched all 267 battle cases and 1,446 operations, including request
+IDs in nested displacement aliases.
+
+A trial fused the two live step-condition field lookups into one scan.
+The combat median moved from 853 to 844 rollouts/s with mixed paired
+results, so the trial was reverted.
+
+A cycle-check trial replaced the visited hash set with a growing bitmap.
+Median combat throughput fell from 865 to 821 rollouts/s across five
+paired runs, so the trial was reverted.
+
+### Later extension — prioritize plausible opponent replies
+
+Once the greedy pass produces useful plans, use the results to prioritize
+plausible opponent hands and commitments in a broader search. Rank those
+possibilities using the defense-based policy and the outcomes of the greedy
+plans before spending budget on less likely replies. Keep the later search
+constrained by the acting player's available information.
+
+The sampled planner now uses the greedy defense policy to order enemy
+commitments inside each observation-derived world. The candidate cap
+selects joint replies in order of combined per-hero rank. The evaluator
+still scores the retained replies adversarially. The uncapped reply set
+matches ordinary enumeration in the focused Rust test. Hand sampling and
+ranking by actual greedy rollout outcomes remain open.
+
+All 374 Rust core tests passed. The 18-match six-map QUICK roster sweep at
+100 ms per decision replayed 865 Rust decisions in Python and reported 90
+fallbacks. This run checks legality and final-state parity.
 
 ## 2. Reference implementation and baseline
 

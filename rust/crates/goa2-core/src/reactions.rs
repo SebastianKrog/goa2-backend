@@ -7,7 +7,7 @@ use crate::{
     world::{ActionKind, CardLifecycle, NativeWorld},
 };
 use serde_json::{Value, json};
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug, Hash, PartialEq)]
 pub struct DefenseCard {
     pub physical: CardId,
     pub id: Symbol,
@@ -17,7 +17,7 @@ pub struct DefenseCard {
     pub primary: bool,
     pub color: Option<Symbol>,
 }
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug, Hash, PartialEq)]
 pub struct DefenseMenu {
     pub owner: Symbol,
     pub cards: Vec<DefenseCard>,

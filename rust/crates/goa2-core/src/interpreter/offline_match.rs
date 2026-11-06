@@ -68,6 +68,18 @@ pub struct OfflineMatch {
 }
 
 impl NativeSession {
+    pub(super) fn planning_trace_json(&self, plans: &[super::PlanningCommitment]) -> Result<Value> {
+        let commitments = plans.iter().map(|plan| {
+            let printed = |card| self.printed_observation_card(card);
+            Ok(json!({
+                "hero": self.symbols.name(plan.hero),
+                "first": plan.first.map(printed).transpose()?,
+                "second": plan.second.map(printed).transpose()?,
+            }))
+        }).collect::<Result<Vec<_>>>()?;
+        Ok(json!({"kind": "planning", "commitments": commitments}))
+    }
+
     pub fn play_offline_match(
         &mut self,
         turns: u8,
@@ -172,18 +184,7 @@ impl NativeSession {
                     joint.push(plan);
                 }
                 if let Some(trace) = &mut trace {
-                    let commitments = joint
-                        .iter()
-                        .map(|plan| {
-                            let printed = |card| self.printed_observation_card(card);
-                            Ok(json!({
-                                "hero": self.symbols.name(plan.hero),
-                                "first": plan.first.map(printed).transpose()?,
-                                "second": plan.second.map(printed).transpose()?,
-                            }))
-                        })
-                        .collect::<Result<Vec<_>>>()?;
-                    trace.push(json!({"kind": "planning", "commitments": commitments}));
+                    trace.push(self.planning_trace_json(&joint)?);
                 }
                 self.apply_joint_planning_ordered(&joint)?;
             } else {

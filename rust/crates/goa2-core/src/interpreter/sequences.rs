@@ -31,7 +31,7 @@ pub enum DecisionMove {
 /// A complete choice for one hero before a simultaneous planning reveal.
 /// For an open second-card slot, first is the next card (or None to finish)
 /// and second is always None.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct PlanningCommitment {
     pub hero: Symbol,
     pub first: Option<CardId>,

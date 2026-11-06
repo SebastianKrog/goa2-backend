@@ -1,5 +1,5 @@
 /// Sized bitset: maps may exceed 512 tiles. Out-of-range writes are errors.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct BitSet {
     words: Vec<u64>,
     len: usize,

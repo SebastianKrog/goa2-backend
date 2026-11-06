@@ -200,9 +200,6 @@ impl NativeSession {
                     .map_err(unsupported)
             })
             .transpose()?;
-        let mut preview = self.world.clone();
-        preview.battle_zones = zones.clone();
-        preview.waves = waves.clone();
         let favored = if matches!(objects.arena.root_field(self.battle_key("tie_breaker_team")?),
             Some(ObjectValue::Atom(Datum::Text(value))) if value == objects.phases.k(Field::Red))
         {
@@ -214,14 +211,16 @@ impl NativeSession {
             .battle_rules
             .as_ref()
             .ok_or_else(|| unsupported("battle rules missing"))?;
-        let (result, writes) = rules
-            .resolve_traced(
-                &mut preview,
-                &self.symbols,
-                live.clone(),
-                selected.as_ref(),
-                favored,
-            )
+        let result = match live {
+            BattleStep::Check(lane) => rules.preview_check(&self.world, &zones, &waves, lane),
+            _ => {
+                let mut preview = self.world.clone();
+                preview.battle_zones = zones.clone();
+                preview.waves = waves.clone();
+                rules.resolve_traced(&mut preview, &self.symbols, live, selected.as_ref(), favored)
+            }
+        };
+        let (result, writes) = result
             .map_err(|error| match error {
                 crate::battle::BattleError::Rule(text) => EngineError::Rule(text),
                 crate::battle::BattleError::Unsupported(text) => unsupported(text),

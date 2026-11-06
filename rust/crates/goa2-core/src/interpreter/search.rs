@@ -142,6 +142,37 @@ struct PlanningPartition<'a> {
 
 // A row is eligible only after it has a worst reply in every sampled world.
 // Compare exact sums so integer rounding cannot change the chosen row.
+// Enumerate the lowest sums of per-hero ranks without constructing the
+// full Cartesian product. Mixed-radix indices also break ties consistently.
+fn ranked_reply_indices(
+    choices: &[Vec<PlanningCommitment>],
+    strides: &[usize],
+    cap: usize,
+) -> Vec<usize> {
+    use std::{cmp::Reverse, collections::{BinaryHeap, HashSet}};
+
+    let mut queue = BinaryHeap::from([Reverse((0usize, 0usize))]);
+    let mut seen = HashSet::from([0]);
+    let mut indices = Vec::with_capacity(cap);
+    while indices.len() < cap {
+        let Some(Reverse((rank, index))) = queue.pop() else { break };
+        indices.push(index);
+        if indices.len() == cap {
+            break;
+        }
+        for (dimension, &stride) in choices.iter().zip(strides) {
+            let digit = index / stride % dimension.len();
+            if digit + 1 < dimension.len() {
+                let next = index + stride;
+                if seen.insert(next) {
+                    queue.push(Reverse((rank + 1, next)));
+                }
+            }
+        }
+    }
+    indices
+}
+
 fn search_planning_worlds(
     player: Symbol,
     rows: &[Vec<PlanningCommitment>],
@@ -246,12 +277,23 @@ impl NativeSession {
         self.joint_plans_partition(player, friendly, cap, None)
     }
 
-    fn joint_plans_partition(
+    pub(super) fn joint_plans_partition(
         &self,
         player: Symbol,
         friendly: bool,
         cap: usize,
         controlled: Option<&[Symbol]>,
+    ) -> Result<JointPlans> {
+        self.joint_plans_with_reply_order(player, friendly, cap, controlled, None)
+    }
+
+    fn joint_plans_with_reply_order(
+        &self,
+        player: Symbol,
+        friendly: bool,
+        cap: usize,
+        controlled: Option<&[Symbol]>,
+        reply_seed: Option<u64>,
     ) -> Result<JointPlans> {
         let invalid = |reason: &str| EngineError::InvalidInput(reason.into());
         if self.planning.phase != Phase::Planning || !(1..=4096).contains(&cap) {
@@ -266,6 +308,7 @@ impl NativeSession {
             .ok_or_else(|| invalid("search player is not a hero"))?
             .team;
         let mut dimensions = Vec::new();
+        let mut strides = Vec::new();
         let mut total = 1usize;
         let mut heroes = self
             .world
@@ -277,16 +320,36 @@ impl NativeSession {
             .collect::<Vec<_>>();
         heroes.sort_by_key(|hero| hero.id != player);
         for hero in heroes {
-            let choices = self.hero_planning_commitments(hero.id)?;
+            let mut choices = self.hero_planning_commitments(hero.id)?;
             if choices.is_empty() {
                 continue;
             }
+            if let Some(seed) = reply_seed.filter(|_| hero.team != team) {
+                let preferred = self.greedy_opponent_commitment(hero.id, seed)?;
+                let mut ranks = std::collections::HashMap::new();
+                for card in choices.iter().filter_map(|choice| choice.first) {
+                    if let std::collections::hash_map::Entry::Vacant(entry) = ranks.entry(card) {
+                        entry.insert(self.greedy_defense_rank(hero.id, card)?);
+                    }
+                }
+                choices.sort_by_key(|choice| (
+                    Some(*choice) != preferred,
+                    choice.first.map_or((true, i64::MAX), |card| ranks[&card]),
+                    choice.second.is_some(),
+                ));
+            }
+            strides.push(total);
             total = total
                 .checked_mul(choices.len())
                 .ok_or_else(|| invalid("joint plan count overflow"))?;
             dimensions.push(choices);
         }
-        let plans = (0..total.min(cap))
+        let indices = if reply_seed.is_some() {
+            ranked_reply_indices(&dimensions, &strides, total.min(cap))
+        } else {
+            (0..total.min(cap)).collect()
+        };
+        let plans = indices.into_iter()
             .map(|mut index| {
                 dimensions
                     .iter()
@@ -359,6 +422,7 @@ impl NativeSession {
         let mut worker = self.sampled_planning_world(player, seed)?;
         worker.search_plans_on_sample(
             player,
+            seed,
             cap,
             limits,
             PlanningSearchOptions {
@@ -384,7 +448,7 @@ impl NativeSession {
                 player,
                 seed,
                 options.upgrade_checkpoints,
-                |worker| worker.search_plans_on_sample(player, cap, limits, options, budget),
+                |worker| worker.search_plans_on_sample(player, seed, cap, limits, options, budget),
             )
         } else {
             let mut worker = self.sampled_planning_world_with_checkpoints(
@@ -392,20 +456,21 @@ impl NativeSession {
                 seed,
                 options.upgrade_checkpoints,
             )?;
-            worker.search_plans_on_sample(player, cap, limits, options, budget)
+            worker.search_plans_on_sample(player, seed, cap, limits, options, budget)
         }
     }
 
     fn search_plans_on_sample(
         &mut self,
         player: Symbol,
+        seed: u64,
         cap: usize,
         limits: SearchLimits,
         options: PlanningSearchOptions<'_>,
         budget: &ExecutionBudget<'_>,
     ) -> Result<SampledPlanningSearch> {
         let friendly = self.joint_plans(player, true, cap)?;
-        let opposing = self.joint_plans(player, false, cap)?;
+        let opposing = self.joint_plans_with_reply_order(player, false, cap, None, Some(seed))?;
         let matrix = if options.workers == 1 {
             self.search_planning_matrix_with_rollout(
                 player,
@@ -502,7 +567,9 @@ impl NativeSession {
                 sample_seed,
                 options.upgrade_checkpoints,
             )?;
-            let replies = world.joint_plans_partition(player, false, cap, Some(&controlled))?;
+            let replies = world.joint_plans_with_reply_order(
+                player, false, cap, Some(&controlled), Some(sample_seed),
+            )?;
             Ok((world, replies.plans))
         };
         let mut samples = Vec::with_capacity(scope.worlds);
@@ -1274,7 +1341,7 @@ impl NativeSession {
         })
     }
 
-    fn order_movement_roots(&self, player: Symbol, moves: &mut [DecisionMove]) {
+    pub(super) fn order_movement_roots(&self, player: Symbol, moves: &mut [DecisionMove]) {
         if moves.len() < 3 {
             return;
         }
@@ -1468,6 +1535,21 @@ impl NativeSession {
         Ok((value.atanh() + bonus / 5.0).tanh())
     }
 
+    pub(super) fn search_score(
+        &self,
+        evaluation: SearchEvaluation,
+        team: Symbol,
+        player: Symbol,
+    ) -> Result<i64> {
+        if matches!(evaluation, SearchEvaluation::MaterialPosition)
+            || self.world.combat.outcome.is_some()
+        {
+            return Ok(self.evaluate_resolution(team, player));
+        }
+        let score = self.evaluate_lab_attack_range(player)?;
+        Ok((score * (WIN - 1) as f64).round() as i64)
+    }
+
     fn evaluate_resolution(&self, root_team: Symbol, player: Symbol) -> i64 {
         if let Some(outcome) = self.world.combat.outcome {
             let winner = outcome.team.or_else(|| {
@@ -1499,19 +1581,17 @@ impl NativeSession {
                         + hero.hand.len() as i128)
             })
             .sum::<i128>();
+        let position = i128::from(self.team_position_score(root_team, player)).clamp(-31, 31);
+        ((life + heroes) * 64 + position).clamp(i128::from(-WIN + 1), i128::from(WIN - 1)) as i64
+    }
+
+    pub(super) fn team_position_score(&self, team: Symbol, player: Symbol) -> i64 {
         let red = self.symbols.lookup("RED");
         let gold = self.symbols.lookup("GOLD");
-        let position = self
-            .world
-            .heroes
-            .iter()
-            .map(|hero| {
-                sign(hero.team)
-                    * i128::from(self.hero_position_score(hero, hero.id == player, red, gold))
-            })
-            .sum::<i128>()
-            .clamp(-31, 31);
-        ((life + heroes) * 64 + position).clamp(i128::from(-WIN + 1), i128::from(WIN - 1)) as i64
+        self.world.heroes.iter().map(|hero| {
+            let sign = if hero.team == team { 1 } else { -1 };
+            sign * self.hero_position_score(hero, hero.id == player, red, gold)
+        }).sum()
     }
 
     pub(super) fn hero_position_score(
@@ -1664,13 +1744,7 @@ impl Search<'_, '_> {
     }
 
     fn score(&self, worker: &NativeSession) -> Result<i64> {
-        if matches!(self.evaluation, SearchEvaluation::MaterialPosition)
-            || worker.world.combat.outcome.is_some()
-        {
-            return Ok(worker.evaluate_resolution(self.team, self.player));
-        }
-        let score = worker.evaluate_lab_attack_range(self.player)?;
-        Ok((score * (WIN - 1) as f64).round() as i64)
+        worker.search_score(self.evaluation, self.team, self.player)
     }
 
     fn reserve_node(&mut self) -> bool {
@@ -2018,6 +2092,33 @@ impl Search<'_, '_> {
 mod tests {
     use super::*;
     use crate::interpreter::{NativeRequest, RequestToken};
+
+    #[test]
+    fn sampled_reply_cap_prefers_greedy_commitments_and_full_search_keeps_every_reply() {
+        use std::collections::HashSet;
+
+        let fixture =
+            super::super::object_execution::fixture_case("object-execution-card-planning-cycle");
+        let root = NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
+            .unwrap();
+        let player = root.world.heroes[0].id;
+        let seed = 39;
+        let sampled = root.sampled_planning_world(player, seed).unwrap();
+        let first = sampled.joint_plans_with_reply_order(player, false, 1, None, Some(seed))
+            .unwrap();
+        let reply = &first.plans[0];
+        assert!(!reply.is_empty());
+        for choice in reply {
+            assert_eq!(Some(*choice), sampled.greedy_opponent_commitment(choice.hero, seed).unwrap());
+        }
+        let ordinary = sampled.joint_plans(player, false, 4096).unwrap();
+        let ranked = sampled.joint_plans_with_reply_order(player, false, 4096, None, Some(seed))
+            .unwrap();
+        assert_eq!(ranked.total, ordinary.total);
+        assert_eq!(ranked.plans.len(), ranked.total);
+        assert_eq!(ranked.plans.into_iter().collect::<HashSet<_>>(),
+            ordinary.plans.into_iter().collect::<HashSet<_>>());
+    }
 
     #[test]
     fn resolution_probe_distinguishes_duplicate_prefixes_from_forced_inputs() {

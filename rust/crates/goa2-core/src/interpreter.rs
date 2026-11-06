@@ -27,6 +27,8 @@ pub use loadout::{
     replay_public_upgrade_batches,
 };
 pub use offline_match::{OfflineMatch, OfflinePolicy};
+mod greedy;
+pub use greedy::{GreedyPlan, GreedySearch, GreedySearchOptions, GreedyStep};
 mod search;
 pub use observation::{
     BotTeamObservation, HeroObservation, PlayerObservation, PrivateCards, PublicCard,
@@ -653,7 +655,7 @@ enum Team {
     Red,
     Blue,
 }
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug, Hash, PartialEq)]
 pub enum RequestChoices {
     SpellCards {
         values: Vec<crate::cards::CardId>,
@@ -725,7 +727,7 @@ pub enum RequestChoices {
         unit: Option<Symbol>,
     },
 }
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug, Hash, PartialEq)]
 pub struct NativeRequest {
     pub id: RequestToken,
     pub owner: Symbol,

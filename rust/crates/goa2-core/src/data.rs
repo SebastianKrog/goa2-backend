@@ -66,6 +66,10 @@ impl Symbols {
         self.local.names.hash(state);
     }
 
+    pub(crate) fn same_local_names(&self, other: &Self) -> bool {
+        self.local.names == other.local.names
+    }
+
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }

@@ -198,13 +198,56 @@ def describe_state_difference(expected, actual, path="state"):
     return f"{path} differs (Python {repr(expected)[:160]}, Rust {repr(actual)[:160]})"
 
 
+def trace_policy(map_id, trace):
+    from automata.runtime.legality import DecisionMove, check_moves, check_sequences
+    from goa2.engine.phases import hero_can_play_two_cards
+
+    def replay(state, prompt, revision):
+        row = trace[revision]
+        if prompt is not None:
+            assert row["kind"] == "resolution"
+            move = DecisionMove("INPUT", row["hero"], row["selection"], prompt.id)
+            verdict = check_moves(state, [move]).results[0]
+            assert verdict.legal is True, (
+                map_id, revision, state.round, state.turn, row,
+                prompt.model_dump(mode="json"), verdict,
+            )
+            return move
+
+        assert row["kind"] == "planning"
+        eligible = {
+            hero.id for team in state.teams.values() for hero in team.heroes
+            if hero.id not in state.pending_inputs
+            or planning_open_for_second_card(state, hero.id)
+        }
+        commitments = row["commitments"]
+        assert len(commitments) == len(eligible) and {
+            entry["hero"] for entry in commitments
+        } == eligible, (map_id, revision, state.round, state.turn, row, eligible)
+        moves = []
+        for entry in commitments:
+            hero = state.get_hero(entry["hero"])
+            first, second = entry["first"], entry["second"]
+            second_slot = hero.id in state.pending_inputs
+            if first is None:
+                kind = "FINISH_PLANNING" if second_slot else "PASS"
+                moves.append(DecisionMove(kind, hero.id))
+                continue
+            moves.append(DecisionMove("CARD", hero.id, first))
+            if second is not None:
+                moves.append(DecisionMove("CARD", hero.id, second))
+            elif not second_slot and len(hero.hand) > 1 and hero_can_play_two_cards(hero):
+                moves.append(DecisionMove("FINISH_PLANNING", hero.id))
+        assert check_sequences(state, [moves]).results[0].legal is True, row
+        return moves
+
+    return replay
+
+
 def verify_rust_match_replay(
     worker, map_id, root, turns, *, require_game_over=False, sweep_policy=None, seed=39,
     decision_ms=1_000,
 ):
-    from automata.runtime.legality import DecisionMove, check_moves, check_sequences
-    from goa2.engine.phases import hero_can_play_two_cards
-
     envelope, _ = export_state_with_shared_objects(root)
     baseline = dict(depth=0, max_nodes=4096, time_ms=decision_ms)
     candidate = dict(baseline, depth=1, rollout_turns=2, evaluation="lab_attack_range_v1")
@@ -221,45 +264,7 @@ def verify_rust_match_replay(
             policies=policies, capture_trace=True,
         )
 
-        def replay(state, prompt, revision):
-            row = result["trace"][revision]
-            if prompt is not None:
-                assert row["kind"] == "resolution"
-                move = DecisionMove("INPUT", row["hero"], row["selection"], prompt.id)
-                verdict = check_moves(state, [move]).results[0]
-                assert verdict.legal is True, (
-                    map_id, revision, state.round, state.turn, row,
-                    prompt.model_dump(mode="json"), verdict,
-                )
-                return move
-
-            assert row["kind"] == "planning"
-            eligible = {
-                hero.id for team in state.teams.values() for hero in team.heroes
-                if hero.id not in state.pending_inputs
-                or planning_open_for_second_card(state, hero.id)
-            }
-            commitments = row["commitments"]
-            assert len(commitments) == len(eligible) and {
-                entry["hero"] for entry in commitments
-            } == eligible, (map_id, revision, state.round, state.turn, row, eligible)
-            moves = []
-            for entry in commitments:
-                hero = state.get_hero(entry["hero"])
-                first, second = entry["first"], entry["second"]
-                second_slot = hero.id in state.pending_inputs
-                if first is None:
-                    kind = "FINISH_PLANNING" if second_slot else "PASS"
-                    moves.append(DecisionMove(kind, hero.id))
-                    continue
-                moves.append(DecisionMove("CARD", hero.id, first))
-                if second is not None:
-                    moves.append(DecisionMove("CARD", hero.id, second))
-                elif not second_slot and len(hero.hand) > 1 and hero_can_play_two_cards(hero):
-                    moves.append(DecisionMove("FINISH_PLANNING", hero.id))
-            assert check_sequences(state, [moves]).results[0].legal is True, row
-            return moves
-
+        replay = trace_policy(map_id, result["trace"])
         final, count = run(root, turns, policy=replay)
         assert count == len(result["trace"])
         expected = normalized_state(final.model_dump(mode="json"))
@@ -287,6 +292,160 @@ def verify_rust_match_replay(
             reasons = stats.get("resolution_fallbacks", {})
             for reason, frequency in sorted(reasons.items(), key=lambda row: (-row[1], row[0]))[:3]:
                 print(f"    {frequency} × {reason}")
+
+
+def verify_greedy_search(worker, map_id, root, decision_ms, *, comparison="cards"):
+    envelope, _ = export_state_with_shared_objects(root)
+    team = next(iter(root.teams.values()))
+    target_reuses = 0
+    for controlled in ([team.heroes[0].id], [hero.id for hero in team.heroes]):
+        for baseline in (True, False):
+            started = perf_counter()
+            result = worker.request(
+                "search_greedy", envelope=envelope, player_id=controlled[0],
+                controlled_ids=controlled, turns=2, seed=17, max_nodes=4096,
+                time_ms=decision_ms, fixed_card_order=baseline and comparison == "cards",
+                positional_ordering=not (baseline and comparison == "position"),
+                position_first=comparison == "routes" and not baseline,
+                tactical_replies=comparison == "tactics" and not baseline,
+                timeout=decision_ms / 1_000 + 5,
+            )
+            elapsed = (perf_counter() - started) * 1_000
+            target_reuses += result["tactical_target_reuses"]
+            replay = result["replay"]
+            assert replay and result["completed_sequences"] > 0, (map_id, controlled, result)
+            final, count = run(root, 2, policy=trace_policy(map_id, replay["trace"]))
+            assert count == len(replay["trace"])
+            expected = normalized_state(final.model_dump(mode="json"))
+            actual = normalized_state(replay["state"])
+            assert expected == actual, describe_state_difference(expected, actual)
+            if comparison == "tactics":
+                label = "hold" if baseline else "tactical"
+            elif comparison == "routes":
+                label = "card first" if baseline else "position first"
+            elif comparison == "position":
+                label = "unordered" if baseline else "position ordered"
+            else:
+                label = "fixed" if baseline else "search"
+            print(f"{map_id} {len(controlled)} controlled {label}: Python validated {count} steps, "
+                  f"score {result['score']}, {result['completed_sequences']} completed sequences, "
+                  f"{result['nodes']} nodes, {result['position_routes']} routes, "
+                  f"{result['position_groups']} groups, {result['tactical_probes']} tactical probes, "
+                  f"{result['tactical_target_reuses']} target reuses, "
+                  f"{result['resumed_position_routes']} route resumes, "
+                  f"{elapsed:.1f} ms")
+    return target_reuses
+
+
+def verify_close_contact_tactics(worker, opening, decision_ms):
+    from goa2.domain.models.enums import ActionType
+
+    root = deepcopy(opening)
+    friendly, enemy = list(root.teams.values())
+    target = friendly.heroes[0]
+    attacker = enemy.heroes[0]
+    start = root.get_position(target.id)
+    adjacent = next(
+        hex for hex in root.board.get_neighbors(start)
+        if not root.board.tiles[hex].occupant_id and not root.board.tiles[hex].is_terrain
+    )
+    root.move_unit(attacker.id, adjacent)
+    attack = max(
+        (card for card in attacker.hand if card.primary_action == ActionType.ATTACK
+         or ActionType.ATTACK in card.secondary_actions),
+        key=lambda card: card.initiative,
+    )
+    for team in root.teams.values():
+        for hero in team.heroes:
+            card = attack if hero.id == attacker.id else min(hero.hand, key=lambda card: card.initiative)
+            commit_card(root, hero.id, card)
+    reuses = verify_greedy_search(
+        worker, "forgotten_island_close_contact", root, decision_ms, comparison="tactics",
+    )
+    assert reuses > 0, "close-contact search never reused a verified tactical target"
+
+
+def verify_greedy_upgrade_search(worker, map_id, opening, decision_ms, *, profile=False):
+    root, _ = run(opening, 3)
+    hero = next(iter(root.teams.values())).heroes[0]
+    hero.gold += 3
+    envelope, _ = export_state_with_shared_objects(root)
+    for defer, positions, turns in ((False, False, 2), (True, False, 2), (True, True, 2), (True, True, 3)):
+        started = perf_counter()
+        result = worker.request(
+            "search_greedy", envelope=envelope, player_id=hero.id, turns=turns,
+            seed=17, max_nodes=16384 if turns == 3 else 4096, time_ms=decision_ms, defer_upgrades=defer, position_first=positions, profile=profile,
+            timeout=decision_ms / 1_000 + 5,
+        )
+        elapsed = (perf_counter() - started) * 1_000
+        replay = result["replay"]
+        assert replay and result["completed_sequences"] > 0, (map_id, defer, result)
+        assert any(isinstance(row.get("selection"), dict)
+                   and row["selection"].get("hero_id") == hero.id
+                   and "card_id" in row["selection"] for row in replay["trace"]), replay["trace"]
+        final, count = run(root, turns, policy=trace_policy(map_id, replay["trace"]))
+        assert count == len(replay["trace"])
+        expected = normalized_state(final.model_dump(mode="json"))
+        actual = normalized_state(replay["state"])
+        assert expected == actual, describe_state_difference(expected, actual)
+        if positions:
+            assert result["upgraded_position_groups"] > 0, (map_id, result)
+            assert result["shared_card_moves"] > 0, (map_id, result)
+            assert result["shared_upgrade_decisions"] > 0, (map_id, result)
+        if turns == 3:
+            assert result["shared_upgrade_commitments"] > 0, (map_id, result)
+        label = "position-first" if positions else "deferred" if defer else "eager"
+        print(f"{map_id} {label} upgrades: Python validated {count} steps, "
+              f"score {result['score']}, {result['completed_sequences']} completed sequences, "
+              f"{result['nodes']} nodes, {result['upgraded_position_groups']} upgraded groups, "
+              f"{result['upgrade_discovery_steps']} discovery steps, "
+              f"{result['shared_upgrade_decisions']} shared decisions, "
+              f"{result['shared_upgrade_commitments']} shared commitments, "
+              f"{result['shared_card_moves']} cross-card moves, {elapsed:.1f} ms")
+        if profile:
+            stats = result["profile"]
+            assert stats["search_ns"] > 0 and stats["first_plan_ns"] is not None
+            print(f"{map_id} {label} {turns} turns profile {json.dumps(stats, sort_keys=True)}")
+
+
+
+def verify_greedy_movement_cache(worker, map_id, opening, decision_ms):
+    root, _ = run(opening, 3)
+    hero = next(iter(root.teams.values())).heroes[0]
+    hero.gold += 3
+    envelope, _ = export_state_with_shared_objects(root)
+    baseline = None
+    for reuse in (False, True):
+        times = []
+        for _ in range(5):
+            started = perf_counter()
+            result = worker.request(
+                "search_greedy", envelope=envelope, player_id=hero.id, turns=2,
+                seed=17, max_nodes=4096, time_ms=decision_ms,
+                position_first=True, reuse_movement=reuse,
+                timeout=decision_ms / 1_000 + 5,
+            )
+            times.append((perf_counter() - started) * 1_000)
+            comparable = {key: value for key, value in result.items()
+                          if key not in {"movement_cache_hits", "movement_cache_misses",
+                                         "travel_cache_hits", "travel_cache_misses"}}
+            if baseline is None:
+                baseline = comparable
+            assert comparable == baseline, (map_id, reuse, result["nodes"], result["score"])
+        replay = result["replay"]
+        assert replay
+        final, count = run(root, 2, policy=trace_policy(map_id, replay["trace"]))
+        assert count == len(replay["trace"])
+        expected = normalized_state(final.model_dump(mode="json"))
+        actual = normalized_state(replay["state"])
+        assert expected == actual, describe_state_difference(expected, actual)
+        if reuse:
+            assert result["movement_cache_hits"] > 0, map_id
+        print(f"{map_id} movement reuse={reuse}: {median(times):.1f} ms median, "
+              f"{result['movement_cache_hits']} hits, {result['movement_cache_misses']} misses, "
+              f"{result['travel_cache_hits']} travel hits, "
+              f"{result['travel_cache_misses']} travel misses, "
+              f"Python validated {count} steps")
 
 
 def verify_terminal_matches(worker):
@@ -864,8 +1023,22 @@ def main():
                         default="first-legal", help="Rust policy used by both teams in the sweep")
     mode.add_argument("--recorded-rollouts", action="store_true",
                       help="Validate and benchmark sampled rollouts from recorded game positions")
+    mode.add_argument("--greedy-tactics", action="store_true",
+                      help="Compare the greedy Hold policy with tactical enemy replies")
+    mode.add_argument("--greedy-routes", action="store_true",
+                      help="Compare position-first and card-first greedy search")
+    mode.add_argument("--greedy-position", action="store_true",
+                      help="Compare greedy search with and without positional ordering")
+    mode.add_argument("--greedy-movement-cache", action="store_true",
+                      help="Compare movement traversal reuse against the uncached search")
+    mode.add_argument("--greedy-upgrades", action="store_true",
+                      help="Compare eager and deferred greedy upgrades across a round boundary")
+    mode.add_argument("--greedy-search", action="store_true",
+                      help="Replay and benchmark greedy plans against a fixed card order")
     mode.add_argument("--sampled-resolution", action="store_true",
                       help="Validate sampled resolution choices and two-turn scores")
+    parser.add_argument("--profile-greedy", action="store_true",
+                        help="Report worker phase timings for the greedy upgrade benchmark")
     parser.add_argument("--prepare-search", action="store_true",
                         help="Initialize immutable Rust rule programs before timing decisions")
     parser.add_argument("--resolution-transport-reserve-ms", type=int, default=0,
@@ -909,8 +1082,8 @@ def main():
         parser.error("--decision-ms must be in 1..60000")
     if args.sample_future_planning and not args.native_turns:
         parser.error("--sample-future-planning requires --native-turns")
-    if args.prepare_search and not args.sampled_resolution:
-        parser.error("--prepare-search requires --sampled-resolution")
+    if args.prepare_search and not (args.sampled_resolution or args.greedy_movement_cache or args.greedy_upgrades or args.greedy_routes or args.greedy_position or args.greedy_tactics or args.greedy_search):
+        parser.error("--prepare-search requires a sampled-resolution or greedy search mode")
     if args.verify_resolution_deadline and not args.sampled_resolution:
         parser.error("--verify-resolution-deadline requires --sampled-resolution")
     if not 0 <= args.resolution_transport_reserve_ms < args.decision_ms:
@@ -970,6 +1143,24 @@ def main():
                 roster[2:],
                 seed=args.game_seed,
             )
+            if args.greedy_movement_cache:
+                verify_greedy_movement_cache(worker, map_id, opening, args.decision_ms)
+                continue
+            if args.greedy_upgrades:
+                verify_greedy_upgrade_search(
+                    worker, map_id, opening, args.decision_ms, profile=args.profile_greedy,
+                )
+                continue
+            if args.greedy_search or args.greedy_position or args.greedy_routes or args.greedy_tactics:
+                verify_greedy_search(
+                    worker, map_id, opening, args.decision_ms,
+                    comparison="tactics" if args.greedy_tactics else
+                    "routes" if args.greedy_routes else
+                    "position" if args.greedy_position else "cards",
+                )
+                if args.greedy_tactics and map_id == "forgotten_island":
+                    verify_close_contact_tactics(worker, opening, args.decision_ms)
+                continue
             if args.sampled_resolution:
                 verify_sampled_resolution(
                     worker, path, opening, args.decision_ms, args.sample_count, args.sample_workers,

@@ -5,7 +5,7 @@ use crate::{
     stats::Stat,
     world::{ActionKind, NativeWorld},
 };
-#[derive(Clone, Copy, Debug, Hash)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq)]
 pub struct ActionOption {
     pub kind: ActionKind,
     pub value: i64,
@@ -13,7 +13,7 @@ pub struct ActionOption {
     pub primary_label: bool,
     pub primary_effect: bool,
 }
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug, Hash, PartialEq)]
 pub struct ActionMenu {
     pub hero: Symbol,
     pub card: Symbol,

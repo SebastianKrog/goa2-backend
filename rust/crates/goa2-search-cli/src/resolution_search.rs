@@ -77,7 +77,7 @@ pub(super) fn time_budget(
     })
 }
 
-fn compile_with_budget(
+pub(super) fn compile_with_budget(
     envelope: StateEnvelope,
     budget: &ExecutionBudget<'_>,
 ) -> Result<NativeSession, String> {

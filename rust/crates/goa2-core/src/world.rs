@@ -264,6 +264,7 @@ impl<T: Clone> RowUndo<T> {
 #[derive(Clone, Debug, Default)]
 pub(crate) struct HeroRows {
     rows: Vec<HeroRecord>,
+    pub(crate) card_sync_stamps: Vec<Option<[crate::objects::ObjectPageStamp; 6]>>,
     undo: RowUndo<HeroRecord>,
     fingerprint: RowFingerprint,
 }
@@ -278,6 +279,7 @@ impl std::ops::Deref for HeroRows {
 
 impl std::ops::IndexMut<usize> for HeroRows {
     fn index_mut(&mut self, index: usize) -> &mut HeroRecord {
+        self.card_sync_stamps[index] = None;
         self.fingerprint.mark(index);
         self.undo.record(index, &self.rows[index]);
         &mut self.rows[index]
@@ -779,6 +781,7 @@ impl NativeWorld {
             battle_zones,
             waves,
             heroes: HeroRows {
+                card_sync_stamps: vec![None; heroes.len()],
                 rows: heroes,
                 undo: RowUndo::default(),
                 fingerprint: RowFingerprint::default(),
@@ -863,7 +866,8 @@ impl NativeWorld {
         self.heroes
             .undo
             .rollback(checkpoint.heroes, &mut self.heroes.rows, |index| {
-                self.heroes.fingerprint.mark(index)
+                self.heroes.card_sync_stamps[index] = None;
+                self.heroes.fingerprint.mark(index);
             });
         self.restore_spatial(checkpoint.spatial_start);
         self.spatial_fingerprint = checkpoint.spatial_fingerprint;
@@ -1159,6 +1163,10 @@ impl NativeWorld {
     pub(crate) fn neighbor_indices(&self, index: usize) -> [Option<usize>; 6] {
         self.definitions.geometry.neighbor_indices(index)
     }
+    pub(crate) fn movement_occupancy(&self) -> &Occupancy {
+        &self.occupancy
+    }
+
     pub(crate) fn obstacle_at(&self, index: usize) -> bool {
         self.definitions
             .geometry

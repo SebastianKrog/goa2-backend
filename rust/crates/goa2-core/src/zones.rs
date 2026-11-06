@@ -221,18 +221,21 @@ impl NativeWorld {
         if start_zone == self.definitions.zones.empty {
             return Ok(reject());
         }
-        let safe = self.safe_travel_zones(team, start_zone);
-        candidates
-            .iter()
-            .map(|hex| {
-                Ok(self
-                    .zone_at(*hex)
-                    .is_some_and(|z| safe.contains(&z) && (!change || z != start_zone))
-                    && self.effect_connected(from, *hex, &[unit])?
-                    && !self.obstacle_for_actor(*hex, Some(unit))?
-                    && self.on_map(*hex)
-                    && self.occupant(*hex).is_none())
-            })
-            .collect()
+        // Card-specific action legality is checked above on every witness.
+        self.reuse_fast_travel_mask(team, start_zone, change, candidates, || {
+            let safe = self.safe_travel_zones(team, start_zone);
+            candidates
+                .iter()
+                .map(|hex| {
+                    Ok(self
+                        .zone_at(*hex)
+                        .is_some_and(|z| safe.contains(&z) && (!change || z != start_zone))
+                        && self.effect_connected(from, *hex, &[unit])?
+                        && !self.obstacle_for_actor(*hex, Some(unit))?
+                        && self.on_map(*hex)
+                        && self.occupant(*hex).is_none())
+                })
+                .collect()
+        })
     }
 }

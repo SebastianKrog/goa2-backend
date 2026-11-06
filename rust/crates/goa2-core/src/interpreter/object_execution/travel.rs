@@ -304,6 +304,36 @@ mod tests {
         assert_eq!(worker.next_step, u64::MAX);
     }
     #[test]
+    fn search_reuses_fast_travel_mask_and_rechecks_a_changed_board() {
+        let root = session("edge-literal-hex");
+        let unit = root.symbols.lookup("hero_arien").unwrap();
+        let mut world = root.world.clone();
+        let candidates = world.tile_hexes().to_vec();
+        let scan = |world: &crate::world::NativeWorld| {
+            world.fast_travel_destinations_with_card(Some(unit), false, &candidates, None)
+                .unwrap()
+        };
+        let expected = scan(&world);
+        let destination = candidates.iter().copied().zip(&expected)
+            .find_map(|(hex, &legal)| legal.then_some(hex)).unwrap();
+        let mut changed = world.clone();
+        changed.move_entity(unit, destination).unwrap();
+        let expected_changed = scan(&changed);
+        assert_ne!(expected, expected_changed);
+        let (_, reuse) = crate::terrain::with_search_traversals(world.definitions.clone(), || {
+            assert_eq!(scan(&world), expected);
+            assert_eq!(world.fast_travel_destinations_with_card(
+                Some(unit), false, &[destination], None,
+            ).unwrap(), vec![true]);
+            world.move_entity(unit, destination).unwrap();
+            assert_eq!(scan(&world), expected_changed);
+            assert_eq!(scan(&world), expected_changed);
+        });
+        assert_eq!(reuse.travel_misses, 2);
+        assert_eq!(reuse.travel_hits, 2);
+    }
+
+    #[test]
     fn travel_cannot_cross_an_enemy_static_barrier() {
         let case = fixture_case("object-execution-arena-travel-edge-barrier");
         let mut envelope: StateEnvelope = serde_json::from_value(case["envelope"].clone()).unwrap();

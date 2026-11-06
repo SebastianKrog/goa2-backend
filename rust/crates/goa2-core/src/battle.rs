@@ -300,15 +300,22 @@ impl BattleRules {
         }?;
         Ok((result, writes))
     }
-    fn check(
+    fn check_triggers(
         &self,
-        world: &mut NativeWorld,
+        world: &NativeWorld,
+        zones: &[(Symbol, Symbol)],
         lane: Option<Symbol>,
-        writes: &mut Vec<BattleMutation>,
-    ) -> Result<Resolution> {
+    ) -> Vec<(Symbol, Symbol)> {
         let mut triggered = Vec::new();
-        for lane in Self::lanes(world, lane) {
-            let Some(zid) = Self::zone(world, lane) else {
+        let lanes = lane.into_iter().chain(
+            zones.iter().map(|(lane, _)| *lane).filter(|_| lane.is_none()),
+        );
+        for lane in lanes {
+            let Some(zid) = zones
+                .iter()
+                .find_map(|(id, zone)| (*id == lane).then_some(*zone))
+                .filter(|zone| *zone != world.definitions.zones.empty)
+            else {
                 continue;
             };
             let Some(zone) = world.definitions.zones.zones.iter().find(|z| z.id == zid) else {
@@ -342,11 +349,18 @@ impl BattleRules {
             };
             triggered.push((lane, loser));
         }
+        triggered
+    }
+
+    fn check_without_writes(
+        world: &NativeWorld,
+        triggered: &[(Symbol, Symbol)],
+    ) -> Option<Resolution> {
         if world.definitions.zones.lanes.len() <= 1 {
-            return Ok(Resolution::Done(
+            return Some(Resolution::Done(
                 triggered
-                    .into_iter()
-                    .map(|(lane, loser)| {
+                    .iter()
+                    .map(|&(lane, loser)| {
                         BattleOp::Step(BattleStep::Push(PushSpec {
                             lane,
                             loser,
@@ -357,9 +371,47 @@ impl BattleRules {
                     .collect(),
             ));
         }
-        if triggered.is_empty() {
-            return Ok(Resolution::Done(vec![]));
+        triggered.is_empty().then(|| Resolution::Done(vec![]))
+    }
+
+    fn check(
+        &self,
+        world: &mut NativeWorld,
+        lane: Option<Symbol>,
+        writes: &mut Vec<BattleMutation>,
+    ) -> Result<Resolution> {
+        let triggered = self.check_triggers(world, &world.battle_zones, lane);
+        if let Some(result) = Self::check_without_writes(world, &triggered) {
+            return Ok(result);
         }
+        self.check_triggered(world, triggered, writes)
+    }
+
+    pub(crate) fn preview_check(
+        &self,
+        world: &NativeWorld,
+        zones: &[(Symbol, Symbol)],
+        waves: &[(Symbol, i64)],
+        lane: Option<Symbol>,
+    ) -> Result<(Resolution, Vec<BattleMutation>)> {
+        let triggered = self.check_triggers(world, zones, lane);
+        if let Some(result) = Self::check_without_writes(world, &triggered) {
+            return Ok((result, Vec::new()));
+        }
+        let mut preview = world.clone();
+        preview.battle_zones = zones.to_vec();
+        preview.waves = waves.to_vec();
+        let mut writes = Vec::new();
+        let result = self.check_triggered(&mut preview, triggered, &mut writes)?;
+        Ok((result, writes))
+    }
+
+    fn check_triggered(
+        &self,
+        world: &mut NativeWorld,
+        triggered: Vec<(Symbol, Symbol)>,
+        writes: &mut Vec<BattleMutation>,
+    ) -> Result<Resolution> {
         let outcomes = triggered
             .into_iter()
             .map(|(l, t)| {

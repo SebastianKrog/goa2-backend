@@ -7,6 +7,72 @@ use crate::{
 };
 use std::collections::VecDeque;
 
+#[derive(Hash, PartialEq, Eq)]
+struct TraversalKey {
+    start: Hex,
+    range: i32,
+    through: bool,
+    occupancy: Option<crate::geometry::Occupancy>,
+    passable: Vec<usize>,
+}
+
+#[derive(Hash, PartialEq, Eq)]
+struct TravelKey {
+    team: Symbol,
+    start_zone: Symbol,
+    change: bool,
+    occupancy: crate::geometry::Occupancy,
+    blockers: Vec<Hex>,
+}
+
+#[derive(Default)]
+pub(crate) struct SearchReuse {
+    pub movement_hits: usize,
+    pub movement_misses: usize,
+    pub travel_hits: usize,
+    pub travel_misses: usize,
+}
+
+type Traversal = (Vec<bool>, Vec<bool>);
+
+struct TraversalCache {
+    // Keep the immutable geometry alive and restrict reuse to this search.
+    definitions: std::sync::Arc<crate::world::WorldDefinitions>,
+    values: std::collections::HashMap<TraversalKey, Traversal>,
+    travel: std::collections::HashMap<TravelKey, Vec<bool>>,
+    reuse: SearchReuse,
+}
+
+thread_local! {
+    static SEARCH_TRAVERSALS: std::cell::RefCell<Option<TraversalCache>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+pub(crate) fn with_search_traversals<T>(
+    definitions: std::sync::Arc<crate::world::WorldDefinitions>,
+    operation: impl FnOnce() -> T,
+) -> (T, SearchReuse) {
+    struct Restore(Option<TraversalCache>);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            SEARCH_TRAVERSALS.with(|cache| cache.replace(self.0.take()));
+        }
+    }
+    let previous = SEARCH_TRAVERSALS.with(|cache| {
+        cache.replace(Some(TraversalCache {
+            definitions,
+            values: Default::default(),
+            travel: Default::default(),
+            reuse: SearchReuse::default(),
+        }))
+    });
+    let _restore = Restore(previous);
+    let result = operation();
+    let reuse = SEARCH_TRAVERSALS
+        .with(|cache| std::mem::take(&mut cache.borrow_mut().as_mut().unwrap().reuse));
+    (result, reuse)
+}
+
 impl NativeWorld {
     /// `actor` is already resolved by the caller (including current-actor fallback).
     pub fn obstacle_for_actor(&self, hex: Hex, actor: Option<Symbol>) -> Result<bool, String> {
@@ -203,7 +269,118 @@ impl NativeWorld {
             })
             .collect()
     }
+    fn can_reuse_spatial(&self, cache: &TraversalCache) -> bool {
+        std::sync::Arc::ptr_eq(&cache.definitions, &self.definitions)
+            && !self.effects.instances.iter().any(|effect| {
+                matches!(
+                    effect.definition.behavior.kind,
+                    Kind::Split | Kind::Isolation | Kind::EmptyHexObstacle | Kind::StaticBarrier
+                )
+            })
+    }
+
+    pub(crate) fn reuse_fast_travel_mask(
+        &self,
+        team: Symbol,
+        start_zone: Symbol,
+        change: bool,
+        candidates: &[Hex],
+        compute: impl FnOnce() -> Result<Vec<bool>, String>,
+    ) -> Result<Vec<bool>, String> {
+        SEARCH_TRAVERSALS.with(|slot| {
+            let mut slot = slot.borrow_mut();
+            let Some(cache) = slot.as_mut().filter(|cache| self.can_reuse_spatial(cache)) else {
+                return compute();
+            };
+            let mut blockers: Vec<_> = self
+                .locations
+                .iter()
+                .filter_map(|(id, hex)| {
+                    self.entity(*id)
+                        .is_some_and(|entity| entity.has_team && entity.team != Some(team))
+                        .then_some(*hex)
+                })
+                .collect();
+            blockers.sort_unstable_by_key(|hex| hex.coordinates());
+            blockers.dedup();
+            let key = TravelKey {
+                team,
+                start_zone,
+                change,
+                occupancy: self.movement_occupancy().clone(),
+                blockers,
+            };
+            if let Some(mask) = cache.travel.get(&key) {
+                cache.reuse.travel_hits += 1;
+                return Ok(candidates
+                    .iter()
+                    .map(|&hex| self.tile_index(hex).is_some_and(|index| mask[index]))
+                    .collect());
+            }
+            let mask = compute()?;
+            // A cold execution check for one hex stays a one-hex query.
+            if candidates == self.tile_hexes() {
+                cache.reuse.travel_misses += 1;
+                if cache.travel.len() == 64 {
+                    cache.travel.clear();
+                }
+                cache.travel.insert(key, mask.clone());
+            }
+            Ok(mask)
+        })
+    }
+
     fn movement_traversal(
+        &self,
+        start: Hex,
+        range: i32,
+        through: bool,
+        actor: Option<Symbol>,
+        units: Option<&[Symbol]>,
+        moved: &[Symbol],
+    ) -> Result<Traversal, String> {
+        SEARCH_TRAVERSALS.with(|slot| {
+            let mut slot = slot.borrow_mut();
+            let cache = slot.as_mut().filter(|cache| self.can_reuse_spatial(cache));
+            let Some(cache) = cache else {
+                return self.compute_movement_traversal(start, range, through, actor, units, moved);
+            };
+            let mut passable = if through {
+                Vec::new()
+            } else {
+                self.locations
+                    .iter()
+                    .filter_map(|&(_, hex)| {
+                        self.passable_token(hex, moved)
+                            .then(|| self.tile_index(hex))
+                            .flatten()
+                    })
+                    .collect::<Vec<_>>()
+            };
+            passable.sort_unstable();
+            let key = TraversalKey {
+                start,
+                range,
+                through,
+                occupancy: (!through).then(|| self.movement_occupancy().clone()),
+                passable,
+            };
+            if let Some(traversal) = cache.values.get(&key) {
+                cache.reuse.movement_hits += 1;
+                return Ok(traversal.clone());
+            }
+            cache.reuse.movement_misses += 1;
+            let traversal =
+                self.compute_movement_traversal(start, range, through, actor, units, moved)?;
+            if cache.values.len() == 128 {
+                cache.values.clear();
+            }
+            cache.values.insert(key, traversal.clone());
+            Ok(traversal)
+        })
+    }
+
+    fn compute_movement_traversal(
         &self,
         start: Hex,
         range: i32,

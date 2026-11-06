@@ -5,6 +5,33 @@ use super::*;
 use crate::cards::CardId;
 use std::collections::BTreeMap;
 
+#[derive(Clone, Copy, Default, Debug, serde::Serialize)]
+pub(crate) struct CardSyncProfile {
+    calls: usize,
+    lists: usize,
+    changed_lists: usize,
+    skipped_heroes: usize,
+    changed_heroes: usize,
+}
+
+thread_local! {
+    static CARD_SYNC_PROFILE: std::cell::Cell<Option<CardSyncProfile>> = const {
+        std::cell::Cell::new(None)
+    };
+}
+
+pub(super) fn with_card_sync_profile<T>(run: impl FnOnce() -> T) -> (T, CardSyncProfile) {
+    struct Restore(Option<CardSyncProfile>);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            CARD_SYNC_PROFILE.set(self.0);
+        }
+    }
+    let _restore = Restore(CARD_SYNC_PROFILE.replace(Some(CardSyncProfile::default())));
+    let result = run();
+    (result, CARD_SYNC_PROFILE.get().unwrap())
+}
+
 struct PlanningHandSample {
     hero: Symbol,
     hand: super::super::SampledHand,
@@ -741,11 +768,49 @@ impl NativeSession {
     // Inspect live handles even when lists share identities across heroes and
     // roles. Unchanged contents can reuse the typed projection.
     pub(super) fn sync_card_collections_bound(&mut self, objects: &BoundObjects) -> Result<()> {
+        let mut profile = CARD_SYNC_PROFILE.get();
+        let mut compared = 0;
         for &(hero, model) in &objects.phases.heroes {
             let index = self
                 .world
                 .hero_index(hero)
                 .ok_or_else(|| unsupported("planning hero cache missing"))?;
+            // The model page covers rebinding and scalar slots. List pages
+            // cover edits through every alias, even across different heroes.
+            if self.world.heroes.card_sync_stamps[index].is_some_and(|stamps| {
+                stamps
+                    .into_iter()
+                    .all(|stamp| objects.arena.matches_page_stamp(stamp))
+            }) {
+                if let Some(profile) = &mut profile {
+                    profile.skipped_heroes += 1;
+                }
+                continue;
+            }
+            compared += 1;
+            let fields = [
+                Field::Deck,
+                Field::Hand,
+                Field::Discard,
+                Field::Spells,
+                Field::Played,
+            ];
+            let model_stamp = objects
+                .arena
+                .page_stamp(model)
+                .ok_or_else(|| unsupported("planning hero model missing"))?;
+            let mut stamps = [model_stamp; 6];
+            for (field, stamp) in fields.into_iter().zip(&mut stamps[1..]) {
+                let Some(ObjectValue::Object(list)) =
+                    objects.arena.field_ref(model, objects.phases.k(field))
+                else {
+                    return Err(unsupported("planning card collection missing"));
+                };
+                *stamp = objects
+                    .arena
+                    .page_stamp(*list)
+                    .ok_or_else(|| unsupported("planning cards must be a list"))?;
+            }
             let row = &self.world.heroes[index];
             let update = |field, old: &[CardId]| -> Result<Option<Vec<CardId>>> {
                 let values = self.hero_card_values_bound(objects, model, field)?;
@@ -793,6 +858,19 @@ impl NativeSession {
                 || extra != row.extra
                 || ultimate != row.ultimate
             {
+                if let Some(profile) = &mut profile {
+                    profile.changed_heroes += 1;
+                    profile.changed_lists += [
+                        deck.is_some(),
+                        hand.is_some(),
+                        discard.is_some(),
+                        spells.is_some(),
+                        played.is_some(),
+                    ]
+                    .into_iter()
+                    .filter(|changed| *changed)
+                    .count();
+                }
                 let row = &mut self.world.heroes[index];
                 if let Some(deck) = deck {
                     row.deck = deck;
@@ -813,8 +891,14 @@ impl NativeSession {
                 row.extra = extra;
                 row.ultimate = ultimate;
             }
+            self.world.heroes.card_sync_stamps[index] = Some(stamps);
         }
         self.world.refresh_card_auras();
+        if let Some(mut profile) = profile {
+            profile.calls += 1;
+            profile.lists += 5 * compared;
+            CARD_SYNC_PROFILE.set(Some(profile));
+        }
         Ok(())
     }
     fn planning_hand_bound(&self, objects: &BoundObjects, model: ObjectId) -> Result<ObjectId> {
@@ -1536,6 +1620,23 @@ mod tests {
             .unwrap();
             let before = serde_json::to_value(root.export_envelope().unwrap()).unwrap();
             let mut worker = root.clone();
+            worker
+                .with_live_objects(|session, objects| {
+                    session.sync_card_collections_bound(objects)?;
+                    let (result, profile) =
+                        with_card_sync_profile(|| session.sync_card_collections_bound(objects));
+                    result?;
+                    assert_eq!(profile.skipped_heroes, session.world.heroes.len());
+
+                    // A typed-only change must be repaired even if every
+                    // arena page still has the same stamp.
+                    let hand = session.world.heroes[0].hand.clone();
+                    session.world.heroes[0].hand.clear();
+                    session.sync_card_collections_bound(objects)?;
+                    assert_eq!(session.world.heroes[0].hand, hand);
+                    Ok(())
+                })
+                .unwrap();
             for operation in fixture["operations"].as_array().unwrap() {
                 let Datum::Text(hero) = worker.import_selection(&operation["hero"]).unwrap() else {
                     unreachable!()

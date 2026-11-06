@@ -95,6 +95,28 @@ enum Operation {
         envelope: StateEnvelope,
         player_id: String,
     },
+    SearchGreedy {
+        envelope: StateEnvelope,
+        player_id: String,
+        controlled_ids: Option<Vec<String>>,
+        turns: u8,
+        max_nodes: usize,
+        seed: u64,
+        time_ms: u64,
+        #[serde(default)]
+        fixed_card_order: bool,
+        defer_upgrades: Option<bool>,
+        positional_ordering: Option<bool>,
+        #[serde(default)]
+        position_first: bool,
+        #[serde(default)]
+        tactical_replies: bool,
+        reuse_movement: Option<bool>,
+        #[serde(default)]
+        profile: bool,
+        #[serde(default)]
+        evaluation: goa2_core::interpreter::SearchEvaluation,
+    },
     SearchResolution {
         envelope: StateEnvelope,
         player_id: String,
@@ -261,6 +283,47 @@ fn execute(
                 .evaluate_lab_attack_range(player)
                 .map_err(|error| error.to_string())?;
             Ok(json!({"recipe_id": "lab-attack-range-v1", "value": value}))
+        }
+        Operation::SearchGreedy {
+            envelope, player_id, controlled_ids, turns, max_nodes, seed, time_ms,
+            fixed_card_order, defer_upgrades, positional_ordering, position_first, tactical_replies, reuse_movement, profile, evaluation,
+        } => {
+            let budget = resolution_search::time_budget(started, time_ms)?;
+            let mut session = resolution_search::compile_with_budget(envelope, &budget)?;
+            let player = sequence_legality::player(&mut session, player_id)?;
+            let controlled = match controlled_ids {
+                Some(ids) => ids.into_iter().map(|id| sequence_legality::player(&mut session, id))
+                    .collect::<Result<Vec<_>, _>>()?,
+                None => vec![player],
+            };
+            let options = goa2_core::interpreter::GreedySearchOptions {
+                controlled: &controlled, turns, max_nodes, seed, evaluation, fixed_card_order,
+                defer_upgrades: defer_upgrades.unwrap_or(true),
+                positional_ordering: positional_ordering.unwrap_or(true),
+                position_first, tactical_replies, reuse_movement: reuse_movement.unwrap_or(true), profile,
+            };
+            let result = session.search_greedy(player, options, &budget).map_err(|e| e.to_string())?;
+            let replay = result.best.as_ref().map(|plan| session.greedy_trace_json(plan))
+                .transpose().map_err(|e| e.to_string())?;
+            Ok(json!({
+                "score": result.best.map(|plan| plan.score), "replay": replay,
+                "nodes": result.nodes, "completed_sequences": result.completed_sequences,
+                "positional_probes": result.positional_probes,
+                "position_routes": result.position_routes, "position_groups": result.position_groups,
+                "upgraded_position_groups": result.upgraded_position_groups,
+                "upgrade_discovery_steps": result.upgrade_discovery_steps,
+                "shared_upgrade_decisions": result.shared_upgrade_decisions,
+                "shared_upgrade_commitments": result.shared_upgrade_commitments,
+                "shared_card_moves": result.shared_card_moves,
+                "movement_cache_hits": result.movement_cache_hits,
+                "movement_cache_misses": result.movement_cache_misses,
+                "travel_cache_hits": result.travel_cache_hits,
+                "travel_cache_misses": result.travel_cache_misses,
+                "profile": result.profile,
+                "resumed_position_routes": result.resumed_position_routes,
+                "tactical_probes": result.tactical_probes,
+                "tactical_target_reuses": result.tactical_target_reuses,
+            }))
         }
         Operation::SearchResolution {
             envelope,

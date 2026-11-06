@@ -29,12 +29,12 @@ pub struct GameOutcome {
     pub hero: Option<Symbol>,
     pub condition: Symbol,
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct TeamCounter {
     key: Symbol,
     life: i64,
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct CombatState {
     pub(crate) round: i64,
     pub(crate) turn: i64,

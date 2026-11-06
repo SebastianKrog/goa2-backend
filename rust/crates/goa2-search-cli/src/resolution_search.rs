@@ -103,26 +103,31 @@ pub(super) fn rollout(
     max_nodes: usize,
     budget: ExecutionBudget<'_>,
     capture_state: bool,
+    capture_sampled_root: bool,
     sample_seed: Option<u64>,
 ) -> Result<Value, String> {
     let mut session = compile_with_budget(envelope, &budget)?;
     let player = super::sequence_legality::player(&mut session, player_id)?;
     let run = |worker: &mut NativeSession| {
-        worker.rollout_game_turns_diagnostic(
+        let sampled_root = capture_sampled_root
+            .then(|| worker.semantic_state())
+            .transpose()?;
+        let leaf = worker.rollout_game_turns_diagnostic(
             player,
             turns,
             max_nodes,
             &budget,
             capture_state,
             false,
-        )
+        )?;
+        Ok((leaf, sampled_root))
     };
-    let result = match sample_seed {
+    let (result, sampled_root) = match sample_seed {
         Some(seed) => session.with_sampled_planning(player, seed, run),
         None => run(&mut session),
     }
     .map_err(|error| error.to_string())?;
-    Ok(match result {
+    let mut reply = match result {
         Some(leaf) => json!({
             "complete": true,
             "round": leaf.round,
@@ -133,7 +138,11 @@ pub(super) fn rollout(
             "state": leaf.state,
         }),
         None => json!({"complete": false}),
-    })
+    };
+    if let Some(root) = sampled_root {
+        reply["sampled_root"] = root;
+    }
+    Ok(reply)
 }
 
 #[derive(serde::Deserialize)]
@@ -198,6 +207,9 @@ pub(super) fn sampled_planning(
         return Ok(json!({
             "commitments": commitments,
             "requested_worlds": result.requested_worlds,
+            "total_rows": result.total_rows,
+            "probe_nodes": result.probe_nodes,
+            "screened_replies": result.screened_replies,
             "prepared_worlds": result.prepared_worlds,
             "score": result.matrix.score,
             "completed_rows": result.matrix.completed_rows,

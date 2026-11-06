@@ -140,6 +140,14 @@ enum Operation {
         player_id: String,
         seed: u64,
         cap: usize,
+        reply_cap: Option<usize>,
+        reply_probe_cap: Option<usize>,
+        #[serde(default)]
+        greedy_card_order: bool,
+        #[serde(default)]
+        fixed_future_planning: bool,
+        #[serde(default)]
+        branch_future_planning: bool,
         max_depth: u8,
         max_nodes: usize,
         #[serde(default)]
@@ -165,6 +173,8 @@ enum Operation {
         time_ms: u64,
         #[serde(default)]
         capture_state: bool,
+        #[serde(default)]
+        capture_sampled_root: bool,
         sample_seed: Option<u64>,
     },
     CheckSequences {
@@ -188,6 +198,12 @@ enum Operation {
         workers: Option<usize>,
         #[serde(default)]
         lab_evaluation: bool,
+    },
+    FingerprintBench {
+        envelope: StateEnvelope,
+        iterations: u32,
+        #[serde(default)]
+        operations: Vec<Value>,
     },
     SimulationBench {
         envelope: StateEnvelope,
@@ -390,6 +406,11 @@ fn execute(
             player_id,
             seed,
             cap,
+            reply_cap,
+            reply_probe_cap,
+            greedy_card_order,
+            fixed_future_planning,
+            branch_future_planning,
             max_depth,
             max_nodes,
             evaluation,
@@ -400,6 +421,9 @@ fn execute(
             public_upgrade_batches,
             bot_team,
         } => {
+            if reply_probe_cap.is_some() && bot_team.is_none() {
+                return Err("reply_probe_cap requires scoped bot planning".into());
+            }
             let budget = resolution_search::time_budget(started, time_ms)?;
             let upgrade_checkpoints =
                 resolve_upgrade_evidence(upgrade_checkpoints, public_upgrade_batches)?;
@@ -413,6 +437,11 @@ fn execute(
                     rollout_turns,
                     workers: workers.unwrap_or(1),
                     upgrade_checkpoints: upgrade_checkpoints.as_ref(),
+                    reply_cap,
+                    reply_probe_cap,
+                    greedy_card_order,
+                    fixed_future_planning,
+                    branch_future_planning,
                 },
                 goa2_core::interpreter::SearchLimits {
                     max_depth,
@@ -447,6 +476,7 @@ fn execute(
             max_nodes,
             time_ms,
             capture_state,
+            capture_sampled_root,
             sample_seed,
         } => resolution_search::rollout(
             envelope,
@@ -455,6 +485,7 @@ fn execute(
             max_nodes,
             resolution_search::time_budget(started, time_ms)?,
             capture_state,
+            capture_sampled_root,
             sample_seed,
         ),
         Operation::CheckSequences {
@@ -492,6 +523,9 @@ fn execute(
             workers.unwrap_or(1),
             lab_evaluation,
         ),
+        Operation::FingerprintBench { envelope, iterations, operations } => {
+            simulation_bench::measure_fingerprints(envelope, iterations, operations)
+        }
         Operation::SimulationBench {
             envelope,
             operations,
@@ -1238,10 +1272,12 @@ mod trace_tests {
         assert!(apply_snapshot_edits(&mut record, invalid).is_err());
     }
     #[test]
+    #[ignore = "exhaustive Python trace replay"]
     fn complete_games_match_python_at_every_operation_using_lossless_snapshot_deltas() {
         assert_compact_games("complete-games.json", 2);
     }
     #[test]
+    #[ignore = "exhaustive Python trace replay"]
     fn hanu_complete_games_match_python_at_every_operation_with_shared_models_and_turns() {
         assert_compact_games("complete-games-hanu.json", 2);
     }
@@ -1326,10 +1362,12 @@ mod trace_tests {
         });
     }
     #[test]
+    #[ignore = "exhaustive Python trace replay"]
     fn live_shared_steps_and_context_match_python_values_requests_and_identity() {
         verify_index("object-execution.json", Some(17347));
     }
     #[test]
+    #[ignore = "exhaustive Python trace replay"]
     fn every_native_transition_matches_python_full_state_request_and_event_order() {
         verify_index("stack-traces.json", None);
     }

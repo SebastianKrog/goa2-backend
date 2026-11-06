@@ -3987,6 +3987,142 @@ mod rollback_tests {
     }
 
     #[test]
+    fn world_fingerprint_tracks_combat_and_lane_counters_across_rollback() {
+        let mut session = object_session("object-execution-live-battle-red-push-first");
+        let before = session.world_state_fingerprint();
+        let team = session.world.heroes[0].team;
+        let (_, lives) = session.world.combat.team_lives().find(|(id, _)| *id == team).unwrap();
+        session.with_rollback(|branch| {
+            branch.world.combat.set_team_life(team, lives - 1).unwrap();
+            let combat = branch.world_state_fingerprint();
+            assert_ne!(combat, before);
+            branch.with_rollback(|branch| {
+                branch.world.waves[0].1 -= 1;
+                assert_ne!(branch.world_state_fingerprint(), combat);
+                Ok(())
+            })?;
+            assert_eq!(branch.world_state_fingerprint(), combat);
+            Ok(())
+        }).unwrap();
+        assert_eq!(session.world_state_fingerprint(), before);
+    }
+
+    #[test]
+    fn fingerprints_track_entity_overrides_and_pending_round_state() {
+        let mut session = object_session("object-execution-arena-travel-edge-barrier");
+        let actor = session.symbols.lookup("hero_arien").unwrap();
+        let token = session.symbols.lookup("mine").unwrap();
+        let board_entity = session.symbols.lookup("travel-spatial").unwrap();
+        let initial_world = session.world_state_fingerprint();
+        let initial_execution = session.execution_fingerprint();
+        session.with_rollback(|branch| {
+            let immune = branch.world.entity(token).unwrap().immune_enemy_actions;
+            branch.world.set_token_properties(token, Some(actor), !immune).unwrap();
+            let token_world = branch.world_state_fingerprint();
+            assert_ne!(token_world, initial_world);
+            branch.with_rollback(|branch| {
+                branch.world.upsert_board_entity(board_entity, board_entity, Some(actor)).unwrap();
+                assert_ne!(branch.world_state_fingerprint(), token_world);
+                branch.round.pending.push((actor, 1));
+                assert_ne!(branch.execution_fingerprint(), initial_execution);
+                Ok(())
+            })?;
+            assert_eq!(branch.world_state_fingerprint(), token_world);
+            assert_eq!(branch.execution_fingerprint(), initial_execution);
+            Ok(())
+        }).unwrap();
+        assert_eq!(session.world_state_fingerprint(), initial_world);
+    }
+
+    #[test]
+    fn fingerprints_distinguish_generated_planning_and_resolution_branches() {
+        use super::super::{DecisionMove, ExecutionBudget, NativeSession};
+        use std::collections::HashMap;
+
+        let mut root = object_session("object-execution-card-planning-cycle");
+        let budget = ExecutionBudget::default();
+        let player = root.world.heroes[0].id;
+        let rows = root.joint_plans(player, true, 4).unwrap().plans;
+        let replies = root.joint_plans(player, false, 4).unwrap().plans;
+        let key = |worker: &mut NativeSession| {
+            (worker.world_state_fingerprint(), worker.execution_fingerprint())
+        };
+        let before = key(&mut root);
+        let mut states = HashMap::new();
+        let mut repeated = 0;
+        let mut check = |worker: &mut NativeSession| {
+            let fingerprint = key(worker);
+            let state = (
+                serde_json::to_value(worker.export_envelope().unwrap()).unwrap(),
+                worker.last_request.as_ref().map(|request| worker.request_json(request)),
+            );
+            match states.entry(fingerprint) {
+                std::collections::hash_map::Entry::Occupied(entry) => {
+                    assert_eq!(*entry.get(), state, "different states have the same fingerprint");
+                    repeated += 1;
+                }
+                std::collections::hash_map::Entry::Vacant(entry) => {
+                    entry.insert(state);
+                }
+            }
+        };
+        for _ in 0..2 {
+            for row in &rows {
+                for reply in &replies {
+                    let joint: Vec<_> = row.iter().chain(reply).copied().collect();
+                    root.with_joint_planning(&joint, |branch| {
+                        branch.advance_to_decision(&budget)?;
+                        check(branch);
+                        if let Some((owner, _)) = branch.search_player()? {
+                            for choice in branch.resolution_choices(owner)?.into_iter().take(2) {
+                                let DecisionMove::Input { request: Some(token), selection, .. } = choice
+                                else { panic!("expected a live resolution choice") };
+                                branch.with_consumed_request(|branch| {
+                                    branch.submit(token, selection)?;
+                                    branch.advance_to_decision(&budget)?;
+                                    check(branch);
+                                    Ok(())
+                                })?;
+                            }
+                        }
+                        Ok(())
+                    }).unwrap();
+                    assert_eq!(key(&mut root), before);
+                }
+            }
+        }
+        assert!(states.len() > rows.len() * replies.len());
+        assert!(repeated >= states.len());
+    }
+
+    #[test]
+    fn fingerprints_preserve_ordered_state_after_reordered_simultaneous_commitments() {
+        use super::super::ExecutionBudget;
+
+        let root = object_session("object-execution-card-planning-cycle");
+        let choices: Vec<_> = root.world.heroes.iter()
+            .map(|hero| root.first_planning_commitment(hero.id).unwrap().unwrap())
+            .collect();
+        let mut forward = root.clone();
+        let mut reversed = root;
+        for (worker, order) in [
+            (&mut forward, (0..choices.len()).collect::<Vec<_>>()),
+            (&mut reversed, (0..choices.len()).rev().collect::<Vec<_>>()),
+        ] {
+            for index in order {
+                let choice = choices[index];
+                worker.commit_card(choice.hero, choice.first.unwrap()).unwrap();
+            }
+            worker.advance_to_decision(&ExecutionBudget::default()).unwrap();
+        }
+        let forward_state = forward.semantic_state().unwrap();
+        let reversed_state = reversed.semantic_state().unwrap();
+        assert_ne!(forward_state["public_revealed_cards"], reversed_state["public_revealed_cards"]);
+        assert_ne!(forward_state["unresolved_hero_ids"], reversed_state["unresolved_hero_ids"]);
+        assert_ne!(forward.world_state_fingerprint(), reversed.world_state_fingerprint());
+    }
+
+    #[test]
     fn session_rollback_recovers_arena_when_live_dispatch_panics() {
         let mut session = object_session("object-execution-hero-respawn-live-ordinary-first");
         let before = serde_json::to_value(session.export_envelope().unwrap()).unwrap();

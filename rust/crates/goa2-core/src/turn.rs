@@ -19,7 +19,7 @@ pub enum FlowStep {
     Upgrades,
     Reset,
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct Boundary {
     guess: Datum,
     reveal: Datum,

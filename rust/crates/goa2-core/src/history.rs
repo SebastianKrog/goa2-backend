@@ -4,7 +4,7 @@ use serde_json::{Value, json};
 use std::sync::Arc;
 
 type DiscardLog = Vec<(Symbol, Vec<Symbol>)>;
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct CardHistory {
     revealed: Arc<Vec<(Symbol, Symbol)>>,
     discarded: Arc<DiscardLog>,

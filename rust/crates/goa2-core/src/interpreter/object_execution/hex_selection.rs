@@ -349,9 +349,9 @@ impl NativeSession {
             };
             let members = match &value {
                 ObjectValue::Object(id) if objects.arena.is_mutable_list(*id) => {
-                    objects.arena.sequence(*id).unwrap_or(&[]).to_vec()
+                    objects.arena.sequence(*id).unwrap_or(&[])
                 }
-                _ => vec![value.clone()],
+                _ => std::slice::from_ref(&value),
             };
             let hexes = members
                 .iter()

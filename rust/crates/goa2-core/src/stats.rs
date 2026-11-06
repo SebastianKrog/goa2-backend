@@ -58,14 +58,14 @@ impl Stat {
         }
     }
 }
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, Hash)]
 #[serde(rename_all = "lowercase")]
 pub enum MarkerKind {
     Venom,
     Poison,
     Bounty,
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct NativeMarker {
     pub key: Symbol,
     pub source: Option<Symbol>,

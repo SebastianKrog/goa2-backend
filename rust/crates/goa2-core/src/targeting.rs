@@ -399,13 +399,12 @@ impl UnitFilter {
                 found
             }
             Self::BehindEmpty(origin) => {
-                let from = context
-                    .origin(origin, true)?
-                    .and_then(|id| world.position(id));
-                from.zip(world.position(id)).is_some_and(|(from, target)| {
+                let actor = context.origin(origin, true)?;
+                let from = actor.and_then(|id| world.position(id));
+                if let Some((from, target)) = from.zip(world.position(id)) {
                     let (a, b, c) = from.coordinates();
                     let (q, r, s) = target.coordinates();
-                    crate::displacement::offset(
+                    let behind = crate::displacement::offset(
                         target,
                         (
                             i64::from(q) - i64::from(a),
@@ -413,9 +412,14 @@ impl UnitFilter {
                             i64::from(s) - i64::from(c),
                         ),
                         1,
-                    )
-                    .is_ok_and(|behind| world.on_map(behind) && !world.obstacle(behind))
-                })
+                    );
+                    match behind {
+                        Ok(behind) => !world.obstacle_for_actor(behind, actor)?,
+                        Err(_) => false,
+                    }
+                } else {
+                    false
+                }
             }
             Self::Spatial(filter) => {
                 if let Some(hex) = world.position(id) {

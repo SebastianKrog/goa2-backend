@@ -9,6 +9,7 @@ from state_codec import REFERENCE_KEY
 
 def validate_commitments(
     state, envelope, response, *, player_id, controlled_ids, searched_revision, live_revision,
+    require_score=True,
 ):
     """Return the whole validated decision prefix, or reject it before submission.
 
@@ -18,7 +19,7 @@ def validate_commitments(
     """
     if searched_revision != live_revision or state.phase != GamePhase.PLANNING:
         raise ValueError("stale planning result")
-    if response["score"] is None:
+    if require_score and response["score"] is None:
         raise ValueError("planning result has no completed score")
     player = state.get_hero(HeroID(player_id))
     if player is None or player.id != player_id or player_id not in controlled_ids:

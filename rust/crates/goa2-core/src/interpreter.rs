@@ -650,7 +650,7 @@ impl std::ops::DerefMut for CompiledStep {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum Team {
     Red,
     Blue,
@@ -1022,6 +1022,7 @@ pub struct NativeSession {
     next_request: u64,
     next_step: u64,
     pub last_request: Option<NativeRequest>,
+    sampled_guess_steps: Option<[crate::objects::ObjectId; 2]>,
     selection_key: Symbol,
     action_stack_key: Symbol,
     yes: Symbol,
@@ -1724,6 +1725,7 @@ impl NativeSession {
             next_request,
             next_step,
             last_request: None,
+            sampled_guess_steps: None,
             selection_key,
             action_stack_key,
             yes,
@@ -6018,6 +6020,9 @@ impl NativeSession {
                 &self.last_request,
                 self.next_request,
                 self.next_step,
+                (&self.planning, &self.boundary, &self.round),
+                self.team,
+                self.sampled_guess_steps,
             )
                 .hash(&mut hash);
             self.symbols.hash_local(&mut hash);
@@ -6030,7 +6035,7 @@ impl NativeSession {
         u128::from(lane(0u64)) | (u128::from(lane(1u64)) << 64)
     }
 
-    /// Diagnostic key for spatial state, typed hero and card rows, and active effects.
+    /// Rollback diagnostic for spatial state, hero and card rows, effects, and world counters.
     pub fn world_state_fingerprint(&mut self) -> u128 {
         self.world.world_state_fingerprint()
     }

@@ -154,6 +154,37 @@ pub struct SampledHand {
     pub(crate) hidden_gold: Option<(HiddenGoldSlot, String)>,
 }
 
+fn hidden_gold_slots(hero: &super::HeroObservation) -> impl Iterator<Item = HiddenGoldSlot> + '_ {
+    fn slots(
+        cards: &[PublicCard],
+        slot: fn(usize) -> HiddenGoldSlot,
+    ) -> impl Iterator<Item = HiddenGoldSlot> + '_ {
+        cards.iter().enumerate().filter_map(move |(index, card)| {
+            matches!(card, PublicCard::Hidden).then(|| slot(index))
+        })
+    }
+
+    slots(&hero.played, HiddenGoldSlot::Played)
+        .chain(slots(&hero.discarded, HiddenGoldSlot::Discard))
+}
+
+pub(super) fn sample_preserved_gold(
+    hero: &super::HeroObservation,
+    seed: u64,
+) -> Result<Option<(HiddenGoldSlot, String)>> {
+    let mut slots = hidden_gold_slots(hero);
+    let Some(slot) = slots.next() else {
+        return Ok(None);
+    };
+    let golds = catalog()?.heroes.get(&hero.name).map(|row| &row.cyclic_golds);
+    let Some(golds) = golds.filter(|golds| {
+        hero.level < 8 && !golds.is_empty() && slots.next().is_none()
+    }) else {
+        return Err(EngineError::Unsupported("unsupported concealed slots on preserved hero".into()));
+    };
+    Ok(Some((slot, golds[sample_index(seed ^ 0x81f2b1aa727ea991, golds.len())].clone())))
+}
+
 pub(super) fn sample_index(seed: u64, len: usize) -> usize {
     // SplitMix64 mixes sequential sample seeds before indexing the sorted hypotheses.
     let mut value = seed.wrapping_add(0x9e3779b97f4a7c15);
@@ -251,14 +282,7 @@ impl PlayerObservation {
         if !definition.cyclic_golds.is_empty() && hero.level < 8 && public_golds > 1 {
             return Ok(None);
         }
-        let hidden_slots = |cards: &[PublicCard], slot: fn(usize) -> HiddenGoldSlot| {
-            cards.iter().enumerate()
-                .filter_map(move |(index, card)| matches!(card, PublicCard::Hidden).then(|| slot(index)))
-                .collect::<Vec<_>>()
-        };
-        let mut hidden = hidden_slots(&hero.played, HiddenGoldSlot::Played)
-            .into_iter()
-            .chain(hidden_slots(&hero.discarded, HiddenGoldSlot::Discard));
+        let mut hidden = hidden_gold_slots(hero);
         let hidden_gold_slot = hidden.next();
         if hidden_gold_slot.is_some()
             && (definition.cyclic_golds.is_empty() || hero.level >= 8
@@ -320,7 +344,8 @@ impl PlayerObservation {
                     definition.cyclic_golds.iter().filter(|id| !unavailable.contains(id)).cloned()
                 );
             } else if public_golds == 0 && !definition.cyclic_golds.is_empty() {
-                let gold = if self.phase == crate::codec::Phase::Planning
+                let gold = if hidden_gold_slot.is_none()
+                    && self.phase == crate::codec::Phase::Planning
                     && self.round == 1 && self.turn == 1
                 {
                     definition.starting.iter().find(|id| definition.cyclic_golds.contains(id))?
@@ -784,6 +809,14 @@ mod tests {
             .unwrap();
         assert_eq!(discarded.cards, sample.cards);
         assert_eq!(discarded.hidden_gold, Some((HiddenGoldSlot::Discard(0), gold)));
+        let preserved: BTreeSet<_> = (0..32)
+            .map(|seed| {
+                let (slot, id) = sample_preserved_gold(&view.heroes[1], seed).unwrap().unwrap();
+                assert_eq!(slot, HiddenGoldSlot::Discard(0));
+                id
+            })
+            .collect();
+        assert_eq!(preserved, seen);
     }
 
     #[test]

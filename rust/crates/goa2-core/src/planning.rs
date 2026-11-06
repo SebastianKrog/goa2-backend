@@ -144,7 +144,7 @@ pub(crate) fn choose_tie(
         }),
     })
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct Planning {
     pub phase: Phase,
     two_card_effects: Vec<Symbol>,

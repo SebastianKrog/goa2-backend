@@ -9,7 +9,7 @@ use crate::{
 };
 use serde_json::{Value, json};
 type Result<T> = std::result::Result<T, CardError>;
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct RoundState {
     pub round: i64,
     pub pending: Vec<(Symbol, i64)>,

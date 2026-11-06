@@ -22,6 +22,8 @@ def capture(state, compact):
     physical = []
 
     def walk(value, raw, path):
+        if type(value) in (str, int, float, bool, type(None)):
+            return
         if isinstance(value, (Card, Token)):
             physical.append(value)
             return

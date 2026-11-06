@@ -6,6 +6,8 @@ format is private offline tooling; no backend API or persistence format changes.
 
 from __future__ import annotations
 
+from enum import Enum
+
 from fixture_cache import read_text, write_text
 
 from oracle import ORACLE_REVISION, digest, verify_sources
@@ -26,6 +28,13 @@ def reject_reserved(value):
 
 class InstanceEncoder:
     def __init__(self):
+        from pydantic import BaseModel
+
+        from goa2.domain.models import Card, Token
+
+        self._base_model = BaseModel
+        self._card = Card
+        self._token = Token
         self.references = {}
         self.objects = []  # Keep originals alive: Python may otherwise reuse id().
         self.definitions = []
@@ -59,17 +68,13 @@ class InstanceEncoder:
         return {REFERENCE_KEY: instance}
 
     def walk(self, value, serialized):
-        from enum import Enum
-
-        from pydantic import BaseModel
-
-        from goa2.domain.models import Card, Token
-
-        if isinstance(value, Card):
+        if type(value) in (str, int, float, bool, type(None)):
+            return serialized
+        if isinstance(value, self._card):
             return self.pack_card(value)
-        if isinstance(value, Token):
+        if isinstance(value, self._token):
             return self.pack_token(value)
-        if isinstance(value, BaseModel) and isinstance(serialized, dict):
+        if isinstance(value, self._base_model) and isinstance(serialized, dict):
             result = dict(serialized)
             for name, field in type(value).model_fields.items():
                 key = field.serialization_alias or name
@@ -88,7 +93,6 @@ class InstanceEncoder:
         return serialized
 
     def pack_card(self, card):
-        from enum import Enum
         from math import isfinite
 
         from goa2.domain.models.spell import SpellCard

@@ -2,6 +2,7 @@
 
 import argparse
 import copy
+from collections import Counter
 from itertools import chain
 
 from live_defeat_traces import retain
@@ -11,17 +12,20 @@ from live_upgrade_traces import scenes as upgrade_scenes
 from live_spellbook_traces import cast_scene
 from model_traces import setup
 from object_execution_traces import (
-    ObjectTraceNormalizer, confirmation_scenes, planning_command_scenes, reference as reference_trace,
+    ObjectTraceNormalizer, confirmation_scenes, iter_reference, planning_command_scenes,
+    reference as reference_trace,
 )
 from oracle import Worker, verify_sources
 from shared_objects import export_state_with_shared_objects
+from streamed_games import StreamWorker
 
-from automata.runtime.legality import DecisionMove, check_sequences
+from automata.runtime.legality import DecisionMove, check_moves, check_sequences
 from goa2.domain.models import CardState, GamePhase, TargetType
 from goa2.domain.input import selection_value
 from goa2.engine.handler import process_stack
+from goa2.engine.filters_hex import MovementPathFilter, ObstacleFilter
 from goa2.engine.steps import (
-    FindNextActorStep, MultiSelectStep, PlaceRunesStep, ResolveCardStep,
+    FindNextActorStep, MoveUnitStep, MultiSelectStep, PlaceRunesStep, ResolveCardStep,
     ResolveCardTextStep, SelectStep,
 )
 
@@ -66,6 +70,40 @@ def scenes():
         [dict(first, player_id="not-a-player")], [second, first],
     ]
 
+
+    state = setup()
+    state.phase = GamePhase.RESOLUTION
+    hero = "hero_arien"
+    state.current_actor_id = hero
+    origin = state.get_position(hero)
+
+    def clear(hex):
+        return hex in state.board.tiles and not state.board.tiles[hex].is_obstacle
+
+    first_hex, second_hex = next(
+        (first, second)
+        for first in origin.neighbors() if clear(first)
+        for second in first.neighbors() if clear(second) and origin.distance(second) == 2
+    )
+    path = MovementPathFilter(range_val=1, unit_id=hero)
+
+    def movement_selector(label):
+        return SelectStep(
+            step_id=f"fixture/sequence/movement-{label}",
+            target_type=TargetType.HEX,
+            prompt=f"Choose the {label} destination",
+            output_key="target_hex",
+            filters=[path, ObstacleFilter()],
+        )
+
+    state.execution_stack = [
+        movement_selector("second"),
+        MoveUnitStep(step_id="fixture/sequence/movement-apply", unit_id=hero),
+        movement_selector("first"),
+    ]
+    first = dict(kind="input", player_id=hero, selection=first_hex.model_dump())
+    second = dict(first, selection=second_hex.model_dump())
+    yield "movement-updates-reachability", state, [[second], [first, second], [second, first], [first]]
 
     for name, state, ops in upgrade_scenes({
         "upgrade-live-Arien-3-batch-0",
@@ -8029,10 +8067,11 @@ def razzle_mirror_traces():
 
 
 def verify_trace(worker, name, state, envelope, operations):
-    records = worker.request("stack_trace", envelope=envelope, operations=operations)["records"]
+    records = worker.records(envelope, operations)
     normalizer = ObjectTraceNormalizer()
-    for index, (record, oracle) in enumerate(zip(records, reference_trace(state, operations), strict=True)):
-        actual = normalizer.record(record)
+    expected = iter_reference(state, operations, inplace_records=True)
+    for index, (record, oracle) in enumerate(zip(records, expected, strict=True)):
+        actual = normalizer.record(record, inplace=True)
         if actual != oracle:
             fields = [key for key in oracle if actual.get(key) != oracle[key]]
             raise AssertionError(f"{name} operation {index}: different trace fields {fields}")
@@ -8080,11 +8119,58 @@ def verify_live_resolution(worker, root):
             raise AssertionError(f"expected rejection: {expected}")
 
 
-def verify(command):
+def verify_consecutive_allied_choices(worker):
+    from goa2.domain.input import InputResponse
+    from goa2.engine.filters_units import TeamFilter, UnitTypeFilter
+    from goa2.engine.handler import submit_input
+    from goa2.engine.steps import DefeatUnitStep
+
+    state = setup()
+    state.phase = GamePhase.RESOLUTION
+    player, ally = "hero_arien", "hero_hanu"
+    state.current_actor_id = player
+    state.execution_stack = [
+        DefeatUnitStep(step_id="fixture/sequence/allied-defeat", victim_key="victim", killer_id=player),
+        SelectStep(
+            step_id="fixture/sequence/allied-target", target_type=TargetType.UNIT,
+            output_key="victim", prompt="Choose an enemy minion", override_player_id=ally,
+            filters=[TeamFilter(relation="ENEMY"), UnitTypeFilter(unit_type="MINION")],
+            is_mandatory=False,
+        ),
+        SelectStep(
+            step_id="fixture/sequence/allied-start", target_type=TargetType.NUMBER,
+            output_key="number", prompt="Choose a number", number_options=[1, 2],
+        ),
+    ]
+    first = process_stack(state).input_request
+    assert first.player_id == player
+    envelope, _ = export_state_with_shared_objects(state)
+    options = dict(envelope=envelope, player_id=player, time_ms=10_000, max_nodes=512)
+    shallow = worker.request("search_resolution", max_depth=1, **options)
+    deep = worker.request("search_resolution", max_depth=2, **options)
+    assert shallow["completed_depth"] == 1 and deep["completed_depth"] == 2
+    assert deep["score"] > shallow["score"], (shallow, deep)
+
+    submit_input(state, InputResponse(request_id=first.id, selection=deep["decision"]["selection"]))
+    second = process_stack(state).input_request
+    assert second.player_id == ally and second.can_skip and second.options
+    gold = state.get_hero(player).gold
+    victim = selection_value(second.options[0])
+    submit_input(state, InputResponse(request_id=second.id, selection=victim))
+    process_stack(state)
+    assert state.get_position(victim) is None and state.get_hero(player).gold > gold
+    print("Matched consecutive allied choices with a strictly better defeat payoff")
+
+
+def verify(command, *, verdicts_only=False):
     verify_sources()
     worker = Worker(command)
+    trace_worker = None
+    trace_complete = False
     count = 0
+    batch_counts = Counter()
     try:
+        trace_worker = StreamWorker(command)
         for name, state, sequences in scenes():
             envelope, _ = export_state_with_shared_objects(state)
             reference = check_sequences(
@@ -8097,6 +8183,26 @@ def verify(command):
             actual = [(row["legal"], row["checked"], row["failed_at"]) for row in native["results"]]
             if actual != expected:
                 raise AssertionError(f"{name}: expected {expected}, got {actual}")
+            # Single-move rows exercise native candidate batches without
+            # applying one candidate before evaluating the next.
+            candidates = [sequence[0] for sequence in sequences if sequence]
+            if candidates:
+                batch = check_moves(state, [python_move(move, envelope) for move in candidates])
+                native_batch = worker.request(
+                    "check_sequences", envelope=envelope,
+                    sequences=[[move] for move in candidates],
+                )
+                expected_batch = [row.legal for row in batch.results]
+                actual_batch = [row["legal"] for row in native_batch["results"]]
+                assert actual_batch == expected_batch, (name, actual_batch, expected_batch)
+                batch_counts.update(expected_batch)
+            if name == "movement-updates-reachability":
+                assert actual == [(False, 0, 0), (True, 2, None), (False, 0, 0), (True, 1, None)]
+                repeated = worker.request(
+                    "check_sequences", envelope=envelope, sequences=sequences * 16,
+                )
+                assert repeated["results"] == native["results"] * 16
+                assert repeated["applied_decisions"] == native["applied_decisions"] == 1
             if name == "two-number-requests":
                 verify_live_resolution(worker, state)
             if name == "rune-inscription":
@@ -8126,29 +8232,34 @@ def verify(command):
                 # The two engines use independent prompt tokens.
                 oracle_move = python_move(dict(decision, request_id=None), envelope)
                 assert check_sequences(state, [[oracle_move]]).results[0].legal is True
-                verify_trace(worker, name, state, envelope, operations)
+                verify_trace(trace_worker, name, state, envelope, operations)
 
             count += len(expected)
+        verify_consecutive_allied_choices(worker)
+        print(f"Matched {sum(batch_counts.values())} batch candidate verdicts: {dict(batch_counts)}")
+        if verdicts_only:
+            trace_complete = True
+            return count
         for name, state, operations in inscription_card_traces():
             envelope, _ = export_state_with_shared_objects(state)
-            verify_trace(worker, name, state, envelope, operations)
+            verify_trace(trace_worker, name, state, envelope, operations)
             print(f"Matched {len(operations)} operations for {name}")
         passage_operations = 0
         for name, state, operations in passage_card_traces():
             envelope, _ = export_state_with_shared_objects(state)
-            verify_trace(worker, name, state, envelope, operations)
+            verify_trace(trace_worker, name, state, envelope, operations)
             passage_operations += len(operations)
         print(f"Matched {passage_operations} Passage operations across 24 rune configurations")
         melee_operations = 0
         for name, state, operations in runic_melee_traces():
             envelope, _ = export_state_with_shared_objects(state)
-            verify_trace(worker, name, state, envelope, operations)
+            verify_trace(trace_worker, name, state, envelope, operations)
             melee_operations += len(operations)
         print(f"Matched {melee_operations} Runic melee operations across 24 rune configurations")
         ranged_operations = 0
         for name, state, operations in runic_ranged_traces():
             envelope, _ = export_state_with_shared_objects(state)
-            verify_trace(worker, name, state, envelope, operations)
+            verify_trace(trace_worker, name, state, envelope, operations)
             ranged_operations += len(operations)
         print(f"Matched {ranged_operations} ranged and discard operations across 28 rune configurations")
         for name, state, operations in chain(
@@ -8183,15 +8294,25 @@ def verify(command):
             widget_fight_as_one_traces(), widget_dragon_knight_traces(), mrak_ultimate_primary_trace(), trinkets_barrier_traces(), trinkets_disruptor_traces(), trinkets_self_destruct_traces(), trinkets_design_traces(), trinkets_setup_traces(), trinkets_turret_repeat_traces(), trinkets_cannon_traces(), nebkher_doubt_traces(), nebkher_illusion_supply_traces(), nebkher_swap_attack_traces(), nebkher_projection_traces(), nebkher_phantasmal_traces(), nebkher_topology_traces(), nebkher_laughter_traces(), razzle_swap_traces(), razzle_wire_traces(), razzle_retrieval_traces(), razzle_stunt_traces(), razzle_removal_traces(), razzle_mirror_traces(),
         ):
             envelope, _ = export_state_with_shared_objects(state)
-            verify_trace(worker, name, state, envelope, operations)
+            verify_trace(trace_worker, name, state, envelope, operations)
             print(f"Matched {len(operations)} operations for {name}")
+        trace_complete = True
     finally:
-        worker.close()
+        try:
+            if trace_worker is not None:
+                if trace_complete:
+                    trace_worker.close()
+                else:
+                    trace_worker.abort()
+        finally:
+            worker.close()
     return count
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--worker", required=True)
+    parser.add_argument("--verdicts-only", action="store_true",
+                        help="Skip the extended card transition replay corpus")
     args = parser.parse_args()
-    print(f"Matched {verify([args.worker])} sequence verdicts")
+    print(f"Matched {verify([args.worker], verdicts_only=args.verdicts_only)} sequence verdicts")

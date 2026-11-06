@@ -9,7 +9,9 @@ use crate::{
     data::{Datum, Symbol},
 };
 
-#[derive(Clone, Debug, PartialEq)]
+use std::{collections::HashMap, hash::BuildHasher};
+
+#[derive(Clone, Debug, Hash, PartialEq)]
 pub enum DecisionMove {
     Card {
         hero: Symbol,
@@ -194,26 +196,21 @@ impl NativeSession {
     /// Structured choices use one rune or upgrade at a time, so search can
     /// reach every arrangement through successive decisions.
     pub fn resolution_choices(&mut self, player: Symbol) -> Result<Vec<DecisionMove>> {
-        self.resolution_choices_up_to(player, usize::MAX)
+        Ok(self.resolution_choices_up_to(player, usize::MAX)?.0)
     }
 
     pub(super) fn first_resolution_choice(
         &mut self,
         player: Symbol,
     ) -> Result<Option<DecisionMove>> {
-        Ok(self.resolution_choices_up_to(player, 1)?.pop())
+        Ok(self.resolution_choices_up_to(player, 1)?.0.pop())
     }
 
     /// Distinguish a forced input from a branch without materializing every
     /// destination. A duplicated prefix does not prove the input is forced.
     pub(super) fn resolution_branch_probe(&mut self, player: Symbol) -> Result<Vec<DecisionMove>> {
-        let choices = self.resolution_choices_up_to(player, 2)?;
-        if choices.len() == 2
-            || self
-                .last_request
-                .as_ref()
-                .is_none_or(|request| matches!(request.choices, RequestChoices::ConfirmAction))
-        {
+        let (choices, exhausted) = self.resolution_choices_up_to(player, 2)?;
+        if choices.len() == 2 || exhausted {
             Ok(choices)
         } else {
             self.resolution_choices(player)
@@ -245,7 +242,7 @@ impl NativeSession {
         &mut self,
         player: Symbol,
         limit: usize,
-    ) -> Result<Vec<DecisionMove>> {
+    ) -> Result<(Vec<DecisionMove>, bool)> {
         enum Choice {
             Typed(Datum),
             Named(&'static str),
@@ -253,10 +250,10 @@ impl NativeSession {
         use Choice::{Named, Typed};
 
         let Some(request) = &self.last_request else {
-            return Ok(Vec::new());
+            return Ok((Vec::new(), true));
         };
         if !self.resolution_request_addresses(request, player) {
-            return Ok(Vec::new());
+            return Ok((Vec::new(), true));
         }
 
         let token = request.id;
@@ -381,6 +378,9 @@ impl NativeSession {
             }
         }
 
+        // Fewer raw candidates than the limit proves the list was exhausted.
+        // Counting after deduplication cannot distinguish a truncated prefix.
+        let exhausted = choices.len() < limit;
         let mut moves = Vec::with_capacity(choices.len());
         for choice in choices.into_iter().take(limit) {
             let selection = match choice {
@@ -396,7 +396,7 @@ impl NativeSession {
                 moves.push(decision);
             }
         }
-        Ok(moves)
+        Ok((moves, exhausted))
     }
 
     /// Choose an input using the ported deterministic Python heuristic ranks.
@@ -525,19 +525,41 @@ impl NativeSession {
             ));
         }
         let mut trie = vec![Prefix::default()];
+        // Preserve insertion order in the trie. Large batches use a separate
+        // index so distinct destinations don't scan every prior sibling.
+        let mut edges = (sequences.len() >= 64).then(HashMap::<(usize, u64), usize>::new);
         for (output, sequence) in sequences.iter().enumerate() {
             let mut node = 0;
             for decision in sequence {
-                node = if let Some((_, child)) =
-                    trie[node].children.iter().find(|(key, _)| *key == decision)
-                {
-                    *child
+                let siblings = &trie[node].children;
+                let find = || siblings.iter().position(|(key, _)| *key == decision);
+                let indexed = edges.as_mut().map(|index| {
+                    let key = (node, index.hasher().hash_one(decision));
+                    index.entry(key)
+                });
+                let existing = match &indexed {
+                    Some(std::collections::hash_map::Entry::Occupied(edge)) => {
+                        let position = *edge.get();
+                        if siblings[position].0 == decision {
+                            Some(position)
+                        } else {
+                            find()
+                        }
+                    }
+                    Some(std::collections::hash_map::Entry::Vacant(_)) => None,
+                    None => find(),
+                };
+                if let Some(position) = existing {
+                    node = siblings[position].1;
                 } else {
+                    if let Some(edge) = indexed {
+                        edge.insert_entry(siblings.len());
+                    }
                     let child = trie.len();
                     trie.push(Prefix::default());
                     trie[node].children.push((decision, child));
-                    child
-                };
+                    node = child;
+                }
             }
             trie[node].outputs.push(output);
         }
@@ -694,10 +716,26 @@ fn visit(
         false,
         batch,
     );
-    for (decision, child) in &trie[node].children {
+    let children = &trie[node].children;
+    for (index, (decision, child)) in children.iter().enumerate() {
         budget.check(0)?;
-        worker.with_rollback(|branch| {
-            let terminal = trie[*child].children.is_empty();
+        let terminal = trie[*child].children.is_empty();
+        if terminal
+            && let DecisionMove::Input { player, request, selection } = decision
+            && !worker.last_request.as_ref().is_some_and(|request| {
+                matches!(request.choices, RequestChoices::Upgrades(_))
+            })
+        {
+            // Plain prompt membership is read-only and the leaf has no
+            // transition to execute. The root rollback still owns the batch.
+            let verdict = sequence_failure(
+                worker.validate_sequence_input(*player, *request, selection).map(|_| ()),
+                depth,
+            )?.unwrap_or(SequenceVerdict::Legal { checked: depth + 1 });
+            assign(trie, *child, &verdict, false, batch);
+            continue;
+        }
+        let mut evaluate = |branch: &mut NativeSession| {
             let applied = match decision {
                 DecisionMove::Card { hero, card } => {
                     branch.validate_planning_player(*hero).and_then(|()| {
@@ -731,19 +769,7 @@ fn visit(
                         }
                     }),
             };
-            let failure = match applied {
-                Ok(()) => None,
-                Err(EngineError::InvalidInput(reason)) => Some(SequenceVerdict::Illegal {
-                    failed_at: depth,
-                    reason,
-                }),
-                Err(EngineError::Unsupported(reason)) => Some(SequenceVerdict::Unknown {
-                    failed_at: depth,
-                    reason,
-                }),
-                Err(error) => return Err(error),
-            };
-            if let Some(failure) = failure {
+            if let Some(failure) = sequence_failure(applied, depth)? {
                 assign(trie, *child, &failure, true, batch);
             } else {
                 if !terminal || !matches!(decision, DecisionMove::Input { .. }) {
@@ -755,9 +781,31 @@ fn visit(
                 visit(branch, trie, *child, depth + 1, budget, batch)?;
             }
             Ok(())
-        })?;
+        };
+        // Only a later sibling needs this node restored. The last child
+        // can use the rollback already owned by the enclosing branch.
+        if index + 1 == children.len() {
+            evaluate(worker)?;
+        } else {
+            worker.with_rollback(evaluate)?;
+        }
     }
     Ok(())
+}
+
+fn sequence_failure(applied: Result<()>, depth: usize) -> Result<Option<SequenceVerdict>> {
+    Ok(match applied {
+        Ok(()) => None,
+        Err(EngineError::InvalidInput(reason)) => Some(SequenceVerdict::Illegal {
+            failed_at: depth,
+            reason,
+        }),
+        Err(EngineError::Unsupported(reason)) => Some(SequenceVerdict::Unknown {
+            failed_at: depth,
+            reason,
+        }),
+        Err(error) => return Err(error),
+    })
 }
 
 fn assign(

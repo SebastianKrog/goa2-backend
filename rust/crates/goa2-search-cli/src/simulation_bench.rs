@@ -229,6 +229,103 @@ pub(super) fn measure_rollout(
     }))
 }
 
+pub(super) fn measure_fingerprints(
+    envelope: StateEnvelope,
+    iterations: u32,
+    operations: Vec<Value>,
+) -> Result<Value, String> {
+    if !(1..=10_000).contains(&iterations) {
+        return Err("fingerprint benchmark requires iterations in 1..10000".into());
+    }
+    let mut root = NativeSession::compile(envelope).map_err(|error| error.to_string())?;
+    root.advance_to_decision(&ExecutionBudget::default())
+        .map_err(|error| error.to_string())?;
+    let snapshot = |session: &NativeSession| {
+        let envelope = session.export_envelope().map_err(|error| error.to_string())?;
+        serde_json::to_vec(&envelope).map_err(|error| error.to_string())
+    };
+    let commands = prepare(&mut root, &operations)?;
+    let expected = snapshot(&root)?;
+    let world = root.world_state_fingerprint();
+    let execution = root.execution_fingerprint();
+
+    let start = Instant::now();
+    for _ in 0..iterations {
+        if black_box(root.world_state_fingerprint()) != world {
+            return Err("world fingerprint changed on repeated reads".into());
+        }
+    }
+    let world_ns = start.elapsed().as_secs_f64() * 1e9 / f64::from(iterations);
+    let start = Instant::now();
+    for _ in 0..iterations {
+        if black_box(root.execution_fingerprint()) != execution {
+            return Err("execution fingerprint changed on repeated reads".into());
+        }
+    }
+    let execution_ns = start.elapsed().as_secs_f64() * 1e9 / f64::from(iterations);
+    let start = Instant::now();
+    for _ in 0..iterations {
+        if black_box(snapshot(&root)?) != expected {
+            return Err("fingerprint benchmark mutated its root".into());
+        }
+    }
+    let snapshot_ns = start.elapsed().as_secs_f64() * 1e9 / f64::from(iterations);
+    let mut dirty = Value::Null;
+    if !commands.is_empty() {
+        let key = |session: &mut NativeSession| {
+            (session.world_state_fingerprint(), session.execution_fingerprint())
+        };
+        let (branch_key, branch_state) = root.with_rollback(|branch| {
+            Ok(run(branch, &commands).and_then(|_| Ok((key(branch), snapshot(branch)?))))
+        }).map_err(|error| error.to_string())??;
+        if branch_state == expected || branch_key == (world, execution) {
+            return Err("fingerprint benchmark operations must change the state and key".into());
+        }
+        let mut transition = Duration::ZERO;
+        let mut branch_hash = Duration::ZERO;
+        let mut restored_hash = Duration::ZERO;
+        for _ in 0..iterations {
+            root.with_rollback(|branch| {
+                let start = Instant::now();
+                let result = run(branch, &commands);
+                transition += start.elapsed();
+                Ok(result.and_then(|_| {
+                    let start = Instant::now();
+                    let actual = black_box(key(branch));
+                    branch_hash += start.elapsed();
+                    if actual != branch_key {
+                        return Err("fingerprint benchmark branch key diverged".into());
+                    }
+                    Ok(())
+                }))
+            }).map_err(|error| error.to_string())??;
+            let start = Instant::now();
+            let restored = black_box(key(&mut root));
+            restored_hash += start.elapsed();
+            if restored != (world, execution) {
+                return Err("fingerprint benchmark did not restore the root key".into());
+            }
+        }
+        if snapshot(&root)? != expected {
+            return Err("fingerprint benchmark did not restore the root state".into());
+        }
+        let mean_ns = |duration: Duration| duration.as_secs_f64() * 1e9 / f64::from(iterations);
+        dirty = json!({
+            "transition_ns": mean_ns(transition),
+            "branch_key_ns": mean_ns(branch_hash),
+            "restored_key_ns": mean_ns(restored_hash),
+        });
+    }
+    Ok(json!({
+        "iterations": iterations,
+        "world_ns_per_read": world_ns,
+        "execution_ns_per_read": execution_ns,
+        "snapshot_ns_per_read": snapshot_ns,
+        "snapshot_bytes": expected.len(),
+        "dirty": dirty,
+    }))
+}
+
 pub(super) fn measure(
     envelope: StateEnvelope,
     operations: Vec<Value>,

@@ -34,8 +34,13 @@ pub(super) fn with_card_sync_profile<T>(run: impl FnOnce() -> T) -> (T, CardSync
 
 struct PlanningHandSample {
     hero: Symbol,
-    hand: super::super::SampledHand,
+    update: SampledCards,
     fixed: [Option<CardId>; 2],
+}
+
+enum SampledCards {
+    Hand(super::super::SampledHand),
+    ConcealedGold(HiddenGoldSlot, String),
 }
 
 impl NativeSession {
@@ -137,7 +142,7 @@ impl NativeSession {
             .resolution_samples(player, sample, &[sample.seed])?
             .pop()
             .unwrap();
-        self.with_installed_resolution_samples(player, samples, operation)
+        self.with_installed_resolution_samples(player, samples, Some(sample.seed), operation)
     }
 
     pub(in crate::interpreter) fn sampled_resolution_workers(
@@ -158,9 +163,10 @@ impl NativeSession {
         let samples = self.resolution_samples(player, sample, &seeds)?;
         samples
             .into_iter()
-            .map(|hands| {
+            .zip(seeds)
+            .map(|(hands, seed)| {
                 budget.check(0)?;
-                self.with_installed_resolution_samples(player, hands, |worker| Ok(worker.clone()))
+                self.with_installed_resolution_samples(player, hands, Some(seed), |worker| Ok(worker.clone()))
             })
             .collect()
     }
@@ -181,7 +187,9 @@ impl NativeSession {
                 let step = step.ok_or_else(|| unsupported("live mine trigger missing"))?;
                 self.trigger_reads_concealed_mine_bound(objects, step, viewer)?
             }
-            Instruction::LiveCardGuess { .. } => true,
+            Instruction::LiveCardGuess { .. } => !step.is_some_and(|step| {
+                self.sampled_guess_steps.is_some_and(|steps| steps.contains(&step))
+            }),
             // Bushido can put a card back into a public slot face down.
             // Its printed identity is unavailable even to the slot owner.
             Instruction::LiveCardSelect | Instruction::LiveCardSwap
@@ -216,6 +224,7 @@ impl NativeSession {
             return Err(unsupported("resolution sampling requires a live resolution prompt for the player"));
         }
         if let (Some(objects), Some(frame)) = (&self.objects, self.stack.last())
+            && !matches!(self.steps[frame.instruction].instruction, Instruction::LiveCardGuess { reveal: false })
             && self.search_step_reads_concealed_state(
                 objects, frame.instruction, frame.object, player,
             )?
@@ -236,6 +245,11 @@ impl NativeSession {
         let mut samples = (0..seeds.len()).map(|_| Vec::new()).collect::<Vec<_>>();
         for (index, hero) in self.world.heroes.iter().enumerate() {
             if hero.id == player {
+                for (world, seed) in samples.iter_mut().zip(seeds) {
+                    if let Some(sample) = self.preserved_gold_sample(&observation, index, *seed)? {
+                        world.push(sample);
+                    }
+                }
                 continue;
             }
             let protected = [hero.current, hero.extra];
@@ -263,7 +277,7 @@ impl NativeSession {
             for (world, hand) in samples.iter_mut().zip(hands) {
                 world.push(PlanningHandSample {
                     hero: hero.id,
-                    hand,
+                    update: SampledCards::Hand(hand),
                     fixed: protected,
                 });
             }
@@ -311,6 +325,7 @@ impl NativeSession {
         &mut self,
         player: Symbol,
         samples: Vec<PlanningHandSample>,
+        seed: Option<u64>,
         operation: impl FnOnce(&mut Self) -> Result<T>,
     ) -> Result<T> {
         self.with_rollback(|worker| {
@@ -319,15 +334,20 @@ impl NativeSession {
                 .ok_or_else(|| unsupported("sampled resolution root request missing"))?;
             worker.with_live_objects(|session, objects| {
                 for sample in samples {
-                    session.replace_sampled_hand(
-                        objects,
-                        sample.hero,
-                        &sample.hand,
-                        sample.fixed,
-                    )?;
+                    match sample.update {
+                        SampledCards::Hand(hand) => session.replace_sampled_hand(
+                            objects, sample.hero, &hand, sample.fixed,
+                        )?,
+                        SampledCards::ConcealedGold(slot, gold) => {
+                            session.bind_sampled_gold(objects, sample.hero, slot, &gold)?;
+                        }
+                    }
                 }
                 session.sync_card_collections_bound(objects)?;
                 session.world.refresh_card_auras();
+                if let Some(seed) = seed {
+                    session.bind_sampled_guess(objects, seed)?;
+                }
                 objects.readonly.take();
                 Ok(())
             })?;
@@ -376,6 +396,7 @@ impl NativeSession {
         let mut samples = Vec::new();
         for (index, hero) in self.world.heroes.iter().enumerate() {
             if hero.id == player || preserved.contains(&hero.id) {
+                samples.extend(self.preserved_gold_sample(&observation, index, seed)?);
                 continue;
             }
             let public = &mut observation.heroes[index];
@@ -416,11 +437,28 @@ impl NativeSession {
                 )))?;
             samples.push(PlanningHandSample {
                 hero: hero.id,
-                hand,
+                update: SampledCards::Hand(hand),
                 fixed,
             });
         }
         Ok(samples)
+    }
+
+    fn preserved_gold_sample(
+        &self,
+        observation: &super::super::PlayerObservation,
+        index: usize,
+        seed: u64,
+    ) -> Result<Option<PlanningHandSample>> {
+        Ok(super::super::loadout::sample_preserved_gold(
+            &observation.heroes[index],
+            seed.wrapping_add(index as u64),
+        )?
+        .map(|(slot, gold)| PlanningHandSample {
+            hero: self.world.heroes[index].id,
+            update: SampledCards::ConcealedGold(slot, gold),
+            fixed: [None, None],
+        }))
     }
 
     fn validate_sampled_resolution_effects(&self) -> Result<()> {
@@ -465,6 +503,19 @@ impl NativeSession {
                         "imbue_doubt" | "time_to_reconsider" | "an_illusion_of_choice"
                     )
                 });
+            let journey = (kind == "delayed_trigger"
+                && effect.duration == crate::effects::Duration::ThisTurn
+                && effect.token.is_none()
+                && effect.granted_passive.is_none())
+                .then(|| effect.card.map(|card| self.symbols.name(card)))
+                .flatten()
+                .filter(|card| matches!(*card,
+                    "unexpected_journey" | "there_and_back_again" | "safe_travels"));
+            let another_one = kind == "delayed_trigger"
+                && effect.duration == crate::effects::Duration::ThisTurn
+                && effect.token.is_none()
+                && effect.granted_passive.is_none()
+                && effect.card.is_some_and(|card| self.symbols.name(card) == "another_one");
             let sentinel = (kind == "delayed_trigger"
                 && effect.duration == crate::effects::Duration::ThisTurn
                 && effect.token.is_none()
@@ -479,6 +530,7 @@ impl NativeSession {
                 Kind::PreMovement
                     | Kind::PreDiscard
                     | Kind::AttackImmunity
+                    | Kind::ActionImmunity
                     | Kind::PlacementPrevention
                     | Kind::MinionProtection
                     | Kind::MovementZone
@@ -487,7 +539,7 @@ impl NativeSession {
                     | Kind::MovementAura
                     | Kind::StaticBarrier
                     | Kind::Petrify
-            ) || action_restriction || round_marker || reverse_time || public_color_trigger || sentinel.is_some();
+            ) || action_restriction || round_marker || reverse_time || public_color_trigger || sentinel.is_some() || journey.is_some() || another_one;
             if !public {
                 return Err(unsupported(format!(
                     "resolution sampling does not support {:?} effect {kind}",
@@ -497,6 +549,16 @@ impl NativeSession {
             // The dense projection omits finishing programs for arena sessions.
             // These programs can still retain references to hidden objects.
             let finishing = objects.finishing_list(node)?;
+            if another_one {
+                self.validate_sampled_retrieval(objects, finishing)?;
+                continue;
+            }
+            if let Some(card) = journey {
+                self.validate_sampled_journey(
+                    objects, finishing, effect.source, card == "safe_travels",
+                )?;
+                continue;
+            }
             if public_color_trigger || sentinel.is_some() {
                 // The stored steps target public units and then use the
                 // sampled hand for any discard. Require the expected program.
@@ -532,6 +594,74 @@ impl NativeSession {
                     "resolution sampling does not support finishing steps on {kind}",
                 )));
             }
+        }
+        Ok(())
+    }
+
+    fn validate_sampled_retrieval(
+        &self,
+        objects: &BoundObjects,
+        finishing: ObjectId,
+    ) -> Result<()> {
+        use crate::card_selection::Container;
+
+        let steps = objects.steps_in_list(finishing)?;
+        let program = |step| objects.program(step).map(|index| &self.steps[index].instruction);
+        let [target, their_card, their_retrieve, own_card, own_retrieve] = steps.as_slice() else {
+            return Err(unsupported("unexpected Another One retrieval program"));
+        };
+        if !matches!(program(*target), Some(Instruction::LiveUnitSelect))
+            || !matches!(program(*their_retrieve), Some(Instruction::LiveRetrieve))
+            || !matches!(program(*own_retrieve), Some(Instruction::LiveRetrieve))
+            || steps.iter().any(|step| !matches!(
+                objects.arena.field_ref(*step, objects.pending),
+                None | Some(ObjectValue::Atom(Datum::Null))
+            ))
+        {
+            return Err(unsupported("unexpected Another One retrieval program"));
+        }
+        for select in [*their_card, *own_card] {
+            if !matches!(program(select), Some(Instruction::LiveCardSelect)) {
+                return Err(unsupported("Another One requires a discard selector"));
+            }
+            let spec = self.card_spec_bound(objects, select)?;
+            if !matches!(spec.containers.as_slice(), [Container::Discard]) || spec.facedown {
+                return Err(unsupported("Another One requires a public discard selector"));
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_sampled_journey(
+        &self,
+        objects: &BoundObjects,
+        finishing: ObjectId,
+        source: Symbol,
+        move_after: bool,
+    ) -> Result<()> {
+        let steps = objects.steps_in_list(finishing)?;
+        let program = |step| {
+            objects.program(step).map(|index| &self.steps[index].instruction)
+        };
+        let swap = match steps.as_slice() {
+            [swap] if !move_after => *swap,
+            [swap, select, movement] if move_after
+                && matches!(program(*select), Some(Instruction::LiveHexSelect))
+                && matches!(program(*movement), Some(Instruction::LiveMove))
+                && self.passive_optional_text_bound(objects, *movement, Field::UnitId)?
+                    == Some(source) => *swap,
+            _ => return Err(unsupported("unexpected Journey return program")),
+        };
+        let target = self.passive_optional_text_bound(objects, swap, Field::UnitBId)?;
+        if !matches!(program(swap), Some(Instruction::LiveSwap))
+            || self.passive_optional_text_bound(objects, swap, Field::UnitAId)? != Some(source)
+            || target.is_none_or(|id| id == source || self.world.hero(id).is_none())
+            || steps.iter().any(|step| !matches!(
+                objects.arena.field_ref(*step, objects.pending),
+                None | Some(ObjectValue::Atom(Datum::Null))
+            ))
+        {
+            return Err(unsupported("Journey return requires public hero bindings and fresh steps"));
         }
         Ok(())
     }
@@ -613,7 +743,14 @@ impl NativeSession {
     fn install_planning_samples(&mut self, samples: Vec<PlanningHandSample>) -> Result<()> {
         self.with_live_objects(|session, objects| {
             for sample in samples {
-                session.install_planning_hand(objects, sample.hero, &sample.hand, sample.fixed)?;
+                match sample.update {
+                    SampledCards::Hand(hand) => {
+                        session.install_planning_hand(objects, sample.hero, &hand, sample.fixed)?;
+                    }
+                    SampledCards::ConcealedGold(slot, gold) => {
+                        session.bind_sampled_gold(objects, sample.hero, slot, &gold)?;
+                    }
+                }
             }
             session.sync_card_collections_bound(objects)?;
             session.world.refresh_card_auras();
@@ -1445,17 +1582,20 @@ mod tests {
                 .find(|row| root.symbols.name(row.hero) == "hero_swift").unwrap();
             let hero = hidden.hero;
             let old_hand = root.world.hero(hero).unwrap().hand.clone();
+            let SampledCards::Hand(hand) = &mut hidden.update else {
+                panic!("expected a sampled hand");
+            };
             let replacement = root.with_live_objects(|session, objects| {
                 let model = session.hero_model_bound(objects, hero).unwrap();
                 let deck = session.hero_card_list_bound(objects, model, Field::Deck)?;
                 Ok(deck.into_iter().flatten().find_map(|card| {
                     let id = session.printed_observation_card(card).unwrap();
                     (!old_hand.contains(&card) && !hidden.fixed.contains(&Some(card))
-                        && !hidden.hand.cards.contains(&id)).then_some(id)
+                        && !hand.cards.contains(&id)).then_some(id)
                 }).unwrap())
             }).unwrap();
-            hidden.hand.cards[0] = replacement;
-            root.with_installed_resolution_samples(request.owner, samples, |worker| {
+            hand.cards[0] = replacement;
+            root.with_installed_resolution_samples(request.owner, samples, None, |worker| {
                 assert!(worker.world.hero(hero).unwrap().hand.iter()
                     .any(|card| !old_hand.contains(card)));
                 assert_eq!(worker.player_observation(request.owner)?, view);
@@ -1553,6 +1693,7 @@ mod tests {
         use crate::effect_rules::Kind;
         for kind in [
             Kind::PreDiscard,
+            Kind::ActionImmunity,
             Kind::MovementZone,
             Kind::LosBlocker,
             Kind::AreaStat,

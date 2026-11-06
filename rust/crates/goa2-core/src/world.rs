@@ -88,7 +88,7 @@ pub struct CardInstance {
     pub initiative_override: Option<i64>,
     pub metadata: Datum,
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum EntityKind {
     Hero,
     Minion,
@@ -96,7 +96,7 @@ pub enum EntityKind {
     Token,
     Other,
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct EntityDefinition {
     pub id: Symbol,
     pub name: Symbol,
@@ -833,10 +833,36 @@ impl NativeWorld {
     }
 
     pub(crate) fn world_state_fingerprint(&mut self) -> u128 {
+        use std::hash::{DefaultHasher, Hash, Hasher};
+
+        let mut token_overrides: Vec<_> = self.entity_overrides.iter().collect();
+        token_overrides.sort_unstable_by_key(|(id, _)| **id);
+        let mut board_overrides: Vec<_> = self.board_entity_overrides.iter().collect();
+        board_overrides.sort_unstable_by_key(|(id, _)| id.0);
+        let lane = |salt| {
+            let mut hash = DefaultHasher::new();
+            (
+                "world counters",
+                salt,
+                &self.history,
+                &self.combat,
+                self.acting_piece,
+                &self.battle_zones,
+                &self.waves,
+                &self.markers,
+                self.next_entity_id,
+                (self.has_effects, self.has_uncompiled_auras),
+                &token_overrides,
+                &board_overrides,
+            ).hash(&mut hash);
+            hash.finish()
+        };
+        let counters = u128::from(lane(0u64)) | (u128::from(lane(1u64)) << 64);
         self.spatial_fingerprint
             ^ self.heroes.fingerprint.read(&self.heroes.rows, 3)
             ^ self.card_fingerprint.read(&self.cards, 4)
             ^ self.effects.fingerprint()
+            ^ counters
     }
 
     pub(crate) fn begin_rows_rollback(&mut self) -> WorldRowsCheckpoint {
@@ -1399,16 +1425,14 @@ mod tests {
         );
         staged.heroes[0].gold += 1;
         let before_card = staged.world_state_fingerprint();
+        let before_card_rows = RowFingerprint::default().read(&staged.cards, 4);
         let card = CardId(staged.cards[0].source_instance);
         staged.card_mut(card).unwrap().metadata = Datum::List(vec![Datum::Float(1.5)]);
         let staged_fingerprint = staged.world_state_fingerprint();
         assert_ne!(staged_fingerprint, before_card);
         assert_eq!(
-            staged_fingerprint,
-            staged.spatial_fingerprint
-                ^ RowFingerprint::default().read(&staged.heroes.rows, 3)
-                ^ RowFingerprint::default().read(&staged.cards, 4)
-                ^ staged.effects.fingerprint()
+            staged_fingerprint ^ before_card,
+            RowFingerprint::default().read(&staged.cards, 4) ^ before_card_rows
         );
         assert_ne!(staged_fingerprint, outer_fingerprint);
         staged.restore_rows(outer_mark, &mut outer);

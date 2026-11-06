@@ -18,6 +18,16 @@ pub struct OfflinePolicy {
     pub max_nodes: usize,
     pub time_ms: u64,
     pub rollout_turns: Option<u8>,
+    pub planning_workers: Option<usize>,
+    pub reply_cap: Option<usize>,
+    #[serde(default)]
+    pub greedy_card_order: bool,
+    #[serde(default)]
+    pub fixed_future_planning: bool,
+    #[serde(default)]
+    pub branch_future_planning: bool,
+    #[serde(default)]
+    pub opponent_policy: OpponentPolicy,
     #[serde(default)]
     pub sample_choices: bool,
     #[serde(default)]
@@ -29,7 +39,7 @@ impl OfflinePolicy {
         SearchLimits {
             max_depth: self.depth,
             max_nodes: self.max_nodes,
-            opponent_policy: OpponentPolicy::Adversarial,
+            opponent_policy: self.opponent_policy,
             evaluation: self.evaluation,
         }
     }
@@ -48,6 +58,17 @@ pub struct OfflinePolicyStats {
     resolution: usize,
     forced: usize,
     fallback: usize,
+    planning_best_so_far: usize,
+    planning_with_greedy_scores: usize,
+    planning_greedy_card_scores: usize,
+    planning_forecast_changes: usize,
+    planning_forecast_checks: usize,
+    planning_forecast_matches: usize,
+    resolution_best_so_far: usize,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    planning_micros: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    resolution_micros: Vec<u64>,
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     resolution_fallbacks: BTreeMap<String, usize>,
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
@@ -93,6 +114,8 @@ impl NativeSession {
             || policies.iter().any(|policy| {
                 policy.depth > 64
                     || (policy.sample_choices && policy.depth != 0)
+                    || policy.planning_workers.is_some_and(|workers| !(1..=2).contains(&workers))
+                    || policy.reply_cap.is_some_and(|cap| !(1..=4096).contains(&cap))
                     || policy.max_nodes == 0
                     || !(1..=60_000).contains(&policy.time_ms)
                     || policy
@@ -152,13 +175,14 @@ impl NativeSession {
                     let index = team_index(self.symbols.name(hero.team))?;
                     let policy = policies[index];
                     stats[index].planning += 1;
+                    let started = (capture_trace && policy.depth > 0).then(Instant::now);
                     let plan = if policy.sample_choices {
                         let choices = self.hero_planning_commitments(hero.id)?;
                         choices[choice_index(hero.id, choices.len())]
                     } else if policy.depth == 0 {
                         fallback
                     } else {
-                        match self.search_bot_team_planning(
+                        let search = self.search_bot_team_planning(
                             hero.id,
                             BotPlanningScope {
                                 bots: &[hero.id],
@@ -170,12 +194,33 @@ impl NativeSession {
                             policy.limits(),
                             PlanningSearchOptions {
                                 rollout_turns: policy.rollout_turns,
-                                workers: 1,
+                                workers: policy.planning_workers.unwrap_or(1),
                                 upgrade_checkpoints: None,
+                                reply_cap: policy.reply_cap,
+                                reply_probe_cap: None,
+                                greedy_card_order: policy.greedy_card_order,
+                                fixed_future_planning: policy.fixed_future_planning,
+                                branch_future_planning: policy.branch_future_planning,
                             },
                             &policy.budget(),
-                        ) {
-                            Ok(result) if result.matrix.score.is_some() => result.commitments[0],
+                        );
+                        if let Ok(result) = &search {
+                            stats[index].planning_with_greedy_scores +=
+                                usize::from(result.greedy_card_scores > 0);
+                            stats[index].planning_greedy_card_scores += result.greedy_card_scores;
+                            stats[index].planning_forecast_changes += result.matrix.forecast_changes;
+                            stats[index].planning_forecast_checks += result.matrix.forecast_checks;
+                            stats[index].planning_forecast_matches += result.matrix.forecast_matches;
+                        }
+                        match search {
+                            Ok(result) if result.matrix.score.is_some() => {
+                                if result.matrix.completed_rows + result.matrix.pruned_rows
+                                    < result.total_rows
+                                {
+                                    stats[index].planning_best_so_far += 1;
+                                }
+                                result.commitments[0]
+                            },
                             other => {
                                 let reason = match other {
                                     Ok(result) if result.prepared_worlds < result.requested_worlds => {
@@ -195,6 +240,9 @@ impl NativeSession {
                             }
                         }
                     };
+                    if let Some(started) = started {
+                        stats[index].planning_micros.push(started.elapsed().as_micros() as u64);
+                    }
                     joint.push(plan);
                 }
                 if let Some(trace) = &mut trace {
@@ -214,6 +262,7 @@ impl NativeSession {
                 let index = team_index(self.symbols.name(team))?;
                 let policy = policies[index];
                 stats[index].resolution += 1;
+                let started = (capture_trace && policy.depth > 0).then(Instant::now);
                 let fallback = |session: &mut Self| {
                     session.first_resolution_choice(owner)?.ok_or_else(|| {
                         EngineError::Unsupported("offline match has no legal input".into())
@@ -247,7 +296,12 @@ impl NativeSession {
                         &policy.budget(),
                     );
                     match searched {
-                        Ok(result) if result.score.is_some() => result.decision,
+                        Ok(result) if result.score.is_some() => {
+                            if !result.resolved && result.completed_depth < policy.depth {
+                                stats[index].resolution_best_so_far += 1;
+                            }
+                            result.decision
+                        },
                         other => {
                             let reason = match other {
                                 Ok(result) => format!("{:?} before a scored move", result.stop),
@@ -273,6 +327,9 @@ impl NativeSession {
                         }
                     }
                 };
+                if let Some(started) = started {
+                    stats[index].resolution_micros.push(started.elapsed().as_micros() as u64);
+                }
                 let DecisionMove::Input {
                     request: Some(token),
                     selection,

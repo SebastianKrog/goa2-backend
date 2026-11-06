@@ -7,7 +7,7 @@ use crate::{
 };
 use serde_json::{Value, json};
 use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ObjectId(usize);
@@ -170,11 +170,34 @@ impl Drop for ArenaRollback<'_> {
     }
 }
 
+#[derive(Clone)]
+struct ObjectPage {
+    objects: Vec<Arc<Object>>,
+    fingerprint: OnceLock<[u64; 2]>,
+}
+
+impl ObjectPage {
+    fn recompute_fingerprint(&self) -> [u64; 2] {
+        use std::hash::{DefaultHasher, Hash, Hasher};
+
+        [0u64, 1].map(|salt| {
+            let mut state = DefaultHasher::new();
+            (salt, &self.objects).hash(&mut state);
+            state.finish()
+        })
+    }
+
+    fn objects_mut(&mut self) -> &mut Vec<Arc<Object>> {
+        self.fingerprint.take();
+        &mut self.objects
+    }
+}
+
 // Forks share pages of handles. The undo journal still records individual
-// object edits, and the page layout has no effect on IDs or execution hashes.
+// object edits, and cached hashes are invalidated only on edited pages.
 #[derive(Clone, Default)]
 struct ObjectPages {
-    pages: Vec<Arc<Vec<Arc<Object>>>>,
+    pages: Vec<Arc<ObjectPage>>,
     revisions: Vec<u64>,
     revision: u64,
     len: usize,
@@ -182,7 +205,7 @@ struct ObjectPages {
 
 impl std::fmt::Debug for ObjectPages {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.pages.fmt(formatter)
+        formatter.debug_list().entries(self.pages.iter().map(|page| &page.objects)).finish()
     }
 }
 
@@ -202,7 +225,7 @@ impl ObjectPages {
     fn get(&self, index: usize) -> Option<&Arc<Object>> {
         self.pages
             .get(index / Self::PAGE_LEN)?
-            .get(index % Self::PAGE_LEN)
+            .objects.get(index % Self::PAGE_LEN)
     }
 
     fn touch(&mut self, page: usize) {
@@ -212,12 +235,14 @@ impl ObjectPages {
 
     fn push(&mut self, object: Arc<Object>) {
         if self.len % Self::PAGE_LEN == 0 {
-            self.pages
-                .push(Arc::new(Vec::with_capacity(Self::PAGE_LEN)));
+            self.pages.push(Arc::new(ObjectPage {
+                objects: Vec::with_capacity(Self::PAGE_LEN),
+                fingerprint: OnceLock::new(),
+            }));
             self.revisions.push(0);
         }
         self.touch(self.pages.len() - 1);
-        Arc::make_mut(self.pages.last_mut().unwrap()).push(object);
+        Arc::make_mut(self.pages.last_mut().unwrap()).objects_mut().push(object);
         self.len += 1;
     }
 
@@ -229,9 +254,9 @@ impl ObjectPages {
         self.pages.truncate(pages);
         self.revisions.truncate(pages);
         let tail = len % Self::PAGE_LEN;
-        if tail != 0 && self.pages.last().unwrap().len() > tail {
+        if tail != 0 && self.pages.last().unwrap().objects.len() > tail {
             self.touch(pages - 1);
-            Arc::make_mut(self.pages.last_mut().unwrap()).truncate(tail);
+            Arc::make_mut(self.pages.last_mut().unwrap()).objects_mut().truncate(tail);
         }
         self.len = len;
     }
@@ -241,7 +266,7 @@ impl std::ops::Index<usize> for ObjectPages {
     type Output = Arc<Object>;
 
     fn index(&self, index: usize) -> &Self::Output {
-        &self.pages[index / Self::PAGE_LEN][index % Self::PAGE_LEN]
+        &self.pages[index / Self::PAGE_LEN].objects[index % Self::PAGE_LEN]
     }
 }
 
@@ -249,15 +274,15 @@ impl std::ops::IndexMut<usize> for ObjectPages {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         let page = index / Self::PAGE_LEN;
         self.touch(page);
-        &mut Arc::make_mut(&mut self.pages[page])[index % Self::PAGE_LEN]
+        &mut Arc::make_mut(&mut self.pages[page]).objects_mut()[index % Self::PAGE_LEN]
     }
 }
 
 impl std::hash::Hash for ObjectPages {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.len.hash(state);
-        for object in self.pages.iter().flat_map(|page| page.iter()) {
-            object.hash(state);
+        for page in &self.pages {
+            page.fingerprint.get_or_init(|| page.recompute_fingerprint()).hash(state);
         }
     }
 }
@@ -1887,6 +1912,10 @@ mod protection_tests {
         });
 
         assert_eq!(hash(&arena), original);
+        assert_ne!(hash(&fork), original);
+        for page in arena.objects.pages.iter().chain(&fork.objects.pages) {
+            assert_eq!(page.fingerprint.get(), Some(&page.recompute_fingerprint()));
+        }
         assert!(arena.objects[slot.0].tracked);
         assert!(!fork.objects[slot.0].tracked);
         assert!(fork.objects[slot.0].deepcopy_shared);

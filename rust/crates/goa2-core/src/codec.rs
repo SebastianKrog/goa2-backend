@@ -122,7 +122,7 @@ pub struct StateEnvelope {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub native_resume: Option<NativeResume>,
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize, Hash)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum Phase {
     Setup,

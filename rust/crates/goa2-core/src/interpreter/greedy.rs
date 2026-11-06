@@ -249,9 +249,12 @@ pub struct GreedyPlan {
     pub score: i64,
 }
 
+type CardSequence = [Option<PlanningCommitment>; 4];
+
 #[derive(Debug, Default)]
 pub struct GreedySearch {
     pub best: Option<GreedyPlan>,
+    card_sequence_scores: Option<std::collections::HashMap<CardSequence, i64>>,
     pub nodes: usize,
     pub completed_sequences: usize,
     pub positional_probes: usize,
@@ -270,6 +273,96 @@ pub struct GreedySearch {
     pub profile: Option<GreedyProfile>,
     pub tactical_probes: usize,
     pub tactical_target_reuses: usize,
+}
+
+impl GreedySearch {
+    pub fn turn_card_scores(&self, offset: usize) -> Vec<(Option<CardId>, i64)> {
+        self.card_scores_at(offset, &[])
+    }
+
+    fn card_scores_at(
+        &self,
+        offset: usize,
+        history: &[Option<PlanningCommitment>],
+    ) -> Vec<(Option<CardId>, i64)> {
+        let mut scores: Vec<(Option<CardId>, i64)> = Vec::new();
+        if let Some(sequences) = &self.card_sequence_scores {
+            for (sequence, &score) in sequences {
+                if !sequence.starts_with(history) {
+                    continue;
+                }
+                let Some(Some(choice)) = sequence.get(offset) else {
+                    continue;
+                };
+                if let Some((_, best)) = scores.iter_mut().find(|(card, _)| *card == choice.first) {
+                    *best = (*best).max(score);
+                } else {
+                    scores.push((choice.first, score));
+                }
+            }
+        }
+        scores.sort_by_key(|(card, _)| card.map(|id| id.0));
+        scores
+    }
+
+    /// Normalize cards seen in completed plans at one offset.
+    pub fn turn_card_likelihoods(&self, offset: usize) -> Option<Vec<(Option<CardId>, f64)>> {
+        let scores = self.turn_card_scores(offset);
+        let cards = scores.iter().map(|(card, _)| *card);
+        Self::normalize_card_scores(&scores, cards)
+    }
+
+    /// Predict the next card given the previous planning commitments and
+    /// the distinct legal first choices on the actual branch. No matching
+    /// legal forecast lets the caller fall back to its ordinary policy.
+    pub fn next_card_likelihoods(
+        &self,
+        history: &[Option<PlanningCommitment>],
+        legal: &[Option<CardId>],
+    ) -> Option<Vec<(Option<CardId>, f64)>> {
+        let mut scores = self.card_scores_at(history.len(), history);
+        scores.retain(|(card, _)| legal.contains(card));
+        if scores.is_empty() {
+            return None;
+        }
+        Self::normalize_card_scores(&scores, legal.iter().copied())
+    }
+
+    pub(super) fn preferred_next_card(
+        &self,
+        history: &[Option<PlanningCommitment>],
+        legal: &[Option<CardId>],
+    ) -> Option<Option<CardId>> {
+        let scores = self.card_scores_at(history.len(), history);
+        legal.iter().filter_map(|&card| {
+            let score = scores.iter().find_map(|&(id, score)| (id == card).then_some(score))?;
+            Some((card, score))
+        }).rev().max_by_key(|(_, score)| *score).map(|(card, _)| card)
+    }
+
+    fn normalize_card_scores(
+        scores: &[(Option<CardId>, i64)],
+        legal: impl Iterator<Item = Option<CardId>>,
+    ) -> Option<Vec<(Option<CardId>, f64)>> {
+        use super::search::{GREEDY_CARD_TEMPERATURE, greedy_card_cost};
+
+        let best = scores.iter().map(|(_, score)| *score).max();
+        let mut weights: Vec<_> = legal.map(|card| {
+            let cost = best.map_or(0, |best| {
+                let score = scores.iter().find_map(|&(id, score)| (id == card).then_some(score));
+                greedy_card_cost(best, score)
+            });
+            (card, (-(cost as f64) / GREEDY_CARD_TEMPERATURE as f64).exp())
+        }).collect();
+        if weights.is_empty() {
+            return None;
+        }
+        let total: f64 = weights.iter().map(|(_, weight)| *weight).sum();
+        for (_, weight) in &mut weights {
+            *weight /= total;
+        }
+        Some(weights)
+    }
 }
 
 #[derive(Debug, Default, serde::Serialize)]
@@ -355,13 +448,34 @@ impl NativeSession {
         options: GreedySearchOptions<'_>,
         budget: &super::ExecutionBudget<'_>,
     ) -> Result<GreedySearch> {
+        self.search_greedy_inner(player, options, budget, false)
+    }
+
+    /// Collect the best completed score for each card at each planning offset.
+    /// A missing score means no completed rollout used that card at that offset.
+    pub fn search_greedy_card_scores(
+        &mut self,
+        player: Symbol,
+        options: GreedySearchOptions<'_>,
+        budget: &super::ExecutionBudget<'_>,
+    ) -> Result<GreedySearch> {
+        self.search_greedy_inner(player, options, budget, true)
+    }
+
+    fn search_greedy_inner(
+        &mut self,
+        player: Symbol,
+        options: GreedySearchOptions<'_>,
+        budget: &super::ExecutionBudget<'_>,
+        collect_card_scores: bool,
+    ) -> Result<GreedySearch> {
         let team = self
             .world
             .hero(player)
             .filter(|row| row.id == player)
             .ok_or_else(|| EngineError::InvalidInput("greedy player must be a hero".into()))?
             .team;
-        if !(1..=3).contains(&options.turns)
+        if !(1..=4).contains(&options.turns)
             || options.max_nodes == 0
             || !options.controlled.contains(&player)
             || options.controlled.iter().any(|id| {
@@ -381,6 +495,7 @@ impl NativeSession {
             team,
             cutoff: self.search_turn_index() + i128::from(options.turns),
             result: GreedySearch {
+                card_sequence_scores: collect_card_scores.then(Default::default),
                 profile: options.profile.then(GreedyProfile::default),
                 ..GreedySearch::default()
             },
@@ -417,6 +532,21 @@ impl NativeSession {
             Ok(()) | Err(EngineError::Deadline | EngineError::Cancelled) => Ok(search.result),
             Err(error) => Err(error),
         }
+    }
+}
+
+struct UpgradeCandidateChanges<'a> {
+    chosen: CardId,
+    replaced: Option<CardId>,
+    item: Option<CardId>,
+    final_hand: Option<&'a [CardId]>,
+}
+
+impl UpgradeCandidateChanges<'_> {
+    fn preserves(&self, card: CardId) -> bool {
+        Some(card) != self.replaced
+            && Some(card) != self.item
+            && self.final_hand.is_none_or(|hand| card == self.chosen || hand.contains(&card))
     }
 }
 
@@ -485,7 +615,16 @@ impl GreedyTraversal<'_, '_, '_> {
 
     fn run(&mut self, worker: &mut NativeSession) -> Result<()> {
         let limit = self.options.max_nodes;
-        let seed_limit = (limit / 8).min(128);
+        let seed_divisor = if self.options.turns == 4 { 2 } else { 8 };
+        let seed_limit = (limit / seed_divisor).min(128);
+        if self.result.card_sequence_scores.is_some()
+            && self.options.controlled == [self.player]
+            && !self.options.fixed_card_order
+            && worker.planning.phase == crate::codec::Phase::Planning
+            && self.seed_first_cards(worker, limit)?
+        {
+            return self.visit(worker, limit);
+        }
         if self.options.position_first && !self.options.fixed_card_order && seed_limit >= 32 {
             // Complete one legal line before spending the remaining budget
             // collecting routes. Charge both passes to the same node limit.
@@ -500,6 +639,46 @@ impl GreedyTraversal<'_, '_, '_> {
         self.visit(worker, limit)
     }
 
+    fn seed_first_cards(&mut self, worker: &mut NativeSession, limit: usize) -> Result<bool> {
+        let mut seen = Vec::new();
+        let plans: Vec<_> = worker.hero_planning_commitments(self.player)?
+            .into_iter()
+            .filter(|plan| {
+                if seen.contains(&plan.first) {
+                    return false;
+                }
+                seen.push(plan.first);
+                true
+            })
+            .collect();
+        let quota = (limit / 2 / plans.len().max(1)).min(128);
+        if plans.is_empty() || quota < 32 {
+            return Ok(false);
+        }
+        let opponents = self.opponent_commitments(worker)?;
+        self.incumbent_only = true;
+        for plan in plans {
+            let mut commitments = vec![plan];
+            commitments.extend_from_slice(&opponents);
+            let branch_limit = self.result.nodes + quota;
+            self.result.nodes += 1;
+            self.path.push(GreedyStep::Planning(commitments.clone()));
+            let result = worker.with_joint_planning(&commitments, |branch| {
+                self.visit(branch, branch_limit)
+            });
+            self.path.pop();
+            if let Err(error) = result {
+                self.incumbent_only = false;
+                return Err(error);
+            }
+        }
+        self.incumbent_only = false;
+        if let Some(profile) = &mut self.result.profile {
+            profile.incumbent_nodes = self.result.nodes;
+        }
+        Ok(true)
+    }
+
     fn visit(&mut self, worker: &mut NativeSession, limit: usize) -> Result<()> {
         self.visit_with_target(worker, limit, None)
     }
@@ -510,10 +689,66 @@ impl GreedyTraversal<'_, '_, '_> {
         limit: usize,
         target: Option<DecisionMove>,
     ) -> Result<()> {
+        let base = self.path.len();
+        let result = self.visit_fixed_prefix(worker, limit, target);
+        self.path.truncate(base);
+        result
+    }
+
+    fn visit_fixed_prefix(
+        &mut self,
+        worker: &mut NativeSession,
+        limit: usize,
+        target: Option<DecisionMove>,
+    ) -> Result<()> {
         use crate::codec::Phase;
 
-        self.budget.check(0)?;
-        self.advance_profiled(worker)?;
+        loop {
+            self.budget.check(0)?;
+            self.advance_profiled(worker)?;
+            if self.options.tactical_replies
+                || target.is_some()
+                || matches!(worker.planning.phase, Phase::Planning | Phase::GameOver)
+                || worker.search_turn_index() >= self.cutoff
+                || self.result.nodes >= limit
+                || matches!(
+                    worker.last_request.as_ref().map(|request| &request.choices),
+                    Some(RequestChoices::Upgrades(_))
+                )
+            {
+                break;
+            }
+            let Some((owner, _)) = worker.search_player()? else {
+                break;
+            };
+            if self.options.controlled.contains(&owner) {
+                break;
+            }
+            let decision = worker.greedy_opponent_input(owner, self.policy_seed(worker, owner))?
+                .ok_or_else(|| EngineError::Unsupported(
+                    "greedy search found no legal continuation".into(),
+                ))?;
+            let DecisionMove::Input { request: Some(token), selection, .. } = &decision else {
+                unreachable!("fixed choices are issued inputs");
+            };
+            let (token, selection) = (*token, selection.clone());
+            self.result.nodes += 1;
+            self.path.push(GreedyStep::Input(decision));
+            // The caller already owns a rollback scope or a private fork.
+            worker.last_request = None;
+            worker.submit(token, selection)?;
+        }
+        self.visit_ready(worker, limit, target)
+    }
+
+    fn visit_ready(
+        &mut self,
+        worker: &mut NativeSession,
+        limit: usize,
+        target: Option<DecisionMove>,
+    ) -> Result<()> {
+        use crate::codec::Phase;
+
         if worker.planning.phase == Phase::GameOver || worker.search_turn_index() >= self.cutoff {
             let score = worker.search_score(self.options.evaluation, self.team, self.player)?;
             self.record_leaf(score);
@@ -540,8 +775,9 @@ impl GreedyTraversal<'_, '_, '_> {
         {
             self.explore_position_routes(worker, limit)?;
         }
+        let planning = worker.planning.phase == Phase::Planning;
         let mut next_target = None;
-        let candidates = if worker.planning.phase == Phase::Planning {
+        let candidates = if planning {
             let fixed = self.opponent_commitments(worker)?;
             self.controlled_plans(worker, limit - self.result.nodes)?
                 .into_iter()
@@ -571,14 +807,20 @@ impl GreedyTraversal<'_, '_, '_> {
             ));
         }
 
+        let completed = self.result.completed_sequences;
         let count = candidates.len();
+        // Preserve room for another card after a later planning boundary.
+        // Small branches still prioritize finishing one complete rollout.
+        let balance_cards = planning
+            && self.result.card_sequence_scores.is_some()
+            && (limit - self.result.nodes) / count >= 32;
         for (index, step) in candidates.into_iter().enumerate() {
             if self.result.nodes >= limit {
                 break;
             }
             // Reserve work for competing root choices instead of exhausting
             // the budget under the first card order.
-            let branch_limit = self.branch_limit(limit, count - index);
+            let branch_limit = self.branch_limit(limit, count - index, balance_cards);
             self.result.nodes += 1;
             self.path.push(step.clone());
             let result = match step {
@@ -596,7 +838,7 @@ impl GreedyTraversal<'_, '_, '_> {
             };
             self.path.pop();
             result?;
-            if self.incumbent_only && self.result.best.is_some() {
+            if self.incumbent_only && self.result.completed_sequences > completed {
                 break;
             }
         }
@@ -610,6 +852,17 @@ impl GreedyTraversal<'_, '_, '_> {
                 .get_or_insert_with(|| elapsed_ns(start));
         }
         self.result.completed_sequences += 1;
+        if let Some(scores) = &mut self.result.card_sequence_scores {
+            let mut sequence = [None; 4];
+            let planning = self.path.iter().filter_map(|step| match step {
+                GreedyStep::Planning(commitments) => Some(commitments),
+                GreedyStep::Input(_) => None,
+            });
+            for (slot, commitments) in sequence.iter_mut().zip(planning) {
+                *slot = commitments.iter().find(|row| row.hero == self.player).copied();
+            }
+            scores.entry(sequence).and_modify(|best| *best = (*best).max(score)).or_insert(score);
+        }
         if self
             .result
             .best
@@ -623,6 +876,12 @@ impl GreedyTraversal<'_, '_, '_> {
         }
     }
 
+    fn short_discovery_deadline(&self) -> Option<std::time::Instant> {
+        let now = std::time::Instant::now();
+        let time_left = self.budget.deadline?.saturating_duration_since(now);
+        (time_left <= std::time::Duration::from_millis(200)).then_some(now + time_left / 4)
+    }
+
     fn explore_position_routes(&mut self, worker: &mut NativeSession, limit: usize) -> Result<()> {
         let remaining = limit - self.result.nodes;
         if remaining < 128 {
@@ -630,17 +889,23 @@ impl GreedyTraversal<'_, '_, '_> {
         }
         let discovery_limit = self.result.nodes + remaining / 4;
         let follow_limit = self.result.nodes + remaining / 2;
+        let discovery_deadline = self.short_discovery_deadline();
         let controlled = self.controlled_plans(worker, (remaining / 64).min(32))?;
         let fixed = self.opponent_commitments(worker)?;
         let turn = worker.search_turn_index();
         let mut routes = Vec::new();
         let count = controlled.len();
         for (index, mut plan) in controlled.into_iter().enumerate() {
-            if self.result.nodes == discovery_limit {
+            if self.result.nodes == discovery_limit
+                || (!routes.is_empty()
+                    && discovery_deadline.is_some_and(|deadline| std::time::Instant::now() >= deadline))
+            {
                 break;
             }
-            let plan_limit = self.result.nodes
-                + ((discovery_limit - self.result.nodes) / (count - index)).max(1);
+            let quota = ((discovery_limit - self.result.nodes) / (count - index)).max(1);
+            // Recheck the wall-time split between bounded collection chunks.
+            let quota = if discovery_deadline.is_some() { quota.min(128) } else { quota };
+            let plan_limit = self.result.nodes + quota;
             plan.extend_from_slice(&fixed);
             self.result.nodes += 1;
             self.path.push(GreedyStep::Planning(plan.clone()));
@@ -1233,13 +1498,15 @@ impl GreedyTraversal<'_, '_, '_> {
                 unreachable!("upgrade choices are issued inputs");
             };
             let compatible = first.map(|cards| {
+                let changes = (owner == self.player)
+                    .then(|| self.upgrade_candidate_changes(worker, selection))
+                    .flatten();
                 cards
                     .iter()
                     .copied()
                     .filter(|&card| {
                         self.upgrade_can_keep_first(worker, card)
-                            && (owner != self.player
-                                || self.upgrade_preserves_candidate(worker, card, selection))
+                            && changes.as_ref().is_none_or(|change| change.preserves(card))
                     })
                     .collect::<Vec<_>>()
             });
@@ -1280,71 +1547,50 @@ impl GreedyTraversal<'_, '_, '_> {
                 .any(|(hero, _)| *hero == self.player)
     }
 
-    fn upgrade_preserves_candidate(
+    fn upgrade_candidate_changes<'a>(
         &self,
-        worker: &NativeSession,
-        card: CardId,
+        worker: &'a NativeSession,
         selection: &Datum,
-    ) -> bool {
+    ) -> Option<UpgradeCandidateChanges<'a>> {
         let Datum::Object(fields) = selection else {
-            return true;
+            return None;
         };
-        let Some(printed) = fields.iter().find_map(|(key, value)| match value {
+        let printed = fields.iter().find_map(|(key, value)| match value {
             Datum::Text(id) if worker.symbols.name(*key) == "card_id" => Some(*id),
             _ => None,
-        }) else {
-            return true;
+        })?;
+        let hero = worker.world.hero(self.player)?;
+        let RequestChoices::Upgrades(players) = &worker.last_request.as_ref()?.choices else {
+            return None;
         };
-        let hero = worker
-            .world
-            .hero(self.player)
-            .expect("validated search player");
-        let Some(candidate) = worker.world.card(card) else {
-            return false;
-        };
-        let definition = &worker.world.definitions.cards[candidate.definition];
-        if hero.hand.iter().copied().find(|id| {
-            worker.world.card(*id).is_some_and(|row| {
-                worker.world.definitions.cards[row.definition].color == definition.color
-            })
-        }) == Some(card)
-        {
-            return !hero
-                .deck
-                .iter()
-                .filter_map(|id| worker.world.card(*id))
-                .any(|row| {
-                    let upgrade = &worker.world.definitions.cards[row.definition];
-                    upgrade.printed_id == printed
-                        && upgrade.color == definition.color
-                        && worker.symbols.name(upgrade.tier) != "IV"
-                });
-        }
-        if hero.hand.contains(&card) {
-            return true;
-        }
-        !worker
-            .round
-            .pending
+        let (option, chosen) = players
             .iter()
+            .filter(|row| row.hero == self.player)
+            .flat_map(|row| &row.options)
+            .find_map(|option| {
+                let chosen = option.pair.iter().copied().find(|&id| {
+                    worker.world.card(id).is_some_and(|row| {
+                        worker.world.definitions.cards[row.definition].printed_id == printed
+                    })
+                })?;
+                Some((option, chosen))
+            })?;
+        let ordinary = worker.symbols.name(option.tier) != "IV";
+        let replaced = ordinary.then(|| {
+            hero.hand.iter().copied().find(|&id| {
+                worker.world.card(id).is_some_and(|row| {
+                    worker.world.definitions.cards[row.definition].color == Some(option.color)
+                })
+            })
+        }).flatten();
+        let item = ordinary.then(|| option.pair.iter().copied().find(|&id| id != chosen)).flatten();
+        let final_hand = worker.round.pending.iter()
             .any(|(id, levels)| *id == self.player && *levels == 1)
-            || definition.printed_id == printed
+            .then_some(hero.hand.as_slice());
+        Some(UpgradeCandidateChanges { chosen, replaced, item, final_hand })
     }
 
-    fn visit_deferred_upgrades(
-        &mut self,
-        worker: &mut NativeSession,
-        limit: usize,
-    ) -> Result<bool> {
-        let remaining = limit - self.result.nodes;
-        if remaining < 8 {
-            return Ok(false);
-        }
-        let base = self.path.len();
-        let completed = self.result.completed_sequences;
-        let position_first = self.options.position_first && !self.options.fixed_card_order;
-        let walk_limit = limit - remaining / 4;
-        let mut routes = Vec::new();
+    fn deferred_first_plays(&self, worker: &NativeSession) -> Vec<CardId> {
         let hero = worker
             .world
             .hero(self.player)
@@ -1383,7 +1629,30 @@ impl GreedyTraversal<'_, '_, '_> {
         }
         first_plays.sort_unstable_by_key(|card| card.0);
         first_plays.dedup();
+        first_plays
+    }
+
+    fn visit_deferred_upgrades(
+        &mut self,
+        worker: &mut NativeSession,
+        limit: usize,
+    ) -> Result<bool> {
+        let remaining = limit - self.result.nodes;
+        if remaining < 8 {
+            return Ok(false);
+        }
+        let base = self.path.len();
+        let completed = self.result.completed_sequences;
+        let position_first = self.options.position_first && !self.options.fixed_card_order;
+        let walk_limit = limit - remaining / 4;
+        let mut routes = Vec::new();
+        let first_plays = self.deferred_first_plays(worker);
         if position_first {
+            // Longer continuations need more time after upgraded route
+            // discovery. Keep the wider two-turn discovery allocation.
+            let discovery_deadline = (self.options.turns > 2)
+                .then(|| self.short_discovery_deadline())
+                .flatten();
             let mut groups: Vec<_> = (0..first_plays.len()).map(|_| Vec::new()).collect();
             let indices: std::collections::HashMap<_, _> = first_plays
                 .iter()
@@ -1445,14 +1714,21 @@ impl GreedyTraversal<'_, '_, '_> {
             }
             let mut witnesses = witnesses.into_iter();
             while witnesses.len() != 0 && self.result.nodes < walk_limit {
+                if !routes.is_empty()
+                    && discovery_deadline.is_some_and(|deadline| std::time::Instant::now() >= deadline)
+                {
+                    break;
+                }
                 let batches = witnesses.len().div_ceil(8);
                 let available = walk_limit - self.result.nodes;
+                let quota = (available / batches).max(1);
+                let quota = if discovery_deadline.is_some() { quota.min(256) } else { quota };
                 let batch: Vec<_> = witnesses.by_ref().take(8).collect();
                 let turn = batch[0].0;
                 self.collect_upgrade_world_routes(
                     batch.into_iter().map(|(_, world)| world).collect(),
                     turn,
-                    self.result.nodes + (available / batches).max(1),
+                    self.result.nodes + quota,
                     base,
                     &mut routes,
                 )?;
@@ -1951,8 +2227,8 @@ impl GreedyTraversal<'_, '_, '_> {
         }
     }
 
-    fn branch_limit(&self, limit: usize, remaining_choices: usize) -> usize {
-        if !self.incumbent_only && self.path.is_empty() {
+    fn branch_limit(&self, limit: usize, remaining_choices: usize, balance_cards: bool) -> usize {
+        if !self.incumbent_only && (self.path.is_empty() || balance_cards) {
             self.result.nodes + ((limit - self.result.nodes) / remaining_choices).max(1)
         } else {
             limit
@@ -2206,11 +2482,13 @@ mod tests {
 
     #[test]
     fn deferred_first_plays_keep_only_compatible_upgrade_paths() {
-        use std::collections::HashSet;
+        use std::collections::{HashMap, HashSet};
 
-        for fixture in [
-            "object-execution-phase-closure-live-round-upgrade-one",
-            "object-execution-cleanup-live-level-gold-3",
+        for (fixture, levels, path_count) in [
+            ("object-execution-phase-closure-live-round-upgrade-one", 1, 6),
+            ("object-execution-cleanup-live-level-gold-3", 2, 24),
+            ("object-execution-cleanup-live-level-gold-6", 3, 48),
+            ("object-execution-cleanup-live-level-gold-28", 6, 2304),
         ] {
             let mut session = session(fixture);
             let player = session.symbols.lookup("hero_arien").unwrap();
@@ -2222,17 +2500,20 @@ mod tests {
             else {
                 panic!("fixture must enter Level Up");
             };
-            let levels = players
-                .iter()
-                .find(|row| row.hero == player)
-                .unwrap()
-                .remaining;
+            assert_eq!(
+                players.iter().find(|row| row.hero == player).unwrap().remaining,
+                levels
+            );
+            if levels == 6 {
+                assert_eq!(session.world.hero(player).unwrap().level, 8);
+            }
+            let node_limit = 4096;
             let initial_hand = session.world.hero(player).unwrap().hand.clone();
             let mut traversal = GreedyTraversal {
                 options: GreedySearchOptions {
                     controlled: &[player],
                     turns: 2,
-                    max_nodes: 1024,
+                    max_nodes: node_limit,
                     seed: 17,
                     evaluation: super::super::SearchEvaluation::MaterialPosition,
                     fixed_card_order: false,
@@ -2252,20 +2533,25 @@ mod tests {
                 path: Vec::new(),
                 incumbent_only: false,
             };
-            let retained = initial_hand[0];
-            let mut expected_retained = HashSet::new();
+            let candidates: HashSet<_> = initial_hand
+                .iter()
+                .chain(&session.world.hero(player).unwrap().deck)
+                .copied()
+                .collect();
+            let mut expected_paths = HashMap::<_, HashSet<_>>::new();
             let mut distinct_paths = HashSet::new();
             let mut offered_existing = false;
             let mut offered_upgrade = false;
             traversal
-                .walk_upgrade_paths(&mut session, 1024, None, &mut |search, worker| {
+                .walk_upgrade_paths(&mut session, node_limit, None, &mut |search, worker| {
                     assert_eq!(search.path.len(), levels as usize);
                     if distinct_paths.is_empty() {
                         assert_eq!(search.result.upgrade_discovery_steps, levels as usize);
                     }
-                    distinct_paths.insert(format!("{:?}", search.path));
-                    if worker.world.hero(player).unwrap().hand.contains(&retained) {
-                        expected_retained.insert(format!("{:?}", search.path));
+                    let path = format!("{:?}", search.path);
+                    distinct_paths.insert(path.clone());
+                    for &card in &worker.world.hero(player).unwrap().hand {
+                        expected_paths.entry(card).or_default().insert(path.clone());
                     }
                     let choices = worker.planning_choices(player)?;
                     for commitments in search.controlled_plans(worker, 256)? {
@@ -2285,24 +2571,73 @@ mod tests {
                     Ok(())
                 })
                 .unwrap();
+            let discovered = traversal.deferred_first_plays(&session);
+            assert!(expected_paths.keys().all(|card| discovered.contains(card)));
             assert_eq!(session.semantic_state().unwrap(), before);
-            traversal.result.nodes = 0;
-            let mut actual_retained = HashSet::new();
-            traversal
-                .walk_upgrade_paths(&mut session, 1024, Some(&[retained]), &mut |search, _| {
-                    actual_retained.insert(format!("{:?}", search.path));
-                    Ok(())
-                })
-                .unwrap();
-            assert!(!expected_retained.is_empty());
-            assert_eq!(actual_retained, expected_retained);
-            assert!(distinct_paths.len() > 1);
+            for card in candidates {
+                traversal.result.nodes = 0;
+                let mut actual_paths = HashSet::new();
+                traversal
+                    .walk_upgrade_paths(&mut session, node_limit, Some(&[card]), &mut |search, _| {
+                        actual_paths.insert(format!("{:?}", search.path));
+                        Ok(())
+                    })
+                    .unwrap();
+                assert_eq!(
+                    actual_paths,
+                    expected_paths.remove(&card).unwrap_or_default(),
+                    "{fixture}, card {card:?}"
+                );
+            }
+            assert!(expected_paths.is_empty());
+            assert_eq!(session.semantic_state().unwrap(), before);
+            assert_eq!(distinct_paths.len(), path_count);
             assert!(offered_existing && offered_upgrade);
         }
     }
 
     #[test]
-    fn greedy_search_returns_a_replayable_two_turn_plan() {
+    fn future_card_likelihoods_follow_the_commitment_prefix_and_live_legal_cards() {
+        let hero = Symbol(0);
+        let [a, b, c, d] = [1, 2, 3, 4].map(|id| Some(CardId(id)));
+        let play = |first| Some(PlanningCommitment { hero, first, second: None });
+        let result = GreedySearch {
+            card_sequence_scores: Some(std::collections::HashMap::from([
+                ([play(a), play(b), None, None], 100),
+                ([play(a), play(c), None, None], 0),
+                ([play(b), play(c), None, None], 200),
+            ])),
+            ..GreedySearch::default()
+        };
+        assert_eq!(result.preferred_next_card(&[play(a)], &[c, b]), Some(b));
+        assert_eq!(result.preferred_next_card(&[play(b)], &[b, c]), Some(c));
+        assert_eq!(result.preferred_next_card(&[play(d)], &[b, c]), None);
+        let after_a = result.next_card_likelihoods(&[play(a)], &[b, c, d]).unwrap();
+        assert!(after_a[0].1 > after_a[1].1 && after_a[1].1 > after_a[2].1);
+        assert!(after_a[2].1 > 0.0);
+        let after_b = result.next_card_likelihoods(&[play(b)], &[b, c, d]).unwrap();
+        assert!(after_b[1].1 > after_b[0].1);
+        assert_eq!(result.next_card_likelihoods(&[play(a)], &[c]), Some(vec![(c, 1.0)]));
+        assert_eq!(
+            result.next_card_likelihoods(&[play(d)], &[b, c]),
+            None
+        );
+    }
+
+    #[test]
+    fn greedy_search_returns_replayable_two_and_four_turn_plans() {
+        assert_replayable_greedy_plan(2);
+        // Unoptimized rollback frames exceed the default test thread stack
+        // when the search keeps an entire round of decisions open.
+        std::thread::Builder::new()
+            .stack_size(8 * 1024 * 1024)
+            .spawn(|| assert_replayable_greedy_plan(4))
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+
+    fn assert_replayable_greedy_plan(turns: u8) {
         let mut session = session("object-execution-card-planning-cycle");
         let player = session.world.heroes[0].id;
         let team = session.world.heroes[0].team;
@@ -2311,7 +2646,7 @@ mod tests {
         let budget = super::super::ExecutionBudget::default();
         let options = GreedySearchOptions {
             controlled: &[player],
-            turns: 2,
+            turns,
             fixed_card_order: false,
             defer_upgrades: true,
             positional_ordering: true,
@@ -2319,23 +2654,53 @@ mod tests {
             tactical_replies: false,
             reuse_movement: true,
             profile: true,
-            max_nodes: 1024,
+            max_nodes: if turns == 4 { 4096 } else { 1024 },
             seed: 17,
             evaluation: super::super::SearchEvaluation::MaterialPosition,
         };
-        let result = session.search_greedy(player, options, &budget).unwrap();
+        let result = session
+            .search_greedy_card_scores(player, options, &budget)
+            .unwrap();
         assert_eq!(session.semantic_state().unwrap(), before);
         assert!(result.nodes <= options.max_nodes);
         assert!(result.completed_sequences > 1);
         assert!(result.position_groups > 0);
         assert!(result.position_routes > result.position_groups);
-        assert!((1..=128).contains(&result.profile.as_ref().unwrap().incumbent_nodes));
+        assert!((1..=options.max_nodes / 2).contains(&result.profile.as_ref().unwrap().incumbent_nodes));
+        if turns == 4 {
+            let sequences = result.card_sequence_scores.as_ref().unwrap();
+            assert!(sequences.keys().any(|sequence| {
+                result.card_scores_at(1, &sequence[..1]).len() > 1
+            }));
+        }
+        let by_turn: Vec<_> = (0..usize::from(turns))
+            .map(|offset| result.turn_card_scores(offset))
+            .collect();
+        for offset in 0..usize::from(turns) {
+            let likelihoods = result.turn_card_likelihoods(offset).unwrap();
+            let total = likelihoods.iter().map(|(_, weight)| weight).sum::<f64>();
+            assert!((total - 1.0).abs() < 1e-9);
+        }
+        let scores = &by_turn[0];
+        assert!(scores.len() > 1);
+        assert_eq!(
+            scores.iter().map(|(_, score)| *score).max(),
+            result.best.as_ref().map(|plan| plan.score),
+        );
+        let legal = session.planning_choices(player).unwrap();
+        assert_eq!(scores.len(), legal.len());
+        assert!(scores.iter().all(|(card, _)| card.is_some_and(|card| {
+            legal.contains(&DecisionMove::Card { hero: player, card })
+        })));
         let plan = result.best.unwrap();
 
+        let mut scored_turns = by_turn.iter();
         for step in plan.steps {
             session.advance_to_decision(&budget).unwrap();
             match step {
                 GreedyStep::Planning(commitments) => {
+                    let own = commitments.iter().find(|row| row.hero == player).unwrap();
+                    assert!(scored_turns.next().unwrap().contains(&(own.first, plan.score)));
                     session.apply_joint_planning_ordered(&commitments).unwrap();
                 }
                 GreedyStep::Input(DecisionMove::Input {
@@ -2357,7 +2722,7 @@ mod tests {
             }
         }
         session.advance_to_decision(&budget).unwrap();
-        assert_eq!(session.search_turn_index(), start + 2);
+        assert_eq!(session.search_turn_index(), start + i128::from(turns));
         assert_eq!(
             session
                 .search_score(options.evaluation, team, player)

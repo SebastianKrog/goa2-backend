@@ -701,8 +701,16 @@ To regenerate fixtures from the *unchanged* frozen source, using the same PowerS
 & $oraclePython "$engineRoot/scripts/rust_oracle/action_traces.py" export
 ```
 
-`cargo test` consumes the small committed fixtures and the local compressed full-corpus cache. Worker verification also
-checks the persistent JSON-lines protocol and corpus/source fingerprints.
+Routine Rust tests include the CLI's snapshot-edit, benchmark and protocol checks.
+The four exhaustive CLI trace tests are opt-in and use the local compressed
+full-corpus cache. Run them from the Rust workspace with bounded concurrency:
+
+```bash
+cargo test --profile iterate -p goa2-search-cli --bin goa2-search-cli -- trace_tests --ignored --test-threads=1
+```
+
+Worker verification also checks the persistent JSON-lines protocol and
+corpus/source fingerprints.
 Movement disagreements are saved under ignored `rust/artifacts/` for diagnosis.
 
 ## Current coverage

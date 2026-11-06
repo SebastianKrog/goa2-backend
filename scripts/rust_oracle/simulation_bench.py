@@ -177,7 +177,7 @@ def initial_state(case):
     return state, map_id
 
 
-def workloads(case):
+def workloads(case, *, midgame=False):
     from goa2.domain.models import Card
 
     state, map_id = initial_state(case)
@@ -186,7 +186,11 @@ def workloads(case):
         index: str(card.id) for index, card in enumerate(physical) if isinstance(card, Card)
     }
     runner = PythonRunner(state, physical)
-    starts = {(1, 1): "opening", (1, 3): "round-boundary", (2, 1): "combat"}
+    starts = (
+        {(3, 1): "midgame-upgraded", (3, 3): "midgame-round-boundary", (4, 1): "midgame-combat"}
+        if midgame else
+        {(1, 1): "opening", (1, 3): "round-boundary", (2, 1): "combat"}
+    )
     active = []
     captured = set()
     for index in range(len(case["operations"]) + 1):
@@ -248,7 +252,7 @@ def workloads(case):
                     )
                 )
                 captured.add(point)
-            if len(captured) == 3 and not active:
+            if len(captured) == len(starts) and not active:
                 return
         if index == len(case["operations"]):
             break

@@ -37,8 +37,8 @@ pub use observation::{
 mod sequences;
 pub use object_execution::LiveEffectExpiry;
 pub use search::{
-    BotPlanningScope, BotTeamPlanningSearch, GameTurnRollout, JointPlans, OpponentPolicy,
-    PlanningRolloutSample, PlanningSearch, PlanningSearchOptions, ResolutionScoreKind,
+    BotPlanningScope, BotTeamPlanningSearch, ForecastNodeShare, GameTurnRollout, JointPlans, OpponentPolicy,
+    PlanningRolloutSample, PlanningSearch, PlanningSearchOptions, ResolutionReuseCensus, ResolutionScoreKind,
     ResolutionSearch, ResolutionStop, SampledPlanningSearch, SearchEvaluation, SearchLimits,
 };
 pub use sequences::{DecisionMove, PlanningCommitment, SequenceBatch, SequenceVerdict};
@@ -1416,7 +1416,7 @@ impl NativeSession {
             .iter()
             .any(|s| matches!(s.instruction, Instruction::Place { .. }))
             && (world.definitions.entities.iter().any(|e| e.passable)
-                || world.definitions.supply_passable.iter().any(|(_, p)| *p));
+                || world.definitions.supply_passable.iter().any(|(_, p, _)| *p));
         let move_links = steps
             .iter()
             .enumerate()
@@ -9461,10 +9461,14 @@ mod tests {
         let hit = options.iter().position(|p| !p.mines.is_empty()).unwrap();
         let avoid = options.iter().position(|p| p.mines.is_empty()).unwrap();
         let before = root.semantic_state().unwrap();
+        let moves = root.resolution_choices(request.owner).unwrap();
         let mut workers = [root.clone(), root.clone()];
         for (worker, index) in workers.iter_mut().zip([hit, avoid]) {
-            let value = worker.import_selection(&json!(index.to_string())).unwrap();
-            worker.submit(request.id, value).unwrap();
+            let DecisionMove::Input { selection, .. } = &moves[index] else {
+                panic!("mine choices must be input decisions");
+            };
+            assert_eq!(worker.selection_json(selection), json!(index.to_string()));
+            worker.submit(request.id, selection.clone()).unwrap();
             // This completes the move, with only the hit worker awaiting discard.
         }
         let hit_result = workers[0].advance(&ExecutionBudget::default()).unwrap();

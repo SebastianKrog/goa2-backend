@@ -60,10 +60,6 @@ pub(super) fn with_card_sync_profile<T>(run: impl FnOnce() -> T) -> (T, CardSync
 }
 mod pre_action;
 mod primary_bodies;
-
-pub(super) fn primary_operand_catalog() -> Result<&'static Value> {
-    primary_bodies::catalog()
-}
 mod push;
 mod queries;
 mod reaction_window;
@@ -96,7 +92,85 @@ use crate::{
     codec::{ObjectKind, ObjectPathPart},
     objects::{ObjectArena, ObjectId, ObjectValue},
 };
-use std::collections::{HashMap, HashSet};
+use std::{
+    cell::RefCell,
+    collections::{BTreeMap, HashMap, HashSet},
+};
+
+#[derive(Debug, Default, serde::Serialize)]
+pub(super) struct RuleStepProfile {
+    calls: usize,
+    elapsed_ns: u128,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    action_rules_ns: Option<u128>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    recipe_prep_ns: Option<u128>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    action_apply_ns: Option<u128>,
+}
+
+impl RuleStepProfile {
+    fn add_timing(total: &mut Option<u128>, sample: Option<u128>) {
+        if let Some(sample) = sample {
+            *total.get_or_insert(0) += sample;
+        }
+    }
+}
+
+pub(super) type RuleStepProfiles = BTreeMap<String, RuleStepProfile>;
+
+thread_local! {
+    static RULE_STEP_PROFILE: RefCell<Option<RuleStepProfiles>> = const { RefCell::new(None) };
+}
+
+pub(super) fn with_rule_step_profile<T>(run: impl FnOnce() -> T) -> (T, RuleStepProfiles) {
+    struct Restore(Option<RuleStepProfiles>);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            RULE_STEP_PROFILE.replace(self.0.take());
+        }
+    }
+
+    let _restore = Restore(RULE_STEP_PROFILE.replace(Some(BTreeMap::new())));
+    let result = run();
+    (result, RULE_STEP_PROFILE.replace(None).unwrap())
+}
+
+struct RuleStepTimer {
+    program: CompiledStep,
+    start: Instant,
+    category: Option<&'static str>,
+    action_rules_ns: Option<u128>,
+    recipe_prep_ns: Option<u128>,
+    action_apply_ns: Option<u128>,
+}
+
+impl Drop for RuleStepTimer {
+    fn drop(&mut self) {
+        let elapsed_ns = self.start.elapsed().as_nanos();
+        let name = self
+            .category
+            .or_else(|| self.program.wire["type"].as_str())
+            .unwrap_or("unknown");
+        RULE_STEP_PROFILE.with_borrow_mut(|profile| {
+            if let Some(profile) = profile {
+                let row = match profile.get_mut(name) {
+                    Some(row) => row,
+                    None => profile.entry(name.to_owned()).or_default(),
+                };
+                row.calls += 1;
+                row.elapsed_ns += elapsed_ns;
+                RuleStepProfile::add_timing(&mut row.action_rules_ns, self.action_rules_ns);
+                RuleStepProfile::add_timing(&mut row.recipe_prep_ns, self.recipe_prep_ns);
+                RuleStepProfile::add_timing(&mut row.action_apply_ns, self.action_apply_ns);
+            }
+        });
+    }
+}
+
+pub(super) fn primary_operand_catalog() -> Result<&'static Value> {
+    primary_bodies::catalog()
+}
 
 /// Natural turn expiry retains the original finishing list identities, without
 /// removing effects. Rule-v9 turn scheduling removes these IDs after the text.
@@ -1416,6 +1490,15 @@ impl BoundObjects {
     }
 }
 
+pub(super) struct RollbackCheckpoint {
+    snapshot: NativeSession,
+    rows: crate::world::WorldRowsCheckpoint,
+    arena: crate::objects::ArenaCheckpoint,
+    readonly: std::sync::OnceLock<Arc<crate::objects::ProtectedObjects>>,
+    programs: Arc<HashMap<ObjectId, usize>>,
+    copied_bindings: usize,
+}
+
 /// Derived ownership/controller and effect/card-lifecycle lookup projection.
 /// Mutable stored step payloads belong exclusively to the authoritative arena.
 impl NativeSession {
@@ -1445,6 +1528,19 @@ impl NativeSession {
         consume_request: bool,
         operation: impl FnOnce(&mut Self) -> Result<T>,
     ) -> Result<T> {
+        let checkpoint = self.begin_rollback_checkpoint(consume_request)?;
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| operation(self)));
+        self.restore_rollback_checkpoint(checkpoint);
+        match result {
+            Ok(value) => value,
+            Err(panic) => std::panic::resume_unwind(panic),
+        }
+    }
+
+    pub(super) fn begin_rollback_checkpoint(
+        &mut self,
+        consume_request: bool,
+    ) -> Result<RollbackCheckpoint> {
         let mut objects = self
             .objects
             .take()
@@ -1469,24 +1565,26 @@ impl NativeSession {
         let programs = objects.programs.clone();
         let copied_bindings = objects.copied_binding_undo.0.len();
         self.objects = Some(objects);
+        Ok(RollbackCheckpoint {
+            snapshot, rows: rows_checkpoint, arena: checkpoint, readonly, programs, copied_bindings,
+        })
+    }
 
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| operation(self)));
+    pub(super) fn restore_rollback_checkpoint(&mut self, checkpoint: RollbackCheckpoint) {
+        let RollbackCheckpoint { mut snapshot, rows, arena, readonly, programs, copied_bindings } =
+            checkpoint;
         let mut objects = self
             .objects
             .take()
             .expect("speculation must preserve live bindings");
-        objects.arena.rollback_to(checkpoint);
+        objects.arena.rollback_to(arena);
         objects.readonly = readonly;
         objects.programs = programs;
         objects.restore_copied_bindings(copied_bindings);
         self.world
-            .restore_rows(rows_checkpoint, &mut snapshot.world);
+            .restore_rows(rows, &mut snapshot.world);
         snapshot.objects = Some(objects);
         *self = snapshot;
-        match result {
-            Ok(value) => value,
-            Err(panic) => std::panic::resume_unwind(panic),
-        }
     }
 
     pub(super) fn with_live_objects<T>(
@@ -1612,6 +1710,7 @@ impl NativeSession {
             budget.check(0)?;
         }
         self.last_request = None;
+        let profile_steps = RULE_STEP_PROFILE.with_borrow(Option::is_some);
         while !self.stack.is_empty() {
             if stop_after.is_some_and(|limit| result.steps >= limit) {
                 return Ok(result);
@@ -1619,6 +1718,15 @@ impl NativeSession {
             budget.check(result.steps)?;
             self.count_observer.clear();
             let top_instruction = self.stack.last().unwrap().instruction;
+            // Retain only the immutable program, even if execution rewrites the stack.
+            let mut rule_timer = profile_steps.then(|| RuleStepTimer {
+                program: self.steps[top_instruction].clone(),
+                start: Instant::now(),
+                category: None,
+                action_rules_ns: None,
+                recipe_prep_ns: None,
+                action_apply_ns: None,
+            });
             let top_object = self.stack.last().unwrap().object;
             let conditions = &self.steps[top_instruction].conditions;
             let move_success = if matches!(
@@ -1761,6 +1869,7 @@ impl NativeSession {
                 Some(self.preflight_card_action_bound(
                     objects,
                     top_object.ok_or_else(|| unsupported("live card-action step missing"))?,
+                    rule_timer.as_mut(),
                 )?)
             } else {
                 None
@@ -2876,10 +2985,14 @@ impl NativeSession {
                     )?;
                 }
                 Instruction::LiveCardAction => {
+                    let started = rule_timer.as_ref().map(|_| Instant::now());
                     request = self.card_action_bound(
                         objects,
                         card_action.ok_or_else(|| unsupported("card-action plan missing"))?,
                     )?;
+                    if let Some((profile, started)) = rule_timer.as_mut().zip(started) {
+                        profile.action_apply_ns = Some(started.elapsed().as_nanos());
+                    }
                 }
                 Instruction::LiveChoosePiece => {
                     request = self.acting_piece_bound(

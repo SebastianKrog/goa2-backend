@@ -45,28 +45,23 @@ pub fn replay_public_upgrade_batches(
             return Err(invalid("conflicting public upgrade batch"));
         }
     }
+    let initial = UpgradeCheckpoint {
+        level: 1,
+        card_items: [0; 6],
+    };
     for batch in ordered.into_values() {
         if batch.hero_id.is_empty()
             || !(1..batch.after.level).contains(&batch.before.level)
             || batch.after.level > 8
-            || batch
-                .before
-                .card_items
-                .iter()
-                .zip(batch.after.card_items)
-                .any(|(before, after)| *before < 0 || after < *before)
+            || !ordinary_item_gains_fit(initial, batch.before)
+            || !ordinary_item_gains_fit(batch.before, batch.after)
         {
             return Err(invalid("invalid public upgrade batch"));
         }
         let rows = checkpoints.entry(batch.hero_id.clone()).or_default();
-        if let Some(previous) = rows.last()
+        if let Some(&previous) = rows.last()
             && (batch.before.level < previous.level
-                || (batch.before.level == previous.level && batch.before != *previous)
-                || previous
-                    .card_items
-                    .iter()
-                    .zip(batch.before.card_items)
-                    .any(|(old, new)| new < *old))
+                || !ordinary_item_gains_fit(previous, batch.before))
         {
             return Err(invalid("inconsistent public upgrade history"));
         }
@@ -76,6 +71,20 @@ pub fn replay_public_upgrade_batches(
         rows.push(batch.after);
     }
     Ok(checkpoints)
+}
+
+fn ordinary_item_gains_fit(before: UpgradeCheckpoint, after: UpgradeCheckpoint) -> bool {
+    // Level eight grants the ultimate, with no ordinary card-item reward.
+    let allowance = after.level.min(7) - before.level.min(7);
+    before
+        .card_items
+        .into_iter()
+        .zip(after.card_items)
+        .try_fold(0i64, |gained, (old, new)| {
+            (new >= old).then_some(())?;
+            gained.checked_add(new - old)
+        })
+        .is_some_and(|gained| gained <= allowance)
 }
 
 #[derive(Deserialize)]
@@ -137,6 +146,114 @@ fn catalog() -> Result<&'static Catalog> {
         })
         .as_ref()
         .map_err(|reason| EngineError::Unsupported(reason.clone()))
+}
+
+/// Per-match public evidence, sampled at the upgrade prompt and after reveal.
+#[derive(Default)]
+pub(super) struct PublicUpgradeHistory {
+    tracked: std::collections::HashMap<crate::data::Symbol, TrackedUpgrades>,
+    checkpoints: BTreeMap<String, Vec<UpgradeCheckpoint>>,
+    pub(super) batches: Vec<PublicUpgradeBatch>,
+}
+
+struct TrackedUpgrades {
+    known: UpgradeCheckpoint,
+    pending: Option<UpgradeCheckpoint>,
+}
+
+impl PublicUpgradeHistory {
+    pub(super) fn new(session: &super::NativeSession) -> Result<Self> {
+        let catalog = catalog()?;
+        let mut history = Self::default();
+        for hero in &session.world.heroes {
+            if hero.level == 1
+                && session.world.entity(hero.id).is_some_and(|entity| {
+                    catalog.heroes.get(session.symbols.name(entity.name))
+                        .is_some_and(|definition| definition.standard)
+                })
+            {
+                history.tracked.insert(hero.id, TrackedUpgrades {
+                    known: UpgradeCheckpoint { level: 1, card_items: [0; 6] },
+                    pending: None,
+                });
+            }
+        }
+        Ok(history)
+    }
+
+    pub(super) fn checkpoints(&self) -> Option<&BTreeMap<String, Vec<UpgradeCheckpoint>>> {
+        (!self.checkpoints.is_empty()).then_some(&self.checkpoints)
+    }
+
+    pub(super) fn begin_batch(&mut self, session: &super::NativeSession) -> Result<()> {
+        for hero in &session.world.heroes {
+            if let Some(tracked) = self.tracked.get_mut(&hero.id)
+                && tracked.known.level < hero.level
+                && tracked.pending.is_none()
+                && let Some(items) = session.public_pre_upgrade_items(hero.id)?
+            {
+                tracked.pending = Some(UpgradeCheckpoint { level: hero.level, card_items: items });
+            }
+        }
+        Ok(())
+    }
+
+    pub(super) fn planning_boundary(
+        &mut self,
+        session: &super::NativeSession,
+        revision: u64,
+    ) -> Result<()> {
+        for hero in &session.world.heroes {
+            let Some(tracked) = self.tracked.get_mut(&hero.id) else {
+                continue;
+            };
+            let before = tracked.known;
+            if before.level == hero.level {
+                continue;
+            }
+            let Some(after) = tracked.reveal(hero.level, hero.items) else {
+                // A missed or inconsistent reveal leaves later cumulative
+                // totals unknown. Earlier checkpoints remain valid evidence.
+                self.tracked.remove(&hero.id);
+                continue;
+            };
+            let hero_id = session.symbols.name(hero.id).to_owned();
+            let checkpoints = self.checkpoints.entry(hero_id.clone()).or_default();
+            if checkpoints.last() != Some(&before) {
+                checkpoints.push(before);
+            }
+            checkpoints.push(after);
+            self.batches.push(PublicUpgradeBatch { revision, hero_id, before, after });
+        }
+        Ok(())
+    }
+}
+
+impl TrackedUpgrades {
+    fn reveal(&mut self, level: i64, public_items: [i64; 6]) -> Option<UpgradeCheckpoint> {
+        let pending = self.pending.take();
+        if self.known.level == 7 && level == 8 {
+            // The ultimate unlock adds no ordinary card item and can
+            // advance straight to planning without an upgrade prompt.
+            self.known.level = level;
+            return Some(self.known);
+        }
+        let pending = pending?;
+        if pending.level != level {
+            return None;
+        }
+        let mut after = self.known;
+        after.level = level;
+        for (index, public) in public_items.into_iter().enumerate() {
+            let gain = public.checked_sub(pending.card_items[index])?;
+            after.card_items[index] = after.card_items[index].checked_add(gain)?;
+        }
+        if !ordinary_item_gains_fit(self.known, after) {
+            return None;
+        }
+        self.known = after;
+        Some(after)
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -970,6 +1087,59 @@ mod tests {
         let mut wrong_revision = first;
         wrong_revision.revision = 10;
         assert!(replay_public_upgrade_batches(&[wrong_revision, later]).is_err());
+    }
+
+    #[test]
+    fn revealed_batch_records_only_ordinary_item_deltas() {
+        let mut tracked = TrackedUpgrades {
+            known: UpgradeCheckpoint { level: 1, card_items: [0; 6] },
+            pending: Some(UpgradeCheckpoint { level: 4, card_items: [2, 0, 0, 0, 0, 0] }),
+        };
+        let point = tracked.reveal(4, [3, 1, 0, 1, 0, 0]).unwrap();
+        assert_eq!(point, UpgradeCheckpoint { level: 4, card_items: [1, 1, 0, 1, 0, 0] });
+        assert!(tracked.pending.is_none());
+        assert!(tracked.reveal(5, [3, 1, 0, 2, 0, 0]).is_none());
+        assert_eq!(tracked.known, point);
+    }
+
+    #[test]
+    fn automatic_ultimate_unlock_preserves_ordinary_items_without_a_prompt() {
+        let before = UpgradeCheckpoint { level: 7, card_items: [1, 2, 1, 1, 1, 0] };
+        let mut tracked = TrackedUpgrades { known: before, pending: None };
+        let after = tracked.reveal(8, [2, 2, 1, 1, 1, 0]).unwrap();
+        assert_eq!(after, UpgradeCheckpoint { level: 8, ..before });
+        assert_eq!(tracked.known, after);
+        assert!(tracked.pending.is_none());
+    }
+
+    #[test]
+    fn public_batches_bound_ordinary_item_gains_by_levels_crossed() {
+        let checkpoint = |level, attack| UpgradeCheckpoint {
+            level,
+            card_items: [attack, 0, 0, 0, 0, 0],
+        };
+        let batch = |revision, before, after| PublicUpgradeBatch {
+            revision,
+            hero_id: "hero_arien".into(),
+            before,
+            after,
+        };
+        let initial = checkpoint(1, 0);
+        let seventh = checkpoint(7, 6);
+        let eighth = checkpoint(8, 6);
+        assert!(replay_public_upgrade_batches(&[batch(1, initial, eighth)]).is_ok());
+        assert!(replay_public_upgrade_batches(&[batch(1, seventh, eighth)]).is_ok());
+        assert!(
+            replay_public_upgrade_batches(&[batch(1, seventh, checkpoint(8, 7))]).is_err()
+        );
+        assert!(
+            replay_public_upgrade_batches(&[batch(1, checkpoint(2, 2), checkpoint(3, 2))])
+                .is_err()
+        );
+        let first = batch(1, initial, checkpoint(2, 0));
+        let later = batch(2, checkpoint(3, 2), checkpoint(4, 2));
+        assert!(replay_public_upgrade_batches(&[first, later.clone()]).is_err());
+        assert!(replay_public_upgrade_batches(&[later]).is_ok());
     }
 
     #[test]

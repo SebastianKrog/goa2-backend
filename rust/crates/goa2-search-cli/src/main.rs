@@ -145,6 +145,10 @@ enum Operation {
         #[serde(default)]
         greedy_card_order: bool,
         #[serde(default)]
+        forecast_node_share: goa2_core::interpreter::ForecastNodeShare,
+        #[serde(default)]
+        legacy_fixed_followup: bool,
+        #[serde(default)]
         fixed_future_planning: bool,
         #[serde(default)]
         branch_future_planning: bool,
@@ -198,6 +202,11 @@ enum Operation {
         workers: Option<usize>,
         #[serde(default)]
         lab_evaluation: bool,
+    },
+    ResolutionReuseCensus {
+        envelope: StateEnvelope,
+        depth: u8,
+        max_nodes: usize,
     },
     FingerprintBench {
         envelope: StateEnvelope,
@@ -409,6 +418,8 @@ fn execute(
             reply_cap,
             reply_probe_cap,
             greedy_card_order,
+            forecast_node_share,
+            legacy_fixed_followup,
             fixed_future_planning,
             branch_future_planning,
             max_depth,
@@ -440,6 +451,9 @@ fn execute(
                     reply_cap,
                     reply_probe_cap,
                     greedy_card_order,
+                    tactical_forecast: false,
+                    forecast_node_share,
+                    legacy_fixed_followup,
                     fixed_future_planning,
                     branch_future_planning,
                 },
@@ -523,6 +537,12 @@ fn execute(
             workers.unwrap_or(1),
             lab_evaluation,
         ),
+        Operation::ResolutionReuseCensus { envelope, depth, max_nodes } => {
+            let mut session = NativeSession::compile(envelope).map_err(|e| e.to_string())?;
+            session.advance_to_decision(&ExecutionBudget::default()).map_err(|e| e.to_string())?;
+            let census = session.resolution_reuse_census(depth, max_nodes).map_err(|e| e.to_string())?;
+            serde_json::to_value(census).map_err(|e| e.to_string())
+        }
         Operation::FingerprintBench { envelope, iterations, operations } => {
             simulation_bench::measure_fingerprints(envelope, iterations, operations)
         }
@@ -1332,6 +1352,8 @@ mod trace_tests {
             let mut ids = HashMap::new();
             let mut steps = HashMap::new();
             let mut count = 0;
+            let total = case.operations.len();
+            eprintln!("{}: checking {total} operations", case.name);
             let mut chunks = case.expected_delta_chunks.into_iter();
             let mut deltas = std::collections::VecDeque::new();
             replay_trace(case.envelope, case.operations, |mut record| {
@@ -1355,6 +1377,9 @@ mod trace_tests {
                     case.name
                 );
                 count += 1;
+                if deltas.is_empty() {
+                    eprintln!("{}: checked {count}/{total} operations", case.name);
+                }
             })
             .unwrap_or_else(|error| panic!("{}: {error}", case.name));
             assert!(deltas.is_empty() && chunks.next().is_none());

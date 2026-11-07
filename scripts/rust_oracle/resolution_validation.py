@@ -3,6 +3,15 @@
 from automata.runtime.driver import eligible_hero_ids_for_request
 from automata.runtime.legality import DecisionMove, check_moves
 from goa2.domain.input import InputRequestType
+from goa2.engine.steps.movement import MinePathChoiceStep
+
+
+def is_mine_path_request(state, request):
+    return (
+        request.request_type == InputRequestType.SELECT_OPTION
+        and bool(state.execution_stack)
+        and isinstance(state.execution_stack[-1], MinePathChoiceStep)
+    )
 
 
 def validate_resolution(
@@ -11,7 +20,16 @@ def validate_resolution(
 ):
     if searched_revision != live_revision or live_request is None:
         raise ValueError("stale resolution result")
+    if (
+        not isinstance(response, dict)
+        or "score" not in response
+        or (response["score"] is not None and type(response["score"]) is not int)
+        or not isinstance(response.get("decision"), dict)
+    ):
+        raise ValueError("malformed resolution result")
     decision = response["decision"]
+    if not {"kind", "request_id", "player_id", "selection"} <= decision.keys():
+        raise ValueError("malformed resolution decision")
     if decision["kind"] != "input" or decision["request_id"] != live_request.id:
         raise ValueError("resolution result does not match the live prompt")
     if (
@@ -28,6 +46,12 @@ def validate_resolution(
         raise ValueError("resolution result has no completed score")
 
     move = DecisionMove("INPUT", player_id, decision["selection"], live_request.id)
-    if check_moves(state, [move]).results[0].legal is not True:
+    if is_mine_path_request(state, live_request):
+        # The generic helper converts numeric option IDs to integers. The
+        # issued MinePathChoice options require their exact string IDs.
+        legal = any(move.selection == option.id for option in live_request.options)
+    else:
+        legal = check_moves(state, [move]).results[0].legal
+    if legal is not True:
         raise ValueError("Python rejected the resolution move")
     return move

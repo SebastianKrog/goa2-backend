@@ -486,6 +486,39 @@ mod tests {
         );
     }
     #[test]
+    fn deployed_mine_detection_uses_live_pool_owners() {
+        let mut root = session("mines-movement-dud-choice-first");
+        let actor = root.symbols.lookup("hero_arien").unwrap();
+        let team = root.world.hero(actor).unwrap().team;
+        let enemy = root.world.heroes.iter().find(|hero| hero.team != team).unwrap().id;
+        root.with_live_objects(|session, objects| {
+            let pool = objects.phases.root(&objects.arena, Field::TokenPool)?;
+            let mut mines = Vec::new();
+            for kind in ["mine_blast", "mine_dud"] {
+                let kind = session.symbols.lookup(kind).unwrap();
+                let Some(ObjectValue::Object(list)) = objects.arena.field(pool, kind) else {
+                    panic!("fixture mine list missing");
+                };
+                for item in objects.arena.sequence(list).unwrap() {
+                    let ObjectValue::Atom(Datum::Instance(physical)) = item else {
+                        panic!("fixture mine instance missing");
+                    };
+                    mines.push(*physical);
+                }
+            }
+            assert!(session.has_enemy_mine_supply_bound(objects, team)?);
+            let owner = objects.phases.k(Field::TokenOwner);
+            for (value, expected) in [(Datum::Null, false), (Datum::Text(actor), false), (Datum::Text(enemy), true)] {
+                for &mine in &mines {
+                    objects.arena.set_physical_field(mine, owner, value.clone()).map_err(unsupported)?;
+                }
+                assert_eq!(session.has_enemy_mine_supply_bound(objects, team)?, expected);
+            }
+            Ok(())
+        }).unwrap();
+    }
+
+    #[test]
     fn movement_mine_requeue_is_a_shallow_step_copy() {
         let mut session = session("mines-movement-dud-choice-first");
         let objects = session.objects.as_mut().unwrap();

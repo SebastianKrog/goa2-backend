@@ -19,7 +19,21 @@ def validate_commitments(
     """
     if searched_revision != live_revision or state.phase != GamePhase.PLANNING:
         raise ValueError("stale planning result")
-    if require_score and response["score"] is None:
+    if (
+        not isinstance(response, dict)
+        or "score" not in response
+        or not isinstance(response.get("commitments"), list)
+    ):
+        raise ValueError("malformed planning result")
+    score = response["score"]
+    shallow_score = response.get("shallow_score")
+    if (
+        (score is not None and type(score) is not int)
+        or (shallow_score is not None and type(shallow_score) is not int)
+        or (score is not None and shallow_score is not None)
+    ):
+        raise ValueError("malformed planning result")
+    if require_score and score is None and shallow_score is None:
         raise ValueError("planning result has no completed score")
     player = state.get_hero(HeroID(player_id))
     if player is None or player.id != player_id or player_id not in controlled_ids:
@@ -33,6 +47,12 @@ def validate_commitments(
     moves = []
     seen = set()
     for row in response["commitments"]:
+        if (
+            not isinstance(row, dict)
+            or not isinstance(row.get("player_id"), str)
+            or not {"first_card", "second_card"} <= row.keys()
+        ):
+            raise ValueError("malformed planning commitment")
         hero_id = row["player_id"]
         hero = state.get_hero(HeroID(hero_id))
         if (
@@ -71,6 +91,14 @@ def validate_commitments(
 
         if second is None and not second_slot and len(hero.hand) > 1 and hero_can_play_two_cards(hero):
             moves.append(DecisionMove("FINISH_PLANNING", hero_id))
+
+    open_slots = {
+        hero_id for hero_id in controlled_ids
+        if hero_id not in state.pending_inputs
+        or planning_open_for_second_card(state, HeroID(hero_id))
+    }
+    if seen != open_slots:
+        raise ValueError("planning result does not cover the controlled open slots")
 
     if not moves or check_sequences(state, [moves]).results[0].legal is not True:
         raise ValueError("Python rejected the planning sequence")

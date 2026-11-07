@@ -164,6 +164,21 @@ impl NativeSession {
             discard: false,
         })
     }
+    fn respawn_minion_request_bound(
+        &mut self,
+        objects: &BoundObjects,
+        step: ObjectId,
+        candidates: Vec<Symbol>,
+        store: Option<ObjectValue>,
+    ) -> Result<RespawnPlan> {
+        let prompt = Arc::make_mut(&mut self.symbols).intern("Choose a minion to respawn.");
+        let values = candidates.into_iter()
+            .map(|id| (id, self.world.entity(id).unwrap().minion_kind.unwrap()))
+            .collect();
+        let request = self.respawn_request_bound(objects, step, prompt, RequestChoices::Minions(values))?;
+        Ok(RespawnPlan::Prompt { request, clear: false, store })
+    }
+
     fn respawn_place_bound(
         &self,
         objects: &BoundObjects,
@@ -233,6 +248,20 @@ impl NativeSession {
             .field(step, objects.pending)
             .is_some_and(|v| objects.arena.truthy(&v));
         let selection = objects.selected(step, self.selection_key);
+        if lane_bound
+            && let Some(stored) = &stored
+            && objects.token(step)?.is_some()
+            && !matches!(&selection, Some(ObjectValue::Atom(Datum::Text(_))))
+        {
+            // The first answer can remain bound while the second prompt is
+            // outstanding. Only a minion ID completes that second stage.
+            let (hex, _) = self.spatial_hex_bound(objects, stored)?;
+            let candidates = self.respawn_supply(team, hex);
+            if candidates.is_empty() || self.world.occupant(hex).is_some() {
+                return Ok(RespawnPlan::Done { clear: false, remove: true });
+            }
+            return self.respawn_minion_request_bound(objects, step, candidates, None);
+        }
         let mut clear = false;
         if pending {
             if lane_bound
@@ -282,23 +311,9 @@ impl NativeSession {
                     if candidates.len() == 1 {
                         return self.respawn_place_bound(objects, candidates[0], hex, false);
                     }
-                    let prompt =
-                        Arc::make_mut(&mut self.symbols).intern("Choose a minion to respawn.");
-                    let values = candidates
-                        .into_iter()
-                        .map(|id| (id, self.world.entity(id).unwrap().minion_kind.unwrap()))
-                        .collect();
-                    let request = self.respawn_request_bound(
-                        objects,
-                        step,
-                        prompt,
-                        RequestChoices::Minions(values),
-                    )?;
-                    return Ok(RespawnPlan::Prompt {
-                        request,
-                        clear: false,
-                        store: selection,
-                    });
+                    return self.respawn_minion_request_bound(
+                        objects, step, candidates, selection,
+                    );
                 }
                 clear = lane_bound;
             }
@@ -389,5 +404,46 @@ impl NativeSession {
             }
         }
         Ok(None)
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn lane_respawn_reissues_the_minion_choice_with_its_original_token() {
+        let fixture = fixture_case("object-execution-spell-primitive-respawn-ordinary");
+        let mut root = NativeSession::compile(
+            serde_json::from_value(fixture["envelope"].clone()).unwrap(),
+        ).unwrap();
+        let hex_request = root.advance_prefix(1).unwrap().request.unwrap();
+        let selection = fixture["operations"].as_array().unwrap().iter()
+            .find(|operation| operation["kind"] == "input").unwrap()["selection"].clone();
+        let selection = root.import_selection(&selection).unwrap();
+        root.submit(hex_request.id, selection).unwrap();
+
+        let minion_request = root.advance_prefix(1).unwrap().request.unwrap();
+        assert!(matches!(&minion_request.choices, RequestChoices::Minions(choices) if choices.len() > 1));
+        let before = root.semantic_state().unwrap();
+        assert_eq!(root.advance_prefix(1).unwrap().request, Some(minion_request.clone()));
+        assert_eq!(root.semantic_state().unwrap(), before);
+
+        let before_choices = root.resolution_choices(minion_request.owner).unwrap();
+        root.with_sampled_resolution(
+            minion_request.owner,
+            crate::interpreter::PlanningRolloutSample { seed: 173, upgrade_checkpoints: None },
+            |sample| {
+                assert_eq!(sample.resolution_choices(minion_request.owner)?, before_choices);
+                Ok(())
+            },
+        ).unwrap();
+        assert_eq!(root.semantic_state().unwrap(), before);
+
+        let expected = root.request_json(&minion_request);
+        let mut restored = NativeSession::compile(root.export_envelope().unwrap()).unwrap();
+        let restored_request = restored.advance_prefix(1).unwrap().request.unwrap();
+        assert_eq!(restored.request_json(&restored_request), expected);
     }
 }

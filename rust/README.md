@@ -1,10 +1,10 @@
 # Native search engine
 
 Work in progress, following [the implementation plan](../docs/superpowers/plans/2026-10-23-rust-search-engine.md).
-Six complete-game traces match Python on Forgotten Island and Magma and Ice.
-They cover four distinct rosters, including games with spellcasting, multi-piece
-heroes, passive offers, respawn, lane pushes and upgrades.
-General roster support and bot action selection remain unfinished.
+The offline worker runs native planning, resolution search, and complete
+Rust-only matches. Python validates the selected choices and replays.
+Recorded coverage includes all six bundled maps and all 33 registered
+heroes. Playing-strength acceptance and broader rule coverage remain open.
 All 18 Hanu primary recipes now execute natively, including delegated co-movement,
 alternate-target attacks, initiative/action control and literal delayed Journey
 returns. Shared filter models across generated attacks retain source identity in
@@ -589,6 +589,13 @@ build limit. Explicit `RUST_TEST_THREADS` or `--test-threads` arguments take
 precedence. For fully serial debugging, set both `RUST_TEST_THREADS=1` and
 `GOA2_ORACLE_WORKERS=1`. Avoid overlapping another build with a large test run.
 
+To replay the four complete-game traces with progress after each verified
+snapshot-delta chunk, run:
+
+```sh
+sh rust/cargo-wsl.sh test --locked --profile iterate -p goa2-search-cli --bin goa2-search-cli complete_games_match_python -- --ignored --nocapture
+```
+
 The every-boundary restore gate is opt-in. Run it when changes touch snapshot
 import/export, object identity or aliasing, or persisted request generations.
 For routine work, run the affected rule tests and validate selected choices or
@@ -715,22 +722,25 @@ Movement disagreements are saved under ignored `rust/artifacts/` for diagnosis.
 
 ## Current coverage
 
-| Area | Implemented and verified | Still required |
-| --- | --- | --- |
-| Reference | Frozen source manifest; independent Python BFS comparisons; fingerprinted corpora | Complete decision/event trace export, replay and minimization; full-search baseline runner |
-| State boundary | Semantic round trips; dense entities/physical cards and typed effects/hero collections; live context, step and model identities; arena/dense walking, placement and removal with shared tile caches; ordered planning buffers and revelation knowledge | Remaining authoritative token/effect/world bindings and physical-child/value-equality coverage |
-| Geometry | Checked cube/hex IDs; dynamic bitsets; terrain/occupancy; batched movement; effect-aware walking paths, dynamic obstacles and passable tokens; compiled range, obstacle, movement-path and straight-line predicates | Effect-aware push paths, targeting and remaining spatial-filter consumers |
-| Execution | Native planning, reveal, action resolution, respawn, lane battles, upgrades and round reset; differential replays through game over | Wider roster and map combinations, remaining world-rule interactions, and complete transition parity |
-| Stats/card model | Item, marker and active-effect stats; scoped immunity and topology; physical card lifecycle and object aliases | Complete equality, effect lifetime and world-rule coverage |
-| Card action rules | Reviewed primary catalog for 596 hero card faces; 22 spell bodies; 750 defense and on-block scenarios; passive scans, offers and live card-body rebuilding | Full-roster passive, filter and cross-card interaction verification |
-| Search/integration | Experimental resolution and planning search entry points | Search correctness and throughput gates, hidden and simultaneous planning verification, parallelism and bot integration |
+| Area | Verified offline coverage |
+| --- | --- |
+| Rules and state | Rules-version 9 envelopes, live step and object identity, native turn transitions, and sampled roster replays across all six maps |
+| Card effects | 596 reviewed primary faces, 22 spell bodies, and 750 defense and on-block scenarios |
+| Oracle parity | 6,592 stack cases and 17,347 shared-object transition cases, including state, requests, and ordered events |
+| Snapshot restore | 17,347 cases restored at every operation boundary in the latest exhaustive run after the mine and card synchronization fixes |
+| Search | Scoped planning in all four knowledge modes, sampled resolution, legal best-so-far results, and replayed public upgrade batches |
+| Rollout performance | Twenty positions across six maps at 2,726 to 4,832 full two-turn rollouts/s with four workers and 850 to 1,386 with one worker |
 
-The JSON state envelope is an outer boundary format, **not** the eventual native
-simulation representation. Importing a saved continuation losslessly does not
-claim its steps can execute. Native transition and search capabilities remain
-false. The separate `stack_trace` diagnostic operation executes only the declared
-native rule closure. Unsupported phases/effects/instructions reject the
-whole trace; it does not call Python to finish individual branches.
+The worker advertises the individual verified operations. The general game
+transition and search capability flags remain off pending the acceptance
+gates in [the implementation plan](../docs/superpowers/plans/2026-10-23-rust-search-engine.md#12-completion-checklist).
+Four serial positions remain below 1,000 rollouts/s. The current
+playing-strength reference is Lane Pressure V3 with depth two and a
+two-turn horizon. Evaluate strength on paired offline matches with
+swapped sides and a 64-turn safety limit. The
+[playing-strength plan](../docs/superpowers/plans/2026-10-23-rust-search-engine.md#playing-strength-evaluation-and-tuning)
+defines the relative target, held-out promotion criteria, and parameter
+sweeps. Layout Lab and server integration are deferred.
 
 The geometry primitive reproduces the **bare-board** Python movement contract,
 including virtual off-map terrain. Stateful topology has different off-map
@@ -739,6 +749,11 @@ its own original stateful BFS separately, and verifies Rust against both sets of
 verdicts. The stateful traversal never crosses a missing map space, even with
 pass-through permission. It never substitutes one contract for the other. Final occupancy permission and permission to pass through obstacles
 remain distinct flags. Query results are not cached across mutations.
+
+To attribute greedy search time to native rule steps, run the upgrade
+verifier with `--greedy-upgrades --profile-greedy --prepare-search`.
+The profile reports dispatch attempts and inclusive elapsed time by step
+type. Use a fixed node limit when comparing profiled and unprofiled results.
 
 ## Recorded validation, 2026-10-24
 
@@ -815,7 +830,7 @@ A 12-pair check of one root's import plus protocol round trip measured medians
 of 198.66 ms before caching and 113.41 ms after. It performed no game advancement.
 
 
-## Next rule-port work
+## Earlier rule-port notes
 
 The interpreter runs ordinary action handoffs through confirmation, finalization,
 minion return/lane checks, initiative ties, respawn and the next planning boundary.

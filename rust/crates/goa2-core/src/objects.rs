@@ -25,9 +25,11 @@ impl ProtectedObjects {
             objects: Vec::new(),
         }
     }
-    fn insert(&mut self, id: ObjectId) -> bool {
+    fn insert<const RETAIN_ORDER: bool>(&mut self, id: ObjectId) -> bool {
         if self.membership.insert(id.0) {
-            self.objects.push(id);
+            if RETAIN_ORDER {
+                self.objects.push(id);
+            }
             true
         } else {
             false
@@ -298,12 +300,32 @@ impl FromIterator<Arc<Object>> for ObjectPages {
     }
 }
 
+#[derive(Debug, Default)]
+struct ArenaLayout {
+    aliases: Vec<ObjectId>,
+    board_keys: Option<Vec<(crate::geometry::Hex, ObjectId)>>,
+    fingerprint: OnceLock<[u64; 2]>,
+}
+
+impl ArenaLayout {
+    fn fingerprint(&self) -> &[u64; 2] {
+        use std::hash::{DefaultHasher, Hash, Hasher};
+
+        self.fingerprint.get_or_init(|| {
+            [0u64, 1].map(|salt| {
+                let mut state = DefaultHasher::new();
+                (salt, &self.aliases, &self.board_keys).hash(&mut state);
+                state.finish()
+            })
+        })
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct ObjectArena {
     pub(crate) symbols: Arc<Symbols>,
     objects: ObjectPages,
-    aliases: Vec<ObjectId>,
-    board_keys: Option<Vec<(crate::geometry::Hex, ObjectId)>>,
+    layout: Arc<ArenaLayout>,
     root: ObjectValue,
     context: ObjectId,
     base_instances: usize,
@@ -454,8 +476,7 @@ impl ObjectArena {
         let mut arena = Self {
             symbols: Arc::new(symbols),
             objects: ObjectPages::default(),
-            aliases: Vec::new(),
-            board_keys: None,
+            layout: Arc::default(),
             root: ObjectValue::Atom(Datum::Null),
             context: ObjectId(0),
             base_instances: source.instances.len(),
@@ -482,7 +503,7 @@ impl ObjectArena {
             .collect::<HashMap<_, _>>();
         let mut shared = vec![None; source.object_bindings.len()];
         arena.root = arena.import(&source.state, &mut Vec::new(), &paths, &mut shared)?;
-        arena.aliases = shared
+        let aliases = shared
             .into_iter()
             .map(|id| id.ok_or("unresolved shared object".to_string()))
             .collect::<Result<_, _>>()?;
@@ -506,7 +527,7 @@ impl ObjectArena {
         if arena.objects[arena.context.0].kind != ObjectKind::Dict {
             return Err("object arena execution context must be a dictionary".into());
         }
-        if let Some(keys) = &source.board_keys {
+        let board_keys = if let Some(keys) = &source.board_keys {
             let coordinates =
                 ["q", "r", "s"].map(|name| Arc::make_mut(&mut arena.symbols).intern(name));
             let mut bound = Vec::new();
@@ -537,12 +558,19 @@ impl ObjectArena {
                 };
                 bound.push((key.hex, id));
             }
-            arena.board_keys = Some(bound);
-        }
+            Some(bound)
+        } else {
+            None
+        };
+        arena.layout = Arc::new(ArenaLayout {
+            aliases,
+            board_keys,
+            fingerprint: OnceLock::new(),
+        });
         Ok(arena)
     }
     pub(crate) fn board_key(&self, index: usize) -> Option<ObjectId> {
-        self.board_keys.as_ref()?.get(index).map(|(_, id)| *id)
+        self.layout.board_keys.as_ref()?.get(index).map(|(_, id)| *id)
     }
     fn import(
         &mut self,
@@ -616,6 +644,7 @@ impl ObjectArena {
                 .map(|_| id)
                 .ok_or("object handle outside arena".into()),
             Target::Alias(index) => self
+                .layout
                 .aliases
                 .get(index)
                 .copied()
@@ -764,12 +793,12 @@ impl ObjectArena {
                 }
             })
             .collect();
-        self.readonly_reachable(roots)
+        self.readonly_reachable::<false>(roots)
     }
     pub(crate) fn readonly_step_objects(&self, step: ObjectId) -> ProtectedObjects {
-        self.readonly_reachable(vec![step])
+        self.readonly_reachable::<true>(vec![step])
     }
-    fn readonly_reachable(&self, mut queue: Vec<ObjectId>) -> ProtectedObjects {
+    fn readonly_reachable<const RETAIN_ORDER: bool>(&self, mut queue: Vec<ObjectId>) -> ProtectedObjects {
         let mut protected = ProtectedObjects::new(self.objects.len());
         // Resolve exclusions once per walk; scalar fields cannot add graph edges.
         let live_fields = [
@@ -781,7 +810,7 @@ impl ObjectArena {
         ]
         .map(|name| self.symbols.lookup(name));
         while let Some(id) = queue.pop() {
-            if !protected.insert(id) {
+            if !protected.insert::<RETAIN_ORDER>(id) {
                 continue;
             }
             let object = &self.objects[id.0];
@@ -1547,8 +1576,7 @@ impl ObjectArena {
         self.symbols.hash_local(state);
         self.root.hash(state);
         self.objects.hash(state);
-        self.aliases.hash(state);
-        self.board_keys.hash(state);
+        self.layout.fingerprint().hash(state);
         self.context.hash(state);
         self.physical_copies.hash(state);
         let mut fields: Vec<_> = self.physical_fields.iter().collect();
@@ -1656,7 +1684,7 @@ impl ObjectArena {
     ) -> Result<(Vec<ObjectBinding>, Option<Vec<crate::codec::BoardKey>>), String> {
         let mut occurrences: Vec<Vec<Vec<ObjectPathPart>>> = vec![Vec::new(); self.objects.len()];
         self.visit(&self.root, &mut Vec::new(), &mut occurrences, 0)?;
-        let keys = self.board_keys.as_ref().map(|keys| {
+        let keys = self.layout.board_keys.as_ref().map(|keys| {
             keys.iter()
                 .map(|(hex, id)| crate::codec::BoardKey {
                     hex: *hex,
@@ -1874,8 +1902,7 @@ mod protection_tests {
             .into_iter()
             .map(Arc::new)
             .collect(),
-            aliases: Vec::new(),
-            board_keys: None,
+            layout: Arc::default(),
             root: ObjectValue::Object(ObjectId(0)),
             context: ObjectId(1),
             base_instances: 0,
@@ -1911,6 +1938,7 @@ mod protection_tests {
             arena.clone()
         });
 
+        assert!(Arc::ptr_eq(&arena.layout, &fork.layout));
         assert_eq!(hash(&arena), original);
         assert_ne!(hash(&fork), original);
         for page in arena.objects.pages.iter().chain(&fork.objects.pages) {
@@ -2017,13 +2045,13 @@ mod protection_tests {
     fn bitmap_protection_spans_words_and_copies_remain_private() {
         let mut root = ProtectedObjects::new(130);
         for id in [0, 63, 64, 127, 129] {
-            assert!(root.insert(ObjectId(id)));
-            assert!(!root.insert(ObjectId(id)));
+            assert!(root.insert::<true>(ObjectId(id)));
+            assert!(!root.insert::<true>(ObjectId(id)));
             assert!(root.contains(&ObjectId(id)));
         }
         assert!(!root.contains(&ObjectId(130)));
         let mut worker = root.clone();
-        worker.insert(ObjectId(65));
+        worker.insert::<true>(ObjectId(65));
         assert!(!root.contains(&ObjectId(65)));
         assert!(worker.contains(&ObjectId(65)));
         assert_eq!(root.into_iter().count(), 5);
@@ -2031,7 +2059,12 @@ mod protection_tests {
     #[test]
     fn readonly_walk_preserves_live_payload_exclusions_aliases_and_cycles() {
         let arena = graph();
-        let protected = arena.readonly_objects().into_iter().collect::<HashSet<_>>();
+        let membership = arena.readonly_objects();
+        assert!(membership.objects.is_empty());
+        let protected: HashSet<_> = (0..arena.objects.len())
+            .map(ObjectId)
+            .filter(|id| membership.contains(id))
+            .collect();
         assert_eq!(
             protected,
             [2, 3, 6, 7, 11].map(ObjectId).into_iter().collect()

@@ -125,8 +125,7 @@ pub struct WorldDefinitions {
     pub(crate) tide_of_darkness: Symbol,
     pub(crate) illusion_token: Symbol,
     pub(crate) targeting: crate::targeting::TargetingKeys,
-    pub(crate) supply_passable: Vec<(Symbol, bool)>,
-    pub(crate) mine_supply: Vec<(Symbol, bool, Option<Symbol>)>,
+    pub(crate) supply_passable: Vec<(Symbol, bool, Option<Symbol>)>,
     geometry: BoardGeometry,
     tile_keys: Vec<String>,
     tile_zones: Vec<Option<Symbol>>,
@@ -464,7 +463,6 @@ impl NativeWorld {
             }
         }
         let mut supply_passable = Vec::new();
-        let mut mine_supply = Vec::new();
         for tokens in semantic["token_pool"]
             .as_object()
             .ok_or("token supply missing")?
@@ -472,12 +470,6 @@ impl NativeWorld {
         {
             for token in tokens.as_array().ok_or("token supply list missing")? {
                 supply_passable.push((
-                    symbols.intern(token["id"].as_str().ok_or("token id missing")?),
-                    token["is_passable"]
-                        .as_bool()
-                        .ok_or("token passability missing")?,
-                ));
-                mine_supply.push((
                     symbols.intern(token["id"].as_str().ok_or("token id missing")?),
                     token["is_passable"]
                         .as_bool()
@@ -747,7 +739,6 @@ impl NativeWorld {
                 illusion_token: symbols.intern("illusion"),
                 targeting: crate::targeting::TargetingKeys::compile(symbols),
                 supply_passable,
-                mine_supply,
                 effect_empty: symbols.intern(""),
                 cards: card_definitions,
                 card_equality_fields,

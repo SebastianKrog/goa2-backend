@@ -57,6 +57,10 @@ Initial constraints:
 - Initially add the workspace inside `goa2-backend-bots`; do not create another
   fork or modify the regular backend checkout as part of this plan.
 
+Playing-strength measurement and parameter tuning follow Section 10. Use the
+frozen Rust reference, pairs with swapped sides, and a 64-game-turn safety guard.
+An absolute strength target remains open until calibration supplies evidence.
+
 ### Next milestone — greedy card-order search
 
 Find a sensible sequence of card plays and actions against opponents who hold
@@ -1412,7 +1416,14 @@ trying the turn horizon, the search uses at most one eighth of its node budget
 (rounded up to at least one node) to score immediate successors. A score at
 completed depth zero can therefore come from an immediate successor or a fully
 evaluated root move from an interrupted first iteration. The resolution CLI
-labels scores as immediate, decision_depth, or turn_rollout.
+labels scores as immediate, decision_depth, short_turn_rollout, or
+turn_rollout. For a requested horizon beyond one turn, a bounded seed
+pass tries every legal root move across all prepared worlds at a one-turn
+cutoff. It uses up to one eighth of the node cap and one eighth of the
+remaining time after setup and immediate scoring. The seed result is
+published only after the pass completes. A partial longer iteration
+preserves that result. A completed longer iteration supersedes it.
+The seed's scores never enter the longer horizon's exact-score cache.
 The CLI's rollout_game_turns diagnostic matches Python's first-legal stopping
 round, turn, phase, decision count and full semantic leaf state for both
 horizons on Forgotten Island and Magma and Ice. Each map starts from both its
@@ -1984,22 +1995,269 @@ coverage to all six bundled maps in combination with the recorded
 corpus. It does not close the serial shortfall on the older corpus or
 measure adversarial search throughput.
 
-### Playing-strength tuning after engine acceptance
+### Playing-strength evaluation and tuning
 
-Use the verified simulator and accepted engine configuration as the control.
-Compare search methods and tune depth, turn horizon, world count, action-set
-width, move ordering, opponent and continuation policy, evaluation weights,
-and time allocation. Treat the two-turn reference configuration as a fixed
-parity and performance benchmark. Candidate playing configurations may vary.
+Freeze the current playable Rust reference as the first comparison
+baseline. Use Lane Pressure V3 with depth two and a two-turn follow-up as
+the starting point. Record the exact worker build or reproducible build
+inputs, rules and content hashes, evaluator, all search parameters, and
+per-prompt budgets. This baseline can have known weaknesses. The first
+target is a repeatable improvement over that configuration at the intended
+playing budget. Set an absolute strength target only when there is a
+credible reference for one. Track the fixed two-turn parity and throughput
+workload separately from playing-strength experiments.
 
-Compare Rust search configurations against a fixed Rust baseline at fixed
-wall-clock decision budgets. Use paired, side-swapped games across seeds,
-maps and rosters, including difficult midgame positions. Use Python solely
-to validate selected decisions or replay rule outcomes. Report completed-game outcomes, move
-quality on reviewed positions, fallback rate and decision latency. Set the
-strength acceptance threshold before evaluating the final candidate and
-confirm the chosen settings on held-out games. Short smoke games verify
-execution only.
+**Match protocol.** Play each starting game twice. Generate one starting
+state from a recorded map, roster and setup seed, or use a recorded midgame
+state. In the first game the candidate plays Red and the baseline plays Blue.
+In the second game the policies swap. Keep the starting state, rosters,
+positions, and match seed fixed. For example, if Red wins both games,
+each policy earned one win from that start. If the candidate wins both
+games, it won with both starting assignments. Cover multiple maps,
+rosters, and both single- and two-lane layouts. Use distinct tuning and
+held-out sets.
+
+The ordinary strength screen starts at the opening. Its historical QUICK
+settings support short tuning runs. Use `--strength-game-type LONG` for
+opening calibration and playing-budget confirmation on full game settings.
+Record the game type with the result and keep QUICK and LONG results
+separate. On two-lane maps both settings use the same wave and life limits.
+Add `--strength-midgame` to use the round-three, turn-one Hanu snapshots
+from the pinned complete-game corpus on Forgotten Island and Magma and Ice.
+They retain the recorded LONG game settings, upgraded hands, and board
+positions. These are additional tuning starts. Keep their results separate
+from the opening screen and the held-out set. The match log records the
+start snapshot hash and game type for reproduction.
+
+Run strength games to a rules-defined ending, with **64 game turns per
+match** as a safety limit. That's 16 four-turn rounds from an opening,
+beyond the roughly ten rounds a typical game is expected to take. Keep
+the same allowance from a midgame start and use it for both policies in
+every comparison. This limit belongs to the offline match runner. If a
+match reaches it, record it as unfinished and report how often that happens.
+Use shorter runs only for smoke tests, legality checks, and latency
+diagnostics.
+
+**Strength and guardrails.** Report wins, losses, draws and unfinished
+games separately, plus the result of each side-swapped pair. Use lane
+pushes by team and direction, hero and minion defeats, and time to game
+over to explain stalled or decisive games. Keep evaluation scores out
+of the strength verdict. Report planning and resolution p95 latency,
+fallback rate, and search work separately. Python validates selected
+decisions and replay outcomes. Rust policies supply the opponents.
+
+Run the frozen baseline against itself at the intended playing budget
+to check finish rates and see which starts favor a side and roster
+assignment. Use a paired candidate pilot on tuning starts to estimate
+how much improvement might be measurable. Size the held-out set using
+the paired variation and the smallest improvement worth promoting.
+Four screening starts are too few for a one-sided sign-flip p of 0.05,
+even if the candidate sweeps every pair. Before opening the held-out
+set, record the candidate, match settings, acceptance rule, and limits
+on unfinished games, latency, and fallbacks. Score each completed pair
+by the candidate game points earned across both assignments, with one
+point for a win, half a point for a rules-defined draw, and zero for a
+loss. One point per pair is even. Estimate uncertainty across paired
+starts and report how many pairs contributed. Account for every
+scheduled game and list incomplete pairs separately. An unfinished
+game contributes no result to the pair score. If the unfinished rate
+exceeds the agreed limit, investigate lane progression and stalled
+positions before using the results for promotion.
+
+The first strength milestone is a reproducible measurement, followed by
+a verified improvement over the frozen baseline. Use recurring weaknesses
+from replay to choose candidate changes. A small or uncertain advantage
+stays a tuning result until an independent confirmation supports it.
+
+**Parameter tuning.** Screen search changes on the tuning set at an
+equal short wall-clock budget, then confirm promising candidates at
+five seconds for planning and resolution. Use ten-second checks to see
+whether rankings change with more time. Where other prompt types use
+shorter budgets, give both policies the same budget for that prompt.
+Sweep a small range for one parameter family at a time, then test
+interactions among the settings that matter. Cover search depth and turn
+horizon, sampled worlds, root and follow-up width, opponent policy,
+forecast allowance, move ordering, and evaluation weights. Compare
+settings by match outcomes and guardrails under the same budget. Keep the
+baseline frozen during a tuning round and use the held-out set only to
+confirm the chosen configuration. Record the tested values, paired
+results, latency, and fallbacks for each sweep so later tuning can
+distinguish robust ranges from settings that only worked for one roster,
+map, or budget. Start with the baseline and bracket its values. For example,
+the existing horizon trial compares one or three turns with the two-turn
+reference. If different settings win at different budgets, record the
+trade-off before choosing a default for the intended budget.
+
+The `--horizon-trial` mode compares one versus two searched game
+turns on the screening starts by default. Pass `--candidate-rollout-turns 3`
+to screen three turns against the same two-turn reference. The trial keeps
+the four-turn greedy forecast,
+quarter node allowance, planning width, evaluator, and decision
+budget fixed. Use `--decision-ms 5000` for the playing-budget screen.
+Both assignments run to game over or the 64-turn safety limit and
+are replayed in Python.
+
+Use `--world-count-trial --decision-ms 5000` to compare four sampled
+hidden worlds against two in both planning and resolution. Keep the
+worker counts, two-turn horizon, node cap, and evaluator fixed. The
+same deadline and node cap apply to each complete decision, so adding
+worlds reduces the work available per world. Record paired outcomes,
+completed planning rows, latency, and fallbacks before tuning the default.
+
+Use `--reply-width-trial --decision-ms 5000` to compare a cap of eight
+opposing planning replies per world with four. Both policies compare
+opponent replies at the root and keep later planning fixed. This lets the
+cap take effect. Keep the controlled plan width, sampled-world count, and
+decision budget fixed. Track wins and completed planning rows alongside
+latency.
+
+Use `--decision-depth-trial --decision-ms 5000` to compare search depths
+three and two at the same two-game-turn horizon. This varies how many
+branching decisions search can explore before following its continuation
+policy. Keep the evaluator, forecast, sampled worlds, and total budgets fixed.
+
+Use `--attack-extension-trial --decision-ms 5000` to test an extra
+search layer when the depth cutoff lands on an attack-target prompt.
+Both policies retain depth two and a two-turn horizon. This isolates a
+tactical extension that can spend the remaining node budget on target
+choices while leaving other depth cutoffs as they are. The focused
+native test checks target branching, node exhaustion, and rollback.
+
+Use `--planning-opposition-trial --decision-ms 5000` to compare complete
+planning strategies. The reference fixes uncontrolled inputs from greedy
+forecasts and spends the follow-up search on controlled choices. The
+candidate compares up to four adversarial root replies per world and
+branches on both sides at the next planning boundary. Both start with
+four-turn greedy forecasts and share the same evaluator, two-turn search
+horizon, depth, world count, node cap, and wall-clock budget. This compares
+the whole treatment of opposition. It cannot attribute a strength change
+to the root matrix or the later replies in isolation.
+
+The Across the River seed-109 preflight completed all four controlled rows
+for both policies. Forecast opposition evaluated 8 cells and used 50,700
+nodes. Adversarial planning evaluated 32 cells and used 73,636 nodes.
+Python accepted both selected commitments. Run the side-swapped pair at
+the five-second budget as the first same-start diagnostic.
+
+Use `--tactical-forecast-trial --decision-ms 500` to screen the bounded
+greedy tactical replies against the Hold forecast. Only the four-turn
+forecast changes. The later two-turn search still samples opponent cards
+from each policy's forecast and uses the same fixed opposition policy.
+The candidate's probes come from the existing greedy node allocation and
+share its deadline. Report tactical probes from forecasts that produced
+usable card scores, both policies' outcomes and latency, and Python
+parity for the selected trace. A five-second follow-up tests promising
+results at the playing budget.
+
+The 500 ms screen on release worker
+`38e8e5a6ba56f83f360c5be669b524148c6b3cd0e8df17ad0a0e030704bc8e16`
+finished 5-3 for the Hold forecast. Hold won both Forgotten Island
+games. The other three pairs split. All eight games ended under the
+rules. Python matched 3,092 decisions, eight endpoints and the public
+upgrade evidence. Both policies used zero unscored fallbacks. Scored
+tactical forecasts used 121,429 probes. Planning p95 rose from 446 to
+460 ms and resolution p95 moved from 268 to 245 ms across different
+positions reached in play. Retain Hold as the reference and keep the
+tactical forecast opt-in.
+
+The paired five-second LONG pilot used worker SHA-256
+`38e8e5a6ba56f83f360c5be669b524148c6b3cd0e8df17ad0a0e030704bc8e16`
+and the same four tuning starts. Tactical won both Across the River
+assignments and split the other three pairs, scoring five of eight
+game points (one-sided sign-flip p = 0.5). All eight games ended under
+the rules after 12 to 41 turns. Python matched 2,778 decisions and all
+eight endpoints. Neither policy used an unscored fallback. Planning
+p95 was 907 ms for Hold and 1,009 ms for Tactical. Resolution p95 was
+233 and 258 ms, respectively. Tactical used 490,298 forecast probes.
+The pilot provides one decisive pair. Keep Hold frozen and use
+independent LONG starts for any later strength claim.
+
+The initial screening baseline is reproducible with
+`rollout_parity.py --worker <release-worker> --strength-baseline --decision-ms 500`.
+It runs fixed-opponent true-rules self-play on four disjoint tuning starts
+(Forgotten Island 71, Across the River 109, Magma and Ice 173, and
+Narrow Passages 223), using depth two, a two-turn follow-up, Lane Pressure
+V3, 131,072 nodes, two sampled worlds and workers, and a quarter-share
+forecast. It uses the 64-turn safety cap and validates every trace in
+Python. The first run uses release worker SHA-256
+`675b3d6c2f5682ab2195149e4e085f36c0061ae12955b44971266521af920e47`.
+The 500 ms run characterizes the tuning setup. Repeat at the intended
+playing budget with `--strength-baseline --strength-game-type LONG
+--decision-ms 5000` before setting a relative strength threshold.
+Use `--strength-map` to run a single start with the same settings.
+
+The five-second LONG calibration used release worker SHA-256
+`38e8e5a6ba56f83f360c5be669b524148c6b3cd0e8df17ad0a0e030704bc8e16`.
+All four starts reached rules-defined endings, two per side. Forgotten
+Island ended by Blue annihilation after 30 turns. Red won by lane push
+on Across the River after 19 turns and on Magma and Ice after 12.
+Blue won by lane push on Narrow Passages after 13 turns. Python
+matched all 1,139 decisions and four endpoints. There were zero
+unscored fallbacks in 1,011 non-forced choices. Planning p95 was 918 ms
+and resolution p95 was 290 ms. These four self-play starts check the
+reference and the guard. Use a candidate pilot before choosing a
+numerical promotion target.
+
+The first screening run completed Forgotten Island (Blue annihilation,
+400 decisions) and Across the River (Red lane push, 279 decisions),
+with no unscored fallbacks and exact Python endpoints. The next replay,
+Magma and Ice seed 173, stopped at decision 102 in round two, turn four.
+Rust requested a Silverarrow confirmation while Python expected Min's
+Viper Stance action. Resolve this parity mismatch before using the corpus
+for strength comparisons. The `--forecast-share-trial` mode uses the
+same starts and runs quarter versus eighth with policies swapped and
+the same 64-turn limit.
+
+The mismatch was caused by the mine-presence shortcut using imported
+supply ownership after a mine had been deployed and assigned to Min.
+It now reads live deployed token properties. The exact 127-input
+sequence from the original opening, ending with Min's Python-legal
+action after Silverarrow crossed the dud, was rejected at input 127
+by the frozen worker and accepted in full by the fixed worker.
+Six mine tests plus the live-owner regression passed. The fixed
+Magma and Ice matchup also reached a Blue lane-push win with
+232 decisions and an exact Python endpoint, with zero unscored
+fallbacks. Rebuild and re-freeze the screening baseline after this
+rules fix before comparing strength.
+
+The corrected screening worker is frozen under WSL verification storage
+with SHA-256
+`a73db95617a4ad4b6416429baeae052034330326158b630c3a612eb47ee39055`.
+The post-fix batch and sequence verifier matched 66 and 69 verdicts,
+respectively. Repeat the four baseline games on this worker before
+comparing forecast allowances.
+
+All four corrected 500 ms self-play starts reached game over. Blue
+won on Forgotten Island (annihilation), Magma and Ice (lane push) and
+Narrow Passages (lane push). Red won on Across the River (lane push).
+Python matched 1,099 decisions and all four endpoints. There was one
+unscored planning fallback in 982 non-forced choices, on Magma and
+Ice, where no row finished in budget. This is a screening reference
+for these map/roster/seed combinations. The paired trial reports
+game length and hero/minion defeats from the Python replay in
+addition to lane shifts, latency, fallbacks and results.
+
+The forecast-share screen split the first two pairs, with Blue winning
+both Forgotten Island games and Red winning both Across the River
+games. Python matched all 1,338 decisions and four terminal states,
+with zero unscored fallbacks. The Magma and Ice replay exposed a
+verifier issue at the second prompt of a lane-bound respawn. The
+Rust-selected minion was offered by the live Python prompt, but the
+clone-based legality check reissued the earlier hex prompt. The
+offline replay now checks ownership and exact selection against the
+live Python request for this prompt, then submits through Python
+normally and compares the final state as before.
+
+The remaining pairs also split: Blue won both Magma and Ice games
+and both Narrow Passages games. The full 500 ms screen ended 4-4,
+with all eight games terminal and all 2,424 decisions and endpoints
+matched in Python. Eight unscored fallbacks occurred on Magma and
+Ice: two planning budget misses and six resolution guard refusals
+while a delayed trigger was active. One refused prompt explicitly
+targeted enemies adjacent to a grenade. Keep quarter as the
+screening baseline. This sample shows no head-to-head gain for
+eighth, and the lower share did not consistently reduce latency
+at this time-limited setting.
 
 The exploratory `--strength-trial` compares one-turn and two-turn Rust
 search with the same depth-one limit, evaluator, 4,096-node cap and
@@ -2318,7 +2576,7 @@ Engine correctness and efficiency gates precede playing-strength tuning.
 | 6. Hidden/simultaneous planning | Observation exporter; consistent beliefs; planning epochs; tested maximin/matrix policy | No-leakage and simultaneous-choice tests; supported planning/second-card games |
 | 7. Full rule coverage | All heroes/maps/effects and declared rules versions; minimized regressions | No unsupported transition reachable for the advertised coverage; full parity corpus passes |
 | 8. Parallelism and engine performance | Worker-local execution; measured allocation/layout/ordering improvements | Deterministic serial baseline retained; real throughput/latency improvement; bounded memory |
-| 9. Playing strength | Compare and tune search methods and parameters offline | Credible play under the agreed budget, with results against a fixed Rust baseline and held-out validation |
+| 9. Playing strength | Establish a frozen Rust baseline, then compare and tune search methods and parameters offline | Reproducible paired measurements and a held-out improvement over the baseline within the agreed budgets and guardrails |
 
 Milestones 3â€“6 can use a declared small roster for development, but do not declare
 the engine complete from a special-case Arien/Brogan opening or exclude difficult
@@ -8796,6 +9054,51 @@ and advance took 24 us, with branch and restored keys at 100 and
 Dirty-page rehashing and metadata still cost too much for an
 unconditional lookup at each search node.
 
+Sharing the immutable arena alias and board-key tables across forks also
+lets them share a lazily computed digest. The same 300-repetition WSL
+iterate-profile workload measured warm execution keys at 1.6, 2.6 and
+4.7 us on the compact, full and live roots. Combined branch keys took
+45, 42 and 62 us, with restored keys at 37, 34 and 56 us respectively.
+All branch keys were stable across repeats and the exported root restored
+exactly. The first-legal controls took 38-39 us per node. Warm keys are
+now cheap enough to investigate reuse at stable boundaries. Dirty keys
+still need to save more than one node on average to pay for a lookup.
+
+The offline resolution_reuse_census operation walks the unpruned legal
+resolution tree and counts same-depth world/execution key matches, split
+by expandable state and leaf. At depth eight submitted inputs and a
+20,000-node cap per root, the first two multi-option requests from the
+seed-39 Forgotten Island and Magma and Ice games, plus the recorded
+Narrow Passages Blink Strike confirmation, visited 8,713 states (4,853
+expandable). There were zero matches. Key work took about 608 ms in
+total on the WSL iterate build. These probes stop at planning or game
+over and do not model alpha-beta ordering, sampled-world reuse, or
+iterative-deepening revisits. Leave general resolution caching off.
+Measure semantic convergence at narrower boundaries before changing
+key equivalence or introducing a table.
+
+Re-running the same five trees with separate world and execution
+counters found 827 expandable states and 1,095 leaves whose world
+fingerprints repeated at the same depth while their execution keys
+differed. Of 2,400 planning endpoints, 355 were world-only matches.
+The full key had zero repeats even across depths. This confirms that
+the world fingerprint alone would merge execution states. The probe
+does not show whether those differences affect future play. Test
+planning endpoints first by comparing legal commitments and replaying
+identical continuations, including next-round effects, before defining
+a narrower reuse key.
+
+The planning-pair probe retained up to 64 endpoints per root and
+checked up to eight pairs. It re-enumerated commitments and resolution
+choices on both branches, ignoring request tokens for the option
+comparison, then applied the same first choice until the next round,
+game over, or divergence. All 40 sampled pairs diverged before the
+next round or game over. The identical-session control crossed the
+round boundary, and changing a hero's gold triggered divergence.
+A matching world fingerprint at planning is therefore insufficient
+for subtree reuse. Keep the cache disabled and prioritize end-to-end
+search throughput over broadening this key.
+
 Sampled multi-world resolution search now uses a bounded immediate-scoring
 pass before game-turn rollouts. It publishes a provisional score only after
 the same candidate has been evaluated in every sampled world. Warmup nodes
@@ -9357,3 +9660,1345 @@ all 16 cells in 40,618 nodes, and from 3.33 to 0.84 seconds. Python
 accepted all four selected commitment sets. The two policies evaluate
 different opposition, so this comparison measures work and legality.
 Playing strength remains unmeasured.
+
+A fixed-policy trial bypassed full input enumeration when the policy
+already determined Hold, Pass, No, Skip, or Confirm. The 11 greedy
+tests and the repeatable fixed-opponent planning test passed. Five
+runs per variant and knowledge mode on the same Forgotten Island
+opening matched commitments, scores, and node counts. Python accepted
+all selected commitments. Median caller time moved from 897 to 907 ms
+in true-rules mode and from 749 to 750 ms in coordinated mode. The
+shortcut was reverted because it added a second decision path without
+an end-to-end benefit on this workload.
+
+WSL perf sampled the optimized Rust worker during five true-rules and
+five coordinated fixed-opponent searches on the same Forgotten Island
+root. All searches completed the same node counts as the unprofiled
+control, and Python validated each selected commitment set outside the
+profile. In 15,198 flat CPU samples, run_objects accounted for 10.9%
+self time, SipHash writes 3.5%, bound card-collection synchronization
+2.5% plus 1.1% in one of its closures, arena apply 2.4%, and copy-on-write
+page/object mutation 3.4% combined. The local perf build could not
+unwind DWARF stacks. These figures are flat self time, so they identify
+engine hotspots but cannot apportion time between the greedy forecast
+and the follow-up. Prioritize profiling card-collection synchronization
+and testing whether it rewrites unchanged lists before changing search
+policy or adding a broad cache.
+
+The existing card-sync stamps already skip unchanged typed lists,
+and the earlier duplicate-read trial found no throughput benefit.
+An adjacent trial removed the temporary flag vector from aura refresh.
+All three focused aura tests passed. Five alternating measured pairs
+per map and mode (after one warmup pair) matched commitments, scores,
+rows, cells, and nodes. Python accepted all 48 selected commitment
+sets including warmups. Median caller time in milliseconds was
+840 to 829 and 696 to 713 on Forgotten Island (true rules and
+coordinated), and 850 to 880 and 791 to 762 on Magma and Ice.
+Reverted the trial because the effect varied by root and mode.
+Prioritize caller or phase attribution before further local rewrites.
+
+Temporary wall-clock probes split fixed-opponent planning into sampled
+world creation, greedy forecasts, and follow-up matrix work. The same
+two-world, two-worker, depth-two opening benchmark used 131,072 nodes
+and a five-second deadline. Across three requests per map and mode,
+median preparation and matrix times in milliseconds were 560/245 and
+545/139 on Forgotten Island (true rules and coordinated), and 604/232
+and 577/149 on Magma and Ice. The slower parallel forecast nearly
+equaled all preparation time. Sampling took less than 0.4 ms per
+world. Every request used 32,768 forecast nodes, with 7,850 to 16,072
+follow-up nodes. Python accepted all 12 commitment sets. The timing
+probes were removed. Forecast preparation accounted for roughly
+70-80% of native wall time on these roots, so test lower or adaptive
+forecast allowances before optimizing follow-up enumeration. Compare
+per-turn coverage and held-out Rust play at equal total budgets.
+
+The forecast allowance trial kept the four-turn horizon, five-second
+deadline, 131,072 total nodes, two sampled worlds and workers, and
+depth-two follow-up. It compared 1/4, 1/8 and 1/16 node allowances
+on opening and upgraded true-rules positions from Forgotten Island,
+Magma and Ice, and Across the River. Per-world distinct hero/card
+entries by turn were [20,20,12,16], [20,20,12,12] and [20,8,8,8]
+respectively on all six roots. Every follow-up forecast check found
+a compatible score. All variants completed all rows and returned the
+same commitment and score on each root. Python validated all 18
+selected commitment sets. Single-request caller latency fell by
+27-39% at 1/8 and 38-53% at 1/16 across these roots. These openings
+do not show whether the thinner forecasts hold up in contested
+positions or against another Rust policy. The temporary override was
+removed. Use 1/8 as the first candidate for a side-swapped match
+trial, since it preserved the first three turns' breadth here.
+
+The offline sampled planner and match runner accept forecast_node_share
+(quarter by default, eighth for comparison). Only the node allocation
+changes; both variants retain the same forecast wall-time limit. In the
+side-swapped trial, both Rust policies used a 500 ms decision deadline,
+32,768 total nodes, depth one, two-turn follow-up, Lane Pressure V3, two
+planning workers and worlds, and a four-reply cap. Across the River
+(seed 137, Arien/Hanu vs Misa/Brogan) ended in two quarter wins.
+Magma and Ice (seed 463, Wasp/Brogan vs Sabina/Tigerclaw) ended in one
+eighth win and one unfinished match at the 64-turn cap. All three wins
+were lane pushes. Python matched all 2,039 selected decisions and the
+four final states. Neither policy reported an unscored fallback.
+Median planning latency was 84-89 ms for eighth and 135-137 ms for
+quarter. Retain quarter by default. This short trial does not establish
+strength equivalence or the best allocation at a 5-10 second budget.
+
+A 3v3 LONG search sweep at seed 73 covered all 33 registered heroes
+across Forgotten Island and Magma and Ice. At 300 ms, two planning
+workers and eight turns, Python matched 1,761 selected decisions and
+all 12 endpoints. The one unscored fallback was at Ignatia's
+Equilibrium action menu with Emmitt's Unstable Timeline cleanup
+pending. Sampling now accepts the public delayed cleanup from
+Unstable Timeline or Flashback after checking the live token query,
+Glitch filter, loop bindings, and remove-token template. It still
+checks the source card's visibility separately. The focused
+Magma and Ice rerun matched all 139 decisions and the endpoint
+against Python, with zero unscored fallbacks. This checks an
+eight-turn window for those rosters, with terminal coverage separate.
+
+The Rust Glitch cleanup regression replays the existing Unstable
+Timeline defense fixture until the delayed cleanup is active. The
+sampling guard accepts the original program and rejects it after the
+live remove-token template is rebound to the list key. The existing
+hidden-hand handoff regression also passed.
+
+The remaining four maps passed the same eight-turn 3v3 LONG search
+sweep at seed 73 with two planning workers and 300 ms per decision.
+Python matched 3,505 selected decisions and 24 endpoints. Search
+reported zero unscored fallbacks and returned scored best-so-far
+on 82/1,152 planning and 11/2,095 non-forced resolution decisions.
+A separate seed-73 5v5 LONG sampled-policy sweep on Across the River
+and Magma and Ice covered all 33 heroes, with Python matching 901
+decisions and eight endpoints through four turns. These runs expand
+roster and map coverage. All cases stopped at their prescribed turn caps.
+
+Uneven-team LONG search replays covered 2v3 and 3v2 on Forgotten
+Island (seed 71, Arien/Razzle vs Emmitt/Ignatia/Hanu), and 4v5 and
+5v4 on Across the River (seed 109, Takahide/Bain/Min/Misa vs
+Swift/Wasp/Gydion/Xargatha/Silverarrow). At 300 ms and two planning
+workers, Python matched 676 decisions and all four endpoints after
+eight turns. Search reported zero unscored fallbacks. This covers
+both team assignments and two uneven player-count brackets.
+
+On the current iterate worker, sequence_legality.py --verdicts-only
+matched 66 batch verdicts (30 accepted, 36 rejected), 69 sequence
+verdicts, and the consecutive-allied-choice payoff fixture. The
+300 ms terminal verifier matched 57 decisions and all eight
+endpoints, winners and victory conditions on Forgotten Island and
+Magma and Ice. The search side used zero unscored fallbacks. These
+checks cover invalid sequences and terminal continuations separately
+from the larger-roster opening replays.
+
+The current working tree passed 398 core tests and eight bounded CLI
+tests. Four exhaustive CLI trace tests remained opt-in. The WSL release
+build took 2m20s. With the same lab evaluator hash and Hanu corpus as
+Section 10, run 1,024 completed rollouts over eight seeds at each of
+12 early- and midgame positions. Python matched state, decisions and
+score for all 96 root/seed pairs at both worker counts. Four workers
+sustained 2,869-4,582 complete two-turn rollouts/s. One worker
+sustained 862-1,422/s, below 1,000/s at four roots: Forgotten Island
+early combat (995), Magma and Ice early round boundary (978),
+Magma and Ice midgame upgraded (934) and midgame combat (862).
+Sampling and restore took 4.0-8.8% of measured worker time.
+The parallel recorded workload clears the target on this build.
+The serial shortfall and adversarial search throughput remain open.
+
+A flat WSL release profile of 4,096 serial Magma and Ice midgame
+combat rollouts collected 10,087 CPU samples. Self time included
+8.8% in the rules loop, 5.3% in read-only arena reachability and
+3.5% in arena field lookup. The profiled run completed 840 rollouts/s.
+The reachability trial avoids retaining visitation order when callers
+only need root-wide membership, while preserving the ordered walk for
+copied step operands. All six arena protection tests passed. Compare
+alternating release runs on the same root before drawing a throughput
+conclusion.
+
+The root-wide reachability trial matched rollout node counts and
+scores in five alternating measured release pairs of 1,024 rollouts
+after a warmup pair. Median throughput moved from 852 to 862/s,
+with four pairs faster and one slower. All 48 sampled midgame
+root/seed results across both recorded maps also matched Python
+state, decisions and score. Keep the reduced root allocation.
+This isolated trial leaves the serial combat position below target.
+
+A five-second-budget side-swap used the two recorded Hanu midgame
+combat roots, seed 701, 131,072 nodes, depth two, a two-turn follow-up,
+Lane Pressure V3, two sampled worlds and workers, and the same
+quarter-share greedy forecasts on both sides. Fixed-opponent play
+used one sampled reply. The adversarial control capped replies at
+four and enabled later branching. All four matches reached the
+12-turn cutoff. Python matched all 654 decisions and four final
+states; neither policy returned an unscored fallback. Fixed
+planning medians were 561-632 ms, against 764-1,013 ms for the
+adversarial control. Lane shifts ranged from zero to two per match.
+The trial verifies a latency advantage on contested roots and
+leaves strength unsettled. Wider controlled follow-up and terminal
+held-out games remain separate checks.
+
+At the first later planning boundary, the fixed-opponent follow-up
+now tries up to four joint commitments for the controlled heroes
+using the existing bounded generator. All rows reuse the same
+opponent commitments and submission order. The adversarial
+diagnostic retains its two-by-two comparison. Both paths charge
+each evaluated row and continuation to the same search budget.
+The fixed-opponent repeatability test and the adversarial exact-value
+and interruption regression passed. Compare recorded-root latency
+and Python legality before running another side-swapped match trial.
+
+On the release worker, the two recorded Hanu midgame combat roots
+each completed all four root rows in true-rules and coordinated mode
+with both widths (seed 701, 131,072 nodes, five seconds, depth two,
+two worlds/workers, Lane Pressure V3). Python accepted all eight
+commitment sets. The wider follow-up selected the same commitments
+in all four cases, with two equal scores and two higher modeled
+scores. It used 932-2,914 more nodes. Single-call latency was
+647-795 ms versus 610-773 ms with the old width; individual
+differences were 19-61 ms. The generator varies the requesting hero
+first, so four rows may leave a controlled ally fixed. This is
+legality and cost evidence. A team-diverse row ordering and
+side-swapped strength trial remain open.
+
+The offline coordinated_planning option searches once for a team's
+open commitments and submits them in the normal game order. The
+two-turn 2v2 smoke test counted two searches for the coordinated
+side and four for the solo side, with zero unscored fallbacks and
+23 Python-matched decisions and the endpoint.
+
+The sampled resolution guard now recognizes the public finishing
+program for Min's Death Grenade and Holy Death Grenade. It verifies
+the live token filter, adjacent enemy hero selection, victim loop,
+discard binding, removal binding, and pending inputs before allowing
+sampling. The delayed effect's source-card visibility still applies.
+The Rust fixture accepted the original grenade program and rejected
+a rebound target condition. A focused Magma and Ice match rerun
+will check the observed fallback path.
+
+The offline runner now exposes legacy_fixed_followup as a control,
+and the verifier's --followup-width-trial compares it with the
+balanced four-row follow-up. Both sides use coordinated planning
+and the quarter forecast share. Each starting game swaps policies
+and uses the 64-turn safety limit. A focused Rust regression
+confirmed that both widths keep one fixed opponent reply, produce
+a score, and restore the original state. The Python summary check
+confirmed side attribution and pooled per-policy guardrails.
+
+The grenade rerun reached a Blue lane-push win after 41 turn-index
+advances. Python matched all 596 decisions and the endpoint. The
+static grenade fixture passed, but a live grenade target prompt
+still rejected the finishing program. Other fallbacks came from
+Double Items, one lane-bound respawn whose sampled root choices
+changed, and two planning budget misses. Inspect these guards on
+live states before attributing a strength difference to search width.
+
+The sampling guard now permits the public ThisRound Double Items
+effect from Inner Strength and Perfect Self. Source visibility and
+the absence of finishing steps are still checked. The grenade guard
+also permits an issued request token on the current live stack frame
+when both the frame and the stored step token match the active
+request. Other pending tokens and altered selectors still reject.
+The Double Items and grenade fixture tests passed. A live match
+rerun remains necessary to verify the original fallback paths.
+
+The post-guard Magma and Ice rerun ended by Blue lane push after
+15 turn-index advances. Python matched 231 decisions and the
+endpoint. It had zero resolution fallbacks and one planning budget
+miss. The search followed a different game, so this is a whole-game
+smoke check rather than a same-trajectory replay of both effects.
+
+Native lane-bound respawn now regenerates the second-stage minion
+options from the stored hex and current lane supply when reissuing
+the live request. The Rust fixture preserved the minion options,
+request token, and state, both in place and after snapshot import.
+This lets the sampled-root validator check the real second prompt
+instead of comparing it with a new hex prompt.
+
+The 500 ms coordinated width trial finished all eight games. Legacy
+two rows won 6-2, sweeping Forgotten Island and Narrow Passages;
+Across the River and Magma and Ice split. Python matched all 3,093
+decisions and final states. The pooled planning p50/p95 was
+197/460 ms for legacy and 263/500 ms for balanced. Fallbacks
+were 46/1,128 and 67/1,178 respectively. Of the 113 total
+fallbacks, 111 came from the Narrow Passages Totem protection
+guard, so the overall result is screening evidence. Repeat that
+pair after the rules guard fix before changing the default.
+The sampling guard now recognizes passive, public Totem anchors
+that protect minions by sacrificing the token, with no card-discard
+choices or stored finishing steps.
+A focused regression passed in both planning and resolution. The same
+fixture rejects the effect when its Totem is turned facedown.
+
+The post-fix Narrow Passages 500 ms pair had zero unscored fallbacks.
+Legacy two won both assignments, by Blue annihilation after 31 turn
+advances and Red lane push after 19. Python matched all 733 decisions
+and both final states. The legacy planning p95 was 311 and 356 ms,
+versus about 500 ms for balanced four in both assignments. This repeats
+the winner pattern without the Totem guard refusals on this start.
+Keep the default while checking whether this transfers to the intended
+budget and other starts. Use `--strength-map narrow_passages` with
+`--followup-width-trial` to repeat this pair without rerunning all maps.
+
+At a five-second decision budget, balanced four won both assignments
+on the same Narrow Passages start, by Red last push after 35 turn
+advances and Blue lane push after 24. Python matched all 866
+decisions and both endpoints. Neither policy fell back (0/318 for
+balanced, 0/307 for legacy). Pooled planning p95 was 993 ms for
+balanced and 859 ms for legacy. The winner reversed relative to
+500 ms, so short-budget width results do not select the intended
+playing configuration. Keep balanced four as the default and
+screen the other tuning starts at five seconds before setting
+a held-out comparison.
+
+Forgotten Island seed 71 split at five seconds. Red won both
+assignments, first by lane push with balanced four and then by
+last push with legacy two. Python matched all 630 decisions and
+both endpoints. Neither policy fell back. Pooled planning p95 was
+1,247 ms for balanced and 1,050 ms for legacy. The five-second
+screen stands at 3-1 for balanced after two starts. The offline
+worker now reports aggregate search nodes and completed, pruned,
+and total planning rows for future runs so we can separate search
+work from wall-clock latency. The ongoing screen uses the previous
+binary and does not report those counters.
+
+The first Across the River seed-109 game reached the 64-turn cap.
+Python matched 868 decisions and the capped state, with no search
+fallbacks. Each lane shifted five times, with two waves remaining
+per lane. Lane 1 last shifted at round 10, turn 1. Lane 2 shifted
+as late as round 15, turn 4. Red lost no heroes and Blue lost one.
+This is an unfinished game with lane progression. Keep it separate
+from wins and use the side swap to check whether the stall recurs.
+
+The Across the River side swap ended in a Blue lane-push win
+for balanced four. Python matched 348 decisions. Legacy two had two
+concealed-choice resolution fallbacks, an unresolved-card swap and
+an optional discard. Balanced four had none. Legacy two won both
+Magma and Ice assignments by lane push, with zero fallbacks and
+390 decisions matched in Python.
+
+Across all four five-second pairs, balanced four won four games,
+legacy two won three, and one was unfinished. Python matched all
+3,102 decisions and eight endpoints. The fallback totals were
+0/1,135 non-forced choices for balanced and 2/1,156 for legacy.
+Balanced swept Narrow Passages, legacy swept Magma and Ice, and
+neither swept both of the other starts. Keep the current default.
+This screen shows strong map or roster dependence and gives weak
+evidence of a general advantage. For follow-up tuning, prefer
+comparing forecast and horizon settings at the intended budget,
+with the width held fixed and multiple map/roster pairs.
+
+The concealed-choice guard was too broad for the Across the River
+card selectors. The typed selector already excludes face-down
+played and discarded cards by default. Allow these ordinary
+selectors to reach the sampled-root regeneration check. Retain
+the guard for selectors that include face-down cards or scan a
+deck, and keep the existing guard on later card operations.
+All 15 planning-command tests passed. Repeat the live prompts to
+verify the fallback count and the search continuation separately.
+
+The focused concealed-discard regression passed on live selector
+fixtures. A hand-plus-discard request excludes the face-down slot
+and passes the dependency guard. A request explicitly including
+face-down cards still stops at the guard.
+
+The five-second forecast-share screen split on Forgotten Island
+seed 71. Red won both games by last push, one with eighth and one
+with quarter. Python matched 877 decisions and both endpoints,
+with zero fallbacks. Eighth planning p95 was 691 and 738 ms;
+quarter was 1,153 and 1,069 ms in the corresponding games.
+
+The optional-discard continuation can now advance when the live
+operand resolves to a card in hand and the step gives that
+container precedence. Its result does not depend on the identity
+of a face-down played or discarded card. Retain the guard for
+played-first or unresolved operands and for card-swap mutations.
+The 17 discard-related Rust unit tests passed. Live match coverage
+of the original optional-discard and swap prompts remains pending.
+
+The ordinary swap continuation now shares its operand resolver with
+the concealed-state guard. It may proceed when it swaps the revealed
+current card with a card in hand, which takes precedence over discard
+and played slots. Keyed sources and other concealed-slot swaps still
+stop. Four swap-related Rust unit tests passed.
+
+At five seconds, eighth swept Across the River seed 109, winning
+with both rosters. Python matched 866 decisions and both endpoints
+with zero fallbacks. Eighth leads 3-1 after two starts. The screen
+is still running on the pre-selector-change worker.
+
+Quarter swept Magma and Ice seed 173 at five seconds. Both games
+ended by lane push, with 613 decisions and both endpoints matched
+in Python. One resolution fallback occurred at a minion respawn
+prompt even with the reissue fix. The previous error conflated
+missing requests, metadata drift, and changed legal choices.
+The worker now distinguishes those outcomes and includes each
+resolution fallback's decision index in the offline replay report.
+The forecast screen is tied 3-3 before Narrow Passages.
+
+The five-second forecast-share screen ended 5-3 for quarter.
+Quarter swept Narrow Passages. All eight games finished, and Python
+matched 2,994 decisions and eight endpoints. Eighth reduced pooled
+planning p95 from 1,021 ms to 692 ms. Fallbacks were 0/1,328 for
+eighth and 1/1,334 for quarter. Keep quarter as the strength baseline.
+Eighth is a lower-latency candidate whose strength needs more pairs.
+
+The respawn fixture reproduced the live fallback: the submitted hex
+can remain attached to the step while its second request is active.
+The reissue now uses the stored hex whenever the request is outstanding
+and no minion ID has been submitted. The regression passed with real
+hand sampling and snapshot restoration, preserving the legal choices
+and the original request token on reissue.
+
+The updated Magma and Ice pair reproduced the prior winners and
+per-game decision totals. Python matched all 613 decisions and
+both endpoints, with zero fallbacks for either policy. This is
+whole-match confirmation alongside the targeted respawn regression.
+The match report now includes searched nodes and planning rows.
+The one-versus-two-turn screen uses this same iterate worker
+(SHA-256 `092c9c0c3e58f562d0a55c8f7e948c8972494770ca307a63538554cfbf655bcc`)
+at five seconds across the four screening starts.
+
+Forgotten Island's first five-second horizon game ended in a Red
+annihilation win for one turn. Python matched 355 decisions and the
+endpoint. One turn searched 1.43 million planning nodes and about
+80,000 resolution nodes. Two turns searched 1.68 million planning
+nodes and about 434,000 resolution nodes. Both completed or pruned
+every planning row and had zero fallbacks. The shared greedy pass
+still generated card scores on both sides. Only two turns reached
+simulated later commitments where its forecast could be consumed.
+Compare the swapped game before attributing the win to horizon.
+
+Forgotten Island split after the side swap. Two turns won as Red
+by last push. Python matched 468 more decisions and the endpoint,
+with no fallbacks. In the swapped game, one-turn planning and
+resolution p95 were 776 and 92 ms, versus 858 and 255 ms for
+two turns. Both games favored Red. The lower one-turn resolution
+cost repeated in both assignments, while the wins split.
+
+Two turns swept Across the River at five seconds. Both games ended
+by lane push, at 27 and 32 turn advances. Python matched 864 decisions
+and both endpoints, with zero fallbacks. Two turns leads 3-1 after
+two pairs. One-turn resolution p95 was about 53 ms in each game,
+versus 173-244 ms for two turns. Both lanes moved twice in each game.
+
+The five-second Magma and Ice horizon pair stopped during the
+side swap with a scoped Rust search thread stack overflow. Before
+that, one turn won as Red after 43 turn advances. Python matched
+614 decisions and the endpoint. The scoped scoring and matrix
+threads now use the same 8 MiB stack as planning preparation.
+This preserves worker count and search limits. The focused
+multi-world planning test passed on the updated code. The full
+core suite finished with all 406 tests passing on the build
+immediately before the stack change. A new match replay is
+running to verify the original crash path.
+
+The 8 MiB rerun reproduced the 614-decision first game with
+zero fallbacks, then still overflowed on the side swap. The
+stack-size change alone is insufficient. Search workers now
+have diagnostic names for the isolated swapped-game rerun.
+Identify the worker and recursive path before tuning further.
+
+The named rerun identified the planning preparation worker, which
+already used an 8 MiB stack. A GDB run of the isolated assignment
+caught SIGSEGV in `run_objects` above repeated
+`collect_position_routes` / `with_consumed_request` frames.
+Position-route discovery can nest a rollback for every prompt
+within one game turn. Move that traversal to an explicit DFS
+stack with reversible checkpoints. Preserve branch order, node
+and deadline accounting, route scoring, and root restoration.
+
+Position-route traversal now uses explicit heap frames with the
+same LIFO arena and world-row undo checkpoints as callback-based
+search. Branch order, position scoring and node accounting stay
+the same. The traversal restores every open checkpoint before
+returning a deadline or error. Cargo check passed. The greedy
+unit suite and isolated failing match are running on this change.
+
+All 11 greedy unit tests passed. The previously crashing Magma
+and Ice side swap finished on the iterative worker, with a Blue
+lane-push win for one turn after 19 turn advances. Python matched
+all 280 decisions and the endpoint. One turn had one unscored
+planning fallback and two turns had none. One turn swept Magma
+and Ice across the pre-fix first game and the post-fix side
+swap, leaving the screen at 3-3 before Narrow Passages. The
+mixed-build result is screening evidence. The final pair is
+running on the iterative worker.
+
+Two turns swept the last Narrow Passages pair, by Blue last push
+and Red lane push after 23 and 35 turn advances. Python matched
+856 decisions and both endpoints, with zero fallbacks. One turn's
+pooled resolution p95 was 45 ms, versus 184 ms for two turns.
+Across the mixed-build five-second screen, two turns won 5-3.
+All eight games finished and Python matched 3,437 decisions and
+eight endpoints. Keep two turns as the baseline and record the
+one-turn latency tradeoff. This is a four-start tuning screen,
+with no held-out strength claim. The rollback regression also
+forces an execution-step limit during a position route and
+verifies that the original prompt, path and state are restored.
+
+The next playing-budget screen compares Lane Pressure V4 with V3
+using `--lane-timing-trial --decision-ms 5000`. Both sides use
+depth two, a two-turn rollout, the quarter forecast allowance,
+the same node cap and planning workers, and the same starting
+positions with sides swapped. This isolates the lane-readiness
+weighting under the current search settings. The earlier 100 ms
+evaluator comparisons used a different policy and budget.
+
+Future strength replays report pushing-team readiness at the first
+observed state after each zone shift. Count heroes within one hex
+of an enemy minion spawn, falling back to the zone's hexes when it
+has no enemy spawn. Off-board heroes count separately. These are
+decision-boundary observations, not samples taken within the push
+step. They help explain whether a policy advances while in position.
+The current lane timing run started before this report change.
+
+A 100 ms Magma and Ice diagnostic exercised the new post-push
+report. Python matched 304 decisions and the Blue lane-push
+endpoint. At the observed lane-1 shift, one of Blue's two heroes
+was within one hex of an opposing minion spawn and both were on
+the board. In the five-second evaluator screen, V4 won the first
+Forgotten Island game as Red by annihilation. Python matched 373
+decisions and the endpoint, with no fallbacks.
+
+V4 also won the Forgotten Island side swap as Blue. Python
+matched 355 decisions in the second game, for 728 across the
+pair. Neither game had an unscored fallback.
+
+Strength trial summaries now report a one-sided paired sign-flip
+probability. Each starting position supplies one net win margin,
+so the side assignments are kept together. Draws and unfinished
+games give neither policy a win. Keep finish rates and fallbacks
+separate and treat the probability as descriptive on the tuning
+starts. The calculation matched direct enumeration on all 625
+four-pair margin combinations.
+
+The lane-timing confirmation set is fixed before any confirmation
+games. Use `--lane-timing-held-out --decision-ms 5000` for eight
+separate map, roster and seed combinations spanning all six maps.
+The run requires Python replay parity throughout. Prefer V4 for
+this playing configuration if it wins at least 11 of 16 games,
+has a one-sided paired sign-flip probability at most 0.05, leaves
+at most two games unfinished, uses unscored fallbacks on under 2%
+of non-forced choices, and keeps both planning and resolution p95
+at or below 5.1 seconds. All eight starts initialized successfully.
+No confirmation game has been played.
+
+Across the River split at five seconds, with Red winning both
+assignments by lane push. Python matched 576 decisions and both
+endpoints. V4 leads 3-1 after two pairs. The held-out runner
+reports which acceptance checks failed. Harness checks exercised a
+clean sweep and rejection for too many unfinished games, exactly
+2% fallbacks, excessive planning p95, and split results.
+
+V3 swept Magma and Ice, with Blue winning the first assignment
+and Red the side swap. Both games ended by lane push. Python
+matched 524 decisions and both endpoints. V4 used one unscored
+planning fallback on the second game. The five-second screen
+is tied 3-3 before Narrow Passages.
+
+Narrow Passages split, with Blue winning both assignments. The
+five-second lane timing screen ended 4-4. Python matched all 2,227
+decisions and eight endpoints. V3 had 0/993 unscored fallbacks and
+V4 had 1/986. Planning p95 was 1,072 ms for V3 and 1,052 ms for
+V4. Retain V3 as the reference and leave the confirmation starts
+unplayed. V4's Forgotten Island sweep did not generalize to the
+other screening starts. Investigate planning rows that exhaust
+their node allowance without yielding a score before the next
+strength sweep.
+
+The isolated Magma and Ice replay reproduced the planning fallback
+at decision 99 for Silverarrow. Both worlds prepared, then the
+first two matrix cells used all 131,072 nodes in 3.25 seconds
+without a score. Reply screening used no nodes. Scoped planning
+now reserves up to 512 nodes and 100 ms for a shallow retry.
+If no deep row finishes, the retry scores up to four leading rows
+at the first branching decision without a turn rollout, using
+the same sampled worlds and opponent replies. Only a complete
+row can replace the unscored choice. The result reports this
+shallow score separately from deep matrix scores. The targeted
+rerun is in progress.
+
+The updated Magma and Ice replay returned one shallow scored
+planning decision for Blue and no unscored fallbacks. Python
+matched all 176 decisions and the final state. Red still won by
+lane push. A focused two-world regression forces the same retry
+with a 64-node budget and checks that it returns a scored legal
+commitment within the cap while preserving the original state.
+
+All 28 search unit tests passed after the shallow retry change.
+The iterate worker matched 66 batch and 69 sequence verdicts
+against Python, including the consecutive allied defeat payoff.
+The current playing-budget baseline is frozen locally as
+`strength-playing-baseline-2578acaa` with SHA-256
+`2578acaafe6954f916c4799b36b2dee3686cdbba5dd04a87db6c85f6d5bb7aba`.
+Its five-second self-play calibration uses V3, two rollout turns
+and quarter forecast allowance on the four screening starts.
+Treat the previous 500 ms worker and results as screening history.
+
+All four five-second baseline games finished. Red won Forgotten
+Island, Across the River and Magma and Ice. Blue won Narrow
+Passages. Python matched 1,032 decisions and all endpoints.
+The baseline had no unscored fallbacks in 921 non-forced choices,
+and used one shallow scored row on Magma and Ice. Pooled p95
+was 995 ms for planning and 276 ms for resolution. The corpus
+shows side and roster asymmetry, which the paired trials control.
+
+The node-budget screen uses the frozen worker to compare 262,144
+versus 131,072 nodes at the same five-second deadline. Use
+`--node-budget-trial --decision-ms 5000`. Both sides retain
+V3, two rollout turns, and a quarter forecast allowance. The
+forecast share is constant, so its absolute node allowance grows
+with the candidate's total. Compare strength, latency and shallow
+or unscored fallbacks before changing the node cap.
+
+The 262,144-node policy won the first Forgotten Island game as
+Red by lane push. Python matched 313 decisions and the endpoint,
+with zero fallbacks. Planning p95 was 1,430 ms on the higher
+budget and 1,008 ms on the baseline. The first game also
+favored Red in baseline self-play, so wait for the side swap.
+The strength summary now totals shallow scored choices by
+policy separately from unscored fallbacks.
+
+Forgotten Island split in the node-budget screen, with Red winning
+both assignments. Python matched 733 decisions and two endpoints,
+with no unscored fallbacks. In the side swap the higher cap searched
+3.74 million planning nodes, versus 2.01 million for the baseline.
+Planning p95 was 1,780 ms versus 842 ms. Future builds report nodes
+used by greedy forecasting, reply screening, and shallow retries
+separately within total planning work. The current screen continues
+on the frozen binary and does not include the breakdown.
+
+Across the River also split in the node-budget screen. Red won
+both assignments by lane push. Python matched 626 decisions and
+both endpoints, with no unscored fallbacks. The trial stands
+at 2-2. The focused scoped-planning test verifies the node
+breakdown for an exhausted deep search with a shallow result
+and for a seeded search with a completed deep result.
+
+Magma and Ice also split in the node-budget screen. Red won
+both assignments by lane push and Python matched 386 decisions
+and both endpoints. The 131,072-node side used one shallow
+scored choice in the first assignment. The screen is 3-3
+before Narrow Passages, with the same winning side in every
+completed pair.
+
+The five-second node-budget screen ended 4-4. Each pair favored
+the same side in both assignments. Python matched 2,210 decisions
+and all eight endpoints. The 262,144-node policy raised planning
+p95 from 964 to 1,602 ms. Both policies had zero unscored fallbacks
+and each used one shallow scored choice on Magma and Ice. Retain
+131,072 nodes as the reference cap. A larger uniform cap did not
+solve the incomplete deep row. The next search experiment should
+measure whether a bounded depth-zero pass over the full two-turn
+horizon yields a better incumbent before depth-two scoring.
+
+The opt-in `--planning-seed-trial` allocates up to 4,096 nodes
+and 250 ms from the existing scoped planning budget to score up
+to four leading rows at depth zero over the configured turn
+horizon. It disables branching at later planning boundaries
+during that pass. It moves the best completed row first for
+deep scoring and retains that row if no deep row completes.
+The engine keeps seed, deep and shallow scores distinct.
+
+The five-second Magma and Ice pair went 2-0 for the seed pass.
+Python matched 491 decisions and both endpoints. Neither side
+used an unscored fallback. Direct deep search used one shallow
+retry. Neither seed-pass game needed to retain the seed result
+as its final choice. Pooled planning p95 was 1,031 ms for the
+seed pass and 1,106 ms for direct search. Greedy forecasting
+accounted for about 2.15 million nodes per policy, versus about
+9,200 total seed-pass nodes on the candidate side. This is one
+tuning start. The other three pairs are queued with additional
+telemetry counting seed completions and deep-search agreement.
+
+The first Forgotten Island game went to direct deep search
+as Blue by last push. Python matched 485 decisions and the
+endpoint. The seed pass scored all 64 candidate planning
+decisions and deep search agreed on 36. Neither policy fell
+back. The seed pass used 8,984 nodes across the game. Future
+summaries also pool seed cost, completions, agreement and
+retained choices by policy.
+
+Direct deep search won both Forgotten Island assignments.
+Python matched 1,024 decisions and two endpoints. Neither
+policy fell back. The seed pass scored 138 decisions, deep
+search agreed on 74, and no seed result was needed as the
+final choice. The trial stands at 2-2 across the two pairs.
+
+Across the River and Narrow Passages both split. The seed pass
+swept Magma and Ice, direct deep swept Forgotten Island, and the
+full five-second screen ended 4-4. Python matched 2,543 decisions
+and all eight endpoints, with zero unscored fallbacks. On the
+three starts with agreement telemetry, the pass scored all 284
+candidate planning decisions and deep search agreed on 160.
+No game used a seed result as its final choice when deep search
+failed. The direct-search side used one shallow retry. Keep
+direct deep as the reference and retain the seed pass as an
+offline experiment. The current data establishes low seed cost
+and different choices, with no measured strength advantage.
+
+The current iterate worker (SHA-256
+`a0eb065e9c91989ddff5c92cee221e1a3141615b86583693515c68c69c50741d`)
+repeated the 1,024-rollout recorded midgame benchmark on both
+corpora, with eight sample seeds and the same lab evaluator
+hash as before. Python matched all 192 root/seed/worker-count
+checks. Four workers completed 2,514-4,325 full sampled
+two-turn rollouts/s. One worker completed 818-1,264/s, with five
+of twelve positions below 1,000/s. Sampling and restore used
+5.3-9.9% of worker time. The parallel reference clears the target
+on these midgame fixtures. Serial Magma and Ice combat and the
+original-roster round boundary remain the slowest cases. These
+are iterate-profile measurements, separate from release and
+adversarial-search throughput.
+
+A current iterate CPU profile replayed the saved Magma and Ice
+combat request for 5,000 serial two-turn rollouts and captured
+5,621 user-cycle samples. It completed 924 rollouts/s without
+the lab evaluator. The rules loop was 9.48% of self samples,
+arena mutation 2.38%, arena page copy-on-write 1.99%, and card
+collection sync 1.63%. Allocation and free together were
+5.36%. The profile uses the saved combat request and is separate
+from the evaluator-enabled throughput table. Investigate rule
+execution and arena mutations with caller attribution before
+changing sampler or restore behavior.
+
+The follow-up call-stack capture recorded 2,801 samples but
+did not resolve useful allocation callers. An arena trial skipped
+field writes when the assigned value and object identity matched
+exactly. All seven arena tests passed, and sampled benchmark
+results matched across five alternating 1,000-rollout pairs
+after a warmup pair. The trial was slower in every pair. Median
+Magma and Ice combat throughput fell from 931 to 885 rollouts/s.
+Reverted the trial and kept normal write and journal behavior.
+
+After reverting the arena experiment, the current worker
+repeated the four-turn, 100 ms QUICK search sweep across all
+33 registered heroes on Forgotten Island and Magma and Ice.
+Python matched all 867 decisions and 18 endpoints. Search
+had zero unscored fallbacks. It returned a scored best-so-far
+result on 4 of 288 planning decisions and 12 of 489 non-forced
+resolution decisions. These matches were capped intentionally
+for coverage and provide no strength result. The eight-turn
+250 ms follow-up spans all six maps and crosses an additional
+round boundary.
+
+The eight-turn, 250 ms QUICK coverage sweep finished all 54
+matches across the six maps and 33 registered heroes. Python
+matched 5,284 decisions and all 54 capped endpoints. Search
+used zero unscored fallbacks, with scored best-so-far results
+on 23/1,728 planning and 5/3,014 non-forced resolution choices.
+A 12-turn, 250 ms LONG follow-up uses 3v3 rosters and seed 73
+to exercise larger teams and later rounds across all maps.
+
+The LONG sweep exposed two resolution fallbacks in the first
+Across the River game under Cordelia's Broom-family BasicBonus.
+Sampling now permits that public round modifier when the
+source card is known, with no token, granted passive or
+finishing program. The targeted rerun matched the prior
+206-decision count and Python endpoint and used zero unscored
+fallbacks. The full LONG sweep uses the pre-fix worker.
+
+The 12-turn LONG sweep completed all 36 matches across six
+maps. Python matched 7,974 decisions and 36 capped endpoints.
+The only two unscored fallbacks were the Cordelia cases fixed
+in the targeted rerun. All 16 planning-command unit tests passed
+on the updated build. A separate QUICK sweep now runs each
+of the 18 roster/map starts to game over or the 64-turn safety
+limit, to exercise late-round resolution and terminal parity.
+
+The terminal QUICK sweep matched all 10,982 decisions across
+18 matches. Eleven reached game over and seven hit the
+64-turn safety cap. It reported 188 unscored fallbacks, of
+which 157 were Wuk's minion battle exclusion and 31 were
+delayed triggers in the Magma and Ice Xargatha/Arien versus
+Bain/Brogan game. The Wuk guard fix replayed the affected
+Forgotten Island roster to a last-push ending with all 532
+decisions matched and zero fallbacks. The delayed-trigger
+guard now logs the source card so the remaining finishing
+program can be verified on a targeted replay.
+
+The round-end guard accepts Final Embrace and Constrict when the
+stored program is a public minion selector followed by defeat
+of its chosen target. It checks the live operand bindings,
+filter types, context-free range, and absence of pending input.
+Both real finishing fixtures passed and rejected a disconnected
+victim binding. The targeted Magma and Ice match reached its
+64-turn cap with 745 decisions and an exact Python endpoint,
+with no unscored fallbacks. The entire 18-start terminal sweep
+is running again with both the Wuk and Xargatha changes.
+
+The post-fix terminal sweep matched 10,945 decisions and all
+18 endpoints with zero unscored fallbacks. Twelve games reached
+game over and six hit the safety cap. Search returned scored
+best-so-far on 126/3,430 planning and 47/6,240 non-forced resolution
+choices. All 407 Rust core library tests passed. This covers
+late-round 2v2 QUICK search across the roster on two maps. The
+six-map 3v3 LONG sweep separately covers the first 12 turns.
+
+The current worker passed the six-map planning and sampled-upgrade
+verifier. Python accepted scoped commitments in all four knowledge
+modes at both opening planning roots per map. Serial and parallel
+sampled planning matched at all 12 roots. The three public upgrade
+batch sequences matched direct evidence on every map, including
+the 3-to-6 jump and the largest tested 1-to-8 batch. The terminal
+QUICK follow-up covers 36 further starts on Across the River,
+Narrow Passages and both Vexing Cliffs maps.
+
+The remaining four maps completed their 36-start terminal sweep.
+Python matched 19,631 decisions and all endpoints, with zero
+unscored fallbacks. Thirty-one games ended and five hit the cap.
+Combined with the first two maps on the same worker, all six
+maps and 33 registered heroes are represented in 54 QUICK games,
+with 30,576 matched decisions, 43 natural endings and 11 capped
+endpoints. These are search-selected replay checks, separate from
+per-operation trace and exhaustive restore verification.
+
+The current native engine passed both compact complete-game trace suites in
+772.76 seconds on the WSL debug build. Rust matched 14,624 recorded Python
+operation snapshots across four games on Forgotten Island and Magma and Ice,
+including both Hanu cases. All four traces ended at GAME_OVER. This replay
+checks snapshot parity and is separate from the every-boundary restore gate.
+
+The held-out five-second lane-timing trial finished with worker SHA-256
+`49670cd7d5b0a17b664f18a73d464d4052ebaa7e81aa4e9607ea6f2aecb5638b`.
+Across eight pairs, V3 won eight games, V4 won seven, and one was unfinished.
+Python matched all 6,998 decisions and 16 final states. The unfinished
+Across the River game reached 64 turns after six zone shifts in one lane
+and four in the other. Neither lane delivered the winning push.
+
+V3 used zero unscored fallbacks in 3,126 non-forced choices. V4 used zero
+in 3,130. Both used one shallow scored planning choice. The planning p95
+was 1,024 ms for V3 and 1,019 ms for V4. Resolution p95 was 269 ms for V3
+and 291 ms for V4. V4 missed the preset 11-win threshold. Under the
+completed-pair reporting rule, V4 scored six of 14 game points across
+seven completed pairs (one-sided sign-flip p = 0.875). Retain V3 as the
+playing reference.
+
+A movement reachability trial reserved the output mask length in advance.
+All ten terrain and legality tests passed. Sampled results matched on both
+Magma and Ice fixtures across five alternating 1,000-rollout pairs after
+warmup. Median serial rates fell from 940 to 932 rollouts/s in combat and
+rose from 911 to 925 at the round boundary. Reverted the mixed change.
+
+The three-turn search option passed the sampled resolution cutoff and
+rollback regression. The five-second Forgotten Island seed 71 screen
+split, with Blue winning both games. Python matched 816 decisions and
+both final states, with zero unscored fallbacks. Planning p95 was
+1,286 ms at three turns versus 1,122 ms at two. Resolution p95 was
+443 ms and 447 ms, respectively. The pair used iterate worker
+`c697b0f0347c453ee0be75b1d93e2fdabb7c611fd7387bad051353c68e3b7fe1`.
+Keep two searched turns as the reference pending broader evidence.
+
+The current release worker
+`cd6cabd874341fee59b8ed1dafc1990abbe7864e3a8c2c16b8a6766a68830033`
+replayed both recorded midgame corpora and the supplemental all-map
+workload with evaluator SHA-256
+`c89203f8bfbefec63e13c3426c42cdba27fc401b0884efb38b3adb1eaac753b3`.
+Python matched 224 root, seed, and worker-count checks. The 12 recorded
+positions completed 2,917-4,324 full two-turn rollouts/s with four workers
+and 845-1,351 with one. Four serial positions fell below 1,000/s.
+The lowest were Hanu combat and the original roster's round boundary
+on Magma and Ice. Two workers completed 2,014-2,600 rollouts/s on the
+eight supplemental positions. The measured parallel workload clears
+the target. The serial shortfall and adversarial search cost remain open.
+
+The same release worker passed the five-second deadline checks on all six
+maps. The 120 planning calls completed their matrices in true-rules and
+coordinated modes on opening and upgraded roots. Maximum latency including
+export, worker reply, and Python validation was 299 ms. The 150 sampled
+resolution calls completed depth one with one and two workers on opening,
+upgraded, movement, Fast Travel, and active Focus roots. The longest reply
+plus validation took 179 ms. Resolution root export was measured separately
+in this run. Every choice passed Python validation. These small-node-budget
+cases complement the five-second match workloads above.
+
+A separate 140 ms stress check timed out on the first cold planning call.
+With the worker prepared in advance, all 270 replies arrived within the
+caller deadline and passed Python legality validation. Planning completed
+31 matrices and returned a scored incumbent on 89 calls. Resolution
+completed 140 calls and returned a scored turn-rollout incumbent on the
+other 10. Maximum reply latency including live export was 127 ms for
+planning and 124 ms for resolution. Including final Python validation
+raised those maxima to 155 ms and 168 ms. The stress check verifies
+scored interruption behavior and exposes a cold-start and validation
+margin at this shorter budget.
+
+A cold preparation profile attributed 14% of 1,019 Rust CPU samples
+to JSON map copying. A trial avoided copying step wires twice when the
+step and its children required no sanitizing. Seven primary-program
+tests passed, and Python matched 57 decisions and eight terminal
+states. Across twelve alternating process pairs, median preparation
+was 140.01 ms before and 139.91 ms after. Median peak RSS fell from
+125,206 to 124,494 KiB. Reverted the added compiler logic after the
+startup measurement showed no practical latency gain.
+
+A release profile isolated the exact slowest recorded position, Hanu
+combat on Magma and Ice at round four, turn one. The pre-trial release
+worker ran 10,000 serial two-turn rollouts with the lab evaluator and
+eight fixed sample seeds at 848/s. Sampling and restore took 6.6% of
+timed work. Among 9,757 samples attributed to Rust, the rules loop
+accounted for 11.2%, protected-object discovery for 6.2%, field lookup
+for 4.0%, and object materialization for 3.5%. Profile the callers of
+protected-object discovery before changing its cache or alias handling.
+
+A separate frame-pointer profile of the same Magma and Ice combat root
+attributed 365 of 6,363 stacks to read-only discovery. At least 359 had
+`mutable_stack` as the caller. It checks that an action context stack does
+not alias a protected world or step object. The call happens after the
+protection cache has been invalidated, so the worker scans the entire arena
+reachable from the protected roots. Keep this alias check on imported and
+restored context. Test faster discovery on this exact fixture with parity
+for shared context, nested scopes, detached payloads, and rollback.
+
+A release trial marked objects when adding them to the membership-only
+walk, avoiding duplicate queue entries while keeping copied-step visit
+order. Seven arena tests and two action scope tests passed. All sampled
+results matched across five alternating 1,000-rollout pairs after warmup
+on Hanu combat. The median moved from 861 to 866 rollouts/s, within the
+observed variation. Reverted the trial. The cost of revisiting the entire
+graph after cache invalidation remains.
+
+The retained release worker passed a 4v4 QUICK replay sweep at seed 73.
+Five rosters per map covered all 33 registered heroes on all six maps.
+Python matched all 43,244 decisions and all 30 final states. Six games
+ended under the rules and 24 reached the 64-turn guard. The sweep used
+sampled legal choices for rules coverage. The finish counts characterize
+that sampler. The three-versus-two-turn strength screen separately runs
+both assignments on all four tuning starts with this release worker.
+
+The four-start release horizon screen finished four wins each for two
+and three searched turns. Forgotten Island and Narrow Passages split.
+Two turns won both Across the River games and three turns won both
+Magma and Ice games. Python matched all 3,023 decisions and eight final
+states. Neither policy used an unscored fallback. Three-turn planning
+and resolution p95 were 1,223 ms and 362 ms. Two-turn p95 was 930 ms and
+225 ms. Keep two turns as the reference. The map-specific results can
+inform future horizon experiments.
+
+Offline validation rejects malformed planning commitments and resolution
+decisions before submission. Injecting one truncated reply for each
+operation produced one whole-decision fallback in each phase. The worker
+continued and Python validated 18 subsequent recommendations. Both
+validator regressions and all four worker transport tests passed.
+
+The four-start, five-second sampled-world screen used release worker
+`1c7d7288fcb96b6ef52b9063c5a5aaef4c74b5b6c470cd96077bbfa607de504d`.
+Two worlds won five games and four worlds won three. Two worlds won both
+Forgotten Island games, and the other pairs split. Python matched all 2,597
+decisions and eight terminal states. Both policies had zero unscored fallbacks.
+Four worlds raised planning p95 from 924 to 1,236 ms and resolution p95 from
+249 to 609 ms. Retain two worlds as the reference. The offline worker returned
+identical choices and final state for an omitted world count and an explicit
+count of two, and rejected out-of-range counts and more workers than worlds.
+
+The current Rust worktree passed the exhaustive restore gate on all
+17,347 cases in 16 shards, using the iterate profile and four fixture
+workers. Each case restored at every operation boundary and compared
+state, board keys, object aliases, request generations, and subsequent
+execution. All shards used the same test binary
+`4872c41ebee8af5726df282f4081b8e4a113e6bbb9f5d50a5f29ca4e602afaca`
+and fixture index
+`c7596d5d31cd15b0970d512d2128bab0601c0bdcaf78765a99076663050026f5`.
+The test time was 1,094.73 seconds (18 minutes 15 seconds), excluding
+the first build. Each shard took 65-75 seconds. Later shards reused
+the compiled binary. The current Rust source diff remained identical
+throughout the run.
+
+The first reply-width run tied 4-4 with 2,064 decisions and eight final
+states matched by Python. The default forecast policy sampled one reply
+per world and bypassed both caps, so the run measured the same reply
+policy on both sides. The corrected trial uses the planning matrix at the
+root for both candidates.
+
+The corrected root-matrix preflight returned 32 cells at four replies
+and 64 at eight. On the four tuning starts, four replies won five games
+and eight won three. Python matched all 3,279 decisions and eight final
+states, with zero unscored fallbacks. Planning p95 was 1,307 ms at four
+replies and 1,923 ms at eight. The worker preceded the mine-pool correction,
+and the focused mine tests briefly compiled while the trial was running.
+The result is a tuning screen for the root matrix policy. Keep the
+existing fixed-forecast reference.
+
+The stack replay exposed two saved mine states where the pool token and
+board entity share an ID but differ in ownership or passability. Python
+uses the pool for the initial mine check and the board for path traversal.
+Rust now follows that split. Bound movement reads live physical pool owners,
+including updates, and the plain interpreter reads its imported pool rows.
+The live ownership regression and all five terrain tests passed. The updated
+binary passed all 6,592 stack cases and all 17,347 shared-object transition
+cases, including the two failures. Those suites took 46.35 and 364.39 seconds
+respectively with four workers. The previous 17,347-case restore run predates
+this mine detection change.
+
+After the mine-pool correction, all 407 core library tests passed. The
+release worker `5c7d0bfaf7480742d4d2b8ae746fb4d4398b0f03f4c77e42dcb6257755a46b49`
+matched 66 batch verdicts and 69 sequence verdicts against Python, including
+the consecutive allied choices with a better defeat payoff. All six maps
+initialized four ten-hero rosters each for the seed-73 LONG replay sweep.
+
+The full-length 5v5 sweep initially matched 22 of 24 games. Both
+remaining Vexing Cliffs V2 games exposed Rust behavior gaps. Spells
+inherit ordinary current-color masking in Python, so action restriction
+exceptions now use the same typed color check for spells and other cards.
+The other game stalled at Rowenna's round-eleven mine path prompt because
+native move generation offered integer indices for string option IDs. Rust
+now generates and validates the issued string IDs. The offline Python
+verifier compares those IDs directly because the frozen generic legality
+helper coerces numeric option IDs. Python then submits the actual choice
+and replays the transition. Both reproductions reached the 64-turn guard
+with exact endpoints and 1,879 and 1,923 decisions, respectively.
+
+The corrected seed-73 5v5 LONG sweep matched Python on all six maps
+and four rosters per map. The iterate worker
+`34b132d7aeadebad2496b4f2b043ba5a7cd42b7e721dc0ae2476e212f4d696f0`
+matched 44,439 decisions and all 24 endpoints. Every game reached the
+64-turn guard. These sampled choices exercise rules and roster coverage.
+The focused native mine choice test also passed using enumerated moves.
+
+The release planning profile used 16 scoped decisions across eight seeds
+on the round-four Hanu Magma and Ice root, with the five-second V3 settings.
+All searches returned a score and completed all four rows. Among 13,583
+Rust CPU samples, the rules loop took 11.0%, arena field lookup 4.0%,
+card collection synchronization 3.2%, and card list lookup 2.1%.
+
+Card synchronization now reads each list once when refreshing its typed
+projection. All 16 paired planning results matched, including scores and
+nodes. The iterate-profile median fell from 760 to 746 ms over 14 measured
+pairs after warmup. The serial rollout median changed from 811 to 815/s.
+These measurements cover the Hanu Magma and Ice root.
+
+All 407 core library tests passed after the card synchronization change.
+The exact card-status boundary test passed, including private card aliases.
+Seven offline validator and worker tests also passed, including a mine-path
+regression that accepts the issued string option ID and rejects the numeric
+equivalent. Run the exhaustive restore gate again after the mine fixes and
+card synchronization change.
+
+A leaf evaluator trial kept the first hero position inline and skipped
+distances to irrelevant entities. The focused evaluator test passed. All
+sampled rollout results matched across seven alternating 1,500-rollout
+pairs on each of two Magma and Ice roots. All 16 Hanu planning replies
+also matched. Excluding warmup, median serial throughput moved from
+875 to 873 rollouts/s in Hanu combat and from 996 to 988 on the second
+root. Removed the trial because neither root showed a speedup.
+
+The five-second decision-depth screen used release worker
+`cc5da7811cc4f12ca480e7d7d3e2619a6fbcddda703f984e032b16ea2276260a`.
+Depth three and depth two split every side-swapped pair on the four tuning
+starts, finishing 4-4. All eight games ended under the rules. Python matched
+all 2,762 selected decisions and final states. Neither policy used an
+unscored fallback. Depth three used one shallow planning result and raised
+planning p95 from 879 to 1,369 ms and resolution p95 from 203 to 1,351 ms.
+Keep depth two as the reference. The targeted attack-extension screen will
+test whether spending extra work on attack targets yields a better result.
+
+The round-three strength-start option was smoke-tested with both policy
+assignments on both snapshots. Across four two-turn continuations Python
+matched 87 decisions and all four endpoints. These short runs establish
+replay compatibility for the recorded LONG roots. Full strength matches
+from these roots use the same 64-turn guard as the opening screen.
+
+Upgrade history replay now bounds ordinary card-item gains by the levels
+crossed. Each level through seven can contribute at most one item. Level
+eight unlocks the ultimate and contributes no ordinary item. The same
+bound applies to gaps between recorded batches, starting from level one
+when only a later checkpoint is available. This rejects impossible public
+histories before handing them to the sampler. Multi-level batches retain
+their aggregate evidence and are free to include upgrades without items.
+All ten loadout tests passed, including the new replay-bound regression.
+
+The worker-level replay check now sends an impossible two-item, one-level
+batch before the valid duplicate/replay requests. It expects rejection and
+then continues using the same worker. Run this and the legal single,
+three-level and maximum batch checks on all six maps.
+
+A fresh-dictionary arena trial builds the final fields before allocating
+the object. An existing arena object cannot already reference the new ID.
+Validate field handles, retain the first insertion position for each key,
+and keep the last value when keys repeat. This preserves shared child
+identities and leaves existing-object mutations and cycle checks on their
+normal path. The regression covers key order, duplicate values, aliasing,
+an invalid future handle, and rollback. The paired release check uses the
+two Magma and Ice rollout roots and the 16 recorded planning requests.
+The running exhaustive restore suite uses the earlier arena build.
+
+The offline planning validator rejects partial coordinated replies before
+asking Python to check the submitted sequence. A result must cover every
+controlled open slot. Teammates whose slots are closed need no commitment.
+The focused regression rejects an omitted open ally and accepts the same
+reply after that ally has passed. Valid scoped responses still pass across
+all four knowledge modes on all six maps. The close-contact allied reveal
+check also passed. Offline resolution tests reject both a changed search
+revision and a replaced live prompt.
+
+Rust-only strength matches now retain revealed public upgrade history.
+For a standard-provenance hero seen at level one, the recorder saves the
+public item totals before the upgrade batch. It derives the ordinary
+card-item delta only at the next planning boundary, when the new totals
+are public. Both planning and sampled resolution receive the resulting
+checkpoints. Starting at a later level leaves the earlier history unknown.
+A missed or inconsistent reveal stops cumulative tracking for that hero
+while preserving earlier valid checkpoints. Traced matches expose the
+recorded batches for verification. The replay verifier compares these
+batches with the frozen Python recorder. It ignores engine-local revision
+numbers and compares the before/after totals per hero and level. The
+`--sampled-upgrades` path also requires Brogan's actual 1-to-4 batch in
+a two-turn offline match on Forgotten Island and Magma and Ice.
+
+The workspace and test targets passed an iterate-profile compile check.
+All 410 core tests passed, including the fresh arena dictionary regression
+and the ordinary-item delta test. The iterate worker
+`9200cc4d8d9dc9f32f241382be7d16db2b6d03c8d22f274171e90ab6b6697e7a`
+passed `--planning --sampled-upgrades --all-maps`. On the two forced
+upgrade matches Python matched both actual level 1-to-4 batches, all 52
+decisions, and both final states. The all-map run matched 18 public
+batch sequences against direct evidence and checked all four knowledge
+modes at 12 planning roots. Traced searches now report an empty batch
+list explicitly so future replays also check the no-batch case.
+
+The exhaustive restore rerun after the mine fixes and card synchronization
+change passed all 17,347 cases in 16 shards. The iterate test binary
+`6f34feabf7187d3ecb6af411aa700ebdb92c0afc197f579b535f3fc1bebe3e15`
+used fixture index
+`c7596d5d31cd15b0970d512d2128bab0601c0bdcaf78765a99076663050026f5`
+and four fixture workers. Total test time was 1,180.15 seconds, excluding
+the build. Each shard compared state, aliases, request generations and
+continued execution at each restored boundary. This run predates the
+fresh-dictionary experiment.
+
+The 500 ms attack-target screen used the same frozen release worker as the
+five-second depth trial. The extension won both Forgotten Island games,
+lost both Across the River games and split Magma and Ice and Narrow
+Passages. All eight games ended under the rules. Python matched 2,501
+decisions and eight final states. Both policies had zero unscored fallbacks.
+The extension's pooled resolution p95 was 216 ms versus 245 ms at fixed
+depth. These timings include different positions reached in play. The
+4-4 result keeps fixed depth as the reference and the extension opt-in.
+
+The fresh-dictionary trial passed eight arena tests and two action-scope
+tests. Across seven alternating 1,500-rollout pairs per position, all
+sample results matched. All 16 planning replies matched as well. Excluding
+warmup, median serial throughput rose from 872.55 to 877.20 rollouts/s in
+Hanu combat and from 989.60 to 996.15 on the second Magma and Ice root.
+Both changes were below one percent. Removed the trial and its specific
+test. The earlier exhaustive restore binary used the retained constructor.
+
+Release worker
+`a5ecc173339a903b352665da8471517512a020ab20011346e84213ee0e7f5958`
+rejected the impossible upgrade batch on all six maps and still matched
+direct evidence on all 18 valid batch sequences. On both focused matches,
+the same release also matched Python's recorded public upgrade history.
+The Across the River opposition diagnostic uses that frozen worker for
+both policies. It includes the fresh-dictionary trial, whose paired
+checks returned identical sampled results and planning replies.
+
+Forecast opposition won both Across the River games at five seconds.
+Python matched all 667 decisions, both terminal states, and the public
+upgrade evidence in both games. Neither policy used an unscored fallback.
+Adversarial planning raised pooled planning p95 from 811 to 1,856 ms.
+Keep forecast opposition as the reference. This result covers one
+side-swapped tuning start.
+
+The exhaustive native resolution reference now checks alpha-beta scores
+at depths zero through three on small live attack and defense trees. It
+enumerates every branch, counts forced inputs without reducing depth,
+chooses max or min using the actual deciding team, and checks that the
+state and pending request restore exactly. The fixtures exercise both
+maximizing and minimizing decisions. All 29 planning and resolution
+search tests passed. This verifies the unpruned comparison independently
+of the existing exact-root reuse test. General transposition caching
+remains disabled because the exact-state census found zero matches.
+
+Resolution search now runs a bounded one-turn seed pass for multi-choice
+roots when the requested horizon is longer. The pass uses the same sampled
+worlds and evaluator, and publishes an incumbent only after all legal
+root moves have comparable scores. It skips forced roots and roots whose
+long-horizon scores are already known. The one-turn score matches the
+standalone one-turn search on the native fixture, including the selected
+move, node cap and exact root restoration. All 29 search tests passed.
+The release deadline and Python legality checks are queued on all six maps.
+
+The initial release completed all 30 two-world requests on the six maps,
+including movement, Fast Travel and Focus. The longest caller reply was
+171 ms, with live export measured separately. A follow-up tightened the
+seed gate: every scored rollout must reach the one-turn cutoff or game
+over. A guarded stop at hidden upgrades cannot publish a one-turn
+incumbent. All 30 search tests passed with this boundary check. Repeat
+the release deadline check and compare completed scores, choices, nodes
+and latency against the earlier worker on identical roots.
+
+Corrected release worker
+`8e26f5c7daa912d974de7d421603015a9ca08672370a3ec7005ec86bce08c5d5`
+completed all 30 requests at five seconds across six maps. At a 100 ms
+native deadline, 36 requests completed and the six Fast Travel requests
+returned a scored partial two-turn result. Python validated every choice.
+That check timed caller transport and validation separately from the
+native deadline.
+
+On Sabina's last movement choice in round one, turn three on Forgotten
+Island, a 512-node cap interrupted two-turn search. The retained
+`short_turn_rollout` score and move matched independent one-turn search,
+and Python accepted the move. The deadline verifier now reproduces this
+case and requires the exact node-limit result.
+
+Against the earlier release worker, all 90 paired completed two-turn
+requests returned identical moves and scores. The median worker exchange
+rose from 30.96 to 32.17 ms, p95 from 109.89 to 135.88 ms, and total nodes
+from 25,248 to 35,304. Keep the bounded one-turn pass for now because it
+supplies a verified scored fallback under interruption. The timings
+quantify the cost of evaluating its continuation before the deeper search.
+
+A follow-up attempted to reuse immediate scores that already reached the
+one-turn boundary. All 30 search tests and all 90 paired replies matched.
+The 512-node fallback still passed, but both workers used 35,304 nodes in
+the paired requests, with p95 exchange time of 137.26 and 137.94 ms.
+Removed the cache trial because it saved no work on these positions.
+
+Release worker
+`d27a8501e179e34daa047d1d800f429c834a280424db5a7b70fb3c8d4d0c5072`
+repeated fixed-policy throughput on 20 roots across all six maps. It
+includes the score-cache trial, which is outside the fixed-policy rollout
+path. Python matched all 256 sampled replays, including endpoints,
+decision counts and evaluator values. Four workers completed 2,726 to
+4,832 full two-turn rollouts per second. One worker completed 850 to
+1,386 per second. Four serial roots remain below 1,000 per second.
+
+An upgrade-prefix trial filters the current hand constraint once before
+visiting sibling upgrade choices. An unchanged set stays borrowed.
+Only a choice that rules out a first card needs a smaller owned set.
+The physical upgrade path, rollback and candidate order are preserved.
+All 11 greedy tests passed. Paired release checks compare the compact
+board and both full reference maps, including a level-eight jump, at
+the same 16,384-node limit.
+
+Six alternating release pairs per root returned identical decisions,
+scores, node counts and traces. Python matched the four selected traces
+and all 131 decisions. After warmup, median search times were 494 to
+496 ms on the compact board, 517 to 508 ms on full Forgotten Island,
+549 to 553 ms on Magma and Ice, and 564 to 566 ms on its level-eight
+case. The mixed changes were below two percent. Removed the trial.
+Repeated rule advancement remains the larger measured cost.
+
+The opt-in greedy profile now records dispatch calls and elapsed time by
+rule-step type. On the compact board and full Forgotten Island and Magma
+and Ice, the 16,384-node position-first upgrade run spent 336 to 404 ms
+inside timed dispatches. Card resolution used 25 to 30 percent of dispatch
+time, followed by hero-turn finalization at 13 to 15 percent, selection
+at 7 to 12 percent, and actor selection at 9 to 11 percent. These are
+inclusive diagnostic timings, including skipped and prompt-producing
+attempts. Use them to narrow subsequent measurements inside the hottest
+steps. In particular, measure card-menu generation and response
+application separately before changing either path.
+
+Python matched 295 decisions in all 12 profiled upgrade traces. The
+alternating profiled and unprofiled runs at identical node limits
+returned identical choices, scores, counts, traces, and final states.
+Median exchanges with profiling enabled rose from 629 to 637 ms on the
+compact board, 654 to 685 ms on Forgotten Island, and 754 to 775 ms on
+Magma and Ice. These timings include all enabled greedy counters and
+rule timing. All 411 Rust core library tests passed.
+
+Split the card-resolution profile by outcome. The same three
+16,384-node roots spent 24 to 30 ms dispatching menu requests and
+56 to 66 ms dispatching accepted responses. The typed action rules,
+including the response's menu reconstruction, took only 11 to 16 ms
+inside response dispatch. Inspect recipe preparation and object allocation
+next. Removing all response-side action-rule work would save at most
+that measured 11 to 16 ms on these roots. Python again matched all
+295 decisions in the 12 profiled upgrade traces.
+
+An action symbol-table trial borrowed the already typed selection and
+looked up existing log strings before requesting mutable intern storage.
+Six alternating warm pairs per root returned identical decisions, scores,
+node counts and traces. Python matched the four selected traces across
+131 decisions. Median exchanges changed from 555 to 559 ms on the
+compact board, 618 to 599 ms on full Forgotten Island, 658 to 658 ms
+on Magma and Ice, and 674 to 670 ms on its level-eight fixture. Reverted
+the trial because the gain did not repeat across the full maps.
+
+A recipe-layout trial shared the immutable object paths, alias links,
+and nested program bindings across recipe copies. It also counted step
+objects once at compile time. Six alternating warm pairs per root
+returned identical choices, scores, node counts and traces. Python
+matched all four selected traces across 131 decisions. Median times
+were 564 to 570 ms on the compact board, 612 to 615 ms on full
+Forgotten Island, 655 to 657 ms on Magma and Ice, and 679 to 677 ms
+on its level-eight fixture. Reverted the trial.
+
+The retained opt-in profile separates recipe preparation from response
+application. On the three 16,384-node roots, recipes and generation
+checks took 12 to 14 ms. Applying responses, including arena allocation
+and stack insertion, took 24 to 27 ms, roughly four percent of total
+search time. The typed rules took 11 to 16 ms. Python matched all
+295 decisions in the 12 profiled traces. Further allocation work
+should target the shared step constructor so gains can extend beyond
+card resolution.
+
+The shared-constructor trial allocated a simple generated recipe directly
+as a step with its assigned generation. Composite recipes retained the
+original order of classification and generation. All four fixed-node
+greedy comparisons returned identical results, with 131 selected
+decisions replayed in Python. Greedy medians changed from 558 to 550 ms
+on the compact board, 598 to 595 ms on full Forgotten Island, and
+653 to 656 ms and 667 to 670 ms on the two Magma and Ice roots. Two
+Magma and Ice serial rollout workloads kept identical results and moved
+from 820 to 827 and 924 to 931 complete two-turn rollouts per second
+on the iterate build. Reverted the trial because the gain was small
+and did not carry over consistently to greedy search.
+
+The retained iterate worker matched all 6,592 stack cases and 27,145
+operations, comparing state, requests and event order with the frozen
+oracle. It also matched 66 candidate verdicts, 69 sequence verdicts and
+the consecutive-allied-choice payoff case.
+
+Future-planning resolution search now propagates unsupported sampling
+or installation errors. It previously accepted any such error before
+the sampled continuation as a scored boundary. Explicit guards for
+concealed choices and upgrades still stop at their intended boundaries.
+A focused Rust case verifies that an unrepresentable revealed opposing
+card produces an error and preserves the root, while the hidden-upgrade
+regression still permits its explicit boundary and rejects it as a
+completed one-turn result.
+
+All 412 Rust core library tests, including 31 search tests, and ten
+Python recommendation and transport tests passed. A real offline
+adapter run injected an unsupported
+planning snapshot and a stale resolution token. Each triggered one
+whole-decision fallback, and Python validated the following 18
+recommendations. With the corrected worker, all 30 sampled resolution
+deadline requests completed across six maps. Four-turn native play
+with future planning samples on the same maps validated 23 planning
+and 236 resolution recommendations, with one unscored planning fallback
+and no resolution fallbacks.
+
+The offline planning validator now accepts a completed shallow score
+when deep search stopped before finishing a row. It continues
+to check live ownership, revision, every controlled slot and the whole
+sequence. Missing scores, non-integer scores and replies claiming both
+deep and shallow scores are rejected. The deadline verifier counts a
+shallow result separately from an unscored fallback.
+
+At a 64-node cap, the worker returned six shallow-only results on
+Forgotten Island, Magma and Ice and Across the River, in solo and
+coordinated mode. Python accepted all nine commitments. With a
+five-second caller budget, all 24 opening and upgraded planning
+matrices completed across six maps. At 180 ms, 58 of 72 requests
+completed their matrices and 14 retained scored best-so-far results.
+All 72 passed Python validation within the caller budget. The longest
+reply was 163.39 ms and the longest validated result took 165.52 ms.
+All 16 targeted Python validator, transport and reporting tests passed.
+
+Public history now records the automatic level-seven to level-eight
+ultimate unlock even when play advances to Planning without an upgrade
+prompt. The ordinary card-item totals stay fixed across this transition.
+Both recorders require a known level-seven baseline and leave earlier
+evidence intact when the baseline is unknown. The native test also
+checks that a change in visible item totals does not become an ordinary
+upgrade reward at this transition.
+
+The reconnect verifier exercises 1-to-2, 1-to-3-to-6, 1-to-8 and
+1-to-7-to-8 on all six maps. In 24 cases, restored, reordered and
+deduplicated batches gave the same Rust results as direct checkpoints.
+Two native offline matches recorded a six-choice 1-to-7 batch followed
+by the automatic 7-to-8 transition. Python matched the public history,
+225 decisions and both final states on Forgotten Island and Magma and
+Ice. The ordinary 1-to-4 offline replays matched another 52 decisions.
+All 413 Rust core library tests passed.

@@ -275,9 +275,6 @@ impl NativeWorld {
                         && let Some(card) = card.and_then(|id| self.card(id))
                     {
                         let def = &self.definitions.cards[card.definition];
-                        if def.spell {
-                            return Err("spell face action color not compiled".into());
-                        }
                         if !card.facedown
                             && def
                                 .color

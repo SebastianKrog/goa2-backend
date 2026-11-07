@@ -9,12 +9,14 @@ struct TokenInfo {
     id: Symbol,
     kind: Symbol,
     owner: Option<Symbol>,
+    passable: bool,
     immune: bool,
     persists: bool,
 }
 #[derive(Clone, Debug)]
 pub(super) struct TokenBindings {
     base: Arc<[Option<TokenInfo>]>,
+    has_passable_tokens: bool,
     kinds: Arc<[Symbol]>,
     pub(super) batch_defaults: Arc<HashMap<&'static str, Datum>>,
     pub(super) turret_default: Datum,
@@ -45,6 +47,9 @@ impl TokenBindings {
                         .ok_or_else(|| unsupported("token type missing"))?,
                 ),
                 owner: raw["owner_id"].as_str().map(|id| symbols.intern(id)),
+                passable: raw["is_passable"]
+                    .as_bool()
+                    .ok_or_else(|| unsupported("token passability missing"))?,
                 persists: raw["persists_end_of_round"]
                     .as_bool()
                     .ok_or_else(|| unsupported("token persistence missing"))?,
@@ -81,6 +86,7 @@ impl TokenBindings {
         Ok(Self {
             turret_default,
             batch_defaults: Arc::new(batch_defaults),
+            has_passable_tokens: base.iter().flatten().any(|token| token.passable),
             base: base.into(),
             kinds: kinds.into(),
         })
@@ -178,12 +184,12 @@ impl NativeSession {
             .and_then(Value::as_bool) == Some(false))
     }
 
-    pub(super) fn cleanup_token_supply_bound(
+    fn any_token_supply_bound(
         &self,
         objects: &BoundObjects,
-    ) -> Result<Vec<(Symbol, bool)>> {
+        mut predicate: impl FnMut(TokenInfo) -> bool,
+    ) -> Result<bool> {
         let pool = objects.phases.root(&objects.arena, Field::TokenPool)?;
-        let mut result = Vec::new();
         for (_, value) in objects
             .arena
             .fields(pool)
@@ -204,11 +210,42 @@ impl NativeSession {
                     .tokens
                     .get(objects, *id)?
                     .ok_or_else(|| unsupported("pool token metadata missing"))?;
-                result.push((row.id, row.persists));
+                if predicate(row) {
+                    return Ok(true);
+                }
             }
         }
+        Ok(false)
+    }
+
+    pub(super) fn has_enemy_mine_supply_bound(
+        &self,
+        objects: &BoundObjects,
+        team: Symbol,
+    ) -> Result<bool> {
+        if !objects.tokens.has_passable_tokens {
+            return Ok(false);
+        }
+        // A pool entry and a board entity with the same ID can be different instances.
+        self.any_token_supply_bound(objects, |token| {
+            token.passable
+                && self.world.position(token.id).is_some()
+                && self.world.is_enemy_mine_owner(token.owner, team)
+        })
+    }
+
+    pub(super) fn cleanup_token_supply_bound(
+        &self,
+        objects: &BoundObjects,
+    ) -> Result<Vec<(Symbol, bool)>> {
+        let mut result = Vec::new();
+        self.any_token_supply_bound(objects, |row| {
+            result.push((row.id, row.persists));
+            false
+        })?;
         Ok(result)
     }
+
     pub(super) fn token_effective_bound(
         &self,
         objects: &BoundObjects,

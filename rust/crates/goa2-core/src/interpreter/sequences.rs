@@ -246,8 +246,9 @@ impl NativeSession {
         enum Choice {
             Typed(Datum),
             Named(&'static str),
+            MinePath(usize),
         }
-        use Choice::{Named, Typed};
+        use Choice::{MinePath, Named, Typed};
 
         let Some(request) = &self.last_request else {
             return Ok((Vec::new(), true));
@@ -317,9 +318,9 @@ impl NativeSession {
                     .take(limit)
                     .map(|n| Typed(Datum::Int(*n)))
                     .collect(),
-                RequestChoices::Mines(paths) => (0..paths.len().min(limit))
-                    .map(|index| Typed(Datum::Int(index as i64)))
-                    .collect(),
+                RequestChoices::Mines(paths) => {
+                    (0..paths.len().min(limit)).map(MinePath).collect()
+                }
                 RequestChoices::Laugh
                 | RequestChoices::YesNo
                 | RequestChoices::Repeat { .. }
@@ -386,6 +387,7 @@ impl NativeSession {
             let selection = match choice {
                 Typed(value) => value,
                 Named(name) => Datum::Text(self.choice_symbol(name)),
+                MinePath(index) => Datum::Text(self.choice_symbol(&index.to_string())),
             };
             let decision = DecisionMove::Input {
                 player,
@@ -667,8 +669,11 @@ impl NativeSession {
             RequestChoices::Numbers { values, .. } => {
                 matches!(selection, Datum::Int(value) if values.contains(value))
             }
-            RequestChoices::Mines(paths) => matches!(selection, Datum::Int(value)
-                if usize::try_from(*value).is_ok_and(|index| index < paths.len())),
+            RequestChoices::Mines(paths) => text.is_some_and(|id| {
+                let name = self.symbols.name(id);
+                name.parse::<usize>()
+                    .is_ok_and(|index| index < paths.len() && index.to_string() == name)
+            }),
             RequestChoices::Laugh
             | RequestChoices::YesNo
             | RequestChoices::Repeat { .. }

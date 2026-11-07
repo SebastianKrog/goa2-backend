@@ -214,12 +214,16 @@ impl NativeSession {
         if hero.id == player {
             return Ok(hero.items);
         }
+        Ok(self.public_pre_upgrade_items(hero.id)?.unwrap_or(hero.items))
+    }
+
+    pub(super) fn public_pre_upgrade_items(&self, hero: Symbol) -> Result<Option<[i64; 6]>> {
         let invalid = || EngineError::Unsupported("invalid public upgrade item snapshot".into());
         let Some(objects) = &self.objects else {
             return if self.planning.phase == Phase::LevelUp {
                 Err(invalid())
             } else {
-                Ok(hero.items)
+                Ok(None)
             };
         };
         let Some(snapshot) = self
@@ -227,13 +231,13 @@ impl NativeSession {
             .lookup("upgrade_reveal_snapshot")
             .and_then(|key| objects.arena.root_field(key))
         else {
-            return Ok(hero.items);
+            return Ok(None);
         };
         let ObjectValue::Object(snapshot) = snapshot else {
             return Err(invalid());
         };
-        let Some(items) = objects.arena.field(snapshot, hero.id) else {
-            return Ok(hero.items);
+        let Some(items) = objects.arena.field(snapshot, hero) else {
+            return Ok(None);
         };
         let ObjectValue::Object(items) = items else {
             return Err(invalid());
@@ -246,7 +250,7 @@ impl NativeSession {
             };
             visible[stat.index()] = *count;
         }
-        Ok(visible)
+        Ok(Some(visible))
     }
 
     /// Project the public board and one hero's own cards for search sampling.

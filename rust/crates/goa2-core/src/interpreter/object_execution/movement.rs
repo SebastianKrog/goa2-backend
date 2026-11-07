@@ -197,7 +197,8 @@ impl NativeSession {
             .entity(unit)
             .filter(|e| matches!(e.kind, EntityKind::Hero | EntityKind::Piece))
             .and_then(|e| e.team)
-            .filter(|team| from != to && self.world.has_enemy_mine_supply(*team))
+            && from != to
+            && self.has_enemy_mine_supply_bound(objects, team)?
         {
             if straight {
                 for hex in line.iter().take(line.len().saturating_sub(1)) {

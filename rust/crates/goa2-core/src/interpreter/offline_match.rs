@@ -1,4 +1,6 @@
 //! Offline policy comparison. All moves and transitions run in Rust.
+use super::loadout::{PublicUpgradeBatch, PublicUpgradeHistory};
+use super::search::MAX_SEARCH_ROLLOUT_TURNS;
 use super::{
     BotPlanningScope, DecisionMove, EngineError, ExecutionBudget, NativeSession, OpponentPolicy,
     PlanningRolloutSample, PlanningSearchOptions, Result, SearchEvaluation, SearchLimits,
@@ -19,9 +21,20 @@ pub struct OfflinePolicy {
     pub time_ms: u64,
     pub rollout_turns: Option<u8>,
     pub planning_workers: Option<usize>,
+    pub sampled_worlds: Option<usize>,
     pub reply_cap: Option<usize>,
     #[serde(default)]
     pub greedy_card_order: bool,
+    #[serde(default)]
+    pub tactical_forecast: bool,
+    #[serde(default)]
+    pub coordinated_planning: bool,
+    #[serde(default)]
+    pub forecast_node_share: super::ForecastNodeShare,
+    #[serde(default)]
+    pub legacy_fixed_followup: bool,
+    #[serde(default)]
+    pub planning_seed_pass: bool,
     #[serde(default)]
     pub fixed_future_planning: bool,
     #[serde(default)]
@@ -35,6 +48,10 @@ pub struct OfflinePolicy {
 }
 
 impl OfflinePolicy {
+    fn sampled_worlds(self) -> usize {
+        self.sampled_worlds.unwrap_or(2)
+    }
+
     fn limits(self) -> SearchLimits {
         SearchLimits {
             max_depth: self.depth,
@@ -52,6 +69,10 @@ impl OfflinePolicy {
     }
 }
 
+fn is_zero(count: &usize) -> bool {
+    *count == 0
+}
+
 #[derive(Default, serde::Serialize)]
 pub struct OfflinePolicyStats {
     planning: usize,
@@ -59,12 +80,27 @@ pub struct OfflinePolicyStats {
     forced: usize,
     fallback: usize,
     planning_best_so_far: usize,
+    planning_shallow_scores: usize,
+    planning_nodes: usize,
+    planning_greedy_nodes: usize,
+    #[serde(skip_serializing_if = "is_zero")]
+    planning_greedy_tactical_probes: usize,
+    planning_probe_nodes: usize,
+    planning_shallow_nodes: usize,
+    planning_seed_nodes: usize,
+    planning_seed_choices: usize,
+    planning_seed_scored: usize,
+    planning_seed_deep_agreement: usize,
+    planning_completed_rows: usize,
+    planning_pruned_rows: usize,
+    planning_total_rows: usize,
     planning_with_greedy_scores: usize,
     planning_greedy_card_scores: usize,
     planning_forecast_changes: usize,
     planning_forecast_checks: usize,
     planning_forecast_matches: usize,
     resolution_best_so_far: usize,
+    resolution_nodes: usize,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     planning_micros: Vec<u64>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -72,7 +108,11 @@ pub struct OfflinePolicyStats {
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     resolution_fallbacks: BTreeMap<String, usize>,
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    resolution_fallback_trace: BTreeMap<usize, String>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     planning_fallbacks: BTreeMap<String, usize>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    planning_fallback_trace: BTreeMap<usize, Vec<String>>,
 }
 
 #[derive(serde::Serialize)]
@@ -84,6 +124,8 @@ pub struct OfflineMatch {
     winner_hero: Option<String>,
     lives: Vec<(String, i64)>,
     policies: [OfflinePolicyStats; 2],
+    #[serde(skip_serializing_if = "Option::is_none")]
+    public_upgrade_batches: Option<Vec<PublicUpgradeBatch>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     trace: Option<Vec<Value>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -114,13 +156,16 @@ impl NativeSession {
             || policies.iter().any(|policy| {
                 policy.depth > 64
                     || (policy.sample_choices && policy.depth != 0)
-                    || policy.planning_workers.is_some_and(|workers| !(1..=2).contains(&workers))
+                    || !(1..=8).contains(&policy.sampled_worlds())
+                    || policy.planning_workers.is_some_and(|workers| {
+                        !(1..=2.min(policy.sampled_worlds())).contains(&workers)
+                    })
                     || policy.reply_cap.is_some_and(|cap| !(1..=4096).contains(&cap))
                     || policy.max_nodes == 0
                     || !(1..=60_000).contains(&policy.time_ms)
                     || policy
                         .rollout_turns
-                        .is_some_and(|turns| !(1..=2).contains(&turns))
+                        .is_some_and(|turns| !(1..=MAX_SEARCH_ROLLOUT_TURNS).contains(&turns))
             })
         {
             return Err(EngineError::InvalidInput(
@@ -131,6 +176,11 @@ impl NativeSession {
         let cutoff = self.search_turn_index() + i128::from(turns);
         let mut trace = capture_trace.then(Vec::new);
         let mut stats = [OfflinePolicyStats::default(), OfflinePolicyStats::default()];
+        let mut upgrades = policies
+            .iter()
+            .any(|policy| policy.depth > 0)
+            .then(|| PublicUpgradeHistory::new(self))
+            .transpose()?;
         let team_index = |team: &str| match team {
             "RED" => Ok(0),
             "BLUE" => Ok(1),
@@ -139,6 +189,11 @@ impl NativeSession {
             )),
         };
         for revision in 0..usize::from(turns) * 128 {
+            if self.planning.phase == Phase::Planning
+                && let Some(history) = &mut upgrades
+            {
+                history.planning_boundary(self, revision as u64)?;
+            }
             if self.planning.phase == Phase::GameOver || self.search_turn_index() >= cutoff {
                 let outcome = self.world.combat.outcome;
                 let name = |id| self.symbols.name(id).to_owned();
@@ -155,6 +210,11 @@ impl NativeSession {
                         .map(|(team, lives)| (name(team), lives))
                         .collect(),
                     policies: stats,
+                    public_upgrade_batches: if capture_trace {
+                        upgrades.map(|history| history.batches)
+                    } else {
+                        None
+                    },
                     trace,
                     state: capture_trace.then(|| self.semantic_state()).transpose()?,
                 });
@@ -168,12 +228,17 @@ impl NativeSession {
             let epoch_seed = seed.wrapping_add(self.search_turn_index() as u64);
             if self.planning.phase == Phase::Planning {
                 let mut joint = Vec::new();
+                let mut coordinated = [Vec::<super::PlanningCommitment>::new(), Vec::new()];
                 for hero in &self.world.heroes {
                     let Some(fallback) = self.first_planning_commitment(hero.id)? else {
                         continue;
                     };
                     let index = team_index(self.symbols.name(hero.team))?;
                     let policy = policies[index];
+                    if let Some(plan) = coordinated[index].iter().find(|plan| plan.hero == hero.id) {
+                        joint.push(*plan);
+                        continue;
+                    }
                     stats[index].planning += 1;
                     let started = (capture_trace && policy.depth > 0).then(Instant::now);
                     let plan = if policy.sample_choices {
@@ -182,12 +247,23 @@ impl NativeSession {
                     } else if policy.depth == 0 {
                         fallback
                     } else {
-                        let search = self.search_bot_team_planning(
+                        let team_bots;
+                        let solo = [hero.id];
+                        let (bots, mode) = if policy.coordinated_planning {
+                            team_bots = self.world.heroes.iter()
+                                .filter(|ally| ally.team == hero.team)
+                                .map(|ally| ally.id)
+                                .collect::<Vec<_>>();
+                            (team_bots.as_slice(), TeamKnowledgeMode::Coordinated)
+                        } else {
+                            (solo.as_slice(), TeamKnowledgeMode::TrueRules)
+                        };
+                        let search = self.search_bot_team_planning_with_seed_pass(
                             hero.id,
                             BotPlanningScope {
-                                bots: &[hero.id],
-                                mode: TeamKnowledgeMode::TrueRules,
-                                worlds: 2,
+                                bots,
+                                mode,
+                                worlds: policy.sampled_worlds(),
                                 seed: epoch_seed,
                             },
                             4,
@@ -195,16 +271,35 @@ impl NativeSession {
                             PlanningSearchOptions {
                                 rollout_turns: policy.rollout_turns,
                                 workers: policy.planning_workers.unwrap_or(1),
-                                upgrade_checkpoints: None,
+                                upgrade_checkpoints: upgrades.as_ref().and_then(PublicUpgradeHistory::checkpoints),
                                 reply_cap: policy.reply_cap,
                                 reply_probe_cap: None,
                                 greedy_card_order: policy.greedy_card_order,
+                                tactical_forecast: policy.tactical_forecast,
+                                forecast_node_share: policy.forecast_node_share,
+                                legacy_fixed_followup: policy.legacy_fixed_followup,
                                 fixed_future_planning: policy.fixed_future_planning,
                                 branch_future_planning: policy.branch_future_planning,
                             },
                             &policy.budget(),
+                            policy.planning_seed_pass,
                         );
                         if let Ok(result) = &search {
+                            stats[index].planning_nodes += result.matrix.nodes;
+                            stats[index].planning_greedy_nodes += result.greedy_nodes;
+                            stats[index].planning_greedy_tactical_probes += result.greedy_tactical_probes;
+                            stats[index].planning_probe_nodes += result.probe_nodes;
+                            stats[index].planning_shallow_nodes += result.shallow_nodes;
+                            stats[index].planning_seed_nodes += result.seed_nodes;
+                            if result.seed_score.is_some() {
+                                stats[index].planning_seed_scored += 1;
+                                if result.matrix.score.is_some() && result.matrix.row == 0 {
+                                    stats[index].planning_seed_deep_agreement += 1;
+                                }
+                            }
+                            stats[index].planning_completed_rows += result.matrix.completed_rows;
+                            stats[index].planning_pruned_rows += result.matrix.pruned_rows;
+                            stats[index].planning_total_rows += result.total_rows;
                             stats[index].planning_with_greedy_scores +=
                                 usize::from(result.greedy_card_scores > 0);
                             stats[index].planning_greedy_card_scores += result.greedy_card_scores;
@@ -213,15 +308,38 @@ impl NativeSession {
                             stats[index].planning_forecast_matches += result.matrix.forecast_matches;
                         }
                         match search {
-                            Ok(result) if result.matrix.score.is_some() => {
-                                if result.matrix.completed_rows + result.matrix.pruned_rows
+                            Ok(result) if result.matrix.score.is_some()
+                                || result.seed_score.is_some() || result.shallow_score.is_some() => {
+                                if result.matrix.score.is_none() && result.seed_score.is_some() {
+                                    stats[index].planning_seed_choices += 1;
+                                }
+                                if result.shallow_score.is_some() {
+                                    stats[index].planning_shallow_scores += 1;
+                                } else if result.matrix.score.is_some()
+                                    && result.matrix.completed_rows + result.matrix.pruned_rows
                                     < result.total_rows
                                 {
                                     stats[index].planning_best_so_far += 1;
                                 }
-                                result.commitments[0]
+                                let chosen = result.commitments.iter().find(|plan| plan.hero == hero.id)
+                                    .copied().ok_or_else(|| {
+                                        EngineError::Unsupported("offline team plan omitted its requesting hero".into())
+                                    })?;
+                                if policy.coordinated_planning {
+                                    coordinated[index] = result.commitments;
+                                }
+                                chosen
                             },
                             other => {
+                                let work = match &other {
+                                    Ok(result) => format!(
+                                        "; {} of {} nodes, {} probe nodes, {} of {} scored cells, {} of {} worlds",
+                                        result.matrix.nodes, policy.max_nodes, result.probe_nodes,
+                                        result.matrix.evaluated_cells, result.matrix.total_cells,
+                                        result.prepared_worlds, result.requested_worlds,
+                                    ),
+                                    Err(_) => String::new(),
+                                };
                                 let reason = match other {
                                     Ok(result) if result.prepared_worlds < result.requested_worlds => {
                                         "interrupted while preparing sampled worlds".into()
@@ -234,7 +352,20 @@ impl NativeSession {
                                 let stats = &mut stats[index];
                                 stats.fallback += 1;
                                 if capture_trace {
+                                    if let Some(trace) = &trace {
+                                        let elapsed = started.map_or(0, |time| time.elapsed().as_millis());
+                                        stats.planning_fallback_trace.entry(trace.len()).or_default().push(
+                                            format!("{}: {reason} ({elapsed} ms{work})", self.symbols.name(hero.id)),
+                                        );
+                                    }
                                     *stats.planning_fallbacks.entry(reason).or_default() += 1;
+                                }
+                                if policy.coordinated_planning {
+                                    for &bot in bots {
+                                        if let Some(plan) = self.first_planning_commitment(bot)? {
+                                            coordinated[index].push(plan);
+                                        }
+                                    }
                                 }
                                 fallback
                             }
@@ -255,6 +386,11 @@ impl NativeSession {
                     || self.search_turn_index() >= cutoff
                 {
                     continue;
+                }
+                if self.planning.phase == Phase::LevelUp
+                    && let Some(history) = &mut upgrades
+                {
+                    history.begin_batch(self)?;
                 }
                 let (owner, team) = self.search_player()?.ok_or_else(|| {
                     EngineError::Unsupported("offline match stalled outside planning".into())
@@ -285,16 +421,19 @@ impl NativeSession {
                 } else {
                     let sample = PlanningRolloutSample {
                         seed: epoch_seed,
-                        upgrade_checkpoints: None,
+                        upgrade_checkpoints: upgrades.as_ref().and_then(PublicUpgradeHistory::checkpoints),
                     };
                     let searched = self.search_resolution_worlds(
                         owner,
-                        (sample, 2, 1),
+                        (sample, policy.sampled_worlds(), 1),
                         policy.limits(),
                         policy.rollout_turns,
                         policy.rollout_turns.map(|_| sample),
                         &policy.budget(),
                     );
+                    if let Ok(result) = &searched {
+                        stats[index].resolution_nodes += result.nodes;
+                    }
                     match searched {
                         Ok(result) if result.score.is_some() => {
                             if !result.resolved && result.completed_depth < policy.depth {
@@ -318,10 +457,11 @@ impl NativeSession {
                                     .map_or("unknown prompt", |request| {
                                         self.symbols.name(request.prompt)
                                     });
-                                *stats
-                                    .resolution_fallbacks
-                                    .entry(format!("{prompt}: {reason}"))
-                                    .or_default() += 1;
+                                let description = format!("{prompt}: {reason}");
+                                if let Some(trace) = &trace {
+                                    stats.resolution_fallback_trace.insert(trace.len(), description.clone());
+                                }
+                                *stats.resolution_fallbacks.entry(description).or_default() += 1;
                             }
                             fallback(self)?
                         }
@@ -350,8 +490,11 @@ impl NativeSession {
                 self.last_request = None;
             }
         }
-        Err(EngineError::Unsupported(
-            "offline match exceeded its decision limit".into(),
-        ))
+        let tail = trace.as_deref().unwrap_or_default();
+        let recent = &tail[tail.len().saturating_sub(6)..];
+        Err(EngineError::Unsupported(format!(
+            "offline match exceeded its decision limit at round {}, turn {}, phase {:?}. Recent decisions: {recent:?}",
+            self.round.round, self.world.combat.turn, self.planning.phase,
+        )))
     }
 }

@@ -17,6 +17,13 @@ fn lifecycle_name(lifecycle: CardLifecycle) -> &'static str {
     }
 }
 
+struct CardSwapOperands {
+    model: ObjectId,
+    target: Symbol,
+    source: Option<Symbol>,
+    source_is_keyed: bool,
+}
+
 impl NativeSession {
     pub(super) fn swap_resolved_cards_bound(
         &mut self,
@@ -96,12 +103,11 @@ impl NativeSession {
         }))
     }
 
-    pub(super) fn swap_cards_bound(
-        &mut self,
-        objects: &mut BoundObjects,
+    fn card_swap_operands_bound(
+        &self,
+        objects: &BoundObjects,
         step: ObjectId,
-    ) -> Result<()> {
-        let p = &objects.phases;
+    ) -> Result<Option<CardSwapOperands>> {
         let text = |name| {
             self.symbols
                 .lookup(name)
@@ -116,19 +122,54 @@ impl NativeSession {
         };
         let hero = context("context_hero_id_key")?.or(self.planning.actor);
         let Some(model) = hero.and_then(|hero| self.hero_model_bound(objects, hero)) else {
-            return Ok(());
+            return Ok(None);
         };
         let target = match self.truthy_symbol_bound(objects, text("target_card_id"))? {
             Some(target) => Some(target),
             None => context("target_card_key")?,
         };
         let Some(target) = target else {
-            return Ok(());
+            return Ok(None);
         };
         let source = context("source_card_key")?;
         let source_is_keyed = self
             .truthy_symbol_bound(objects, text("source_card_key"))?
             .is_some();
+        Ok(Some(CardSwapOperands { model, target, source, source_is_keyed }))
+    }
+
+    pub(super) fn card_swap_is_current_to_hand_bound(
+        &self,
+        objects: &BoundObjects,
+        step: ObjectId,
+    ) -> Result<bool> {
+        let Some(operands) = self.card_swap_operands_bound(objects, step)? else {
+            return Ok(false);
+        };
+        let current = self.model_card_bound(objects, operands.model, Field::Current)?;
+        if operands.source_is_keyed
+            || current.and_then(|id| self.world.card(id)).is_none_or(|card| card.facedown)
+        {
+            return Ok(false);
+        }
+        let hand = self.hero_card_list_bound(objects, operands.model, Field::Hand)?;
+        Ok(hand.into_iter().flatten().any(|id| self.world.card(id).is_some_and(|card| {
+            !card.facedown
+                && self.world.definitions.cards[card.definition].printed_id == operands.target
+        })))
+    }
+
+    pub(super) fn swap_cards_bound(
+        &mut self,
+        objects: &mut BoundObjects,
+        step: ObjectId,
+    ) -> Result<()> {
+        let p = &objects.phases;
+        let Some(CardSwapOperands { model, target, source, source_is_keyed }) =
+            self.card_swap_operands_bound(objects, step)?
+        else {
+            return Ok(());
+        };
         let current = self.model_card_bound(objects, model, Field::Current)?;
         let printed = |id: CardId| {
             self.world.definitions.cards[self.world.card(id).unwrap().definition].printed_id

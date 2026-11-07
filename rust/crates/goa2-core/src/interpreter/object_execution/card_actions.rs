@@ -116,6 +116,7 @@ impl NativeSession {
         &mut self,
         objects: &BoundObjects,
         step: ObjectId,
+        mut profile: Option<&mut RuleStepTimer>,
     ) -> Result<CardActionPlan> {
         let hero = self.passive_text_bound(objects, step, Field::HeroId)?;
         self.sync_card_collections_bound(objects)?;
@@ -139,10 +140,19 @@ impl NativeSession {
                     .map_err(unsupported)
             })
             .transpose()?;
+        let started = profile.as_ref().map(|_| Instant::now());
         let resolution = self
             .action_rules
             .resolve(&self.world, hero, selected.as_ref(), &mut context)
             .map_err(unsupported)?;
+        if let Some((profile, started)) = profile.as_deref_mut().zip(started) {
+            profile.action_rules_ns = Some(started.elapsed().as_nanos());
+            profile.category = Some(match &resolution {
+                ActionResolution::Prompt(_) => "resolve_card.menu",
+                ActionResolution::Finished(children) if children.is_empty() => "resolve_card.no_action",
+                ActionResolution::Finished(_) => "resolve_card.response",
+            });
+        }
         let card = context.get(objects.action_keys[1]).cloned();
         let mut plan = CardActionPlan {
             card,
@@ -172,6 +182,7 @@ impl NativeSession {
             ActionResolution::Finished(children) => children,
         };
         plan.action = context.get(objects.action_keys[0]).cloned();
+        let started = profile.as_ref().map(|_| Instant::now());
         plan.recipes = self.prepare_action_recipes_bound(objects, hero, children)?;
         let count = plan
             .recipes
@@ -185,6 +196,9 @@ impl NativeSession {
                 u64::try_from(count)
                     .map_err(|_| unsupported("action generation count overflow"))?,
             )?;
+        }
+        if let Some((profile, started)) = profile.zip(started) {
+            profile.recipe_prep_ns = Some(started.elapsed().as_nanos());
         }
         Ok(plan)
     }

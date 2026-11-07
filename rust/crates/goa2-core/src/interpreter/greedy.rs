@@ -379,6 +379,8 @@ pub struct GreedyProfile {
     pub replayed_steps: usize,
     pub largest_upgrade_batch: usize,
     card_sync: super::object_execution::CardSyncProfile,
+    /// Inclusive dispatch time by step type, including guards and prompt attempts.
+    rule_steps: super::object_execution::RuleStepProfiles,
 }
 
 fn elapsed_ns(start: std::time::Instant) -> u64 {
@@ -519,8 +521,12 @@ impl NativeSession {
             }
         };
         let outcome = if options.profile {
-            let (outcome, sync) = super::object_execution::with_card_sync_profile(visit);
-            search.result.profile.as_mut().unwrap().card_sync = sync;
+            let ((outcome, sync), rule_steps) = super::object_execution::with_rule_step_profile(|| {
+                super::object_execution::with_card_sync_profile(visit)
+            });
+            let profile = search.result.profile.as_mut().unwrap();
+            profile.card_sync = sync;
+            profile.rule_steps = rule_steps;
             outcome
         } else {
             visit()
@@ -586,6 +592,12 @@ struct PositionRoute {
     destination: Vec<Vec<crate::geometry::Hex>>,
     score: i64,
     steps: Vec<GreedyStep>,
+}
+
+struct PositionRouteFrame {
+    moves: std::vec::IntoIter<DecisionMove>,
+    next_target: Option<DecisionMove>,
+    child: Option<super::object_execution::RollbackCheckpoint>,
 }
 
 impl GreedyTraversal<'_, '_, '_> {
@@ -1233,6 +1245,59 @@ impl GreedyTraversal<'_, '_, '_> {
         routes: &mut Vec<PositionRoute>,
         target: Option<DecisionMove>,
     ) -> Result<()> {
+        let prefix = self.path.len();
+        let mut frames = Vec::new();
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            if let Some(frame) = self.position_route_frame(worker, turn, limit, base, routes, target)? {
+                frames.push(frame);
+            }
+            while let Some(frame) = frames.last_mut() {
+                if let Some(checkpoint) = frame.child.take() {
+                    worker.restore_rollback_checkpoint(checkpoint);
+                    self.path.pop();
+                }
+                let Some(decision) = frame.moves.next().filter(|_| self.result.nodes < limit) else {
+                    frames.pop();
+                    continue;
+                };
+                let DecisionMove::Input { request: Some(token), selection, .. } = &decision else {
+                    unreachable!("position choices are issued inputs");
+                };
+                let (token, selection) = (*token, selection.clone());
+                self.result.nodes += 1;
+                self.path.push(GreedyStep::Input(decision));
+                frame.child = Some(worker.begin_rollback_checkpoint(true)?);
+                worker.submit(token, selection)?;
+                let target = frame.next_target.take();
+                if let Some(child) = self.position_route_frame(worker, turn, limit, base, routes, target)? {
+                    frames.push(child);
+                }
+            }
+            Ok(())
+        }));
+        // The explicit traversal owns these checkpoints even when submission,
+        // deadline checks or route evaluation interrupt the current branch.
+        for frame in frames.into_iter().rev() {
+            if let Some(checkpoint) = frame.child {
+                worker.restore_rollback_checkpoint(checkpoint);
+            }
+        }
+        self.path.truncate(prefix);
+        match result {
+            Ok(value) => value,
+            Err(panic) => std::panic::resume_unwind(panic),
+        }
+    }
+
+    fn position_route_frame(
+        &mut self,
+        worker: &mut NativeSession,
+        turn: i128,
+        limit: usize,
+        base: usize,
+        routes: &mut Vec<PositionRoute>,
+        target: Option<DecisionMove>,
+    ) -> Result<Option<PositionRouteFrame>> {
         use crate::codec::Phase;
 
         self.budget.check(0)?;
@@ -1271,39 +1336,17 @@ impl GreedyTraversal<'_, '_, '_> {
                 score,
                 steps: self.path[base..].to_vec(),
             });
-            return Ok(());
+            return Ok(None);
         }
         let (owner, _) = worker.search_player()?.ok_or_else(|| {
             EngineError::Unsupported("position route stalled before the next turn".into())
         })?;
-        let (mut moves, mut next_target) =
+        let (mut moves, next_target) =
             self.search_input_choices(worker, owner, limit, target)?;
         if self.options.positional_ordering {
             worker.order_movement_roots(owner, &mut moves);
         }
-        for decision in moves {
-            if self.result.nodes >= limit {
-                break;
-            }
-            let DecisionMove::Input {
-                request: Some(token),
-                selection,
-                ..
-            } = &decision
-            else {
-                unreachable!("position choices are issued inputs");
-            };
-            let (token, selection) = (*token, selection.clone());
-            self.result.nodes += 1;
-            self.path.push(GreedyStep::Input(decision));
-            let result = worker.with_consumed_request(|branch| {
-                branch.submit(token, selection)?;
-                self.collect_position_routes(branch, turn, limit, base, routes, next_target.take())
-            });
-            self.path.pop();
-            result?;
-        }
-        Ok(())
+        Ok(Some(PositionRouteFrame { moves: moves.into_iter(), next_target, child: None }))
     }
 
     fn order_position_choices(
@@ -2478,6 +2521,20 @@ mod tests {
         assert_eq!(traversal.result.positional_probes, original.len());
         assert_eq!(session.semantic_state().unwrap(), before);
         assert!(original.iter().all(|decision| moves.contains(decision)));
+
+        let budget = super::super::ExecutionBudget { max_steps: 1, ..budget };
+        traversal.budget = &budget;
+        traversal.result.nodes = 0;
+        let turn = session.search_turn_index();
+        let request = session.last_request.clone();
+        assert!(matches!(
+            traversal.collect_position_routes(&mut session, turn, 128, 0, &mut Vec::new(), None),
+            Err(EngineError::StepLimit)
+        ));
+        assert!(traversal.result.nodes > 0);
+        assert!(traversal.path.is_empty());
+        assert_eq!(session.last_request, request);
+        assert_eq!(session.semantic_state().unwrap(), before);
     }
 
     #[test]
@@ -2662,11 +2719,31 @@ mod tests {
             .search_greedy_card_scores(player, options, &budget)
             .unwrap();
         assert_eq!(session.semantic_state().unwrap(), before);
+        let profile = result.profile.as_ref().unwrap();
+        assert!(profile.rule_steps.len() > 1);
+        assert!(!profile.rule_steps.contains_key("unknown"));
+        if turns == 2 {
+            let unprofiled = session
+                .search_greedy_card_scores(
+                    player,
+                    GreedySearchOptions { profile: false, ..options },
+                    &budget,
+                )
+                .unwrap();
+            assert!(unprofiled.profile.is_none());
+            assert_eq!(unprofiled.nodes, result.nodes);
+            assert_eq!(unprofiled.completed_sequences, result.completed_sequences);
+            let profiled_plan = result.best.as_ref().unwrap();
+            let unprofiled_plan = unprofiled.best.as_ref().unwrap();
+            assert_eq!(profiled_plan.score, unprofiled_plan.score);
+            assert_eq!(profiled_plan.steps, unprofiled_plan.steps);
+            assert_eq!(session.semantic_state().unwrap(), before);
+        }
         assert!(result.nodes <= options.max_nodes);
         assert!(result.completed_sequences > 1);
         assert!(result.position_groups > 0);
         assert!(result.position_routes > result.position_groups);
-        assert!((1..=options.max_nodes / 2).contains(&result.profile.as_ref().unwrap().incumbent_nodes));
+        assert!((1..=options.max_nodes / 2).contains(&profile.incumbent_nodes));
         if turns == 4 {
             let sequences = result.card_sequence_scores.as_ref().unwrap();
             assert!(sequences.keys().any(|sequence| {

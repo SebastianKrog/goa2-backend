@@ -190,16 +190,36 @@ impl NativeSession {
             Instruction::LiveCardGuess { .. } => !step.is_some_and(|step| {
                 self.sampled_guess_steps.is_some_and(|steps| steps.contains(&step))
             }),
-            // Bushido can put a card back into a public slot face down.
-            // Its printed identity is unavailable even to the slot owner.
-            Instruction::LiveCardSelect | Instruction::LiveCardSwap
-            | Instruction::LiveResolvedCardSwap | Instruction::LiveDeckCardSwap
-            | Instruction::LiveRetrieve | Instruction::LiveDiscard
-            | Instruction::LiveColorDiscard => self.world.heroes.iter().any(|hero| {
-                hero.played.iter().flatten().chain(&hero.discard)
-                    .any(|id| self.world.card(*id).is_some_and(|card| card.facedown))
-            }),
+            Instruction::LiveCardSelect if self.has_concealed_card_in_public_zone() => {
+                use crate::card_selection::Container;
+                let step = step.ok_or_else(|| unsupported("live card selector missing"))?;
+                let spec = self.card_spec_bound(objects, step)?;
+                // Ordinary selectors exclude face-down played and discarded
+                // cards before applying filters. A deck selector may still
+                // read their printed identity through the deck collection.
+                spec.facedown || spec.containers.iter().any(|c| matches!(c, Container::Deck))
+            }
+            Instruction::LiveDiscard if self.has_concealed_card_in_public_zone() => {
+                let step = step.ok_or_else(|| unsupported("live discard missing"))?;
+                !self.discard_targets_hand_bound(objects, step)?
+            }
+            Instruction::LiveCardSwap if self.has_concealed_card_in_public_zone() => {
+                let step = step.ok_or_else(|| unsupported("live card swap missing"))?;
+                !self.card_swap_is_current_to_hand_bound(objects, step)?
+            }
+            Instruction::LiveResolvedCardSwap
+            | Instruction::LiveDeckCardSwap | Instruction::LiveRetrieve
+            | Instruction::LiveColorDiscard => {
+                self.has_concealed_card_in_public_zone()
+            }
             _ => false,
+        })
+    }
+
+    fn has_concealed_card_in_public_zone(&self) -> bool {
+        self.world.heroes.iter().any(|hero| {
+            hero.played.iter().flatten().chain(&hero.discard)
+                .any(|id| self.world.card(*id).is_some_and(|card| card.facedown))
         })
     }
 
@@ -355,15 +375,18 @@ impl NativeSession {
             // validate the actual rules, including filters on public prompts.
             worker.with_rollback(|probe| {
                 probe.advance_objects(&ExecutionBudget::default(), Some(1), false)?;
-                let unchanged = probe.last_request.as_ref().is_some_and(|generated| {
-                    generated.id == request.id
-                        && generated.owner == request.owner
-                        && generated.controlled == request.controlled
-                        && generated.prompt == request.prompt
-                        && generated.can_skip == request.can_skip
-                        && generated.discard == request.discard
-                });
-                if !unchanged || probe.resolution_choices(player)? != root_choices {
+                let generated = probe.last_request.as_ref()
+                    .ok_or_else(|| unsupported("sampled resolution lost the root request"))?;
+                if generated.id != request.id
+                    || generated.owner != request.owner
+                    || generated.controlled != request.controlled
+                    || generated.prompt != request.prompt
+                    || generated.can_skip != request.can_skip
+                    || generated.discard != request.discard
+                {
+                    return Err(unsupported("sampled resolution changed the root request metadata"));
+                }
+                if probe.resolution_choices(player)? != root_choices {
                     return Err(unsupported("sampled resolution changed the root choices"));
                 }
                 Ok(())
@@ -482,10 +505,28 @@ impl NativeSession {
                 && !behavior.restrictions.is_empty();
             // These round markers record performed cards. Source-card
             // visibility and live finishing steps are checked separately.
-            let round_marker = matches!(kind, "enraged" | "equilibrium")
+            let double_items = behavior.kind == Kind::DoubleItems
+                && effect.card.is_some_and(|card| {
+                    matches!(self.symbols.name(card), "inner_strength" | "perfect_self")
+                });
+            let basic_bonus = behavior.kind == Kind::BasicBonus
+                && effect.card.is_some_and(|card| {
+                    matches!(self.symbols.name(card),
+                        "broom_for_improvement" | "broomstick_beatdown" | "this_is_my_broomstick")
+                });
+            let round_marker = (matches!(kind, "enraged" | "equilibrium") || double_items || basic_bonus)
                 && effect.duration == crate::effects::Duration::ThisRound
                 && effect.token.is_none()
                 && effect.granted_passive.is_none();
+            // Wuk's Dominance uses public minion positions at battle time.
+            let dominance = behavior.kind == Kind::BattleExclusion
+                && effect.duration == crate::effects::Duration::Passive
+                && effect.token.is_none()
+                && effect.granted_passive.is_none()
+                && effect.scope_origin == Some(effect.source)
+                && effect.card.is_some_and(|card| {
+                    matches!(self.symbols.name(card), "claim_dominance" | "assert_dominance")
+                });
             // Reverse Time changes public initiative ordering next turn.
             let reverse_time = kind == "reversed_initiative"
                 && effect.duration == crate::effects::Duration::NextTurn
@@ -523,6 +564,27 @@ impl NativeSession {
                 .then(|| effect.card.map(|card| self.symbols.name(card)))
                 .flatten()
                 .filter(|card| matches!(*card, "warning_shot" | "treetop_sentinel"));
+            let glitch_cleanup = kind == "delayed_trigger"
+                && effect.duration == crate::effects::Duration::ThisTurn
+                && effect.token.is_none()
+                && effect.granted_passive.is_none()
+                && effect.card.is_some_and(|card| {
+                    matches!(self.symbols.name(card), "flashback" | "unstable_timeline")
+                });
+            let round_minion_defeat = kind == "delayed_trigger"
+                && effect.duration == crate::effects::Duration::ThisRound
+                && effect.token.is_none()
+                && effect.granted_passive.is_none()
+                && effect.card.is_some_and(|card| {
+                    matches!(self.symbols.name(card), "final_embrace" | "constrict")
+                });
+            let grenade = kind == "delayed_trigger"
+                && effect.duration == crate::effects::Duration::ThisTurn
+                && effect.token.is_none()
+                && effect.granted_passive.is_none()
+                && effect.card.is_some_and(|card| {
+                    matches!(self.symbols.name(card), "death_grenade" | "holy_death_grenade")
+                });
             // Pre-discard triggers use the public board and hand count.
             // Any resulting discard choice runs against the sampled hand.
             let public = matches!(
@@ -539,16 +601,29 @@ impl NativeSession {
                     | Kind::MovementAura
                     | Kind::StaticBarrier
                     | Kind::Petrify
-            ) || action_restriction || round_marker || reverse_time || public_color_trigger || sentinel.is_some() || journey.is_some() || another_one;
+            ) || action_restriction || round_marker || dominance || reverse_time || public_color_trigger || sentinel.is_some() || journey.is_some() || another_one || glitch_cleanup || grenade || round_minion_defeat;
             if !public {
+                let card = effect.card.map_or("cardless", |id| self.symbols.name(id));
                 return Err(unsupported(format!(
-                    "resolution sampling does not support {:?} effect {kind}",
+                    "resolution sampling does not support {:?} effect {kind} from {card}",
                     behavior.kind,
                 )));
             }
             // The dense projection omits finishing programs for arena sessions.
             // These programs can still retain references to hidden objects.
             let finishing = objects.finishing_list(node)?;
+            if round_minion_defeat {
+                self.validate_sampled_round_minion_defeat(objects, finishing, effect.source)?;
+                continue;
+            }
+            if grenade {
+                self.validate_sampled_grenade(objects, finishing)?;
+                continue;
+            }
+            if glitch_cleanup {
+                self.validate_sampled_glitch_cleanup(objects, finishing)?;
+                continue;
+            }
             if another_one {
                 self.validate_sampled_retrieval(objects, finishing)?;
                 continue;
@@ -596,6 +671,190 @@ impl NativeSession {
             }
         }
         Ok(())
+    }
+
+    fn validate_sampled_round_minion_defeat(
+        &self,
+        objects: &BoundObjects,
+        finishing: ObjectId,
+        source: Symbol,
+    ) -> Result<()> {
+        let invalid = || unsupported("unexpected round-end minion defeat program");
+        let steps = objects.steps_in_list(finishing)?;
+        let [select, defeat] = steps.as_slice() else {
+            return Err(invalid());
+        };
+        let program = |step| objects.program(step).map(|id| &self.steps[id].instruction);
+        let text = |step, field| self.passive_optional_text_bound(objects, step, field);
+        let output = self.passive_text_bound(objects, *select, Field::Output)?;
+        if !matches!(program(*select), Some(Instruction::LiveUnitSelect))
+            || !matches!(program(*defeat), Some(Instruction::LiveDefeat))
+            || text(*select, Field::TargetType)?.is_none_or(|id| self.symbols.name(id) != "UNIT")
+            || text(*defeat, Field::Victim)?.is_some()
+            || text(*defeat, Field::VictimKey)? != Some(output)
+            || text(*defeat, Field::ActiveIf)? != Some(output)
+            || text(*defeat, Field::KillerId)? != Some(source)
+        {
+            return Err(invalid());
+        }
+        for &step in &steps {
+            if objects.token(step)?.is_some() || !matches!(
+                objects.arena.field_ref(step, objects.pending),
+                None | Some(ObjectValue::Atom(Datum::Null))
+            ) {
+                return Err(invalid());
+            }
+        }
+        let filters = self.unit_filter_list_bound(objects, *select, Field::Filters)?;
+        let [ObjectValue::Object(team), ObjectValue::Object(minions), ObjectValue::Object(range)] =
+            filters.as_slice()
+        else {
+            return Err(invalid());
+        };
+        for (filter, expected) in [
+            (*team, "team_filter"), (*minions, "minion_type_filter"), (*range, "range_filter"),
+        ] {
+            if self.symbols.name(self.passive_text_bound(objects, filter, Field::FilterType)?) != expected {
+                return Err(invalid());
+            }
+        }
+        for field in [Field::OriginKey, Field::OriginHexKey, Field::MinRangeKey, Field::MaxRangeKey] {
+            if text(*range, field)?.is_some() {
+                return Err(invalid());
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_sampled_grenade(&self, objects: &BoundObjects, finishing: ObjectId) -> Result<()> {
+        let invalid = || unsupported("unexpected grenade finishing program");
+        let field = |object, name| objects.arena.field_ref(object, self.symbols.lookup(name)?);
+        let text = |object, name, expected| {
+            matches!(field(object, name), Some(ObjectValue::Atom(Datum::Text(id)))
+                if self.symbols.name(*id) == expected)
+        };
+        let empty = |object, name| {
+            matches!(field(object, name), None | Some(ObjectValue::Atom(Datum::Null)))
+        };
+        let sequence = |object, name| match field(object, name) {
+            Some(ObjectValue::Object(list)) => objects.arena.sequence(*list),
+            _ => None,
+        };
+        let program = |step| objects.program(step).map(|index| &self.steps[index].instruction);
+        let steps = objects.steps_in_list(finishing)?;
+        let [token, targets, repeat, remove] = steps.as_slice() else {
+            return Err(invalid());
+        };
+        let Some([ObjectValue::Object(token_filter)]) = sequence(*token, "filters") else {
+            return Err(invalid());
+        };
+        let Some([ObjectValue::Object(adjacent), ObjectValue::Object(enemy), ObjectValue::Object(hero)]) =
+            sequence(*targets, "filters")
+        else {
+            return Err(invalid());
+        };
+        let Some([ObjectValue::Object(discard)]) = sequence(*repeat, "steps_template") else {
+            return Err(invalid());
+        };
+        // The selectors read public board geometry and ownership. The
+        // downstream discard resolves against the sampled victim's hand.
+        if matches!(program(*token), Some(Instruction::LiveUnitSelect))
+            && matches!(program(*targets), Some(Instruction::LiveMultiSelect))
+            && matches!(program(*repeat), Some(Instruction::ForEach { .. }))
+            && matches!(program(*discard), Some(Instruction::LiveDiscardOrDefeat))
+            && matches!(program(*remove), Some(Instruction::LiveTokenRemove))
+            && steps.iter().chain([discard]).all(|&step| {
+                let current_request = self.stack.last().is_some_and(|frame| {
+                    frame.object == Some(step)
+                        && self.last_request.as_ref().is_some_and(|request| {
+                            frame.request == Some(request.id)
+                                && objects.token(step).ok().flatten() == Some(request.id)
+                        })
+                });
+                empty(step, "pending_input")
+                    && (empty(step, "pending_request_id") || current_request)
+                    && empty(step, "skip_if_key")
+                    && (step == *targets || empty(step, "active_if_key"))
+            })
+            && text(*token, "target_type", "UNIT_OR_TOKEN")
+            && text(*token, "output_key", "grenade_resolve_id")
+            && text(*token_filter, "type", "token_type_filter")
+            && text(*token_filter, "token_type", "grenade")
+            && text(*targets, "target_type", "UNIT")
+            && text(*targets, "active_if_key", "grenade_resolve_id")
+            && text(*targets, "output_key", "grenade_victims")
+            && text(*adjacent, "type", "adjacency_to_context_filter")
+            && text(*adjacent, "target_key", "grenade_resolve_id")
+            && text(*enemy, "type", "team_filter")
+            && text(*enemy, "relation", "ENEMY")
+            && text(*hero, "type", "unit_type_filter")
+            && text(*hero, "unit_type", "HERO")
+            && text(*repeat, "list_key", "grenade_victims")
+            && text(*repeat, "item_key", "current_victim")
+            && text(*discard, "victim_key", "current_victim")
+            && empty(*discard, "victim_id")
+            && text(*remove, "token_key", "grenade_resolve_id")
+            && empty(*remove, "token_id")
+        {
+            Ok(())
+        } else {
+            Err(invalid())
+        }
+    }
+
+    fn validate_sampled_glitch_cleanup(
+        &self,
+        objects: &BoundObjects,
+        finishing: ObjectId,
+    ) -> Result<()> {
+        let invalid = || unsupported("unexpected Glitch cleanup program");
+        let field = |object, name| {
+            objects.arena.field_ref(object, self.symbols.lookup(name)?)
+        };
+        let text = |object, name, expected| {
+            matches!(field(object, name), Some(ObjectValue::Atom(Datum::Text(id)))
+                if self.symbols.name(*id) == expected)
+        };
+        let empty = |object, name| {
+            matches!(field(object, name), None | Some(ObjectValue::Atom(Datum::Null)))
+        };
+        let fresh = |step| {
+            ["pending_input", "pending_request_id", "active_if_key", "skip_if_key"]
+                .into_iter().all(|name| empty(step, name))
+        };
+        let program = |step| objects.program(step).map(|index| &self.steps[index].instruction);
+        let steps = objects.steps_in_list(finishing)?;
+        let [collect, repeat] = steps.as_slice() else { return Err(invalid()); };
+        let Some(ObjectValue::Object(filters)) = field(*collect, "filters") else {
+            return Err(invalid());
+        };
+        let Some([ObjectValue::Object(unit), ObjectValue::Object(token)]) =
+            objects.arena.sequence(*filters)
+        else {
+            return Err(invalid());
+        };
+        let Some(ObjectValue::Object(templates)) = field(*repeat, "steps_template") else {
+            return Err(invalid());
+        };
+        let children = objects.steps_in_list(*templates)?;
+        let [remove] = children.as_slice() else { return Err(invalid()); };
+        if matches!(program(*collect), Some(Instruction::LiveQuery { collect: true }))
+            && matches!(program(*repeat), Some(Instruction::ForEach { .. }))
+            && matches!(program(*remove), Some(Instruction::LiveTokenRemove))
+            && fresh(*collect) && fresh(*repeat) && fresh(*remove)
+            && text(*collect, "target_type", "UNIT_OR_TOKEN")
+            && text(*unit, "type", "unit_type_filter") && text(*unit, "unit_type", "TOKEN")
+            && text(*token, "type", "token_type_filter") && text(*token, "token_type", "glitch")
+            && text(*collect, "output_key", "_glitch_cleanup_ids")
+            && text(*repeat, "list_key", "_glitch_cleanup_ids")
+            && text(*repeat, "item_key", "_glitch_cleanup_id")
+            && text(*remove, "token_key", "_glitch_cleanup_id")
+            && empty(*remove, "token_id")
+        {
+            Ok(())
+        } else {
+            Err(invalid())
+        }
     }
 
     fn validate_sampled_retrieval(
@@ -677,11 +936,15 @@ impl NativeSession {
                 && let Some(token) = effect.token
                 && effect.scope_origin == Some(token)
                 && let Some(kind) = self.world.entity(token).and_then(|entity| entity.token_type)
-                && matches!(
-                    (effect.definition.behavior.kind, self.symbols.name(kind)),
+                && match (effect.definition.behavior.kind, self.symbols.name(kind)) {
                     (crate::effect_rules::Kind::LosBlocker, "smoke_bomb")
-                        | (crate::effect_rules::Kind::AreaStat, "ice" | "barrier")
-                )
+                    | (crate::effect_rules::Kind::AreaStat, "ice" | "barrier") => true,
+                    (crate::effect_rules::Kind::MinionProtection, "totem") => {
+                        effect.definition.behavior.sacrifice
+                            && effect.definition.behavior.discard_colors.is_empty()
+                    }
+                    _ => false,
+                }
                 && let Some(objects) = &self.objects
                 && self.token_is_public_bound(objects, token)?
             {
@@ -994,7 +1257,7 @@ impl NativeSession {
         Ok(choices)
     }
 
-    fn hero_card_list_bound(
+    pub(super) fn hero_card_list_bound(
         &self,
         objects: &BoundObjects,
         model: ObjectId,
@@ -1074,20 +1337,25 @@ impl NativeSession {
                 .page_stamp(model)
                 .ok_or_else(|| unsupported("planning hero model missing"))?;
             let mut stamps = [model_stamp; 6];
-            for (field, stamp) in fields.into_iter().zip(&mut stamps[1..]) {
+            let mut values = [&[][..]; 5];
+            for (index, field) in fields.into_iter().enumerate() {
                 let Some(ObjectValue::Object(list)) =
                     objects.arena.field_ref(model, objects.phases.k(field))
                 else {
                     return Err(unsupported("planning card collection missing"));
                 };
-                *stamp = objects
+                stamps[index + 1] = objects
                     .arena
                     .page_stamp(*list)
                     .ok_or_else(|| unsupported("planning cards must be a list"))?;
+                values[index] = objects
+                    .arena
+                    .sequence(*list)
+                    .ok_or_else(|| unsupported("planning cards must be a list"))?;
             }
+            let [deck_values, hand_values, discard_values, spell_values, played_values] = values;
             let row = &self.world.heroes[index];
-            let update = |field, old: &[CardId]| -> Result<Option<Vec<CardId>>> {
-                let values = self.hero_card_values_bound(objects, model, field)?;
+            let update = |field, values: &[ObjectValue], old: &[CardId]| -> Result<Option<Vec<CardId>>> {
                 if values.len() == old.len()
                     && values.iter().zip(old).all(|(value, card)| {
                         matches!(value, ObjectValue::Atom(Datum::Instance(id)) if *id == card.0)
@@ -1102,13 +1370,12 @@ impl NativeSession {
                         .collect(),
                 ))
             };
-            let deck = update(Field::Deck, &row.deck)?;
-            let hand = update(Field::Hand, &row.hand)?;
-            let discard = update(Field::Discard, &row.discard)?;
-            let spells = update(Field::Spells, &row.spells)?;
-            let values = self.hero_card_values_bound(objects, model, Field::Played)?;
-            let played = if values.len() == row.played.len()
-                && values
+            let deck = update(Field::Deck, deck_values, &row.deck)?;
+            let hand = update(Field::Hand, hand_values, &row.hand)?;
+            let discard = update(Field::Discard, discard_values, &row.discard)?;
+            let spells = update(Field::Spells, spell_values, &row.spells)?;
+            let played = if played_values.len() == row.played.len()
+                && played_values
                     .iter()
                     .zip(&row.played)
                     .all(|(value, card)| match (value, card) {
@@ -1118,7 +1385,7 @@ impl NativeSession {
                     }) {
                 None
             } else {
-                Some(self.decode_hero_cards(values, Field::Played)?)
+                Some(self.decode_hero_cards(played_values, Field::Played)?)
             };
             let current = self.model_card_bound(objects, model, Field::Current)?;
             let extra = self.model_card_bound(objects, model, Field::Extra)?;
@@ -1534,6 +1801,182 @@ mod tests {
     use super::*;
 
     #[test]
+    fn concealed_discard_only_blocks_selectors_that_can_read_it() {
+        for (case, reads_concealed) in [("merge-hidden", false), ("include-hidden", true)] {
+            let fixture = fixture_case(&format!("object-execution-card-selector-{case}"));
+            let mut root = NativeSession::compile(
+                serde_json::from_value(fixture["envelope"].clone()).unwrap(),
+            ).unwrap();
+            assert!(root.has_concealed_card_in_public_zone());
+            let request = root.advance_prefix(1).unwrap().request.unwrap();
+            let frame = root.stack.last().unwrap();
+            assert!(matches!(root.steps[frame.instruction].instruction, Instruction::LiveCardSelect));
+            assert_eq!(
+                root.search_step_reads_concealed_state(
+                    root.objects.as_ref().unwrap(), frame.instruction, frame.object, request.owner,
+                ).unwrap(),
+                reads_concealed,
+            );
+        }
+    }
+
+    #[test]
+    fn sampled_round_minion_defeat_requires_the_selector_binding() {
+        for card in ["final_embrace", "constrict"] {
+            let fixture = fixture_case(&format!("object-execution-xargatha-primary-{card}-round-ordinary-first"));
+            let mut root = NativeSession::compile(
+                serde_json::from_value(fixture["envelope"].clone()).unwrap(),
+            ).unwrap();
+            root.advance_prefix(1).unwrap();
+            root.advance_prefix(1).unwrap();
+            assert_eq!(root.world.effects.instances.len(), 1);
+            root.validate_sampled_resolution_effects().unwrap();
+
+            root.with_live_objects(|_, objects| {
+                let node = objects.effect_nodes()?[0];
+                let finishing = objects.finishing_list(node)?;
+                let defeat = objects.steps_in_list(finishing)?[1];
+                objects.arena.set_field(
+                    defeat, objects.phases.k(Field::VictimKey), ObjectValue::Atom(Datum::Null),
+                ).map_err(unsupported)
+            }).unwrap();
+            assert!(matches!(root.validate_sampled_resolution_effects(),
+                Err(EngineError::Unsupported(reason))
+                if reason == "unexpected round-end minion defeat program"));
+        }
+    }
+
+    #[test]
+    fn sampled_resolution_allows_public_double_items() {
+        let fixture = fixture_case("object-execution-min-primary-inner_strength-text-first");
+        let mut root = NativeSession::compile(
+            serde_json::from_value(fixture["envelope"].clone()).unwrap(),
+        ).unwrap();
+        for _ in 0..8 {
+            if root.world.effects.instances.iter().any(|effect| {
+                root.symbols.name(effect.definition.kind) == "double_items"
+            }) {
+                root.validate_sampled_resolution_effects().unwrap();
+                return;
+            }
+            root.advance_prefix(1).unwrap();
+        }
+        panic!("fixture must create Double Items");
+    }
+
+    #[test]
+    fn sampled_grenade_allows_its_issued_target_request() {
+        let fixture = fixture_case("object-execution-min-primary-death_grenade-text-first");
+        let mut root = NativeSession::compile(
+            serde_json::from_value(fixture["envelope"].clone()).unwrap(),
+        ).unwrap();
+        for operation in fixture["operations"].as_array().unwrap() {
+            if operation["kind"] == "input" {
+                let request = root.last_request.as_ref().unwrap().id;
+                let selection = root.import_selection(&operation["selection"]).unwrap();
+                root.submit(request, selection).unwrap();
+                continue;
+            }
+            let Some(request) = root.advance_prefix(1).unwrap().request else {
+                continue;
+            };
+            if !matches!(request.choices, RequestChoices::Multiple { .. }) {
+                continue;
+            }
+
+            let objects = root.objects.as_ref().unwrap();
+            let step = root.stack.last().unwrap().object.unwrap();
+            assert_eq!(objects.token(step).unwrap(), Some(request.id));
+            let node = objects.effect_nodes().unwrap()[0];
+            let finishing = objects.finishing_list(node).unwrap();
+            assert_eq!(objects.steps_in_list(finishing).unwrap()[1], step);
+            root.validate_sampled_resolution_effects().unwrap();
+            return;
+        }
+        panic!("fixture must issue the live grenade target prompt");
+    }
+
+    #[test]
+    fn sampled_grenade_rejects_a_rebound_public_target() {
+        let fixture = fixture_case("object-execution-min-primary-death_grenade-text-first");
+        let mut root = NativeSession::compile(
+            serde_json::from_value(fixture["envelope"].clone()).unwrap(),
+        ).unwrap();
+        let index = fixture["operations"].as_array().unwrap().iter().find_map(|operation| {
+            if operation["kind"] == "input" {
+                let request = root.last_request.as_ref().unwrap().id;
+                let selection = root.import_selection(&operation["selection"]).unwrap();
+                root.submit(request, selection).unwrap();
+            } else {
+                root.advance_prefix(1).unwrap();
+            }
+            root.world.effects.instances.iter().position(|effect| {
+                root.symbols.name(effect.definition.kind) == "delayed_trigger"
+                    && effect.card.is_some_and(|id| root.symbols.name(id) == "death_grenade")
+            })
+        }).expect("fixture must create the delayed grenade");
+        root.validate_sampled_resolution_effects().unwrap();
+
+        let symbols = &root.symbols;
+        let objects = root.objects.as_mut().unwrap();
+        let node = objects.effect_nodes().unwrap()[index];
+        let finishing = objects.finishing_list(node).unwrap();
+        let targets = objects.steps_in_list(finishing).unwrap()[1];
+        objects.arena.set_field(
+            targets,
+            symbols.lookup("active_if_key").unwrap(),
+            ObjectValue::Atom(Datum::Text(symbols.lookup("grenade_victims").unwrap())),
+        ).unwrap();
+        assert!(matches!(
+            root.validate_sampled_resolution_effects(),
+            Err(EngineError::Unsupported(reason)) if reason == "unexpected grenade finishing program",
+        ));
+    }
+
+    #[test]
+    fn sampled_glitch_cleanup_rejects_a_rebound_remove_token() {
+        let fixture = fixture_case("object-execution-defense-body-unstable_timeline-text-first");
+        let mut root = NativeSession::compile(
+            serde_json::from_value(fixture["envelope"].clone()).unwrap(),
+        ).unwrap();
+        let index = fixture["operations"].as_array().unwrap().iter().find_map(|operation| {
+            if operation["kind"] == "input" {
+                let request = root.last_request.as_ref().unwrap().id;
+                let selection = root.import_selection(&operation["selection"]).unwrap();
+                root.submit(request, selection).unwrap();
+            } else {
+                root.advance_prefix(1).unwrap();
+            }
+            root.world.effects.instances.iter().position(|effect| {
+                root.symbols.name(effect.definition.kind) == "delayed_trigger"
+                    && effect.card.is_some_and(|id| root.symbols.name(id) == "unstable_timeline")
+            })
+        }).expect("fixture must create the delayed Glitch cleanup");
+        root.validate_sampled_resolution_effects().unwrap();
+
+        let symbols = &root.symbols;
+        let objects = root.objects.as_mut().unwrap();
+        let node = objects.effect_nodes().unwrap()[index];
+        let finishing = objects.finishing_list(node).unwrap();
+        let repeat = objects.steps_in_list(finishing).unwrap()[1];
+        let Some(ObjectValue::Object(templates)) = objects.arena.field(
+            repeat, symbols.lookup("steps_template").unwrap(),
+        ) else {
+            panic!("cleanup loop must have a template");
+        };
+        let remove = objects.steps_in_list(templates).unwrap()[0];
+        objects.arena.set_field(
+            remove,
+            symbols.lookup("token_key").unwrap(),
+            ObjectValue::Atom(Datum::Text(symbols.lookup("_glitch_cleanup_ids").unwrap())),
+        ).unwrap();
+        assert!(matches!(
+            root.validate_sampled_resolution_effects(),
+            Err(EngineError::Unsupported(reason)) if reason == "unexpected Glitch cleanup program",
+        ));
+    }
+
+    #[test]
     fn sampled_glitch_handoff_preserves_choices_after_hidden_hand_changes() {
         let fixture = fixture_case("object-execution-defense-body-unstable_timeline-text-first");
         let mut root =
@@ -1605,6 +2048,60 @@ mod tests {
             checked += 1;
         }
         assert_eq!(checked, 2);
+    }
+
+    #[test]
+    fn sampled_totem_protection_requires_a_public_anchor() {
+        let fixture = fixture_case("object-execution-live-combat-effect-protection-totem-False");
+        let mut envelope = fixture["envelope"].clone();
+        fn adjust_effect_copies(value: &mut serde_json::Value) {
+            match value {
+                serde_json::Value::Object(fields) => {
+                    match fields.get("effect_type").and_then(serde_json::Value::as_str) {
+                        Some("minion_defeat_bounty") => {
+                            fields.insert("source_card_id".into(), json!("fixture_known_card"));
+                        }
+                        Some("minion_protection") => {
+                            fields.insert("allowed_discard_colors".into(), json!([]));
+                        }
+                        _ => {}
+                    }
+                    fields.values_mut().for_each(adjust_effect_copies);
+                }
+                serde_json::Value::Array(items) => {
+                    items.iter_mut().for_each(adjust_effect_copies);
+                }
+                _ => {}
+            }
+        }
+        // The fixture repeats effect rows at shared object paths.
+        adjust_effect_copies(&mut envelope);
+        let mut root = NativeSession::compile(serde_json::from_value(envelope).unwrap()).unwrap();
+        let viewer = root.world.heroes[0].id;
+        let token = root.world.effects.instances[1].token.unwrap();
+        let mut observation = root.player_observation(viewer).unwrap();
+        observation.heroes.iter_mut().find(|hero| hero.id == "hero_swift").unwrap()
+            .known_spells.push("fixture_known_card".into());
+
+        for phase in [Phase::Planning, Phase::Resolution] {
+            observation.phase = phase;
+            root.validate_sampled_effect_cards(&observation).unwrap();
+        }
+        root.with_live_objects(|_, objects| {
+            let misc = objects.phases.root(&objects.arena, Field::MiscEntities)?;
+            let Some(ObjectValue::Atom(Datum::Instance(physical))) = objects.arena.field(misc, token) else {
+                panic!("placed Totem missing");
+            };
+            objects.arena.set_physical_field(
+                physical, objects.phases.k(Field::Facedown), Datum::Bool(true),
+            ).map_err(unsupported)
+        }).unwrap();
+        for phase in [Phase::Planning, Phase::Resolution] {
+            observation.phase = phase;
+            assert!(matches!(root.validate_sampled_effect_cards(&observation),
+                Err(EngineError::Unsupported(reason))
+                if reason == "sampled worlds cannot preserve minion_protection effect: source card missing"));
+        }
     }
 
     #[test]

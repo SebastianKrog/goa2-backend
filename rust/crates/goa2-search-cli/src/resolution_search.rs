@@ -212,6 +212,7 @@ pub(super) fn sampled_planning(
             "screened_replies": result.screened_replies,
             "prepared_worlds": result.prepared_worlds,
             "score": result.matrix.score,
+            "shallow_score": result.shallow_score,
             "completed_rows": result.matrix.completed_rows,
             "pruned_rows": result.matrix.pruned_rows,
             "evaluated_cells": result.matrix.evaluated_cells,

@@ -5,16 +5,19 @@ import json
 import os
 from collections import Counter, defaultdict
 from copy import deepcopy
+from hashlib import file_digest
 from importlib.util import module_from_spec, spec_from_file_location
 from math import ceil, isclose
 from pathlib import Path
 from random import Random
+from shutil import which
 from statistics import median
 from types import SimpleNamespace
 from time import perf_counter
 
 from model_traces import setup
-from oracle import ROOT, Worker, WorkerUnavailable, verify_sources
+from oracle import ROOT, Worker, WorkerUnavailable, digest, verify_sources
+from resolution_validation import is_mine_path_request
 from shared_objects import export_state_with_shared_objects
 
 from goa2.domain.input import InputResponse, selection_value
@@ -37,7 +40,7 @@ def apply_planning_move(state, move):
         raise AssertionError("unexpected validated planning move")
 
 
-def run(root, turns, *, copy_state=True, policy=None, exact_planning=False):
+def run(root, turns, *, copy_state=True, policy=None, exact_planning=False, observe_events=None):
     state = deepcopy(root) if copy_state else root
     cutoff = state.round * 4 + state.turn + turns
     count = 0
@@ -77,13 +80,18 @@ def run(root, turns, *, copy_state=True, policy=None, exact_planning=False):
                     if row["options"]
                 )
                 choice = {"hero_id": hero, "card_id": row["options"][0]["pair"][0]}
+            elif is_mine_path_request(state, req) and req.options:
+                choice = req.options[0].id
             else:
                 choice = selection_value(req.options[0]) if req.options else "SKIP"
             submit_input(state, InputResponse(request_id=req.id, selection=choice))
             req = None
             count += 1
         else:
-            req = process_stack(state).input_request
+            result = process_stack(state)
+            if observe_events is not None:
+                observe_events(state, result.events)
+            req = result.input_request
             assert req or state.phase in {GamePhase.PLANNING, GamePhase.GAME_OVER}
         assert count < max(512, turns * 128)
     return state, count
@@ -219,6 +227,19 @@ def trace_policy(map_id, trace, *, observe=None):
         if prompt is not None:
             assert row["kind"] == "resolution"
             move = DecisionMove("INPUT", row["hero"], row["selection"], prompt.id)
+            # This two-stage step reissues its first (hex) prompt when
+            # advanced from a cloned state without the pending response.
+            # Validate the already-issued second prompt before submitting it.
+            if prompt.prompt == "Choose a minion to respawn.":
+                assert move.player_id == prompt.player_id and any(
+                    move.selection == selection_value(option) for option in prompt.options
+                ), (map_id, revision, row, prompt.model_dump(mode="json"))
+                return move
+            if is_mine_path_request(state, prompt):
+                assert move.player_id == prompt.player_id and any(
+                    move.selection == option.id for option in prompt.options
+                ), (map_id, revision, row, prompt.model_dump(mode="json"))
+                return move
             verdict = check_moves(state, [move]).results[0]
             assert verdict.legal is True, (
                 map_id, revision, state.round, state.turn, row,
@@ -261,6 +282,9 @@ def verify_rust_match_replay(
     decision_ms=1_000, policy_pairs=None, planning_workers=None,
 ):
     envelope, original_objects = export_state_with_shared_objects(root)
+    if policy_pairs is not None:
+        print(f"  Start snapshot SHA-256 {digest(envelope)}, {root.game_type.value}, "
+              f"round {root.round}, turn {root.turn}", flush=True)
     baseline = dict(depth=0, max_nodes=4096, time_ms=decision_ms)
     candidate = dict(baseline, depth=1, rollout_turns=2, evaluation="lab_attack_range_v1")
     if policy_pairs is not None:
@@ -273,6 +297,8 @@ def verify_rust_match_replay(
     else:
         policy = dict(baseline, sample_choices=sweep_policy == "sampled")
         pairs = ([policy, policy],)
+    from public_upgrades import PublicUpgradeRecorder
+
     results = []
     for policies in pairs:
         result = worker.request(
@@ -280,16 +306,48 @@ def verify_rust_match_replay(
             policies=policies, capture_trace=True,
         )
 
+        evidence = None
+        evidence_revision = 0
+        if "public_upgrade_batches" in result:
+            evidence = PublicUpgradeRecorder()
+            evidence.observe(root, evidence_revision)
+
         lane_progress = {lane: [] for lane in root.wave_counters}
         lane_presence = {lane: {} for lane in lane_progress}
+        lane_order = {
+            lane: {zone: index for index, zone in enumerate(root.board.lanes[lane])}
+            for lane in lane_progress
+        }
+        push_distances = defaultdict(list)
 
         def observe(state):
+            nonlocal evidence_revision
+            if evidence is not None and state.phase in (GamePhase.LEVEL_UP, GamePhase.PLANNING):
+                evidence_revision += 1
+                evidence.observe(state, evidence_revision)
+            if not policy_pairs:
+                return
             turn = (state.round, state.turn)
             for lane, history in lane_progress.items():
                 position = (state.wave_counters[lane], state.battle_zones.get(lane))
+                before = history[-1][2] if history else None
                 if not history or history[-1][1:] != position:
                     history.append((turn, *position))
                 zone = state.board.zones.get(position[1])
+                order = lane_order[lane]
+                if before != position[1] and before in order and position[1] in order and zone:
+                    side = "RED" if order[position[1]] > order[before] else "BLUE"
+                    targets = [
+                        spawn.location for spawn in zone.spawn_points
+                        if spawn.is_minion_spawn and spawn.team.value != side
+                    ] or zone.hexes
+                    heroes = next(team.heroes for color, team in state.teams.items() if color.value == side)
+                    for hero in heroes:
+                        distance = min(
+                            (hex.distance(target) for hex in state.get_positions(hero.id) for target in targets),
+                            default=None,
+                        )
+                        push_distances[lane, side].append(distance)
                 if state.phase != GamePhase.PLANNING or zone is None or turn in lane_presence[lane]:
                     continue
                 lane_presence[lane][turn] = {
@@ -301,9 +359,47 @@ def verify_rust_match_replay(
                     for color, team in state.teams.items()
                 }
 
-        replay = trace_policy(map_id, result["trace"], observe=observe if policy_pairs else None)
-        final, count = run(root, turns, policy=replay, exact_planning=True)
+        defeats = Counter()
+        minion_teams = {
+            minion.id: color.value
+            for color, team in root.teams.items()
+            for minion in team.minions
+        }
+
+        def count_defeats(state, events):
+            for event in events:
+                if event.event_type.value != "UNIT_DEFEATED":
+                    continue
+                hero = state.get_hero(event.target_id)
+                if hero:
+                    defeats[(hero.team.value, "hero")] += 1
+                elif event.target_id in minion_teams:
+                    defeats[(minion_teams[event.target_id], "minion")] += 1
+                else:
+                    defeats[("unknown", "unit")] += 1
+
+        replay = trace_policy(
+            map_id, result["trace"], observe=observe if policy_pairs or evidence is not None else None,
+        )
+        final, count = run(
+            root, turns, policy=replay, exact_planning=True,
+            observe_events=count_defeats if policy_pairs else None,
+        )
         assert count == len(result["trace"])
+        if evidence is not None:
+            if final.phase == GamePhase.PLANNING:
+                evidence.observe(final, evidence_revision + 1)
+
+            def public_batches(batches):
+                # Revisions are local to each engine's advancement loop.
+                return sorted(
+                    ({key: value for key, value in row.items() if key != "revision"} for row in batches),
+                    key=lambda row: (row["hero_id"], row["after"]["level"]),
+                )
+
+            actual_batches = public_batches(result["public_upgrade_batches"])
+            expected_batches = public_batches(evidence.batches)
+            assert actual_batches == expected_batches, (map_id, seed, actual_batches, expected_batches)
         expected = normalized_state(final.model_dump(mode="json"))
         actual = normalized_state(result["state"])
         if expected != actual:
@@ -337,9 +433,14 @@ def verify_rust_match_replay(
         if final.phase == GamePhase.GAME_OVER:
             print(f"  Victory condition: {final.victory_condition}")
         if policy_pairs:
+            turns_elapsed = (final.round - root.round) * 4 + final.turn - root.turn
+            print(f"  Turn index advanced {turns_elapsed}; defeats suffered: "
+                  f"RED {defeats['RED', 'hero']} heroes, {defeats['RED', 'minion']} minions; "
+                  f"BLUE {defeats['BLUE', 'hero']} heroes, {defeats['BLUE', 'minion']} minions"
+                  + (f"; {defeats['unknown', 'unit']} unclassified" if defeats['unknown', 'unit'] else ""))
             observe(final)
             for lane, history in lane_progress.items():
-                order = {zone: index for index, zone in enumerate(final.board.lanes[lane])}
+                order = lane_order[lane]
                 red = blue = unknown = 0
                 for (_, _, before), (_, _, after) in zip(history, history[1:]):
                     if before == after:
@@ -356,6 +457,13 @@ def verify_rust_match_replay(
                     direction += f", unknown {unknown}"
                 print(f"  {lane}: {shifts} observed zone shifts ({direction}), "
                       f"{history[-1][1]} waves remaining")
+                for side in ("RED", "BLUE"):
+                    distances = push_distances[lane, side]
+                    if distances:
+                        ready = sum(distance is not None and distance <= 1 for distance in distances)
+                        off_board = sum(distance is None for distance in distances)
+                        print(f"    {side} at first observed post-push state: "
+                              f"{ready}/{len(distances)} heroes within one hex, {off_board} off board")
                 if final.phase != GamePhase.GAME_OVER:
                     print(f"    Lane history (round/turn, waves, zone): {history}")
                     samples = lane_presence[lane].values()
@@ -378,6 +486,23 @@ def verify_rust_match_replay(
                     f"    scored best-so-far: {stats['planning_best_so_far']} planning, "
                     f"{stats['resolution_best_so_far']} resolution"
                 )
+            if stats.get("planning_seed_nodes"):
+                print(f"    planning seed pass: {stats['planning_seed_nodes']} nodes, "
+                      f"{stats['planning_seed_choices']} choices retained")
+                if "planning_seed_scored" in stats:
+                    print(f"    seed pass scored {stats['planning_seed_scored']} decisions, "
+                          f"deep search agreed on {stats['planning_seed_deep_agreement']}")
+            if stats.get("planning_shallow_scores"):
+                print(f"    shallow scored planning: {stats['planning_shallow_scores']}")
+            if "planning_nodes" in stats:
+                print(f"    search nodes: {stats['planning_nodes']} planning, "
+                      f"{stats['resolution_nodes']} resolution")
+                if "planning_greedy_nodes" in stats:
+                    print(f"    planning nodes by stage: {stats['planning_greedy_nodes']} greedy, "
+                          f"{stats['planning_probe_nodes']} reply probe, {stats['planning_shallow_nodes']} shallow retry")
+                print(f"    planning rows: {stats['planning_completed_rows']} completed, "
+                      f"{stats['planning_pruned_rows']} pruned, "
+                      f"{stats['planning_total_rows']} total")
             if policy.get("greedy_card_order"):
                 print(f"    greedy scores: {stats['planning_greedy_card_scores']} across "
                       f"{stats['planning_with_greedy_scores']}/{stats['planning']} planning decisions")
@@ -394,6 +519,11 @@ def verify_rust_match_replay(
                 reasons = stats.get(f"{phase}_fallbacks", {})
                 for reason, frequency in sorted(reasons.items(), key=lambda row: (-row[1], row[0])):
                     print(f"    {frequency} × {phase}: {reason}")
+            for index, reasons in stats.get("planning_fallback_trace", {}).items():
+                for reason in reasons:
+                    print(f"    replay decision {int(index) + 1}: {reason}")
+            for index, reason in stats.get("resolution_fallback_trace", {}).items():
+                print(f"    replay decision {int(index) + 1}: {reason}")
         results.append(result)
     return results
 
@@ -488,6 +618,260 @@ def verify_lane_pressure_trial(
     if held_out:
         passed = outcomes["candidate wins"] >= 5 and outcomes["unfinished"] <= 1 and fallbacks / choices < 0.02
         print(f"Held-out evaluator threshold {'met' if passed else 'missed'}")
+
+
+STRENGTH_SCREEN_STARTS = (
+    ("forgotten_island", 71, ["Arien", "Razzle"], ["Emmitt", "Ignatia"]),
+    ("across_the_river", 109, ["Takahide", "Bain"], ["Swift", "Wasp"]),
+    ("magma_and_ice", 173, ["Min", "Hanu"], ["Gydion", "Silverarrow"]),
+    ("narrow_passages", 223, ["Misa", "Tali"], ["Brogan", "Sabina"]),
+)
+
+
+LANE_TIMING_HELD_OUT_STARTS = (
+    ("forgotten_island", 571, ["Hanu", "Rowenna"], ["Min", "Xargatha"]),
+    ("across_the_river", 607, ["Ignatia", "Sabina"], ["Tali", "Garrus"]),
+    ("magma_and_ice", 631, ["Swift", "Takahide"], ["Bain", "Wuk"]),
+    ("narrow_passages", 661, ["Emmitt", "Cordelia"], ["Misa", "Brynn"]),
+    ("vexing_cliffs", 701, ["Gydion", "Wasp"], ["Brogan", "Dodger"]),
+    ("vexing_cliffs_v2", 727, ["Arien", "Razzle"], ["Cutter", "Tigerclaw"]),
+    ("across_the_river", 757, ["Whisper", "Mortimer"], ["Hanu", "Silverarrow"]),
+    ("magma_and_ice", 797, ["NebKher", "Snorri"], ["Tali", "Trinkets"]),
+)
+
+
+def paired_strength_p_value(margins):
+    """One-sided sign-flip probability, treating each starting position as one unit."""
+    observed = sum(margins)
+    distribution = Counter({0: 1})
+    for margin in margins:
+        flipped = Counter()
+        for total, count in distribution.items():
+            flipped[total + margin] += count
+            flipped[total - margin] += count
+        distribution = flipped
+    return sum(count for total, count in distribution.items() if total >= observed) / distribution.total()
+
+
+STRENGTH_MIDGAME_MAPS = ("forgotten_island", "magma_and_ice")
+
+
+def strength_start_positions(maps, selected_map, *, held_out, midgame, game_type):
+    if midgame:
+        from simulation_bench import read_case, read_index, workloads
+
+        corpus = ROOT / "rust/tests/fixtures/complete-games-hanu.json"
+        index, _ = read_index(corpus)
+        for entry in index["cases"]:
+            map_id = next(name for name in STRENGTH_MIDGAME_MAPS if name in entry["name"])
+            if selected_map is not None and map_id != selected_map:
+                continue
+            workload = next(workloads(read_case(corpus, entry), midgame=True))
+            assert workload["start"] == (3, 1), workload["source_game"]
+            yield map_id, 29, workload["state"]
+        return
+
+    starts = LANE_TIMING_HELD_OUT_STARTS if held_out else STRENGTH_SCREEN_STARTS
+    for map_id, seed, red, blue in starts:
+        if selected_map is not None and map_id != selected_map:
+            continue
+        root = GameSetup.create_game(
+            str(maps / f"{map_id}.json"), red, blue, seed=seed, game_type=game_type,
+        )
+        yield map_id, seed, root
+
+
+def verify_strength_baseline(
+    worker, maps, decision_ms, *, trial=None, selected_map=None, held_out=False,
+    candidate_rollout_turns=1, midgame=False, game_type="QUICK",
+):
+    policy = dict(
+        depth=2, max_nodes=131072, time_ms=decision_ms, rollout_turns=2,
+        evaluation="lane_pressure_v3", planning_workers=2, reply_cap=4,
+        greedy_card_order=True, forecast_node_share="quarter",
+    )
+    label = "Baseline self-play"
+    policy_names = ("quarter",)
+    pairs = ((policy, policy),)
+    if trial == "forecast_share":
+        label = "Forecast-share trial"
+        policy_names = ("eighth", "quarter")
+        candidate = dict(policy, forecast_node_share="eighth")
+        pairs = ((candidate, policy), (policy, candidate))
+    elif trial == "followup_width":
+        label = "Coordinated follow-up width trial"
+        policy_names = ("balanced-four", "legacy-two")
+        candidate = dict(policy, coordinated_planning=True)
+        control = dict(candidate, legacy_fixed_followup=True)
+        pairs = ((candidate, control), (control, candidate))
+    elif trial == "horizon":
+        label = "Search horizon trial"
+        candidate_name = "one-turn" if candidate_rollout_turns == 1 else "three-turn"
+        policy_names = (candidate_name, "two-turn")
+        candidate = dict(policy, rollout_turns=candidate_rollout_turns)
+        pairs = ((candidate, policy), (policy, candidate))
+    elif trial == "lane_timing":
+        label = "Held-out lane timing trial" if held_out else "Lane timing trial"
+        policy_names = ("lane_pressure_v4", policy["evaluation"])
+        candidate = dict(policy, evaluation=policy_names[0])
+        pairs = ((candidate, policy), (policy, candidate))
+    elif trial == "node_budget":
+        label = "Search node-budget trial"
+        policy_names = ("262144-nodes", "131072-nodes")
+        candidate = dict(policy, max_nodes=262144)
+        pairs = ((candidate, policy), (policy, candidate))
+    elif trial == "decision_depth":
+        label = "Decision depth trial"
+        policy_names = ("depth-three", "depth-two")
+        candidate = dict(policy, depth=3)
+        pairs = ((candidate, policy), (policy, candidate))
+    elif trial == "tactical_forecast":
+        label = "Tactical forecast trial"
+        policy_names = ("tactical-forecast", "hold-forecast")
+        candidate = dict(policy, tactical_forecast=True)
+        pairs = ((candidate, policy), (policy, candidate))
+    elif trial == "planning_opposition":
+        label = "Planning opposition trial"
+        policy_names = ("adversarial-planning", "forecast-opposition")
+        candidate = dict(policy, branch_future_planning=True)
+        pairs = ((candidate, policy), (policy, candidate))
+    elif trial == "attack_extension":
+        label = "Attack-target extension trial"
+        policy_names = ("attack-extension", "fixed-depth")
+        candidate = dict(policy, opponent_policy="adversarial_attack_targets")
+        pairs = ((candidate, policy), (policy, candidate))
+    elif trial == "reply_width":
+        label = "Planning reply width trial"
+        policy_names = ("eight-replies", "four-replies")
+        # Keep later planning fixed while letting the root compare opponent replies.
+        control = dict(policy, fixed_future_planning=True)
+        candidate = dict(control, reply_cap=8)
+        pairs = ((candidate, control), (control, candidate))
+    elif trial == "world_count":
+        label = "Sampled-world count trial"
+        policy_names = ("four-worlds", "two-worlds")
+        candidate = dict(policy, sampled_worlds=4)
+        control = dict(policy, sampled_worlds=2)
+        pairs = ((candidate, control), (control, candidate))
+    elif trial == "planning_seed":
+        label = "Planning seed-pass trial"
+        policy_names = ("seed-pass", "direct-deep")
+        candidate = dict(policy, planning_seed_pass=True)
+        pairs = ((candidate, policy), (policy, candidate))
+    print(f"{label} policies: {json.dumps(dict(zip(policy_names, pairs[0])), sort_keys=True)}")
+    outcomes = Counter()
+    pair_margins = []
+    incomplete_pairs = 0
+    decisions = 0
+    fallbacks = Counter()
+    shallow_scores = Counter()
+    non_forced = Counter()
+    timings = defaultdict(list)
+    search_work = defaultdict(Counter)
+    for map_id, seed, root in strength_start_positions(
+        maps, selected_map, held_out=held_out, midgame=midgame, game_type=game_type,
+    ):
+        red, blue = ([hero.name for hero in root.teams[side].heroes] for side in ("RED", "BLUE"))
+        print(f"{label} {map_id}, seed {seed}, Red {red}, Blue {blue}", flush=True)
+        results = verify_rust_match_replay(
+            worker, map_id, root, 64, seed=seed, decision_ms=decision_ms,
+            policy_pairs=pairs,
+        )
+        assert len(results) == len(pairs), (map_id, seed, len(results))
+        pair = []
+        for index, result in enumerate(results):
+            winner = result["winner_team"]
+            if result["phase"] != "GAME_OVER":
+                outcome = "unfinished"
+            elif winner is None:
+                outcome = "draw"
+            elif trial:
+                outcome = policy_names[int(winner != ("RED", "BLUE")[index])]
+            else:
+                outcome = winner
+            pair.append(outcome)
+            outcomes[outcome] += 1
+            decisions += len(result["trace"])
+            for side, stats in enumerate(result["policies"]):
+                share = policy_names[int(bool(trial) and side != index)]
+                fallbacks[share] += stats["fallback"]
+                shallow_scores[share] += stats.get("planning_shallow_scores", 0)
+                non_forced[share] += stats["planning"] + stats["resolution"] - stats["forced"]
+                for key in (
+                    "planning_nodes", "resolution_nodes", "planning_completed_rows",
+                    "planning_pruned_rows", "planning_total_rows",
+                    "planning_greedy_nodes", "planning_greedy_tactical_probes",
+                    "planning_probe_nodes", "planning_shallow_nodes",
+                    "planning_seed_nodes", "planning_seed_scored", "planning_seed_choices",
+                    "planning_seed_deep_agreement",
+                ):
+                    if key in stats:
+                        search_work[share][key] += stats[key]
+                for phase in ("planning", "resolution"):
+                    timings[share, phase].extend(stats.get(f"{phase}_micros", ()))
+        if trial:
+            print(f"{map_id}, seed {seed}, {policy_names[0]} as Red then Blue: {pair}")
+            if "unfinished" in pair:
+                incomplete_pairs += 1
+            else:
+                pair_margins.append(pair.count(policy_names[0]) - pair.count(policy_names[1]))
+    print(f"{label}: {dict(outcomes)}; {decisions} decisions")
+    paired_p = paired_strength_p_value(pair_margins) if pair_margins else None
+    if trial:
+        print(f"  Completed {len(pair_margins)}/{len(pair_margins) + incomplete_pairs} side-swapped pairs")
+        if paired_p is not None:
+            candidate_points = len(pair_margins) + sum(pair_margins) / 2
+            print(f"  Candidate game points from completed pairs: {candidate_points:g}/{2 * len(pair_margins)}")
+            print(f"  Paired sign-flip p for a {policy_names[0]} advantage: "
+                  f"{paired_p:.4f} ({len(pair_margins)} starts)")
+        else:
+            print("  Paired strength estimate unavailable without a completed pair")
+    for share in sorted(non_forced):
+        print(f"  {share}: {fallbacks[share]}/{non_forced[share]} unscored fallbacks")
+        if shallow_scores[share]:
+            print(f"    shallow scored planning: {shallow_scores[share]}")
+        work = search_work[share]
+        if work:
+            print(f"    search nodes: {work['planning_nodes']} planning, "
+                  f"{work['resolution_nodes']} resolution")
+            if "planning_greedy_nodes" in work:
+                print(f"    planning nodes by stage: {work['planning_greedy_nodes']} greedy, "
+                      f"{work['planning_probe_nodes']} reply probe, {work['planning_shallow_nodes']} shallow retry")
+            if work["planning_greedy_tactical_probes"]:
+                print(f"    tactical probes in scored greedy forecasts: "
+                      f"{work['planning_greedy_tactical_probes']}")
+            if work["planning_seed_nodes"]:
+                print(f"    planning seed pass: {work['planning_seed_nodes']} nodes, "
+                      f"{work['planning_seed_scored']} decisions scored, "
+                      f"{work['planning_seed_deep_agreement']} deep agreements, "
+                      f"{work['planning_seed_choices']} choices retained")
+            print(f"    planning rows: {work['planning_completed_rows']} completed, "
+                  f"{work['planning_pruned_rows']} pruned, {work['planning_total_rows']} total")
+        for phase in ("planning", "resolution"):
+            elapsed = sorted(timings[share, phase])
+            if elapsed:
+                p95 = elapsed[ceil(len(elapsed) * 0.95) - 1]
+                print(f"    {phase} p50 {median(elapsed) / 1000:.2f} ms, "
+                      f"p95 {p95 / 1000:.2f} ms ({len(elapsed)} selections)")
+
+    if held_out:
+        candidate = policy_names[0]
+        latency_ok = all(
+            (samples := sorted(timings[candidate, phase]))
+            and samples[ceil(len(samples) * 0.95) - 1] <= 5_100_000
+            for phase in ("planning", "resolution")
+        )
+        checks = {
+            "at least 11 candidate wins": outcomes[candidate] >= 11,
+            "at most two unfinished games": outcomes["unfinished"] <= 2,
+            "paired sign-flip p at most 0.05": paired_p is not None and paired_p <= 0.05,
+            "candidate fallback rate below 2%": (
+                non_forced[candidate] > 0 and fallbacks[candidate] / non_forced[candidate] < 0.02
+            ),
+            "candidate planning and resolution p95 at most 5.1 s": latency_ok,
+        }
+        failed = [label for label, passed in checks.items() if not passed]
+        print("Held-out lane timing threshold " + (f"missed ({', '.join(failed)})" if failed else "met"))
 
 
 def verify_held_out_strength(worker, maps):
@@ -831,8 +1215,11 @@ def verify_planning_deadline(worker, map_id, opening, decision_ms, iterations, e
                 evaluated_rows = result["completed_rows"] + result["pruned_rows"]
                 assert 0 <= evaluated_rows <= result["total_rows"]
                 if result["score"] is None:
-                    assert result["completed_rows"] == 0
-                    outcome = "unscored fallback"
+                    assert evaluated_rows == 0
+                    outcome = (
+                        "shallow scored fallback" if result.get("shallow_score") is not None
+                        else "unscored fallback"
+                    )
                 elif evaluated_rows == result["total_rows"]:
                     outcome = "matrix complete"
                 else:
@@ -1048,6 +1435,13 @@ def verify_public_upgrade_replay(worker, root):
         envelope=envelope, player_id="hero_arien", seed=39, cap=2,
         max_depth=1, max_nodes=512, time_ms=10_000,
     )
+    impossible = dict(batch, after={"level": 2, "card_items": [2, 0, 0, 0, 0, 0]})
+    try:
+        worker.request("search_sampled_planning", public_upgrade_batches=[impossible], **options)
+    except RuntimeError as error:
+        assert "invalid public upgrade batch" in str(error)
+    else:
+        raise AssertionError("search accepted more card items than crossed upgrade levels")
     for workers in (1, 2):
         direct = worker.request(
             "search_sampled_planning", workers=workers,
@@ -1088,32 +1482,35 @@ def verify_upgrade_batch_sizes(worker, opening):
         assert state.phase == GamePhase.LEVEL_UP and hero.level == target_level
         step = ResolveUpgradesStep()
         state.execution_stack = [step]
-        prompt = process_stack(state).input_request
-        assert prompt.context["players"][hero.id]["remaining"] == count
         recorded = len(recorder.batches)
-        recorder.observe(state, revision)
-        assert len(recorder.batches) == recorded
         saved = json.loads(json.dumps(recorder.checkpoint(game_id)))
+        prompt = process_stack(state).input_request
+        if count:
+            assert prompt.context["players"][hero.id]["remaining"] == count
+            recorder.observe(state, revision)
+            assert len(recorder.batches) == recorded
+            saved = json.loads(json.dumps(recorder.checkpoint(game_id)))
+            choices = []
+            preview = state
+            for _ in range(count):
+                choice = step._get_upgrade_options(preview, hero.id)[0]["pair"][0]
+                choices.append(choice)
+                preview = step.preview_choices(preview, hero.id, [choice])
+            submit_input(state, InputResponse(
+                request_id=prompt.id, selection={"hero_id": hero.id, "card_ids": choices},
+            ))
+            process_stack(state)
+        else:
+            assert prompt is None
         resumed = PublicUpgradeRecorder.restore(saved, game_id)
         assert resumed.batches == recorder.batches
-
-        choices = []
-        preview = state
-        for _ in range(count):
-            choice = step._get_upgrade_options(preview, hero.id)[0]["pair"][0]
-            choices.append(choice)
-            preview = step.preview_choices(preview, hero.id, [choice])
-        submit_input(state, InputResponse(
-            request_id=prompt.id, selection={"hero_id": hero.id, "card_ids": choices},
-        ))
-        process_stack(state)
         assert state.phase == GamePhase.PLANNING and not state.upgrade_reveal_snapshot
         recorder.observe(state, revision)
         resumed.observe(state, revision)
         assert resumed.checkpoint(game_id) == recorder.checkpoint(game_id)
         return {"revision": revision, "hero_id": hero.id, "before": before, "after": checkpoint(hero)}
 
-    for levels in ((2,), (3, 6), (8,)):
+    for levels in ((2,), (3, 6), (8,), (7, 8)):
         state = deepcopy(opening)
         hero = state.get_hero("hero_brogan")
         recorder = PublicUpgradeRecorder()
@@ -1128,7 +1525,7 @@ def verify_upgrade_batch_sizes(worker, opening):
         restored = PublicUpgradeRecorder.restore(persisted, game_id)
         assert restored.batches == batches
         latest = batches[-1]
-        assert latest["before"]["level"] == (3 if len(levels) == 2 else 1)
+        assert latest["before"]["level"] == (1, *levels)[-2]
         assert latest["after"]["level"] == levels[-1]
         if levels[-1] == 8:
             assert hero.ultimate_card is not None
@@ -1153,6 +1550,28 @@ def verify_upgrade_batch_sizes(worker, opening):
         )
         sequence = "-to-".join(map(str, (1, *levels)))
         print(f"{state.board.map_id}: {sequence} upgrade batch replay matched direct evidence")
+
+
+def verify_offline_upgrade_history(worker, map_id, opening):
+    root, _ = run(opening, 3)
+    assert (root.round, root.turn) == (1, 4)
+    for team in root.teams.values():
+        for hero in team.heroes:
+            hero.gold = 0
+    policy = dict(depth=1, max_nodes=64, time_ms=100, rollout_turns=2)
+    for gold, turns, expected in ((6, 2, [(1, 4)]), (27, 10, [(1, 7), (7, 8)])):
+        root.get_hero("hero_brogan").gold = gold
+        (result,) = verify_rust_match_replay(
+            worker, map_id, root, turns, seed=29, decision_ms=100,
+            policy_pairs=((policy, policy),),
+        )
+        batches = [row for row in result["public_upgrade_batches"]
+                   if row["hero_id"] == "hero_brogan"]
+        assert [(row["before"]["level"], row["after"]["level"])
+                for row in batches] == expected, (map_id, batches)
+        if expected[-1] == (7, 8):
+            assert batches[-1]["before"]["card_items"] == batches[-1]["after"]["card_items"]
+        print(f"{map_id}: Python matched Brogan's offline upgrade batches {expected}")
 
 
 def load_lab_evaluator(path):
@@ -1245,6 +1664,50 @@ def verify_sampled_color_guess(worker):
     alternate.card_guess["attempts"][-1]["card_id"] = card.id
     assert search(alternate) == expected
     print("Bain color guess: hidden card substitution preserved the scored selection")
+
+
+def verify_retained_short_turn(worker, opening):
+    from automata.runtime.legality import DecisionMove
+    from resolution_validation import validate_resolution
+
+    movement = False
+    root = None
+
+    def capture(state, prompt, _revision):
+        nonlocal movement, root
+        if prompt is None:
+            return None
+        if movement and state.turn == 3 and prompt.request_type.value == "SELECT_HEX":
+            root = deepcopy(state), prompt.model_copy(deep=True)
+        movement = (
+            not state.unresolved_hero_ids and prompt.request_type.value == "CHOOSE_ACTION"
+            and any(option.id == "MOVEMENT" for option in prompt.options)
+        )
+        if movement:
+            return DecisionMove("INPUT", prompt.player_id, "MOVEMENT", prompt.id)
+        return None
+
+    run(opening, 3, policy=capture)
+    assert root is not None
+    state, prompt = root
+    assert (state.round, state.turn, prompt.player_id, len(prompt.options)) == (1, 3, "hero_sabina", 16)
+    envelope, _ = export_state_with_shared_objects(state)
+    options = dict(
+        envelope=envelope, player_id=prompt.player_id, max_depth=1, time_ms=5000,
+        resolution_sample_seed=39, resolution_sample_worlds=2, planning_sample_seed=71,
+    )
+    expected = worker.request("search_resolution", rollout_turns=1, max_nodes=8192, **options)
+    actual = worker.request("search_resolution", rollout_turns=2, max_nodes=512, **options)
+    assert expected["completed_depth"] == 1, expected
+    assert (actual["stop"], actual["completed_depth"], actual["score_kind"], actual["nodes"]) == (
+        "node_limit", 0, "short_turn_rollout", 512,
+    ), actual
+    assert (actual["decision"], actual["score"]) == (expected["decision"], expected["score"])
+    validate_resolution(
+        state, prompt, actual, player_id=prompt.player_id, controlled_ids={prompt.player_id},
+        searched_revision=0, live_revision=0,
+    )
+    print("Forgotten Island: two-turn node limit retained the Python-validated one-turn move")
 
 
 def verify_sampled_resolution(
@@ -1346,7 +1809,9 @@ def verify_sampled_resolution(
                     else:
                         assert reply["stop"] == "deadline", (map_id, label, reply)
                         kind = "unscored" if reply["score"] is None else reply["score_kind"]
-                        assert kind in {"unscored", "immediate", "turn_rollout"}, (map_id, label, reply)
+                        assert kind in {
+                            "unscored", "immediate", "short_turn_rollout", "turn_rollout",
+                        }, (map_id, label, reply)
                     validate_resolution(
                         root, prompt, reply, player_id=player, controlled_ids={player},
                         searched_revision=0, live_revision=0, require_score=False,
@@ -1652,6 +2117,42 @@ def main():
     parser.add_argument("--lane-pressure-baseline",
                         choices=("lab_attack_range_v1", "lane_pressure_v1", "lane_pressure_v2", "lane_pressure_v3", "lane_pressure_v4"),
                         default="lab_attack_range_v1", help="Baseline score for --lane-pressure-trial")
+    mode.add_argument("--strength-baseline", action="store_true",
+                      help="Measure the fixed Rust policy against itself on the tuning corpus")
+    mode.add_argument("--forecast-share-trial", action="store_true",
+                      help="Compare quarter and eighth forecast budgets in side-swapped tuning games")
+    mode.add_argument("--followup-width-trial", action="store_true",
+                      help="Compare balanced four-row and legacy two-row coordinated follow-ups")
+    mode.add_argument("--horizon-trial", action="store_true",
+                      help="Compare candidate and reference rollout horizons, swapping sides")
+    parser.add_argument("--candidate-rollout-turns", type=int, choices=(1, 3),
+                        help="Candidate horizon for --horizon-trial (default: 1)")
+    mode.add_argument("--lane-timing-trial", action="store_true",
+                      help="Compare Lane Pressure V4 and V3 under the strength screening policy")
+    mode.add_argument("--lane-timing-held-out", action="store_true",
+                      help="Validate V4 versus V3 at five seconds on eight held-out starts")
+    mode.add_argument("--node-budget-trial", action="store_true",
+                      help="Compare 262,144 and 131,072 nodes at the same decision deadline")
+    mode.add_argument("--decision-depth-trial", action="store_true",
+                      help="Compare search depths three and two at a fixed two-turn horizon")
+    mode.add_argument("--tactical-forecast-trial", action="store_true",
+                      help="Use bounded tactical replies only in the four-turn greedy forecast")
+    mode.add_argument("--planning-opposition-trial", action="store_true",
+                      help="Compare adversarial planning replies with fixed greedy forecast opposition")
+    mode.add_argument("--attack-extension-trial", action="store_true",
+                      help="Extend attack-target search at the depth cutoff while holding the horizon fixed")
+    mode.add_argument("--reply-width-trial", action="store_true",
+                      help="Compare eight and four planning replies at equal budgets")
+    mode.add_argument("--world-count-trial", action="store_true",
+                      help="Compare four and two sampled hidden worlds at equal budgets")
+    mode.add_argument("--planning-seed-trial", action="store_true",
+                      help="Compare a bounded depth-zero planning pass with direct deep search")
+    parser.add_argument("--strength-map", choices=tuple(case[0] for case in STRENGTH_SCREEN_STARTS),
+                        help="Run only this screening start, including both sides for a trial")
+    parser.add_argument("--strength-game-type", choices=("QUICK", "LONG"),
+                        help="Opening game settings for strength screens (default: QUICK)")
+    parser.add_argument("--strength-midgame", action="store_true",
+                        help="Use recorded round-three tuning starts on Forgotten Island and Magma and Ice")
     mode.add_argument("--held-out-strength", action="store_true",
                       help="Run the fixed 16-game horizon comparison at 100 ms")
     mode.add_argument("--strength-trial", action="store_true",
@@ -1673,6 +2174,23 @@ def main():
     parser.add_argument("--sampled", action="store_true", help="Also check sampled level-one roots")
     parser.add_argument("--sampled-upgrades", action="store_true", help="Also check upgraded samples")
     args = parser.parse_args()
+    if args.candidate_rollout_turns is not None and not args.horizon_trial:
+        parser.error("--candidate-rollout-turns requires --horizon-trial")
+    strength_screen = (
+        args.strength_baseline or args.forecast_share_trial
+        or args.followup_width_trial or args.horizon_trial or args.lane_timing_trial
+        or args.node_budget_trial or args.decision_depth_trial or args.attack_extension_trial
+        or args.planning_opposition_trial or args.tactical_forecast_trial
+        or args.reply_width_trial or args.world_count_trial or args.planning_seed_trial
+    )
+    if (args.strength_map or args.strength_midgame) and not strength_screen:
+        parser.error("--strength-map and --strength-midgame require a strength baseline or screening trial mode")
+    if args.strength_game_type and (not strength_screen or args.strength_midgame):
+        parser.error("--strength-game-type requires a strength baseline or screening trial at the opening")
+    if args.strength_midgame and args.strength_map not in (None, *STRENGTH_MIDGAME_MAPS):
+        parser.error("--strength-midgame only supports Forgotten Island and Magma and Ice")
+    if args.lane_timing_held_out and args.decision_ms != 5000:
+        parser.error("--lane-timing-held-out requires --decision-ms 5000")
     if args.roster_sweep_turns is not None and not 1 <= args.roster_sweep_turns <= 64:
         parser.error("--roster-sweep-turns must be in 1..64")
     if args.rust_replay_turns is not None and not 1 <= args.rust_replay_turns <= 64:
@@ -1801,6 +2319,31 @@ def main():
                 reply_cap=args.lane_pressure_reply_cap,
             )
             return
+        if strength_screen or args.lane_timing_held_out:
+            trial = (
+                "forecast_share" if args.forecast_share_trial else
+                "followup_width" if args.followup_width_trial else
+                "horizon" if args.horizon_trial else
+                "lane_timing" if args.lane_timing_trial or args.lane_timing_held_out else
+                "node_budget" if args.node_budget_trial else
+                "decision_depth" if args.decision_depth_trial else
+                "attack_extension" if args.attack_extension_trial else
+                "tactical_forecast" if args.tactical_forecast_trial else
+                "planning_opposition" if args.planning_opposition_trial else
+                "reply_width" if args.reply_width_trial else
+                "world_count" if args.world_count_trial else
+                "planning_seed" if args.planning_seed_trial else None
+            )
+            worker_path = Path(which(args.worker) or args.worker)
+            with worker_path.open("rb") as executable:
+                print(f"Strength worker SHA-256: {file_digest(executable, 'sha256').hexdigest()}")
+            verify_strength_baseline(
+                worker, maps, args.decision_ms, trial=trial, selected_map=args.strength_map,
+                held_out=args.lane_timing_held_out,
+                candidate_rollout_turns=args.candidate_rollout_turns or 1,
+                midgame=args.strength_midgame, game_type=args.strength_game_type or "QUICK",
+            )
+            return
         if args.held_out_strength:
             verify_held_out_strength(worker, maps)
             return
@@ -1858,8 +2401,11 @@ def main():
                 )
                 continue
             if args.sampled_resolution:
-                if map_id == "forgotten_island" and not args.verify_resolution_deadline:
-                    verify_sampled_color_guess(worker)
+                if map_id == "forgotten_island":
+                    if args.verify_resolution_deadline:
+                        verify_retained_short_turn(worker, opening)
+                    else:
+                        verify_sampled_color_guess(worker)
                 verify_sampled_resolution(
                     worker, path, opening, args.decision_ms, args.sample_count, args.sample_workers,
                     args.bench_iterations, args.verify_resolution_deadline,
@@ -1903,6 +2449,8 @@ def main():
                     )
             if args.sampled_upgrades:
                 verify_upgrade_batch_sizes(worker, opening)
+                if map_id in STRENGTH_MIDGAME_MAPS:
+                    verify_offline_upgrade_history(worker, map_id, opening)
                 upgraded = upgraded_opening(opening)
                 midround, _ = run(upgraded, 1)
                 for root in (upgraded, midround):

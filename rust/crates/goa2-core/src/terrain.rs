@@ -175,8 +175,8 @@ impl NativeWorld {
         self.definitions
             .supply_passable
             .iter()
-            .find(|(candidate, _)| *candidate == id)
-            .is_some_and(|(_, passable)| *passable)
+            .find(|(candidate, _, _)| *candidate == id)
+            .is_some_and(|(_, passable, _)| *passable)
     }
     pub fn terrain_hex(&self, hex: Hex) -> Result<bool, String> {
         // Board.get_tile supplies an out-of-map terrain tile in the reference.

@@ -20,16 +20,18 @@ impl NativeWorld {
     /// has a different copy: that is the source MoveUnit detection boundary.
     pub(crate) fn has_enemy_mine_supply(&self, team: Symbol) -> bool {
         self.definitions
-            .mine_supply
+            .supply_passable
             .iter()
-            .any(|(id, passable, owner)| {
-                *passable
-                    && self.position(*id).is_some()
-                    && owner.is_some_and(|owner| {
-                        owner != self.definitions.effect_empty
-                            && self.hero(owner).is_none_or(|hero| hero.team != team)
-                    })
+            .any(|&(id, passable, owner)| {
+                passable && self.position(id).is_some() && self.is_enemy_mine_owner(owner, team)
             })
+    }
+
+    pub(crate) fn is_enemy_mine_owner(&self, owner: Option<Symbol>, team: Symbol) -> bool {
+        owner.is_some_and(|owner| {
+            owner != self.definitions.effect_empty
+                && self.hero(owner).is_none_or(|hero| hero.team != team)
+        })
     }
     pub(crate) fn has_deployed_passable(&self) -> bool {
         self.definitions
@@ -40,7 +42,7 @@ impl NativeWorld {
                 .definitions
                 .supply_passable
                 .iter()
-                .any(|(id, passable)| *passable && self.position(*id).is_some())
+                .any(|(id, passable, _)| *passable && self.position(*id).is_some())
     }
     fn mine_identity_rank(&self, id: Symbol) -> usize {
         self.entity_index(id).unwrap_or_else(|| {
@@ -49,7 +51,7 @@ impl NativeWorld {
                     .definitions
                     .supply_passable
                     .iter()
-                    .position(|(candidate, _)| *candidate == id)
+                    .position(|(candidate, _, _)| *candidate == id)
                     .expect("passable mine identity must be in entities or supply")
         })
     }

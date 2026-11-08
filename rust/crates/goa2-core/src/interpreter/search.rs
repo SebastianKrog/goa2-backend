@@ -16,6 +16,8 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
+mod stall;
+
 const SEARCH_WORKER_STACK: usize = 8 * 1024 * 1024;
 pub(super) const MAX_SEARCH_ROLLOUT_TURNS: u8 = 4;
 
@@ -40,6 +42,16 @@ pub enum SearchEvaluation {
     LanePressureV3,
     LanePressureV3AccumulatedGold,
     WaveBreakthrough,
+    StallLaneAdvance,
+    StallWaveClear,
+    StallMinionApproach,
+    StallHeroThreat,
+    StallCrossfire,
+    StallNextWave,
+    StallLanePresence,
+    StallLifePressure,
+    StallAttackReady,
+    StallGoldDiscount,
     LanePressureV4,
     LanePressureV5,
 }
@@ -2788,37 +2800,13 @@ impl NativeSession {
             .team_lives()
             .map(|(team, life)| sign(team) * life)
             .sum::<i64>();
-        let gold = self
-            .world
-            .heroes
-            .iter()
-            .map(|row| {
-                let spent = if accumulated_gold {
-                    // The upgrade from level L to L+1 costs L gold.
-                    let level = row.level.clamp(1, 8);
-                    level * (level - 1) / 2
-                } else {
-                    0
-                };
-                sign(row.team) * (row.gold + spent)
-            })
-            .sum::<i64>();
+        let gold = self.team_gold_delta(hero.team, accumulated_gold);
         let mut minions = 0;
         let mut near_minion = false;
         let mut near_hero = false;
         let mut cover = false;
         let mut exposure = false;
-        let range = hero
-            .hand
-            .iter()
-            .filter_map(|id| {
-                let card = self.world.card(*id)?;
-                let def = &self.world.definitions.cards[card.definition];
-                let color = def.color.map(|color| self.symbols.name(color));
-                (!card.played_this_round && matches!(color, Some("RED" | "GOLD")))
-                    .then_some(def.range.filter(|range| *range != 0).unwrap_or(1))
-            })
-            .max();
+        let range = self.attack_ready_range(hero);
         let positions = self.world.positions(player).collect::<Vec<_>>();
         for &(id, target) in &self.world.locations {
             let Some(entity) = self.world.entity(id) else {
@@ -2867,6 +2855,39 @@ impl NativeSession {
         Ok((value.atanh() + bonus / 5.0).tanh())
     }
 
+    fn team_gold_delta(&self, team: Symbol, accumulated_gold: bool) -> i64 {
+        self
+            .world
+            .heroes
+            .iter()
+            .map(|row| {
+                let spent = if accumulated_gold {
+                    // The upgrade from level L to L+1 costs L gold.
+                    let level = row.level.clamp(1, 8);
+                    level * (level - 1) / 2
+                } else {
+                    0
+                };
+                let sign = if row.team == team { 1 } else { -1 };
+                sign * (row.gold + spent)
+            })
+            .sum()
+    }
+
+    fn attack_ready_range(&self, hero: &HeroRecord) -> Option<i64> {
+        hero
+            .hand
+            .iter()
+            .filter_map(|id| {
+                let card = self.world.card(*id)?;
+                let def = &self.world.definitions.cards[card.definition];
+                let color = def.color.map(|color| self.symbols.name(color));
+                (!card.played_this_round && matches!(color, Some("RED" | "GOLD")))
+                    .then_some(def.range.filter(|range| *range != 0).unwrap_or(1))
+            })
+            .max()
+    }
+
     pub(super) fn search_score(
         &self,
         evaluation: SearchEvaluation,
@@ -2878,12 +2899,19 @@ impl NativeSession {
         {
             return Ok(self.evaluate_resolution(team, player));
         }
+        let stall_pressure = self.stall_pressure(evaluation, team);
+        let evaluation = if stall_pressure.is_some() {
+            SearchEvaluation::LanePressureV3AccumulatedGold
+        } else {
+            evaluation
+        };
         let mut score = self.evaluate_attack_range(
             player, matches!(evaluation, SearchEvaluation::LanePressureV3AccumulatedGold),
         )?;
         if !matches!(evaluation, SearchEvaluation::LabAttackRangeV1) {
+            let lane_pressure = self.evaluate_lane_pressure(team, evaluation);
             score = (score.clamp(-1.0 + 1e-6, 1.0 - 1e-6).atanh()
-                + self.evaluate_lane_pressure(team, evaluation) / 5.0).tanh();
+                + (lane_pressure + stall_pressure.unwrap_or(0.0)) / 5.0).tanh();
         }
         Ok((score * (WIN - 1) as f64).round() as i64)
     }

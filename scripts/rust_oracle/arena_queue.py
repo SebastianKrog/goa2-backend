@@ -49,6 +49,9 @@ CREATE TABLE IF NOT EXISTS stage_preflights (
 CREATE TABLE IF NOT EXISTS registered_profiles (
     id TEXT PRIMARY KEY, profile TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS standard_changes (
+    previous TEXT NOT NULL, next TEXT NOT NULL, reason TEXT NOT NULL, created REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS confirmation_selections (
     job TEXT PRIMARY KEY REFERENCES jobs(id),
     profile TEXT NOT NULL REFERENCES registered_profiles(id)
@@ -161,6 +164,31 @@ def init_standard(db, store, repo, ref, referee, policy_path=None):
     with db:
         db.execute("INSERT INTO settings VALUES (?, ?)", ("standard", canonical(standard)))
     return standard
+
+
+def set_standard(db, repo, ref, expected, policy_path, reason):
+    reason = reason.strip()
+    if not reason:
+        raise ValueError("changing the standard requires a review reason")
+    candidate = pin_commit(repo, ref)
+    expected = resolve_ref(repo, expected)
+    policy = load_policy(policy_path) if policy_path is not None else {}
+    with db:
+        db.execute("BEGIN IMMEDIATE")
+        row = db.execute("SELECT value FROM settings WHERE name = 'standard'").fetchone()
+        if row is None:
+            raise ValueError("initialize the accepted arena standard first")
+        previous = json.loads(row["value"])
+        if previous["commit"] != expected:
+            raise ValueError("the accepted standard changed; check the current standard before replacing it")
+        updated = {"commit": candidate, "referee": previous["referee"]}
+        if policy:
+            updated["policy"] = policy
+        if updated != previous:
+            db.execute("UPDATE settings SET value = ? WHERE name = 'standard'", (canonical(updated),))
+            db.execute("INSERT INTO standard_changes VALUES (?, ?, ?, ?)",
+                       (canonical(previous), canonical(updated), reason, time.time()))
+    return updated
 
 
 def load_profile(store, path):
@@ -626,7 +654,7 @@ def extend_tie(db, job, evidence):
         set_status(db, job, "queued", "tied screen extended on reviewed evidence")
 
 
-def select_confirmation(db, jobs):
+def select_confirmation(db, jobs, *, historical=False):
     if len(jobs) not in (1, 2) or len(set(jobs)) != len(jobs):
         raise ValueError("shortlist one or two distinct jobs")
     with db:
@@ -644,9 +672,11 @@ def select_confirmation(db, jobs):
             profile = manifest["registered_profile"]
             if registered_profile(db, profile) != manifest["profile"]:
                 raise ValueError("confirmation requires the registered batch profile")
-            if (manifest["standard"] != standard["commit"] or manifest["referee"] != standard["referee"]
-                    or manifest.get("standard_policy", {}) != standard.get("policy", {})):
-                raise ValueError("the accepted standard or referee changed; screen against the current standard")
+            if not historical and (
+                manifest["standard"] != standard["commit"] or manifest["referee"] != standard["referee"]
+                or manifest.get("standard_policy", {}) != standard.get("policy", {})
+            ):
+                raise ValueError("the standard changed; use --historical to confirm the original comparison")
             profiles.add(profile)
         if len(profiles) != 1:
             raise ValueError("shortlist jobs from one registered batch")
@@ -729,12 +759,15 @@ def summarize_matches(store, matches):
     totals = Counter()
     work = {"candidate": Counter(), "standard": Counter()}
     pairs = {}
+    stall = {}
     for row in matches:
         pair = pairs.setdefault(row["pair"], {})
         if row["report"] is None:
             continue
         report = read_report(store, row["report"])
         endpoint = report["endpoint"]
+        if "stall" in report:
+            stall.setdefault(row["pair"], {})[row["side"]] = report["stall"]
         if endpoint["phase"] != "GAME_OVER":
             outcome = "unfinished"
         else:
@@ -755,7 +788,8 @@ def summarize_matches(store, matches):
     paired = [value for value in paired_values(pairs) if value is not None]
     return {"outcomes": dict(totals), "work": {role: dict(row) for role, row in work.items()},
             "pairs": pairs, "scored_pairs": len(paired),
-            "paired_advantage": sum(paired) / len(paired) if paired else None}
+            "paired_advantage": sum(paired) / len(paired) if paired else None,
+            **({"stall": stall} if stall else {})}
 
 
 def describe_jobs(db, store, job):
@@ -838,6 +872,11 @@ def main():
     init.add_argument("--standard", required=True)
     init.add_argument("--referee", type=Path, required=True)
     init.add_argument("--policy", type=Path)
+    standard = commands.add_parser("set-standard")
+    standard.add_argument("--standard", required=True)
+    standard.add_argument("--expected-standard", required=True)
+    standard.add_argument("--policy", type=Path)
+    standard.add_argument("--reason", required=True)
     registration = commands.add_parser("register-profile")
     registration.add_argument("--profile", type=Path, required=True)
     submit = commands.add_parser("enqueue")
@@ -855,6 +894,8 @@ def main():
     extend.add_argument("--evidence", required=True)
     confirm = commands.add_parser("confirm")
     confirm.add_argument("jobs", nargs="+")
+    confirm.add_argument("--historical", action="store_true",
+                         help="confirm against the original pinned standard for diagnostic evidence")
     review = commands.add_parser("promote")
     review.add_argument("job")
     review.add_argument("--benefit-evidence", type=Path)
@@ -875,6 +916,9 @@ def main():
         try:
             if args.command == "init":
                 print(canonical(init_standard(db, store, repo, args.standard, args.referee, args.policy)))
+            elif args.command == "set-standard":
+                print(canonical(set_standard(db, repo, args.standard, args.expected_standard,
+                                             args.policy, args.reason)))
             elif args.command == "register-profile":
                 print(register_profile(db, store, args.profile))
             elif args.command == "enqueue":
@@ -885,7 +929,7 @@ def main():
             elif args.command == "extend-tie":
                 extend_tie(db, args.job, args.evidence)
             elif args.command == "confirm":
-                select_confirmation(db, args.jobs)
+                select_confirmation(db, args.jobs, historical=args.historical)
             elif args.command == "promote":
                 print(canonical(promote(db, store, args.job, args.benefit_evidence)))
             elif args.command in ("cancel", "retry"):

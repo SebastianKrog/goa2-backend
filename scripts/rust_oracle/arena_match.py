@@ -10,6 +10,7 @@ from pathlib import Path
 
 from arena_choices import CHOICE_ENCODING, decision_hash
 from arena_policy import apply_policy, load_policy, validate_policy
+from arena_progress import StallClock
 from arena_reports import save_report, sha256_file
 from oracle import Worker, digest
 
@@ -30,6 +31,9 @@ def play_match(referee, workers, envelope, *, turns, seed, planning_nodes,
     policy_profiles = {side: validate_policy(policy) for side, policy in (policy_profiles or {}).items()}
     if policy_profiles.keys() - workers.keys():
         raise ValueError("arena policy settings target an unknown side")
+    stall_policies = {side: policy["stall"] for side, policy in policy_profiles.items() if "stall" in policy}
+    if stall_policies and not selective:
+        raise ValueError("stall policies require the Arena v2 work budget")
     rosters = {
         team: [hero["id"] for hero in row["heroes"]]
         for team, row in envelope["state"]["teams"].items()
@@ -37,6 +41,7 @@ def play_match(referee, workers, envelope, *, turns, seed, planning_nodes,
     if workers.keys() != rosters.keys() or workers.keys() != {"RED", "BLUE"}:
         raise ValueError("arena matches require a policy worker for each of Red and Blue")
     position = referee.request("arena_start", envelope=envelope, turns=turns, timeout=watchdog)
+    stall_clock = StallClock(position) if stall_policies else None
     trace = []
     work = {team: defaultdict(int) for team in workers}
 
@@ -45,6 +50,10 @@ def play_match(referee, workers, envelope, *, turns, seed, planning_nodes,
         depth = (3 if phase == "planning" else 5) if selective else 2
         request = dict(options, max_depth=depth, **fields)
         apply_policy(request, phase, policy_profiles.get(team, {}).get(phase, {}))
+        stall = stall_policies.get(team)
+        if stall is not None and stall_clock.age(stall["progress"]) >= stall["turns"]:
+            request["evaluation"] = stall["evaluation"]
+            work[team][f"{phase}_stall_activations"] += 1
         if observe_request is not None:
             observe_request(phase, operation, request, position)
         try:
@@ -133,8 +142,13 @@ def play_match(referee, workers, envelope, *, turns, seed, planning_nodes,
             record(decision)
         trace.append(decision)
         position = response["position"]
-    return {"choice_encoding": CHOICE_ENCODING, "trace": trace, "work": {team: dict(stats) for team, stats in work.items()},
-            "endpoint": position}
+        if stall_clock is not None:
+            stall_clock.observe(position)
+    result = {"choice_encoding": CHOICE_ENCODING, "trace": trace,
+              "work": {team: dict(stats) for team, stats in work.items()}, "endpoint": position}
+    if stall_clock is not None:
+        result["stall"] = stall_clock.result()
+    return result
 
 
 def score_match(paths, envelope, *, record=None, expected_binaries=None, **parameters):

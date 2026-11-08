@@ -242,14 +242,17 @@ def test_enqueue_retains_commits_and_normalizes_start_paths(tmp_path):
     assert git("rev-parse", f"refs/goa2-arena/pinned/{first}") == first
 
 
-def stage_profile(store, *, track="stronger", confirm=12, advance_at=0.25, method=None):
+def stage_profile(store, *, track="stronger", confirm=12, advance_at=0.25, method=None, triage=False):
     starts = [{"start_sha256": save_start(store, {"state": {"fixture": index}}), "seed": index}
               for index in range(4 + confirm)]
     starts[1] = starts[0]
     confidence = {} if method is None else {"method": method}
-    return {"starts": starts, "parameters": {"turns": 64}, "scorer": "arena_search_v1",
+    if triage:
+        confidence["screening"] = "triage_v2"
+    return {"starts": starts, "parameters": {"turns": 64},
+            "scorer": "arena_search_v2" if triage else "arena_search_v1",
             "acceptance": {"preflight_pairs": 1, "screen_pairs": 1, "extend_batches": [1],
-                           "confirm_pairs": confirm, "advance_at": advance_at, "stop_below": -0.5,
+                           "confirm_pairs": confirm, "advance_at": advance_at, "stop_below": 0 if triage else -0.5,
                            "max_unfinished_rate": 0, "max_fallback_rate": 0,
                            "track": track, "effect": 0.3 if track != "stronger" else 0,
                            "alpha": 0.05, **confidence}}
@@ -337,6 +340,85 @@ def test_tied_tuning_stays_inconclusive_and_leaves_confirmation_unplayed(job, mo
     assert [stage["outcome"] for stage in finished["stages"]] == ["advance", "extend_low", "inconclusive"]
     assert len(finished["attempts"]) == 8
     assert all(match["report"] is None for match in finished["matches"] if match["pair"] >= 4)
+
+
+def test_v2_tie_stops_until_evidence_and_then_waits_for_a_shortlist(job, monkeypatch):
+    configure_stages(job, triage=True)
+
+    def score(*_, seed, expected_binaries, **__):
+        game = result()
+        if seed != 2:
+            game["endpoint"]["winner_team"] = next(
+                side for side in arena_queue.SIDES if expected_binaries[side] == "candidate-commit"
+            )
+        return game
+
+    monkeypatch.setattr(arena_queue, "score_match", score)
+    screened = run(job)
+    assert screened["status"] == "screened_out"
+    assert len(screened["attempts"]) == 6
+    with closing(arena_queue.open_queue(job)) as db:
+        with pytest.raises(ValueError, match="requires evidence"):
+            arena_queue.extend_tie(db, "job", " ")
+        arena_queue.extend_tie(db, "job", "Verified replay shows an earlier lane push.")
+    waiting = run(job)
+    assert waiting["status"] == "awaiting_confirmation"
+    assert waiting["stages"][1]["extension_evidence"] == "Verified replay shows an earlier lane push."
+    assert len(waiting["attempts"]) == 8
+    assert all(row["report"] is None for row in waiting["matches"] if row["pair"] >= 4)
+    with closing(arena_queue.open_queue(job)) as db:
+        arena_queue.select_confirmation(db, ["job"])
+    assert run(job)["status"] == "passed"
+
+
+def test_v2_weak_screen_is_distinct_from_a_health_failure(job, monkeypatch):
+    configure_stages(job, triage=True)
+
+    def score(*_, expected_binaries, **__):
+        game = result()
+        game["endpoint"]["winner_team"] = next(
+            side for side in arena_queue.SIDES if expected_binaries[side] == "standard-commit"
+        )
+        return game
+
+    monkeypatch.setattr(arena_queue, "score_match", score)
+    screened = run(job)
+    assert screened["status"] == "screened_out"
+    assert screened["stages"][-1]["paired_advantage"] == -1
+    with closing(arena_queue.open_queue(job)) as db:
+        with pytest.raises(ValueError, match="only a tied screening result"):
+            arena_queue.extend_tie(db, "job", "Unrelated evidence")
+
+
+def test_v2_reports_when_both_workers_exceed_fallback_guardrail(job, monkeypatch):
+    configure_stages(job, triage=True)
+
+    def score(*_, seed, **__):
+        game = result()
+        if seed == 2:
+            for work in game["work"].values():
+                work["resolution_unsupported"] = 1
+        return game
+
+    monkeypatch.setattr(arena_queue, "score_match", score)
+    screened = run(job)
+    assert screened["status"] == "unhealthy"
+    assert screened["reason"] == "candidate and baseline both exceeded the fallback guardrail"
+    assert len(screened["attempts"]) == 6
+
+
+def test_v2_shortlist_has_only_two_slots_per_registered_profile(job):
+    configure_stages(job, triage=True)
+    with closing(arena_queue.open_queue(job)) as db:
+        with db:
+            manifest = db.execute("SELECT manifest FROM jobs WHERE id = 'job'").fetchone()[0]
+            db.execute("UPDATE jobs SET status = 'awaiting_confirmation' WHERE id = 'job'")
+            db.executemany("INSERT INTO jobs VALUES (?, ?, 'awaiting_confirmation', NULL, 2)",
+                           ((name, manifest) for name in ("second", "third")))
+        arena_queue.select_confirmation(db, ["job", "second"])
+        with pytest.raises(ValueError, match="two confirmation slots"):
+            arena_queue.select_confirmation(db, ["third"])
+        assert arena_queue.job_status(db, "third") == "awaiting_confirmation"
 
 
 def test_preflight_stops_when_repeated_result_changes(job, monkeypatch):

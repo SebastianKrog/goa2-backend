@@ -16,7 +16,7 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from threading import Event
 
-from arena_acceptance import guardrail, held_out, stages, validate_acceptance
+from arena_acceptance import TRIAGE, guardrail, held_out, stages, validate_acceptance
 from arena_match import SCORER_BUDGETS, score_match
 from arena_policy import load_policy, validate_policy
 from arena_reports import (
@@ -48,6 +48,10 @@ CREATE TABLE IF NOT EXISTS stage_preflights (
 );
 CREATE TABLE IF NOT EXISTS registered_profiles (
     id TEXT PRIMARY KEY, profile TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS confirmation_selections (
+    job TEXT PRIMARY KEY REFERENCES jobs(id),
+    profile TEXT NOT NULL REFERENCES registered_profiles(id)
 );
 CREATE TABLE IF NOT EXISTS promotions (
     job TEXT PRIMARY KEY REFERENCES jobs(id), evidence TEXT, created REAL NOT NULL
@@ -176,6 +180,8 @@ def load_profile(store, path):
     acceptance = profile.get("acceptance")
     if acceptance is not None:
         validate_acceptance(acceptance, profile["starts"])
+        if acceptance.get("screening") == TRIAGE and profile["schema_version"] != 2:
+            raise ValueError("triage screening requires an Arena v2 profile")
         if parameters["turns"] != 64:
             raise ValueError("arena strength profiles require the 64-turn limit")
     for row in profile["starts"]:
@@ -224,6 +230,8 @@ def enqueue(db, store, repo, candidate, profile_path=None, *, profile_id=None, c
         raise ValueError("initialize the accepted arena standard first")
     standard = json.loads(accepted["value"])
     profile = registered_profile(db, profile_id) if profile_id else load_profile(store, profile_path)
+    if (profile.get("acceptance") or {}).get("screening") == TRIAGE and not profile_id:
+        raise ValueError("triage screening requires a registered profile")
     baseline_policy = validate_policy(standard.get("policy", {}))
     policy = load_policy(candidate_policy) if candidate_policy is not None else baseline_policy
     manifest = {
@@ -269,7 +277,8 @@ def cancel_or_retry(db, job, retry):
             result = db.execute(
                 """UPDATE jobs SET status = CASE status WHEN 'running' THEN 'cancel_requested'
                    ELSE 'cancelled' END
-                   WHERE id = ? AND status IN ('queued', 'running', 'awaiting_verification')""",
+                   WHERE id = ? AND status IN
+                       ('queued', 'running', 'awaiting_verification', 'awaiting_confirmation')""",
                 (job,),
             )
         if result.rowcount != 1:
@@ -556,20 +565,27 @@ def stage_result(db, store, job, profile, index):
         rows = stage_matches(db, job, definitions[1][1], end)
     summary = summarize_matches(store, rows)
     reason = guardrail(summary, config)
+    triage = config.get("screening") == TRIAGE
     if reason is not None:
-        return "rejected", reason, summary
+        return ("unhealthy" if triage else "rejected"), reason, summary
     if name == "confirm":
         analysis = held_out(paired_values(summary["pairs"]), config)
         outcome = analysis["status"]
         return outcome, f"held-out {config['track']} result is {outcome}", dict(summary, analysis=analysis)
     score = summary["paired_advantage"]
     if score is not None and score < config["stop_below"]:
-        return "rejected", "tuning result below the futility threshold", summary
+        outcome = "screened_out" if triage else "rejected"
+        return outcome, "tuning result below the futility threshold", summary
+    if triage and name == "screen" and score == 0:
+        return "screened_out", "paired score tied at screening", summary
     next_is_confirm = definitions[index + 1][0] == "confirm"
     if score is not None and score >= config["advance_at"]:
+        if triage and next_is_confirm:
+            return "awaiting_confirmation", "tuning threshold met; awaiting batch shortlist", summary
         return "advance", "tuning advancement threshold met", summary
     if next_is_confirm:
-        return "inconclusive", "tuning allowance ended below the advancement threshold", summary
+        outcome = "screened_out" if triage else "inconclusive"
+        return outcome, "tuning allowance ended below the advancement threshold", summary
     return "extend_low", "uncertain tuning result receives lower priority", summary
 
 
@@ -585,6 +601,64 @@ def finalize_stage(db, store, job, profile):
             data = dict(details, stage=name, reason=reason)
             db.execute("INSERT INTO stage_runs VALUES (?, ?, ?, ?)",
                        (job, index, outcome, canonical(data)))
+
+
+def extend_tie(db, job, evidence):
+    evidence = evidence.strip()
+    if not evidence:
+        raise ValueError("tie extension requires evidence of the intended benefit")
+    with db:
+        db.execute("BEGIN IMMEDIATE")
+        row = db.execute("SELECT status, manifest FROM jobs WHERE id = ?", (job,)).fetchone()
+        if row is None or row["status"] != "screened_out":
+            raise ValueError("only a tied screening result can be extended")
+        profile = json.loads(row["manifest"])["profile"]
+        index = stage_index(db, job)
+        last = db.execute("SELECT data FROM stage_runs WHERE job = ? AND stage = ?",
+                          (job, index - 1)).fetchone()
+        data = json.loads(last["data"])
+        if (data.get("stage") != "screen" or data.get("paired_advantage") != 0
+                or stages(profile)[index][0] != "extend"):
+            raise ValueError("only a tied screening result with an extension stage can be extended")
+        data["extension_evidence"] = evidence
+        db.execute("UPDATE stage_runs SET data = ? WHERE job = ? AND stage = ?",
+                   (canonical(data), job, index - 1))
+        set_status(db, job, "queued", "tied screen extended on reviewed evidence")
+
+
+def select_confirmation(db, jobs):
+    if len(jobs) not in (1, 2) or len(set(jobs)) != len(jobs):
+        raise ValueError("shortlist one or two distinct jobs")
+    with db:
+        db.execute("BEGIN IMMEDIATE")
+        profiles = set()
+        standard_row = db.execute("SELECT value FROM settings WHERE name = 'standard'").fetchone()
+        if standard_row is None:
+            raise ValueError("initialize the accepted arena standard first")
+        standard = json.loads(standard_row["value"])
+        for job in jobs:
+            row = db.execute("SELECT status, manifest FROM jobs WHERE id = ?", (job,)).fetchone()
+            if row is None or row["status"] != "awaiting_confirmation":
+                raise ValueError(f"job {job} is not awaiting confirmation")
+            manifest = json.loads(row["manifest"])
+            profile = manifest["registered_profile"]
+            if registered_profile(db, profile) != manifest["profile"]:
+                raise ValueError("confirmation requires the registered batch profile")
+            if (manifest["standard"] != standard["commit"] or manifest["referee"] != standard["referee"]
+                    or manifest.get("standard_policy", {}) != standard.get("policy", {})):
+                raise ValueError("the accepted standard or referee changed; screen against the current standard")
+            profiles.add(profile)
+        if len(profiles) != 1:
+            raise ValueError("shortlist jobs from one registered batch")
+        profile, = profiles
+        selected = db.execute("SELECT COUNT(*) FROM confirmation_selections WHERE profile = ?",
+                              (profile,)).fetchone()[0]
+        if selected + len(jobs) > 2:
+            raise ValueError("the batch already used its two confirmation slots")
+        db.executemany("INSERT INTO confirmation_selections VALUES (?, ?)",
+                       ((job, profile) for job in jobs))
+        for job in jobs:
+            set_status(db, job, "queued", "shortlisted for held-out confirmation")
 
 
 def drain_verifications(db, store):
@@ -617,7 +691,7 @@ def next_job(db):
         SELECT * FROM pending
         ORDER BY CASE
             WHEN stage_count < 2 AND ? THEN 0
-            WHEN stage_count >= 2 AND last_outcome = 'advance' THEN 1
+            WHEN stage_count >= 2 AND last_outcome IN ('advance', 'awaiting_confirmation') THEN 1
             WHEN stage_count < 2 THEN 2
             ELSE 3 END, created, id
         LIMIT 1
@@ -776,6 +850,11 @@ def main():
     status.add_argument("job", nargs="?")
     for name in ("cancel", "retry"):
         commands.add_parser(name).add_argument("job")
+    extend = commands.add_parser("extend-tie")
+    extend.add_argument("job")
+    extend.add_argument("--evidence", required=True)
+    confirm = commands.add_parser("confirm")
+    confirm.add_argument("jobs", nargs="+")
     review = commands.add_parser("promote")
     review.add_argument("job")
     review.add_argument("--benefit-evidence", type=Path)
@@ -803,6 +882,10 @@ def main():
                               profile_id=args.profile_id, candidate_policy=args.candidate_policy))
             elif args.command == "status":
                 print(canonical(describe_jobs(db, store, args.job)))
+            elif args.command == "extend-tie":
+                extend_tie(db, args.job, args.evidence)
+            elif args.command == "confirm":
+                select_confirmation(db, args.jobs)
             elif args.command == "promote":
                 print(canonical(promote(db, store, args.job, args.benefit_evidence)))
             elif args.command in ("cancel", "retry"):

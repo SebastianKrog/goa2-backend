@@ -6,7 +6,7 @@ from hashlib import sha256
 from pathlib import Path
 from random import Random
 
-from arena_acceptance import confirmation_pair_counts, validate_acceptance
+from arena_acceptance import TRIAGE, confirmation_pair_counts, validate_acceptance
 from arena_reports import _write, sha256_file
 from oracle import ROOT, canonical, digest
 
@@ -18,12 +18,12 @@ PREFLIGHT = (
 )
 
 
-def generated_starts(name, seed, count, heroes):
+def generated_starts(name, seed, count, heroes, *, map_offset=0):
     for index in range(count):
         material = f"goa2:arena_starts_v1:{name}:{seed}:{index}".encode("utf-8")
         rng = Random(int.from_bytes(sha256(material).digest(), "big"))
         roster = rng.sample(heroes, 4)
-        yield MAPS[index % len(MAPS)], rng.getrandbits(64), roster[:2], roster[2:]
+        yield MAPS[(index + map_offset) % len(MAPS)], rng.getrandbits(64), roster[:2], roster[2:]
 
 
 def generate_profile(template, output):
@@ -42,7 +42,8 @@ def generate_profile(template, output):
     extend = sum(config["extend_batches"])
     confirm = config["confirm_pairs"]
     validate_acceptance(config, range(preflight + screen + extend + confirm))
-    if preflight > len(PREFLIGHT) or screen > len(STRENGTH_SCREEN_STARTS):
+    triage = config.get("screening") == TRIAGE
+    if preflight > len(PREFLIGHT) or (not triage and screen > len(STRENGTH_SCREEN_STARTS)):
         raise ValueError("requested more fixed preflight or screen starts than available")
     if template["parameters"]["turns"] != 64:
         raise ValueError("strength profiles require the 64-turn cap")
@@ -50,8 +51,11 @@ def generate_profile(template, output):
     if any(type(seed) is not int or not 0 <= seed < 2**64 for seed in seeds):
         raise ValueError("recipe seeds must be unsigned 64-bit integers")
     heroes = sorted(HeroRegistry.list_heroes())
+    screen_starts = (generated_starts("screen", seeds[0], screen, heroes,
+                                      map_offset=seeds[0] % len(MAPS))
+                     if triage else STRENGTH_SCREEN_STARTS[:screen])
     cases = [
-        *PREFLIGHT[:preflight], *STRENGTH_SCREEN_STARTS[:screen],
+        *PREFLIGHT[:preflight], *screen_starts,
         *generated_starts("extend", seeds[0], extend, heroes),
         *generated_starts("confirm", seeds[1], confirm, heroes),
     ]

@@ -1,4 +1,5 @@
 //! Search-local, typed values and interned symbols. JSON conversion is boundary-only.
+use foldhash::fast::RandomState;
 use serde_json::{Map, Value};
 use std::{collections::HashMap, sync::Arc};
 
@@ -7,7 +8,8 @@ pub struct Symbol(pub(crate) usize);
 #[derive(Clone, Debug, Default)]
 struct SymbolTable {
     names: Vec<Arc<str>>,
-    ids: HashMap<Arc<str>, Symbol>,
+    // Lookup only. Symbol IDs and exported order come from names.
+    ids: HashMap<Arc<str>, Symbol, RandomState>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -84,6 +86,7 @@ pub enum Datum {
     List(Vec<Datum>),
     Object(Vec<(Symbol, Datum)>),
     Instance(u32),
+    Unsigned(u64),
 }
 impl std::hash::Hash for Datum {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
@@ -100,6 +103,7 @@ impl std::hash::Hash for Datum {
             Self::List(values) => values.hash(state),
             Self::Object(fields) => fields.hash(state),
             Self::Instance(value) => value.hash(state),
+            Self::Unsigned(value) => value.hash(state),
         }
     }
 }
@@ -110,6 +114,7 @@ impl Datum {
             Self::Null => "None".into(),
             Self::Bool(value) => if *value { "True" } else { "False" }.into(),
             Self::Int(value) => value.to_string(),
+            Self::Unsigned(value) => value.to_string(),
             Self::Float(value) => python_float_text(*value),
             Self::Text(id) => symbols.name(*id).to_owned(),
             _ => return None,
@@ -157,6 +162,7 @@ impl Datum {
             Self::Null => Value::Null,
             Self::Bool(v) => Value::Bool(*v),
             Self::Int(v) => Value::from(*v),
+            Self::Unsigned(v) => Value::from(*v),
             Self::Float(v) => Value::from(*v),
             Self::Text(id) => Value::String(symbols.name(*id).into()),
             Self::List(items) => Value::Array(items.iter().map(|v| v.to_json(symbols)).collect()),
@@ -222,6 +228,7 @@ impl Datum {
             Self::Null => false,
             Self::Bool(v) => *v,
             Self::Int(v) => *v != 0,
+            Self::Unsigned(v) => *v != 0,
             Self::Float(v) => *v != 0.0,
             Self::Text(id) => !symbols.name(*id).is_empty(),
             Self::List(v) => !v.is_empty(),
@@ -234,6 +241,9 @@ impl Datum {
     pub fn to_integer(&self, symbols: &Symbols) -> Result<Option<i64>, String> {
         match self {
             Self::Int(v) => Ok(Some(*v)),
+            Self::Unsigned(v) => i64::try_from(*v)
+                .map(Some)
+                .map_err(|_| "unsupported integer coercion outside i64".into()),
             Self::Bool(v) => Ok(Some(i64::from(*v))),
             Self::Float(v) => {
                 if *v >= i64::MIN as f64 && *v < 9_223_372_036_854_775_808.0 {

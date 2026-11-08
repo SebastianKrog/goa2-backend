@@ -31,6 +31,8 @@ pub struct HeroObservation {
     pub gold: i64,
     pub items: [i64; 6],
     pub hand_size: usize,
+    /// Number of card backs in the public planning slots.
+    pub hidden_commitments: usize,
     pub played: Vec<PublicCard>,
     pub discarded: Vec<PublicCard>,
     pub revealed_current: Vec<String>,
@@ -286,6 +288,12 @@ impl NativeSession {
                 .heroes
                 .iter()
                 .map(|row| {
+                    let hidden_commitments = if self.planning.phase == Phase::Planning {
+                        let (first, second) = self.observed_planning_cards(row.id)?;
+                        usize::from(first.is_some()) + usize::from(second.is_some())
+                    } else {
+                        0
+                    };
                     Ok(HeroObservation {
                         id: name(row.id),
                         team: name(row.team),
@@ -298,6 +306,7 @@ impl NativeSession {
                         gold: row.gold,
                         items: self.observation_items(player, row)?,
                         hand_size: row.hand.len(),
+                        hidden_commitments,
                         played: row
                             .played
                             .iter()
@@ -592,7 +601,7 @@ mod tests {
     }
 
     #[test]
-    fn commitment_changes_only_public_count_and_owners_private_cards() {
+    fn commitment_changes_only_public_counts_and_owners_private_cards() {
         let fixture =
             super::super::object_execution::fixture_case("object-execution-card-planning-cycle");
         let mut session =
@@ -627,6 +636,7 @@ mod tests {
                         .find(|hero| &hero.id == owner_id)
                         .unwrap();
                     assert_eq!(row.hand_size + 1, before.private.hand.len());
+                    assert_eq!(row.hidden_commitments, 1);
                     assert_eq!(
                         observed.sample_planning_hand(owner_id, 17)?,
                         Some(SampledHand {
@@ -637,12 +647,13 @@ mod tests {
                             hidden_gold: None,
                         })
                     );
-                    observed
+                    let row = observed
                         .heroes
                         .iter_mut()
                         .find(|hero| &hero.id == owner_id)
-                        .unwrap()
-                        .hand_size += 1;
+                        .unwrap();
+                    row.hand_size += 1;
+                    row.hidden_commitments = 0;
                     assert_eq!(&observed, expected);
                 }
                 Ok(())

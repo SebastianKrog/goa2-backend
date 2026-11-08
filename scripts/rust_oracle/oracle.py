@@ -259,7 +259,10 @@ class Worker:
                 if not wait((exchange,), timeout=timeout).done:
                     self._retire()
                     raise TimeoutError(f"worker timed out during {operation}")
-                return exchange.result()
+                result = exchange.result()
+                if decision_deadline is not None and time.perf_counter() >= decision_deadline:
+                    raise TimeoutError(f"worker reply missed the decision deadline during {operation}")
+                return result
         except WorkerUnavailable:
             self._retire()
             raise

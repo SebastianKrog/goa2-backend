@@ -20,6 +20,7 @@ pub struct DefenseCard {
 #[derive(Clone, Debug, Hash, PartialEq)]
 pub struct DefenseMenu {
     pub owner: Symbol,
+    pub target: Symbol,
     pub cards: Vec<DefenseCard>,
     pub attack: Option<Datum>,
     pub modifier: i64,
@@ -349,6 +350,7 @@ impl ReactionRules {
             .transpose()?;
         Ok(DefenseMenu {
             owner: world.hero(target).ok_or("reaction owner missing")?.id,
+            target,
             cards,
             attack,
             modifier,

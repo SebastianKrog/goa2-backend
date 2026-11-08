@@ -22,7 +22,7 @@ from collections import OrderedDict
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from goa2.server.admin import replay_api_enabled, require_admin
 from goa2.server.models import ShareLinkResponse
@@ -33,6 +33,7 @@ from goa2.server.replay import (
     load_replay,
     state_body,
 )
+from goa2.server.rust_hosted import hosted_games, is_rust_game
 from goa2.server.share_mint import mint_replay_share
 
 __all__ = ["replay_api_enabled", "router"]
@@ -125,12 +126,10 @@ def _get_cursor(game_id: str) -> ReplayCursor:
 
 
 @router.get("")
-def list_replays() -> list[dict[str, Any]]:
+def list_replays(request: Request) -> list[dict[str, Any]]:
     """List available replays (newest first) from their setup headers."""
     directory = Path(_replay_dir())
     out: list[dict[str, Any]] = []
-    if not directory.is_dir():
-        return out
     for f in directory.glob("*.jsonl"):
         try:
             with open(f) as fh:
@@ -156,13 +155,17 @@ def list_replays() -> list[dict[str, Any]]:
                 "num_decisions": num_decisions,
             }
         )
+    if request.app.state.rust_hosted is not None:
+        out.extend(request.app.state.rust_hosted.replay_catalog())
     out.sort(key=lambda r: r.get("created_at") or 0, reverse=True)
     return out
 
 
 @router.get("/{game_id}")
-def get_replay_meta(game_id: str) -> dict[str, Any]:
+def get_replay_meta(game_id: str, request: Request) -> dict[str, Any]:
     """Return the setup header plus the full ordered decision list for a replay."""
+    if is_rust_game(game_id):
+        return hosted_games(request).replay(game_id)
     path = _replay_path(game_id)
     try:
         setup, decisions = load_replay(str(path))
@@ -186,12 +189,14 @@ def get_replay_meta(game_id: str) -> dict[str, Any]:
 
 
 @router.post("/{game_id}/share", response_model=ShareLinkResponse, status_code=201)
-async def create_share(game_id: str) -> ShareLinkResponse:
+async def create_share(game_id: str, request: Request) -> ShareLinkResponse:
     """Bake a finished game into a shareable artifact and return its token.
 
     Heavy work uses the same bounded process pool as consensus rewinds, so live
     games remain responsive and simultaneous heavy operations queue safely.
     """
+    if is_rust_game(game_id):
+        return await hosted_games(request).create_share(game_id)
     path = _replay_candidate_path(game_id)
     return await mint_replay_share(path, game_id)
 
@@ -199,6 +204,7 @@ async def create_share(game_id: str) -> ShareLinkResponse:
 @router.get("/{game_id}/state")
 def get_replay_state(
     game_id: str,
+    request: Request,
     decision: int | None = Query(None, description="Apply exactly N decisions"),
     round: int | None = Query(None, description="Position at the start of round R"),
     turn: int | None = Query(None, description="With round: position at turn T"),
@@ -208,6 +214,12 @@ def get_replay_state(
     Position is chosen by, in priority order: `decision` (apply N decisions),
     else `round`/`turn` (start of that moment), else the end of the game.
     """
+    if is_rust_game(game_id):
+        seek = {key: value for key, value in (
+            ("decision", decision), ("round", round), ("turn", turn),
+        ) if value is not None}
+        return hosted_games(request).replay(game_id, seek)
+
     with _game_lock(game_id):
         cursor = _get_cursor(game_id)
         if decision is not None:

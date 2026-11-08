@@ -189,25 +189,25 @@ def test_capture_prioritizes_the_acting_player(client, game_data):
     assert "client_action_id" not in messages[1][2]
 
 
-def test_capture_reuses_only_the_spectator_scoped_payload(client, game_data, monkeypatch):
+def test_capture_reuses_only_the_spectator_scoped_payload(client, mine_game_data, monkeypatch):
     from goa2.domain.events import GameEvent, GameEventType
     from goa2.domain.models import TokenType
 
-    game = client.app.state.registry.get(game_data["game_id"])
-    arien_token = _token_for(game_data, "hero_arien")
-    wasp_token = _token_for(game_data, "hero_wasp")
-    game.ws_connections = {arien_token: object(), wasp_token: object()}
+    game = client.app.state.registry.get(mine_game_data["game_id"])
+    min_token = _token_for(mine_game_data, "hero_min")
+    wasp_token = _token_for(mine_game_data, "hero_wasp")
+    game.ws_connections = {min_token: object(), wasp_token: object()}
     game.spectator_ws_connections = {1: object(), 2: object()}
 
     state = game.session.state
     mine = state.token_pool[TokenType.MINE_BLAST][0]
-    mine.owner_id = "hero_arien"
+    mine.owner_id = "hero_min"
     destination = next(hex_ for hex_, tile in state.board.tiles.items() if not tile.is_occupied)
     state.place_entity(mine.id, destination)
     events = [
         GameEvent(
             event_type=GameEventType.TOKEN_PLACED,
-            actor_id="hero_arien",
+            actor_id="hero_min",
             target_id=mine.id,
             metadata={"token_type": TokenType.MINE_BLAST.value},
         ).model_dump()
@@ -225,14 +225,14 @@ def test_capture_reuses_only_the_spectator_scoped_payload(client, game_data, mon
     messages = ws_module._capture_broadcast(
         game,
         events,
-        priority_token=arien_token,
+        priority_token=min_token,
         client_action_id="actor-private-id",
     )
 
     player_payloads = [payload for token, _, payload in messages if token is not None]
     spectator_payloads = [payload for token, _, payload in messages if token is None]
 
-    assert event_viewers == ["hero_arien", "hero_wasp", None]
+    assert event_viewers == ["hero_min", "hero_wasp", None]
     assert player_payloads[0] is not player_payloads[1]
     assert spectator_payloads[0] is spectator_payloads[1]
     assert player_payloads[0]["events"][0]["metadata"]["token_type"] == "mine_blast"

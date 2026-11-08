@@ -72,7 +72,11 @@ mod rock_ultimate;
 mod rune_choice;
 mod spell_bodies;
 mod spells;
+mod starting_positions;
 mod step_isolation;
+mod table_card_patch;
+mod table_effect_patch;
+mod table_patch;
 #[cfg(test)]
 mod test_support;
 #[cfg(test)]
@@ -249,14 +253,22 @@ pub(super) struct SharedPrimaryPrograms {
 }
 
 pub(super) fn shared_primary_programs() -> Result<&'static SharedPrimaryPrograms> {
-    static PROGRAMS: std::sync::OnceLock<Result<SharedPrimaryPrograms>> = std::sync::OnceLock::new();
+    static PROGRAMS: std::sync::OnceLock<Result<SharedPrimaryPrograms>> =
+        std::sync::OnceLock::new();
     PROGRAMS
         .get_or_init(|| {
             let mut symbols = Symbols::default();
             let mut steps = Vec::new();
-            let rules = Arc::new(primary_bodies::PrimaryRules::compile(&mut steps, &mut symbols)?);
+            let rules = Arc::new(primary_bodies::PrimaryRules::compile(
+                &mut steps,
+                &mut symbols,
+            )?);
             symbols.freeze_shared();
-            Ok(SharedPrimaryPrograms { symbols, steps, rules })
+            Ok(SharedPrimaryPrograms {
+                symbols,
+                steps,
+                rules,
+            })
         })
         .as_ref()
         .map_err(Clone::clone)
@@ -1284,11 +1296,18 @@ impl BoundObjects {
         }
     }
     fn protected(&self, object: ObjectId) -> bool {
-        self.copied_readonly.contains(&object)
-            || self
-                .readonly
-                .get_or_init(|| Arc::new(self.arena.readonly_objects()))
-                .contains(&object)
+        if self.copied_readonly.contains(&object) {
+            return true;
+        }
+        if let Some(readonly) = self.readonly.get() {
+            return readonly.contains(&object);
+        }
+        if self.arena.fresh_context_object_is_private(object) {
+            return false;
+        }
+        self.readonly
+            .get_or_init(|| Arc::new(self.arena.readonly_objects()))
+            .contains(&object)
     }
     fn copy_template(&mut self, step: ObjectId) -> Result<(ObjectId, usize)> {
         let (ObjectValue::Object(copy), objects) = self
@@ -1333,6 +1352,12 @@ impl BoundObjects {
         }
         Ok(id)
     }
+    pub(super) fn refresh_pending_request(&mut self, step: ObjectId, id: u64) -> Result<()> {
+        self.arena
+            .set_field(step, self.request, ObjectValue::Request(id))
+            .map_err(unsupported)
+    }
+
     pub fn symbol_from_context(&self, key: Symbol, symbols: &Symbols) -> Result<Option<Symbol>> {
         match self.arena.context_value(key) {
             Some(ObjectValue::Atom(Datum::Text(id))) if !symbols.name(id).is_empty() => {
@@ -1452,7 +1477,13 @@ impl BoundObjects {
         Ok(())
     }
     fn restore_type(&mut self) -> Result<()> {
-        if let Some(stack) = self.mutable_stack(self.type_stack)?
+        // The source only pops a truthy stack. Empty aliases need no mutation
+        // guard and must remain attached to the original list.
+        if self
+            .arena
+            .context_value(self.type_stack)
+            .is_some_and(|value| self.arena.truthy(&value))
+            && let Some(stack) = self.mutable_stack(self.type_stack)?
             && let Some(value) = self.arena.list_pop(stack).map_err(unsupported)?
         {
             self.arena
@@ -1566,13 +1597,24 @@ impl NativeSession {
         let copied_bindings = objects.copied_binding_undo.0.len();
         self.objects = Some(objects);
         Ok(RollbackCheckpoint {
-            snapshot, rows: rows_checkpoint, arena: checkpoint, readonly, programs, copied_bindings,
+            snapshot,
+            rows: rows_checkpoint,
+            arena: checkpoint,
+            readonly,
+            programs,
+            copied_bindings,
         })
     }
 
     pub(super) fn restore_rollback_checkpoint(&mut self, checkpoint: RollbackCheckpoint) {
-        let RollbackCheckpoint { mut snapshot, rows, arena, readonly, programs, copied_bindings } =
-            checkpoint;
+        let RollbackCheckpoint {
+            mut snapshot,
+            rows,
+            arena,
+            readonly,
+            programs,
+            copied_bindings,
+        } = checkpoint;
         let mut objects = self
             .objects
             .take()
@@ -1581,8 +1623,7 @@ impl NativeSession {
         objects.readonly = readonly;
         objects.programs = programs;
         objects.restore_copied_bindings(copied_bindings);
-        self.world
-            .restore_rows(rows, &mut snapshot.world);
+        self.world.restore_rows(rows, &mut snapshot.world);
         snapshot.objects = Some(objects);
         *self = snapshot;
     }
@@ -1625,52 +1666,83 @@ impl NativeSession {
     }
     pub(super) fn pending_attack_target(&self) -> bool {
         use phases::Field;
-        let Some(objects) = &self.objects else { return false };
-        if !self.last_request.as_ref().is_some_and(|request| {
-            matches!(request.choices, RequestChoices::Units { .. })
-        }) {
+        let Some(objects) = &self.objects else {
+            return false;
+        };
+        if !self
+            .last_request
+            .as_ref()
+            .is_some_and(|request| matches!(request.choices, RequestChoices::Units { .. }))
+        {
             return false;
         }
         let mut frames = self.stack.iter().rev();
-        let Some(selector) = frames.next() else { return false };
-        if !matches!(self.steps[selector.instruction].instruction, Instruction::LiveUnitSelect) {
+        let Some(selector) = frames.next() else {
+            return false;
+        };
+        if !matches!(
+            self.steps[selector.instruction].instruction,
+            Instruction::LiveUnitSelect
+        ) {
             return false;
         }
-        let Some(selector) = selector.object else { return false };
+        let Some(selector) = selector.object else {
+            return false;
+        };
         let Ok(output) = self.passive_text_bound(objects, selector, Field::Output) else {
             return false;
         };
-        frames.find_map(|frame| {
-            let key = match self.steps[frame.instruction].instruction {
-                Instruction::LiveCombatResolve => Field::TargetKey,
-                Instruction::LiveAttackSequence => Field::AttackTargetKey,
-                _ => return None,
-            };
-            Some(frame.object.is_some_and(|step| {
-                self.passive_text_bound(objects, step, key).ok() == Some(output)
-            }))
-        }).unwrap_or(false)
+        frames
+            .find_map(|frame| {
+                let key = match self.steps[frame.instruction].instruction {
+                    Instruction::LiveCombatResolve => Field::TargetKey,
+                    Instruction::LiveAttackSequence => Field::AttackTargetKey,
+                    _ => return None,
+                };
+                Some(frame.object.is_some_and(|step| {
+                    self.passive_text_bound(objects, step, key).ok() == Some(output)
+                }))
+            })
+            .unwrap_or(false)
     }
 
     pub(super) fn pending_token_swap(&self) -> bool {
         use phases::Field;
 
-        let Some(objects) = &self.objects else { return false };
-        let Some(request) = &self.last_request else { return false };
-        let RequestChoices::Units { tokens: true, values } = &request.choices else {
+        let Some(objects) = &self.objects else {
             return false;
         };
-        if !values.iter().any(|(id, _)| self.world.entity(*id)
-            .is_some_and(|entity| entity.kind == crate::world::EntityKind::Token))
-        {
+        let Some(request) = &self.last_request else {
+            return false;
+        };
+        let RequestChoices::Units {
+            tokens: true,
+            values,
+        } = &request.choices
+        else {
+            return false;
+        };
+        if !values.iter().any(|(id, _)| {
+            self.world
+                .entity(*id)
+                .is_some_and(|entity| entity.kind == crate::world::EntityKind::Token)
+        }) {
             return false;
         }
         let mut frames = self.stack.iter().rev();
-        let Some(selector) = frames.next() else { return false };
-        let Some(swap) = frames.next() else { return false };
-        if !matches!(self.steps[selector.instruction].instruction, Instruction::LiveUnitSelect)
-            || !matches!(self.steps[swap.instruction].instruction, Instruction::LiveSwap)
-        {
+        let Some(selector) = frames.next() else {
+            return false;
+        };
+        let Some(swap) = frames.next() else {
+            return false;
+        };
+        if !matches!(
+            self.steps[selector.instruction].instruction,
+            Instruction::LiveUnitSelect
+        ) || !matches!(
+            self.steps[swap.instruction].instruction,
+            Instruction::LiveSwap
+        ) {
             return false;
         }
         let (Some(selector), Some(swap)) = (selector.object, swap.object) else {
@@ -1680,7 +1752,10 @@ impl NativeSession {
             return false;
         };
         [Field::UnitAKey, Field::UnitBKey].into_iter().any(|key| {
-            self.passive_optional_text_bound(objects, swap, key).ok().flatten() == Some(output)
+            self.passive_optional_text_bound(objects, swap, key)
+                .ok()
+                .flatten()
+                == Some(output)
         })
     }
 
@@ -1770,7 +1845,10 @@ impl NativeSession {
             if let Some(viewer) = search_viewer
                 && !skipped
                 && self.search_step_reads_concealed_state(
-                    objects, top_instruction, top_object, viewer,
+                    objects,
+                    top_instruction,
+                    top_object,
+                    viewer,
                 )?
             {
                 return Ok(result);
@@ -3483,6 +3561,101 @@ impl NativeSession {
         self.last_request = Some(request);
         Ok(())
     }
+    pub(super) fn unstick_abort(&mut self) -> Result<()> {
+        self.with_live_objects(|session, objects| {
+            if session.last_request.take().is_some() {
+                session.pop_aborted_step(objects)?;
+            }
+            session.abort_objects(objects)
+        })
+    }
+
+    pub(super) fn unstick_end_turn(&mut self) -> Result<()> {
+        use phases::Field;
+        self.with_live_objects(|session, objects| {
+            objects
+                .arena
+                .clear_list(objects.stack)
+                .map_err(unsupported)?;
+            session.stack.clear();
+            session.last_request = None;
+            let step = if let Some(actor) = session.planning.actor {
+                session.hero_phase_step_bound(objects, "finalize_hero", actor)?
+            } else {
+                objects
+                    .arena
+                    .clear_dictionary(objects.arena.context_id())
+                    .map_err(unsupported)?;
+                session.context.clear();
+                session.planning.owner = None;
+                session.world.acting_piece = None;
+                for field in [
+                    objects.phases.k(Field::Owner),
+                    objects.phases.k(Field::Piece),
+                ] {
+                    objects
+                        .arena
+                        .set_root(field, ObjectValue::Atom(Datum::Null))
+                        .map_err(unsupported)?;
+                }
+                session.phase_step(objects, "find_actor")?
+            };
+            session.push_live_steps_bound(objects, &[step])
+        })
+    }
+
+    pub(super) fn unstick_force_actor(&mut self, actor: Symbol) -> Result<()> {
+        self.with_live_objects(|session, objects| {
+            for field in [objects.actor, objects.phases.k(phases::Field::Owner)] {
+                objects
+                    .arena
+                    .set_root(field, ObjectValue::Atom(Datum::Text(actor)))
+                    .map_err(unsupported)?;
+            }
+            session.planning.actor = Some(actor);
+            session.planning.owner = Some(actor);
+            Ok(())
+        })?;
+        self.invalidate_table_prompt()
+    }
+
+    pub(super) fn invalidate_table_prompt(&mut self) -> Result<()> {
+        if self.last_request.is_none() {
+            return Ok(());
+        }
+        self.with_live_objects(|session, objects| {
+            let frame = session
+                .stack
+                .last_mut()
+                .ok_or_else(|| unsupported("pending step missing"))?;
+            let step = frame
+                .object
+                .ok_or_else(|| unsupported("pending step binding missing"))?;
+            objects
+                .arena
+                .set_field(step, objects.request, ObjectValue::Atom(Datum::Null))
+                .map_err(unsupported)?;
+            frame.request = None;
+            session.last_request = None;
+            Ok(())
+        })
+    }
+
+    fn pop_aborted_step(&mut self, objects: &mut BoundObjects) -> Result<Frame> {
+        let frame = self
+            .stack
+            .pop()
+            .ok_or_else(|| unsupported("aborted step missing"))?;
+        let id = frame
+            .object
+            .ok_or_else(|| unsupported("aborted step object missing"))?;
+        if !matches!(objects.arena.list_pop(objects.stack).map_err(unsupported)?, Some(ObjectValue::Object(top)) if top == id)
+        {
+            return Err(unsupported("aborted stack/frame binding drift"));
+        }
+        Ok(frame)
+    }
+
     fn abort_objects(&mut self, objects: &mut BoundObjects) -> Result<()> {
         let truthy = |field| {
             objects
@@ -3541,14 +3714,7 @@ impl NativeSession {
                     break;
                 }
             }
-            let frame = self.stack.pop().unwrap();
-            let id = frame
-                .object
-                .ok_or_else(|| unsupported("aborted step object missing"))?;
-            if !matches!(objects.arena.list_pop(objects.stack).map_err(unsupported)?, Some(ObjectValue::Object(top)) if top == id)
-            {
-                return Err(unsupported("aborted stack/frame binding drift"));
-            }
+            let frame = self.pop_aborted_step(objects)?;
             if matches!(
                 self.steps[frame.instruction].instruction,
                 Instruction::RestoreContext { .. }
@@ -3709,7 +3875,11 @@ impl NativeSession {
     ) -> Result<()> {
         // Validate the batch before appending any frame. The common
         // single-step case validates as it goes and needs just one lookup.
-        if steps.len() > 1 && steps.iter().any(|object| objects.program(*object).is_none()) {
+        if steps.len() > 1
+            && steps
+                .iter()
+                .any(|object| objects.program(*object).is_none())
+        {
             return Err(unsupported("stored step program is not compiled"));
         }
         for &object in steps.iter().rev() {
@@ -4104,19 +4274,26 @@ mod rollback_tests {
         let mut session = object_session("object-execution-live-battle-red-push-first");
         let before = session.world_state_fingerprint();
         let team = session.world.heroes[0].team;
-        let (_, lives) = session.world.combat.team_lives().find(|(id, _)| *id == team).unwrap();
-        session.with_rollback(|branch| {
-            branch.world.combat.set_team_life(team, lives - 1).unwrap();
-            let combat = branch.world_state_fingerprint();
-            assert_ne!(combat, before);
-            branch.with_rollback(|branch| {
-                branch.world.waves[0].1 -= 1;
-                assert_ne!(branch.world_state_fingerprint(), combat);
+        let (_, lives) = session
+            .world
+            .combat
+            .team_lives()
+            .find(|(id, _)| *id == team)
+            .unwrap();
+        session
+            .with_rollback(|branch| {
+                branch.world.combat.set_team_life(team, lives - 1).unwrap();
+                let combat = branch.world_state_fingerprint();
+                assert_ne!(combat, before);
+                branch.with_rollback(|branch| {
+                    branch.world.waves[0].1 -= 1;
+                    assert_ne!(branch.world_state_fingerprint(), combat);
+                    Ok(())
+                })?;
+                assert_eq!(branch.world_state_fingerprint(), combat);
                 Ok(())
-            })?;
-            assert_eq!(branch.world_state_fingerprint(), combat);
-            Ok(())
-        }).unwrap();
+            })
+            .unwrap();
         assert_eq!(session.world_state_fingerprint(), before);
     }
 
@@ -4128,22 +4305,30 @@ mod rollback_tests {
         let board_entity = session.symbols.lookup("travel-spatial").unwrap();
         let initial_world = session.world_state_fingerprint();
         let initial_execution = session.execution_fingerprint();
-        session.with_rollback(|branch| {
-            let immune = branch.world.entity(token).unwrap().immune_enemy_actions;
-            branch.world.set_token_properties(token, Some(actor), !immune).unwrap();
-            let token_world = branch.world_state_fingerprint();
-            assert_ne!(token_world, initial_world);
-            branch.with_rollback(|branch| {
-                branch.world.upsert_board_entity(board_entity, board_entity, Some(actor)).unwrap();
-                assert_ne!(branch.world_state_fingerprint(), token_world);
-                branch.round.pending.push((actor, 1));
-                assert_ne!(branch.execution_fingerprint(), initial_execution);
+        session
+            .with_rollback(|branch| {
+                let immune = branch.world.entity(token).unwrap().immune_enemy_actions;
+                branch
+                    .world
+                    .set_token_properties(token, Some(actor), !immune)
+                    .unwrap();
+                let token_world = branch.world_state_fingerprint();
+                assert_ne!(token_world, initial_world);
+                branch.with_rollback(|branch| {
+                    branch
+                        .world
+                        .upsert_board_entity(board_entity, board_entity, Some(actor))
+                        .unwrap();
+                    assert_ne!(branch.world_state_fingerprint(), token_world);
+                    branch.round.pending.push((actor, 1));
+                    assert_ne!(branch.execution_fingerprint(), initial_execution);
+                    Ok(())
+                })?;
+                assert_eq!(branch.world_state_fingerprint(), token_world);
+                assert_eq!(branch.execution_fingerprint(), initial_execution);
                 Ok(())
-            })?;
-            assert_eq!(branch.world_state_fingerprint(), token_world);
-            assert_eq!(branch.execution_fingerprint(), initial_execution);
-            Ok(())
-        }).unwrap();
+            })
+            .unwrap();
         assert_eq!(session.world_state_fingerprint(), initial_world);
     }
 
@@ -4158,7 +4343,10 @@ mod rollback_tests {
         let rows = root.joint_plans(player, true, 4).unwrap().plans;
         let replies = root.joint_plans(player, false, 4).unwrap().plans;
         let key = |worker: &mut NativeSession| {
-            (worker.world_state_fingerprint(), worker.execution_fingerprint())
+            (
+                worker.world_state_fingerprint(),
+                worker.execution_fingerprint(),
+            )
         };
         let before = key(&mut root);
         let mut states = HashMap::new();
@@ -4167,11 +4355,18 @@ mod rollback_tests {
             let fingerprint = key(worker);
             let state = (
                 serde_json::to_value(worker.export_envelope().unwrap()).unwrap(),
-                worker.last_request.as_ref().map(|request| worker.request_json(request)),
+                worker
+                    .last_request
+                    .as_ref()
+                    .map(|request| worker.request_json(request)),
             );
             match states.entry(fingerprint) {
                 std::collections::hash_map::Entry::Occupied(entry) => {
-                    assert_eq!(*entry.get(), state, "different states have the same fingerprint");
+                    assert_eq!(
+                        *entry.get(),
+                        state,
+                        "different states have the same fingerprint"
+                    );
                     repeated += 1;
                 }
                 std::collections::hash_map::Entry::Vacant(entry) => {
@@ -4188,8 +4383,14 @@ mod rollback_tests {
                         check(branch);
                         if let Some((owner, _)) = branch.search_player()? {
                             for choice in branch.resolution_choices(owner)?.into_iter().take(2) {
-                                let DecisionMove::Input { request: Some(token), selection, .. } = choice
-                                else { panic!("expected a live resolution choice") };
+                                let DecisionMove::Input {
+                                    request: Some(token),
+                                    selection,
+                                    ..
+                                } = choice
+                                else {
+                                    panic!("expected a live resolution choice")
+                                };
                                 branch.with_consumed_request(|branch| {
                                     branch.submit(token, selection)?;
                                     branch.advance_to_decision(&budget)?;
@@ -4199,7 +4400,8 @@ mod rollback_tests {
                             }
                         }
                         Ok(())
-                    }).unwrap();
+                    })
+                    .unwrap();
                     assert_eq!(key(&mut root), before);
                 }
             }
@@ -4213,7 +4415,10 @@ mod rollback_tests {
         use super::super::ExecutionBudget;
 
         let root = object_session("object-execution-card-planning-cycle");
-        let choices: Vec<_> = root.world.heroes.iter()
+        let choices: Vec<_> = root
+            .world
+            .heroes
+            .iter()
             .map(|hero| root.first_planning_commitment(hero.id).unwrap().unwrap())
             .collect();
         let mut forward = root.clone();
@@ -4224,15 +4429,28 @@ mod rollback_tests {
         ] {
             for index in order {
                 let choice = choices[index];
-                worker.commit_card(choice.hero, choice.first.unwrap()).unwrap();
+                worker
+                    .commit_card(choice.hero, choice.first.unwrap())
+                    .unwrap();
             }
-            worker.advance_to_decision(&ExecutionBudget::default()).unwrap();
+            worker
+                .advance_to_decision(&ExecutionBudget::default())
+                .unwrap();
         }
         let forward_state = forward.semantic_state().unwrap();
         let reversed_state = reversed.semantic_state().unwrap();
-        assert_ne!(forward_state["public_revealed_cards"], reversed_state["public_revealed_cards"]);
-        assert_ne!(forward_state["unresolved_hero_ids"], reversed_state["unresolved_hero_ids"]);
-        assert_ne!(forward.world_state_fingerprint(), reversed.world_state_fingerprint());
+        assert_ne!(
+            forward_state["public_revealed_cards"],
+            reversed_state["public_revealed_cards"]
+        );
+        assert_ne!(
+            forward_state["unresolved_hero_ids"],
+            reversed_state["unresolved_hero_ids"]
+        );
+        assert_ne!(
+            forward.world_state_fingerprint(),
+            reversed.world_state_fingerprint()
+        );
     }
 
     #[test]

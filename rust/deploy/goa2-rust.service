@@ -1,0 +1,29 @@
+[Unit]
+Description=GoA2 Rust game service
+After=network.target
+
+[Service]
+Type=simple
+User=goa2
+Group=goa2
+StateDirectory=goa2-rust
+StateDirectoryMode=0700
+UMask=0077
+WorkingDirectory=/opt/goa2-rust/current
+Environment=GOA2_GAME_CONTENT=/opt/goa2-rust/current/live-game-content.json
+Environment=GOA2_GAME_DATABASE=/var/lib/goa2-rust/games.sqlite
+Environment=GOA2_GAME_BIND=127.0.0.1:3288
+EnvironmentFile=/etc/goa2-rust/server.env
+ExecStartPre=/usr/bin/sha256sum --check SHA256SUMS
+ExecStartPre=/opt/goa2-rust/current/goa2-game-server --check-content ${GOA2_GAME_CONTENT}
+ExecStart=/opt/goa2-rust/current/goa2-game-server --hosted
+Restart=on-failure
+RestartSec=2s
+TimeoutStopSec=20s
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target

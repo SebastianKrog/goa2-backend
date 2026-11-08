@@ -54,13 +54,21 @@ class CreationLimiter:
             return None
         return max(1, math.ceil(hits[0] + self.window - now))
 
-    def record(self, ip: str) -> None:
+    def record(self, ip: str) -> float:
         now = self._clock()
         hits = self._hits.get(ip)
         if hits is None:
             self._maybe_sweep(now)
             hits = self._hits[ip] = deque(maxlen=self.limit)
         hits.append(now)
+        return now
+
+    def refund(self, ip: str, reservation: float) -> None:
+        hits = self._hits.get(ip)
+        if hits is not None and reservation in hits:
+            hits.remove(reservation)
+            if not hits:
+                del self._hits[ip]
 
     def tracked_ips(self) -> int:
         return len(self._hits)
@@ -104,5 +112,9 @@ def check_creation_budget(request: Request) -> str:
     return ip
 
 
-def spend_creation_budget(request: Request, ip: str) -> None:
-    request.app.state.creation_limiter.record(ip)
+def spend_creation_budget(request: Request, ip: str) -> float:
+    return request.app.state.creation_limiter.record(ip)
+
+
+def refund_creation_budget(request: Request, ip: str, reservation: float) -> None:
+    request.app.state.creation_limiter.refund(ip, reservation)

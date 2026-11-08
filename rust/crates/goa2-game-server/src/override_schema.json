@@ -1,0 +1,554 @@
+{
+  "ops": [
+    {
+      "name": "add_effect",
+      "family": "patch",
+      "label": "Add active effect",
+      "description": "Re-instate a buff/debuff that expired early (full ActiveEffect payload).",
+      "args_schema": {
+        "properties": {
+          "effect": {
+            "additionalProperties": true,
+            "title": "Effect",
+            "type": "object"
+          }
+        },
+        "required": [
+          "effect"
+        ],
+        "title": "AddEffectArgs",
+        "type": "object"
+      }
+    },
+    {
+      "name": "add_marker",
+      "family": "patch",
+      "label": "Place marker",
+      "description": "Place a singleton marker (venom / poison / bounty) on a target.",
+      "args_schema": {
+        "$defs": {
+          "MarkerType": {
+            "description": "Types of markers in the game. Each type is a singleton.",
+            "enum": [
+              "venom",
+              "poison",
+              "bounty"
+            ],
+            "title": "MarkerType",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "marker_type": {
+            "$ref": "#/$defs/MarkerType"
+          },
+          "target_id": {
+            "title": "Target Id",
+            "type": "string"
+          },
+          "value": {
+            "default": 0,
+            "title": "Value",
+            "type": "integer"
+          },
+          "source_id": {
+            "title": "Source Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "marker_type",
+          "target_id",
+          "source_id"
+        ],
+        "title": "AddMarkerArgs",
+        "type": "object"
+      }
+    },
+    {
+      "name": "move_card",
+      "family": "patch",
+      "label": "Move card between zones",
+      "description": "Move a card between hand, discard, a played slot, and the deck.",
+      "args_schema": {
+        "properties": {
+          "hero_id": {
+            "title": "Hero Id",
+            "type": "string"
+          },
+          "card_id": {
+            "title": "Card Id",
+            "type": "string"
+          },
+          "zone": {
+            "enum": [
+              "hand",
+              "discard",
+              "played",
+              "deck"
+            ],
+            "title": "Zone",
+            "type": "string"
+          },
+          "slot": {
+            "anyOf": [
+              {
+                "maximum": 4,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Turn slot for zone='played'",
+            "title": "Slot"
+          }
+        },
+        "required": [
+          "hero_id",
+          "card_id",
+          "zone"
+        ],
+        "title": "MoveCardArgs",
+        "type": "object"
+      }
+    },
+    {
+      "name": "move_entity",
+      "family": "patch",
+      "label": "Move entity",
+      "description": "Move a unit, hero piece, or token to a hex (fixes a refused legal move).",
+      "args_schema": {
+        "$defs": {
+          "HexArg": {
+            "properties": {
+              "q": {
+                "title": "Q",
+                "type": "integer"
+              },
+              "r": {
+                "title": "R",
+                "type": "integer"
+              },
+              "s": {
+                "title": "S",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "q",
+              "r",
+              "s"
+            ],
+            "title": "HexArg",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "entity_id": {
+            "title": "Entity Id",
+            "type": "string"
+          },
+          "hex": {
+            "$ref": "#/$defs/HexArg"
+          }
+        },
+        "required": [
+          "entity_id",
+          "hex"
+        ],
+        "title": "MoveEntityArgs",
+        "type": "object"
+      }
+    },
+    {
+      "name": "place_entity",
+      "family": "patch",
+      "label": "Place entity on board",
+      "description": "Put a wrongly defeated unit back, or fix a bad respawn hex.",
+      "args_schema": {
+        "$defs": {
+          "HexArg": {
+            "properties": {
+              "q": {
+                "title": "Q",
+                "type": "integer"
+              },
+              "r": {
+                "title": "R",
+                "type": "integer"
+              },
+              "s": {
+                "title": "S",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "q",
+              "r",
+              "s"
+            ],
+            "title": "HexArg",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "entity_id": {
+            "title": "Entity Id",
+            "type": "string"
+          },
+          "hex": {
+            "$ref": "#/$defs/HexArg"
+          }
+        },
+        "required": [
+          "entity_id",
+          "hex"
+        ],
+        "title": "PlaceEntityArgs",
+        "type": "object"
+      }
+    },
+    {
+      "name": "remove_effect",
+      "family": "patch",
+      "label": "Remove active effect",
+      "description": "End a spurious buff/debuff immediately.",
+      "args_schema": {
+        "properties": {
+          "effect_id": {
+            "title": "Effect Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "effect_id"
+        ],
+        "title": "RemoveEffectArgs",
+        "type": "object"
+      }
+    },
+    {
+      "name": "remove_entity",
+      "family": "patch",
+      "label": "Remove entity from board",
+      "description": "Remove a unit that should have been defeated.",
+      "args_schema": {
+        "properties": {
+          "entity_id": {
+            "title": "Entity Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "entity_id"
+        ],
+        "title": "RemoveEntityArgs",
+        "type": "object"
+      }
+    },
+    {
+      "name": "remove_marker",
+      "family": "patch",
+      "label": "Return marker to supply",
+      "description": "Return a marker to the supply (fixes wrong attribution).",
+      "args_schema": {
+        "$defs": {
+          "MarkerType": {
+            "description": "Types of markers in the game. Each type is a singleton.",
+            "enum": [
+              "venom",
+              "poison",
+              "bounty"
+            ],
+            "title": "MarkerType",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "marker_type": {
+            "$ref": "#/$defs/MarkerType"
+          }
+        },
+        "required": [
+          "marker_type"
+        ],
+        "title": "RemoveMarkerArgs",
+        "type": "object"
+      }
+    },
+    {
+      "name": "set_gold",
+      "family": "patch",
+      "label": "Set gold",
+      "description": "Set a hero's gold to an exact value (fixes a miscredited bounty).",
+      "args_schema": {
+        "properties": {
+          "hero_id": {
+            "title": "Hero Id",
+            "type": "string"
+          },
+          "value": {
+            "minimum": 0,
+            "title": "Value",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "hero_id",
+          "value"
+        ],
+        "title": "SetGoldArgs",
+        "type": "object"
+      }
+    },
+    {
+      "name": "set_item",
+      "family": "patch",
+      "label": "Set item count",
+      "description": "Set how many items of one stat a hero has (does not move item cards).",
+      "args_schema": {
+        "$defs": {
+          "StatType": {
+            "enum": [
+              "ATTACK",
+              "DEFENSE",
+              "MOVEMENT",
+              "INITIATIVE",
+              "RANGE",
+              "RADIUS"
+            ],
+            "title": "StatType",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "hero_id": {
+            "title": "Hero Id",
+            "type": "string"
+          },
+          "stat": {
+            "$ref": "#/$defs/StatType"
+          },
+          "value": {
+            "minimum": 0,
+            "title": "Value",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "hero_id",
+          "stat",
+          "value"
+        ],
+        "title": "SetItemArgs",
+        "type": "object"
+      }
+    },
+    {
+      "name": "set_level",
+      "family": "patch",
+      "label": "Set level",
+      "description": "Set a hero's level to an exact value.",
+      "args_schema": {
+        "properties": {
+          "hero_id": {
+            "title": "Hero Id",
+            "type": "string"
+          },
+          "value": {
+            "maximum": 8,
+            "minimum": 1,
+            "title": "Value",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "hero_id",
+          "value"
+        ],
+        "title": "SetLevelArgs",
+        "type": "object"
+      }
+    },
+    {
+      "name": "set_life_counters",
+      "family": "patch",
+      "label": "Set life counters",
+      "description": "Set a team's life counters. 0 ends the game; raising a finished game's losing team above 0 resurrects the game.",
+      "args_schema": {
+        "$defs": {
+          "TeamColor": {
+            "enum": [
+              "RED",
+              "BLUE"
+            ],
+            "title": "TeamColor",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "team": {
+            "$ref": "#/$defs/TeamColor"
+          },
+          "value": {
+            "minimum": 0,
+            "title": "Value",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "team",
+          "value"
+        ],
+        "title": "SetLifeCountersArgs",
+        "type": "object"
+      }
+    },
+    {
+      "name": "set_tie_breaker_team",
+      "family": "patch",
+      "label": "Set tie-breaker / coin face",
+      "description": "Set the tie-breaker team (also Ignatia's coin face).",
+      "args_schema": {
+        "$defs": {
+          "TeamColor": {
+            "enum": [
+              "RED",
+              "BLUE"
+            ],
+            "title": "TeamColor",
+            "type": "string"
+          }
+        },
+        "properties": {
+          "team": {
+            "$ref": "#/$defs/TeamColor"
+          }
+        },
+        "required": [
+          "team"
+        ],
+        "title": "SetTieBreakerArgs",
+        "type": "object"
+      }
+    },
+    {
+      "name": "set_wave_counter",
+      "family": "patch",
+      "label": "Set wave counter",
+      "description": "Set a lane's wave counter (fixes a wrongly scored lane push).",
+      "args_schema": {
+        "properties": {
+          "lane_id": {
+            "title": "Lane Id",
+            "type": "string"
+          },
+          "value": {
+            "minimum": 0,
+            "title": "Value",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "lane_id",
+          "value"
+        ],
+        "title": "SetWaveCounterArgs",
+        "type": "object"
+      }
+    },
+    {
+      "name": "swap_item_card",
+      "family": "patch",
+      "label": "Swap upgrade with its item",
+      "description": "Swap a tucked item card with its same-color, same-tier sibling (fixes picking the wrong upgrade).",
+      "args_schema": {
+        "properties": {
+          "hero_id": {
+            "title": "Hero Id",
+            "type": "string"
+          },
+          "color": {
+            "enum": [
+              "RED",
+              "BLUE",
+              "GREEN"
+            ],
+            "title": "Color",
+            "type": "string"
+          },
+          "tier": {
+            "enum": [
+              "II",
+              "III"
+            ],
+            "title": "Tier",
+            "type": "string"
+          }
+        },
+        "required": [
+          "hero_id",
+          "color",
+          "tier"
+        ],
+        "title": "SwapItemCardArgs",
+        "type": "object"
+      }
+    },
+    {
+      "name": "abort_action",
+      "family": "unstick",
+      "label": "Abort the current action",
+      "description": "Unwind the wedged action through the normal abort path (defense/reaction sequences unwind correctly).",
+      "args_schema": {
+        "properties": {},
+        "title": "NoArgs",
+        "type": "object"
+      }
+    },
+    {
+      "name": "end_turn",
+      "family": "unstick",
+      "label": "Force end of hero turn",
+      "description": "Discard the wedged stack and finalize the current hero's turn.",
+      "args_schema": {
+        "properties": {},
+        "title": "NoArgs",
+        "type": "object"
+      }
+    },
+    {
+      "name": "force_actor",
+      "family": "unstick",
+      "label": "Fix the current actor",
+      "description": "Set current_actor_id when turn order itself went wrong.",
+      "args_schema": {
+        "properties": {
+          "hero_id": {
+            "title": "Hero Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "hero_id"
+        ],
+        "title": "ForceActorArgs",
+        "type": "object"
+      }
+    },
+    {
+      "name": "skip_input",
+      "family": "unstick",
+      "label": "Skip the pending input",
+      "description": "Answer the wedged input request with the SKIP sentinel.",
+      "args_schema": {
+        "properties": {},
+        "title": "NoArgs",
+        "type": "object"
+      }
+    }
+  ]
+}

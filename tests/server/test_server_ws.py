@@ -787,7 +787,7 @@ def test_ws_broadcast_names_the_awaited_player_without_leaking_their_options(cli
     assert defender_msg["input_request"]["options"][0]["id"] == "magnetic_dagger"
 
 
-def test_ws_broadcast_projects_hidden_mine_event_per_connection(client, game_data):
+def test_ws_broadcast_projects_hidden_mine_event_per_connection(client, mine_game_data):
     import asyncio
 
     from goa2.domain.events import GameEvent, GameEventType
@@ -801,22 +801,22 @@ def test_ws_broadcast_projects_hidden_mine_event_per_connection(client, game_dat
         async def send_text(self, data):
             self.message = json.loads(data)
 
-    game = client.app.state.registry.get(game_data["game_id"])
+    game = client.app.state.registry.get(mine_game_data["game_id"])
     state = game.session.state
     mine = state.token_pool[TokenType.MINE_BLAST][0]
-    mine.owner_id = "hero_arien"
+    mine.owner_id = "hero_min"
     destination = next(hex_ for hex_, tile in state.board.tiles.items() if not tile.is_occupied)
     state.place_entity(mine.id, destination)
     event = GameEvent(
         event_type=GameEventType.TOKEN_PLACED,
-        actor_id="hero_arien",
+        actor_id="hero_min",
         target_id=mine.id,
         metadata={"token_type": TokenType.MINE_BLAST.value},
     ).model_dump()
 
     sockets = {
-        _token_for(game_data, "hero_arien"): RecordingSocket(),
-        _token_for(game_data, "hero_wasp"): RecordingSocket(),
+        _token_for(mine_game_data, "hero_min"): RecordingSocket(),
+        _token_for(mine_game_data, "hero_wasp"): RecordingSocket(),
     }
     spectator_socket = RecordingSocket()
     game.ws_connections = sockets
@@ -824,10 +824,10 @@ def test_ws_broadcast_projects_hidden_mine_event_per_connection(client, game_dat
 
     asyncio.run(broadcast(game, client.app.state.registry, events=[event]))
 
-    arien_event = sockets[_token_for(game_data, "hero_arien")].message["events"][0]
-    wasp_event = sockets[_token_for(game_data, "hero_wasp")].message["events"][0]
+    min_event = sockets[_token_for(mine_game_data, "hero_min")].message["events"][0]
+    wasp_event = sockets[_token_for(mine_game_data, "hero_wasp")].message["events"][0]
     spectator_event = spectator_socket.message["events"][0]
-    assert arien_event["metadata"]["token_type"] == "mine_blast"
+    assert min_event["metadata"]["token_type"] == "mine_blast"
     assert wasp_event["metadata"]["token_type"] == "mine"
     assert spectator_event["metadata"]["token_type"] == "mine"
 

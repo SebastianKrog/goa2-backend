@@ -311,6 +311,7 @@ pub(super) enum Field {
     Attacker,
     AttackDamage,
     AttackBasic,
+    AttackSourceCard,
     TargetPlayerKey,
     SaveKey,
     ActorKey,
@@ -408,7 +409,7 @@ pub(super) enum Field {
     OtherUnitKey,
     MaxDistance,
 }
-const NAMES: [&str; 404] = [
+const NAMES: [&str; 405] = [
     "phase",
     "turn",
     "turn_discard_log",
@@ -717,6 +718,7 @@ const NAMES: [&str; 404] = [
     "attacker_id",
     "attack_damage",
     "attack_is_basic",
+    "attack_source_card_id",
     "target_player_key",
     "save_key",
     "actor_key",
@@ -1118,6 +1120,25 @@ impl NativeSession {
         }
         self.advance_turn_bound(objects)
     }
+    pub(super) fn record_position_snapshot_bound(
+        &mut self,
+        objects: &mut BoundObjects,
+    ) -> Result<()> {
+        let locations = objects.phases.root(&objects.arena, Field::Locations)?;
+        let fields = objects
+            .arena
+            .fields(locations)
+            .ok_or_else(|| unsupported("position fields missing"))?
+            .to_vec();
+        let snapshot = objects.arena.dictionary(fields).map_err(unsupported)?;
+        objects
+            .arena
+            .set_root(objects.phases.k(Field::Snapshot), snapshot)
+            .map_err(unsupported)?;
+        self.boundary.snapshot(&self.world);
+        Ok(())
+    }
+
     pub(super) fn advance_turn_bound(&mut self, objects: &mut BoundObjects) -> Result<()> {
         self.preflight_bound_advance(objects)?;
         if self.world.combat.turn >= 4 {
@@ -1133,18 +1154,7 @@ impl NativeSession {
                 ObjectValue::Atom(Datum::Int(self.world.combat.turn)),
             )
             .map_err(unsupported)?;
-        let locations = objects.phases.root(&objects.arena, Field::Locations)?;
-        let fields = objects
-            .arena
-            .fields(locations)
-            .ok_or_else(|| unsupported("position fields missing"))?
-            .to_vec();
-        let snapshot = objects.arena.dictionary(fields).map_err(unsupported)?;
-        objects
-            .arena
-            .set_root(objects.phases.k(Field::Snapshot), snapshot)
-            .map_err(unsupported)?;
-        self.boundary.snapshot(&self.world);
+        self.record_position_snapshot_bound(objects)?;
         self.phase_set(objects, Phase::Planning)?;
         let pending = objects.phases.root(&objects.arena, Field::Pending)?;
         let mut passed = false;

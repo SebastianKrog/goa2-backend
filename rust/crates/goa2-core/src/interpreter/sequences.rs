@@ -67,6 +67,17 @@ impl NativeSession {
         commitments: &[PlanningCommitment],
         operation: impl FnOnce(&mut Self) -> Result<T>,
     ) -> Result<T> {
+        let ordered = self.validate_joint_planning(commitments)?;
+        self.with_rollback(|worker| {
+            worker.apply_joint_planning_ordered(&ordered)?;
+            operation(worker)
+        })
+    }
+
+    pub(super) fn validate_joint_planning(
+        &self,
+        commitments: &[PlanningCommitment],
+    ) -> Result<Vec<PlanningCommitment>> {
         let invalid = |message: &str| EngineError::InvalidInput(message.into());
         if self.planning.phase != Phase::Planning {
             return Err(invalid("joint commitments require planning"));
@@ -118,10 +129,7 @@ impl NativeSession {
         if ordered.is_empty() || ordered.len() != commitments.len() {
             return Err(invalid("joint choice is empty or includes an unknown hero"));
         }
-        self.with_rollback(|worker| {
-            worker.apply_joint_planning_ordered(&ordered)?;
-            operation(worker)
-        })
+        Ok(ordered)
     }
 
     // The caller validates or generates the complete plan before mutation and
@@ -601,7 +609,7 @@ impl NativeSession {
         Ok(())
     }
 
-    fn validate_sequence_input(
+    pub(super) fn validate_sequence_input(
         &mut self,
         player: Symbol,
         token: Option<RequestToken>,

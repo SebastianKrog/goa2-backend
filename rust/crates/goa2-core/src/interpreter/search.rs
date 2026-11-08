@@ -22,6 +22,7 @@ pub enum OpponentPolicy {
     #[default]
     Adversarial,
     AdversarialAttackTargets,
+    AdversarialMovementTargets,
     FirstLegal,
 }
 
@@ -139,13 +140,15 @@ pub enum ForecastNodeShare {
     #[default]
     Quarter,
     Eighth,
+    Zero,
 }
 
 impl ForecastNodeShare {
     fn allowance(self, nodes: usize) -> usize {
-        nodes / match self {
-            Self::Quarter => 4,
-            Self::Eighth => 8,
+        match self {
+            Self::Quarter => nodes / 4,
+            Self::Eighth => nodes / 8,
+            Self::Zero => 0,
         }
     }
 }
@@ -838,16 +841,16 @@ impl NativeSession {
         tactical_replies: bool,
         budget: &ExecutionBudget<'_>,
     ) -> Result<(GreedyCardScores, usize, GreedyForecasts)> {
+        let max_nodes = node_cap / self.world.heroes.len().max(1);
+        if max_nodes == 0 {
+            return Ok((Vec::new(), 0, Vec::new()));
+        }
         let heroes: Vec<_> = self.world.heroes.iter().map(|hero| hero.id).collect();
         let mut scores = Vec::new();
         let mut forecasts = Vec::new();
         let mut nodes = 0;
         let now = std::time::Instant::now();
         let seed_time = budget.deadline.map(|deadline| deadline.saturating_duration_since(now));
-        let max_nodes = node_cap / heroes.len().max(1);
-        if max_nodes == 0 {
-            return Ok((scores, nodes, forecasts));
-        }
         for hero in heroes {
             if self.hero_planning_commitments(hero)?.len() < 2 {
                 continue;
@@ -3369,6 +3372,48 @@ impl Search<'_, '_> {
         Ok((rows, reply_alternative))
     }
 
+    fn movement_leaf(
+        &mut self,
+        worker: &mut NativeSession,
+        player: Symbol,
+        cutoff: i128,
+        beta: i64,
+    ) -> Result<Option<ValueBound>> {
+        let mut moves = worker.resolution_choices(player)?;
+        let Some(fallback) = moves.first().cloned() else {
+            return Err(EngineError::Unsupported(
+                "movement search has no native choices".into(),
+            ));
+        };
+        let is_hex = |choice: &DecisionMove| {
+            matches!(choice, DecisionMove::Input { selection: super::Datum::Object(_), .. })
+        };
+        let skip = moves.iter().find(|choice| !is_hex(choice)).cloned();
+        worker.order_movement_roots(player, &mut moves);
+        let mut shortlist: Vec<_> = moves.into_iter().filter(is_hex).take(3).collect();
+        for extra in std::iter::once(fallback).chain(skip) {
+            if !shortlist.contains(&extra) {
+                shortlist.push(extra);
+            }
+        }
+
+        let mut best = i64::MIN;
+        for choice in shortlist {
+            let leaf = worker.with_consumed_request(|branch| {
+                if !self.apply_input(branch, choice)? {
+                    return Ok(None);
+                }
+                self.rollout(branch, cutoff, false, false)
+            })?;
+            let Some(leaf) = leaf else { return Ok(None) };
+            best = best.max(leaf.score);
+            if best >= beta {
+                break;
+            }
+        }
+        Ok(Some(ValueBound { score: best, resolved: false }))
+    }
+
     // The caller owns the rollback scope for this path.
     fn value(
         &mut self,
@@ -3421,6 +3466,19 @@ impl Search<'_, '_> {
             } else {
                 matches!(self.opponent_policy, OpponentPolicy::FirstLegal)
             };
+            if depth == 0
+                && controlled
+                && matches!(self.opponent_policy, OpponentPolicy::AdversarialMovementTargets)
+                && let Some(cutoff) = self.turn_cutoff
+                && worker.last_request.as_ref().is_some_and(|request| {
+                    matches!(&request.choices, RequestChoices::Hexes(hexes)
+                        if hexes.len() + usize::from(request.can_skip) > 1)
+                })
+                && worker.movement_root_actor()
+                    .is_some_and(|actor| worker.world.hero_identity(actor) == player)
+            {
+                return self.movement_leaf(worker, player, cutoff, beta);
+            }
             let extend_attack = depth == 0
                 && !fixed_policy
                 && matches!(self.opponent_policy, OpponentPolicy::AdversarialAttackTargets)
@@ -4094,6 +4152,75 @@ mod tests {
         let farthest = original.iter().filter_map(|choice| distance(choice, &threats)).max();
         assert!(farthest.is_some());
         assert!(ordered[..3].iter().any(|choice| distance(choice, &threats) == farthest));
+    }
+
+    #[test]
+    fn movement_extension_retains_first_legal_and_charges_each_probe() {
+        let fixture =
+            super::super::object_execution::fixture_case("object-execution-card-planning-cycle");
+        let mut root = NativeSession::compile(
+            serde_json::from_value(fixture["envelope"].clone()).unwrap(),
+        ).unwrap();
+        let plan: Vec<_> = root.world.heroes.iter().map(|hero| PlanningCommitment {
+            hero: hero.id,
+            first: Some(hero.hand[1]),
+            second: None,
+        }).collect();
+        let budget = ExecutionBudget::default();
+        root.with_joint_planning(&plan, |worker| {
+            worker.advance_to_decision(&budget)?;
+            let (owner, team) = worker.search_player()?.unwrap();
+            let choices = worker.resolution_choices(owner)?;
+            let (token, action) = choices.into_iter().find_map(|choice| match choice {
+                DecisionMove::Input { request: Some(token), selection: super::super::Datum::Text(id), .. }
+                    if worker.symbols.name(id) == "FAST_TRAVEL" => Some((token, id)),
+                _ => None,
+            }).expect("opening actor can Fast Travel");
+            worker.submit(token, super::super::Datum::Text(action))?;
+            worker.last_request = None;
+            worker.advance_to_decision(&budget)?;
+            assert!(worker.movement_root_actor().is_some());
+            assert!(worker.resolution_choices(owner)?.len() > 5);
+            let before = worker.semantic_state()?;
+            let request = worker.last_request.clone();
+            let mut search = Search {
+                player: owner,
+                team,
+                budget: &budget,
+                nodes: 0,
+                max_nodes: 1024,
+                opponent_policy: OpponentPolicy::Adversarial,
+                evaluation: SearchEvaluation::MaterialPosition,
+                turn_cutoff: worker.search_turn_cutoff(Some(1))?,
+                controlled: None,
+                shared_nodes: None,
+                guard_hidden: false,
+                planning_sample: None,
+                future_planning: None,
+                forecast_changes: 0,
+                forecast_checks: 0,
+                forecast_matches: 0,
+            };
+            let reference = worker.with_rollback(|branch| search.value(branch, 0, i64::MIN, i64::MAX))?
+                .unwrap();
+            let reference_nodes = search.nodes;
+            search.opponent_policy = OpponentPolicy::AdversarialMovementTargets;
+            search.nodes = 0;
+            let extended = worker.with_rollback(|branch| search.value(branch, 0, i64::MIN, i64::MAX))?
+                .unwrap();
+            assert!(extended.score >= reference.score);
+            assert!(search.nodes > reference_nodes);
+            assert!(!extended.resolved);
+
+            search.nodes = 0;
+            search.max_nodes = 1;
+            assert!(worker.with_rollback(|branch| search.value(branch, 0, i64::MIN, i64::MAX))?
+                .is_none());
+            assert_eq!(search.nodes, 1);
+            assert_eq!(worker.semantic_state()?, before);
+            assert_eq!(worker.last_request, request);
+            Ok(())
+        }).unwrap();
     }
 
     #[test]
@@ -4821,7 +4948,7 @@ mod tests {
         assert!(seed_pass.matrix.score.is_some());
         assert!(seed_pass.matrix.nodes <= 8192);
         assert_eq!(root.semantic_state().unwrap(), state_before_retry);
-        let run_seeded = |root: &NativeSession| root.search_bot_team_planning(
+        let run_fixed = |root: &NativeSession, forecast_node_share| root.search_bot_team_planning(
             player,
             BotPlanningScope {
                 bots: &only,
@@ -4831,10 +4958,24 @@ mod tests {
             },
             2,
             SearchLimits { max_nodes: 8192, ..limits },
-            PlanningSearchOptions { workers: 2, greedy_card_order: true, rollout_turns: Some(2), ..options },
+            PlanningSearchOptions {
+                workers: 2,
+                greedy_card_order: true,
+                rollout_turns: Some(2),
+                forecast_node_share,
+                ..options
+            },
             &budget,
         ).unwrap();
-        let seeded = run_seeded(&root);
+        let seeded = run_fixed(&root, ForecastNodeShare::Quarter);
+        let unseeded = run_fixed(&root, ForecastNodeShare::Zero);
+        assert_eq!(unseeded.greedy_nodes, 0);
+        assert_eq!(unseeded.greedy_card_scores, 0);
+        assert_eq!(unseeded.matrix.forecast_matches, 0);
+        assert!(unseeded.matrix.forecast_checks > 0);
+        assert_eq!(unseeded.matrix.total_cells, unseeded.total_rows * 2);
+        assert!(unseeded.matrix.score.is_some());
+        assert_eq!(root.semantic_state().unwrap(), state_before_retry);
         assert_eq!(seeded.prepared_worlds, 2);
         assert!(seeded.greedy_card_scores > 0);
         assert_eq!(before.greedy_card_scores, 0);
@@ -4917,7 +5058,7 @@ mod tests {
         assert_eq!(fallback.matrix.score, None);
         assert_eq!(fallback.commitments, limited.commitments);
         root.commit_card(ally_id, hand[0]).unwrap();
-        assert_eq!(run_seeded(&root), seeded);
+        assert_eq!(run_fixed(&root, ForecastNodeShare::Quarter), seeded);
         assert_eq!(
             run(&root, &only, TeamKnowledgeMode::CoordinatedShow),
             before

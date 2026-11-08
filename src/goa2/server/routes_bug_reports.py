@@ -12,12 +12,15 @@ Two routers live here:
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from threading import Lock
+
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from goa2.server import bug_reports
 from goa2.server.admin import require_admin
-from goa2.server.auth import PlayerDep, RegistryDep
+from goa2.server.auth import RegistryDep, get_current_player
 from goa2.server.models import BugReportResponse, SubmitBugReportRequest
+from goa2.server.rust_hosted import hosted_games, is_rust_game
 
 public_router = APIRouter(prefix="/games", tags=["bug-reports"])
 admin_router = APIRouter(
@@ -25,29 +28,49 @@ admin_router = APIRouter(
 )
 
 
+_report_lock = Lock()
+
+
+def _check_report_limit(game_id: str) -> None:
+    if bug_reports.count_reports_for_game(game_id) >= bug_reports.MAX_REPORTS_PER_GAME:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Report limit reached for this game ({bug_reports.MAX_REPORTS_PER_GAME})",
+        )
+
+
 @public_router.post("/{game_id}/bug-reports", status_code=201, response_model=BugReportResponse)
 def submit_bug_report(
     game_id: str,
     body: SubmitBugReportRequest,
-    player: PlayerDep,
+    request: Request,
     registry: RegistryDep,
 ) -> BugReportResponse:
-    game = registry.get(game_id)  # 404 via GameNotFoundError if unknown
-    if bug_reports.count_reports_for_game(game_id) >= bug_reports.MAX_REPORTS_PER_GAME:
-        raise HTTPException(
-            status_code=429,
-            detail=f"Report limit reached for this game " f"({bug_reports.MAX_REPORTS_PER_GAME})",
+    if is_rust_game(game_id):
+        authorization = request.headers.get("Authorization", "")
+        if not authorization.startswith("Bearer "):
+            raise HTTPException(401, "Missing or invalid Authorization header")
+        position = hosted_games(request).report_position(game_id, authorization)
+        reporter = position.reporter_hero
+        decision_index = position.decision_index
+        round_num, turn = position.round, position.turn
+    else:
+        player = get_current_player(request, registry)
+        state = registry.get(game_id).session.state
+        reporter = None if player.is_spectator else player.hero_id
+        decision_index = bug_reports.count_replay_decisions(game_id)
+        round_num, turn = state.round, state.turn
+    with _report_lock:
+        _check_report_limit(game_id)
+        report = bug_reports.create_report(
+            game_id=game_id,
+            title=body.title,
+            description=body.description,
+            reporter_hero=reporter,
+            decision_index=decision_index,
+            round_num=round_num,
+            turn=turn,
         )
-    state = game.session.state
-    report = bug_reports.create_report(
-        game_id=game_id,
-        title=body.title,
-        description=body.description,
-        reporter_hero=None if player.is_spectator else player.hero_id,
-        decision_index=bug_reports.count_replay_decisions(game_id),
-        round_num=state.round,
-        turn=state.turn,
-    )
     return BugReportResponse(**report)
 
 

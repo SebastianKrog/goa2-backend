@@ -4,13 +4,13 @@ use super::search::MAX_SEARCH_ROLLOUT_TURNS;
 use super::{
     BotPlanningScope, DecisionMove, EngineError, ExecutionBudget, NativeSession, OpponentPolicy,
     PlanningRolloutSample, PlanningSearchOptions, Result, SearchEvaluation, SearchLimits,
-    TeamKnowledgeMode,
+    TeamKnowledgeMode, WorkBudget,
 };
 use crate::codec::Phase;
 use serde_json::{Value, json};
 use std::{
     collections::BTreeMap,
-    time::{Duration, Instant},
+    time::Instant,
 };
 
 #[derive(Clone, Copy, serde::Deserialize)]
@@ -18,7 +18,9 @@ use std::{
 pub struct OfflinePolicy {
     pub depth: u8,
     pub max_nodes: usize,
-    pub time_ms: u64,
+    pub resolution_max_nodes: Option<usize>,
+    pub time_ms: Option<u64>,
+    pub work_budget: Option<WorkBudget>,
     pub rollout_turns: Option<u8>,
     pub planning_workers: Option<usize>,
     pub sampled_worlds: Option<usize>,
@@ -52,20 +54,23 @@ impl OfflinePolicy {
         self.sampled_worlds.unwrap_or(2)
     }
 
-    fn limits(self) -> SearchLimits {
+    fn limits(self, max_nodes: usize) -> SearchLimits {
         SearchLimits {
             max_depth: self.depth,
-            max_nodes: self.max_nodes,
+            max_nodes,
             opponent_policy: self.opponent_policy,
             evaluation: self.evaluation,
         }
     }
 
-    fn budget(self) -> ExecutionBudget<'static> {
-        ExecutionBudget {
-            deadline: Some(Instant::now() + Duration::from_millis(self.time_ms)),
-            ..ExecutionBudget::default()
-        }
+    fn resolution_nodes(self) -> usize {
+        self.resolution_max_nodes.unwrap_or(self.max_nodes)
+    }
+
+    fn budget_from(self, started: Instant) -> Result<ExecutionBudget<'static>> {
+        ExecutionBudget::for_search(
+            started, self.time_ms, self.work_budget, self.planning_workers.unwrap_or(1),
+        )
     }
 }
 
@@ -125,6 +130,8 @@ pub struct OfflineMatch {
     lives: Vec<(String, i64)>,
     policies: [OfflinePolicyStats; 2],
     #[serde(skip_serializing_if = "Option::is_none")]
+    work_budget: Option<WorkBudget>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     public_upgrade_batches: Option<Vec<PublicUpgradeBatch>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     trace: Option<Vec<Value>>,
@@ -162,7 +169,7 @@ impl NativeSession {
                     })
                     || policy.reply_cap.is_some_and(|cap| !(1..=4096).contains(&cap))
                     || policy.max_nodes == 0
-                    || !(1..=60_000).contains(&policy.time_ms)
+                    || policy.resolution_nodes() == 0
                     || policy
                         .rollout_turns
                         .is_some_and(|turns| !(1..=MAX_SEARCH_ROLLOUT_TURNS).contains(&turns))
@@ -170,6 +177,18 @@ impl NativeSession {
         {
             return Err(EngineError::InvalidInput(
                 "invalid offline match limits".into(),
+            ));
+        }
+        let [red, blue] = policies;
+        for policy in policies {
+            policy.budget_from(Instant::now())?;
+        }
+        if red.work_budget != blue.work_budget
+            || (red.work_budget.is_some()
+                && (red.max_nodes != blue.max_nodes || red.resolution_nodes() != blue.resolution_nodes()))
+        {
+            return Err(EngineError::InvalidInput(
+                "work-budget matches require the same accounting and node caps on both sides".into(),
             ));
         }
         let budget = ExecutionBudget::default();
@@ -210,6 +229,7 @@ impl NativeSession {
                         .map(|(team, lives)| (name(team), lives))
                         .collect(),
                     policies: stats,
+                    work_budget: red.work_budget,
                     public_upgrade_batches: if capture_trace {
                         upgrades.map(|history| history.batches)
                     } else {
@@ -230,6 +250,7 @@ impl NativeSession {
                 let mut joint = Vec::new();
                 let mut coordinated = [Vec::<super::PlanningCommitment>::new(), Vec::new()];
                 for hero in &self.world.heroes {
+                    let started = Instant::now();
                     let Some(fallback) = self.first_planning_commitment(hero.id)? else {
                         continue;
                     };
@@ -240,7 +261,6 @@ impl NativeSession {
                         continue;
                     }
                     stats[index].planning += 1;
-                    let started = (capture_trace && policy.depth > 0).then(Instant::now);
                     let plan = if policy.sample_choices {
                         let choices = self.hero_planning_commitments(hero.id)?;
                         choices[choice_index(hero.id, choices.len())]
@@ -267,7 +287,7 @@ impl NativeSession {
                                 seed: epoch_seed,
                             },
                             4,
-                            policy.limits(),
+                            policy.limits(policy.max_nodes),
                             PlanningSearchOptions {
                                 rollout_turns: policy.rollout_turns,
                                 workers: policy.planning_workers.unwrap_or(1),
@@ -281,7 +301,7 @@ impl NativeSession {
                                 fixed_future_planning: policy.fixed_future_planning,
                                 branch_future_planning: policy.branch_future_planning,
                             },
-                            &policy.budget(),
+                            &policy.budget_from(started)?,
                             policy.planning_seed_pass,
                         );
                         if let Ok(result) = &search {
@@ -353,9 +373,13 @@ impl NativeSession {
                                 stats.fallback += 1;
                                 if capture_trace {
                                     if let Some(trace) = &trace {
-                                        let elapsed = started.map_or(0, |time| time.elapsed().as_millis());
+                                        let detail = if policy.time_ms.is_some() {
+                                            format!(" ({} ms{work})", started.elapsed().as_millis())
+                                        } else {
+                                            work
+                                        };
                                         stats.planning_fallback_trace.entry(trace.len()).or_default().push(
-                                            format!("{}: {reason} ({elapsed} ms{work})", self.symbols.name(hero.id)),
+                                            format!("{}: {reason}{detail}", self.symbols.name(hero.id)),
                                         );
                                     }
                                     *stats.planning_fallbacks.entry(reason).or_default() += 1;
@@ -371,7 +395,7 @@ impl NativeSession {
                             }
                         }
                     };
-                    if let Some(started) = started {
+                    if capture_trace && policy.depth > 0 && policy.time_ms.is_some() {
                         stats[index].planning_micros.push(started.elapsed().as_micros() as u64);
                     }
                     joint.push(plan);
@@ -398,7 +422,7 @@ impl NativeSession {
                 let index = team_index(self.symbols.name(team))?;
                 let policy = policies[index];
                 stats[index].resolution += 1;
-                let started = (capture_trace && policy.depth > 0).then(Instant::now);
+                let started = Instant::now();
                 let fallback = |session: &mut Self| {
                     session.first_resolution_choice(owner)?.ok_or_else(|| {
                         EngineError::Unsupported("offline match has no legal input".into())
@@ -426,10 +450,10 @@ impl NativeSession {
                     let searched = self.search_resolution_worlds(
                         owner,
                         (sample, policy.sampled_worlds(), 1),
-                        policy.limits(),
+                        policy.limits(policy.resolution_nodes()),
                         policy.rollout_turns,
                         policy.rollout_turns.map(|_| sample),
-                        &policy.budget(),
+                        &policy.budget_from(started)?,
                     );
                     if let Ok(result) = &searched {
                         stats[index].resolution_nodes += result.nodes;
@@ -467,7 +491,7 @@ impl NativeSession {
                         }
                     }
                 };
-                if let Some(started) = started {
+                if capture_trace && policy.depth > 0 && policy.time_ms.is_some() {
                     stats[index].resolution_micros.push(started.elapsed().as_micros() as u64);
                 }
                 let DecisionMove::Input {

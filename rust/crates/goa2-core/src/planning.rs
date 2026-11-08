@@ -150,10 +150,10 @@ pub struct Planning {
     two_card_effects: Vec<Symbol>,
     executing: bool,
     end_turn: bool,
-    pending: Vec<(Symbol, Option<CardId>)>,
+    pub(crate) pending: Vec<(Symbol, Option<CardId>)>,
     second: Vec<(Symbol, CardId)>,
     done: Vec<Symbol>,
-    requests: Vec<(String, Symbol, Symbol)>,
+    pub(crate) requests: Vec<(String, Symbol, Symbol)>,
     pub(crate) actor: Option<Symbol>,
     pub(crate) owner: Option<Symbol>,
     /// Stored in actual LIFO order, exactly as on the engine stack.
@@ -586,11 +586,15 @@ impl Planning {
                 .map(|h| symbols.name(*h))
                 .collect::<Vec<_>>()
         );
-        // Retain all request fields verbatim, deleting only cleared requests.
-        state["starting_position_requests"]
+        let requests = state["starting_position_requests"]
             .as_object_mut()
-            .ok_or("requests missing")?
-            .retain(|k, _| self.requests.iter().any(|(key, _, _)| key == k));
+            .ok_or("requests missing")?;
+        requests.retain(|k, _| self.requests.iter().any(|(key, _, _)| key == k));
+        for (key, from, to) in &self.requests {
+            requests.entry(key.clone()).or_insert_with(|| {
+                json!({"from": symbols.name(*from), "to": symbols.name(*to)})
+            });
+        }
         state["current_actor_id"] = json!(self.actor.map(|h| symbols.name(h)));
         state["resolution_owner_id"] = json!(self.owner.map(|h| symbols.name(h)));
         Ok(())

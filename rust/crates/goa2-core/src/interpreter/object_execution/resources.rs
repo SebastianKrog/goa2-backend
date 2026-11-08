@@ -421,7 +421,22 @@ impl NativeSession {
             },
         })
     }
-    fn write_resource_gold_bound(
+    pub(in crate::interpreter) fn grant_test_gold(
+        &mut self,
+        hero: Symbol,
+        amount: i64,
+    ) -> Result<()> {
+        let total = self
+            .world
+            .hero(hero)
+            .and_then(|row| row.gold.checked_add(amount))
+            .ok_or_else(|| {
+                EngineError::InvalidInput("Gold total is outside the supported range".into())
+            })?;
+        self.patch_hero_gold(hero, total)
+    }
+
+    pub(super) fn write_resource_gold_bound(
         &mut self,
         objects: &mut BoundObjects,
         model: ObjectId,

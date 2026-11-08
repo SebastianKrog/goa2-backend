@@ -19,6 +19,11 @@ pub struct UpgradeCheckpoint {
     pub card_items: [i64; 6],
 }
 
+const INITIAL_UPGRADE_CHECKPOINT: UpgradeCheckpoint = UpgradeCheckpoint {
+    level: 1,
+    card_items: [0; 6],
+};
+
 /// One hero's public evidence from a completed upgrade batch.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -45,15 +50,11 @@ pub fn replay_public_upgrade_batches(
             return Err(invalid("conflicting public upgrade batch"));
         }
     }
-    let initial = UpgradeCheckpoint {
-        level: 1,
-        card_items: [0; 6],
-    };
     for batch in ordered.into_values() {
         if batch.hero_id.is_empty()
             || !(1..batch.after.level).contains(&batch.before.level)
             || batch.after.level > 8
-            || !ordinary_item_gains_fit(initial, batch.before)
+            || !ordinary_item_gains_fit(INITIAL_UPGRADE_CHECKPOINT, batch.before)
             || !ordinary_item_gains_fit(batch.before, batch.after)
         {
             return Err(invalid("invalid public upgrade batch"));
@@ -85,6 +86,22 @@ fn ordinary_item_gains_fit(before: UpgradeCheckpoint, after: UpgradeCheckpoint) 
             gained.checked_add(new - old)
         })
         .is_some_and(|gained| gained <= allowance)
+}
+
+fn validate_checkpoint_sequence(level: i64, checkpoints: &[UpgradeCheckpoint]) -> Result<()> {
+    let mut before = INITIAL_UPGRADE_CHECKPOINT;
+    for &after in checkpoints {
+        if after.level < before.level
+            || after.level > level.min(8)
+            || !ordinary_item_gains_fit(before, after)
+        {
+            return Err(EngineError::InvalidInput(
+                "invalid public upgrade checkpoints".into(),
+            ));
+        }
+        before = after;
+    }
+    Ok(())
 }
 
 #[derive(Deserialize)]
@@ -149,13 +166,14 @@ fn catalog() -> Result<&'static Catalog> {
 }
 
 /// Per-match public evidence, sampled at the upgrade prompt and after reveal.
-#[derive(Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub(super) struct PublicUpgradeHistory {
-    tracked: std::collections::HashMap<crate::data::Symbol, TrackedUpgrades>,
+    tracked: BTreeMap<String, TrackedUpgrades>,
     checkpoints: BTreeMap<String, Vec<UpgradeCheckpoint>>,
     pub(super) batches: Vec<PublicUpgradeBatch>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
 struct TrackedUpgrades {
     known: UpgradeCheckpoint,
     pending: Option<UpgradeCheckpoint>,
@@ -168,17 +186,31 @@ impl PublicUpgradeHistory {
         for hero in &session.world.heroes {
             if hero.level == 1
                 && session.world.entity(hero.id).is_some_and(|entity| {
-                    catalog.heroes.get(session.symbols.name(entity.name))
+                    catalog
+                        .heroes
+                        .get(session.symbols.name(entity.name))
                         .is_some_and(|definition| definition.standard)
                 })
             {
-                history.tracked.insert(hero.id, TrackedUpgrades {
-                    known: UpgradeCheckpoint { level: 1, card_items: [0; 6] },
-                    pending: None,
-                });
+                history.tracked.insert(
+                    session.symbols.name(hero.id).to_owned(),
+                    TrackedUpgrades {
+                        known: UpgradeCheckpoint {
+                            level: 1,
+                            card_items: [0; 6],
+                        },
+                        pending: None,
+                    },
+                );
             }
         }
         Ok(history)
+    }
+
+    pub(super) fn invalidate_edited_hero(&mut self, hero: &str) {
+        self.tracked.remove(hero);
+        self.checkpoints.remove(hero);
+        self.batches.retain(|batch| batch.hero_id != hero);
     }
 
     pub(super) fn checkpoints(&self) -> Option<&BTreeMap<String, Vec<UpgradeCheckpoint>>> {
@@ -187,12 +219,15 @@ impl PublicUpgradeHistory {
 
     pub(super) fn begin_batch(&mut self, session: &super::NativeSession) -> Result<()> {
         for hero in &session.world.heroes {
-            if let Some(tracked) = self.tracked.get_mut(&hero.id)
+            if let Some(tracked) = self.tracked.get_mut(session.symbols.name(hero.id))
                 && tracked.known.level < hero.level
                 && tracked.pending.is_none()
                 && let Some(items) = session.public_pre_upgrade_items(hero.id)?
             {
-                tracked.pending = Some(UpgradeCheckpoint { level: hero.level, card_items: items });
+                tracked.pending = Some(UpgradeCheckpoint {
+                    level: hero.level,
+                    card_items: items,
+                });
             }
         }
         Ok(())
@@ -204,7 +239,7 @@ impl PublicUpgradeHistory {
         revision: u64,
     ) -> Result<()> {
         for hero in &session.world.heroes {
-            let Some(tracked) = self.tracked.get_mut(&hero.id) else {
+            let Some(tracked) = self.tracked.get_mut(session.symbols.name(hero.id)) else {
                 continue;
             };
             let before = tracked.known;
@@ -214,7 +249,7 @@ impl PublicUpgradeHistory {
             let Some(after) = tracked.reveal(hero.level, hero.items) else {
                 // A missed or inconsistent reveal leaves later cumulative
                 // totals unknown. Earlier checkpoints remain valid evidence.
-                self.tracked.remove(&hero.id);
+                self.tracked.remove(session.symbols.name(hero.id));
                 continue;
             };
             let hero_id = session.symbols.name(hero.id).to_owned();
@@ -223,7 +258,12 @@ impl PublicUpgradeHistory {
                 checkpoints.push(before);
             }
             checkpoints.push(after);
-            self.batches.push(PublicUpgradeBatch { revision, hero_id, before, after });
+            self.batches.push(PublicUpgradeBatch {
+                revision,
+                hero_id,
+                before,
+                after,
+            });
         }
         Ok(())
     }
@@ -293,13 +333,21 @@ pub(super) fn sample_preserved_gold(
     let Some(slot) = slots.next() else {
         return Ok(None);
     };
-    let golds = catalog()?.heroes.get(&hero.name).map(|row| &row.cyclic_golds);
-    let Some(golds) = golds.filter(|golds| {
-        hero.level < 8 && !golds.is_empty() && slots.next().is_none()
-    }) else {
-        return Err(EngineError::Unsupported("unsupported concealed slots on preserved hero".into()));
+    let golds = catalog()?
+        .heroes
+        .get(&hero.name)
+        .map(|row| &row.cyclic_golds);
+    let Some(golds) =
+        golds.filter(|golds| hero.level < 8 && !golds.is_empty() && slots.next().is_none())
+    else {
+        return Err(EngineError::Unsupported(
+            "unsupported concealed slots on preserved hero".into(),
+        ));
     };
-    Ok(Some((slot, golds[sample_index(seed ^ 0x81f2b1aa727ea991, golds.len())].clone())))
+    Ok(Some((
+        slot,
+        golds[sample_index(seed ^ 0x81f2b1aa727ea991, golds.len())].clone(),
+    )))
 }
 
 pub(super) fn sample_index(seed: u64, len: usize) -> usize {
@@ -311,6 +359,23 @@ pub(super) fn sample_index(seed: u64, len: usize) -> usize {
 }
 
 impl PlayerObservation {
+    pub(super) fn validate_upgrade_evidence(
+        &self,
+        evidence: Option<&BTreeMap<String, Vec<UpgradeCheckpoint>>>,
+    ) -> Result<()> {
+        for (id, checkpoints) in evidence.into_iter().flatten() {
+            let hero = self
+                .heroes
+                .iter()
+                .find(|hero| hero.id == *id)
+                .ok_or_else(|| {
+                    EngineError::InvalidInput("upgrade checkpoints name an unknown hero".into())
+                })?;
+            validate_checkpoint_sequence(hero.level, checkpoints)?;
+        }
+        Ok(())
+    }
+
     /// Sample one other hero's ordinary planning hand before hidden commitments.
     /// Returns None when public card slots or a special lifecycle leave the
     /// ordinary hand reconstruction unsupported.
@@ -338,7 +403,10 @@ impl PlayerObservation {
         seed: u64,
         checkpoints: &[UpgradeCheckpoint],
     ) -> Result<Option<SampledHand>> {
-        if !matches!(self.phase, crate::codec::Phase::Resolution | crate::codec::Phase::Cleanup) {
+        if !matches!(
+            self.phase,
+            crate::codec::Phase::Resolution | crate::codec::Phase::Cleanup
+        ) {
             return Ok(None);
         }
         self.sample_ordinary_hand(hero_id, seed, checkpoints)
@@ -361,7 +429,10 @@ impl PlayerObservation {
         seeds: impl Iterator<Item = u64>,
         checkpoints: &[UpgradeCheckpoint],
     ) -> Result<Option<Vec<SampledHand>>> {
-        if !matches!(self.phase, crate::codec::Phase::Resolution | crate::codec::Phase::Cleanup) {
+        if !matches!(
+            self.phase,
+            crate::codec::Phase::Resolution | crate::codec::Phase::Cleanup
+        ) {
             return Ok(None);
         }
         Ok(self
@@ -402,8 +473,10 @@ impl PlayerObservation {
         let mut hidden = hidden_gold_slots(hero);
         let hidden_gold_slot = hidden.next();
         if hidden_gold_slot.is_some()
-            && (definition.cyclic_golds.is_empty() || hero.level >= 8
-                || public_golds != 0 || hidden.next().is_some())
+            && (definition.cyclic_golds.is_empty()
+                || hero.level >= 8
+                || public_golds != 0
+                || hidden.next().is_some())
         {
             return Ok(None);
         }
@@ -413,10 +486,13 @@ impl PlayerObservation {
             if checkpoints
                 .iter()
                 .any(|point| point.level != 1 || point.card_items != [0; 6])
-                || unavailable.iter().any(|id| !definition.starting.contains(id))
-                || self.revealed_cards.iter().any(|(owner, id)| {
-                    owner == hero_id && !definition.starting.contains(id)
-                })
+                || unavailable
+                    .iter()
+                    .any(|id| !definition.starting.contains(id))
+                || self
+                    .revealed_cards
+                    .iter()
+                    .any(|(owner, id)| owner == hero_id && !definition.starting.contains(id))
             {
                 return Ok(None);
             }
@@ -444,12 +520,13 @@ impl PlayerObservation {
                 .iter()
                 .filter(|id| {
                     !definition.cyclic_golds.contains(id)
-                        && !(hero.level >= 8 && !definition.cyclic_golds.is_empty()
+                        && !(hero.level >= 8
+                            && !definition.cyclic_golds.is_empty()
                             && id.as_str() == "bushido")
                         && !definition
-                        .cards
-                        .iter()
-                        .any(|card| card.id == **id && upgraded.contains(&card.color.index()))
+                            .cards
+                            .iter()
+                            .any(|card| card.id == **id && upgraded.contains(&card.color.index()))
                 })
                 .chain(&loadout.active_card_ids)
                 .filter(|id| !unavailable.contains(id))
@@ -458,18 +535,25 @@ impl PlayerObservation {
             let mut hidden_gold = None;
             if hero.level >= 8 {
                 cards.extend(
-                    definition.cyclic_golds.iter().filter(|id| !unavailable.contains(id)).cloned()
+                    definition
+                        .cyclic_golds
+                        .iter()
+                        .filter(|id| !unavailable.contains(id))
+                        .cloned(),
                 );
             } else if public_golds == 0 && !definition.cyclic_golds.is_empty() {
                 let gold = if hidden_gold_slot.is_none()
                     && self.phase == crate::codec::Phase::Planning
-                    && self.round == 1 && self.turn == 1
+                    && self.round == 1
+                    && self.turn == 1
                 {
-                    definition.starting.iter().find(|id| definition.cyclic_golds.contains(id))?
+                    definition
+                        .starting
+                        .iter()
+                        .find(|id| definition.cyclic_golds.contains(id))?
                 } else {
-                    &definition.cyclic_golds[sample_index(
-                        seed ^ 0x81f2b1aa727ea991, definition.cyclic_golds.len()
-                    )]
+                    &definition.cyclic_golds
+                        [sample_index(seed ^ 0x81f2b1aa727ea991, definition.cyclic_golds.len())]
                 };
                 if let Some(slot) = hidden_gold_slot {
                     hidden_gold = Some((slot, gold.clone()));
@@ -477,11 +561,9 @@ impl PlayerObservation {
                     cards.push(gold.clone());
                 }
             }
-            // The reconstructed pool still includes unrevealed commitments.
-            // Only the count is public and can rule out an impossible pool.
-            if cards.len() < hero.hand_size
-                || (self.phase != crate::codec::Phase::Planning && cards.len() != hero.hand_size)
-            {
+            // Unrevealed commitments still belong to the reconstructed
+            // pool. Their public slots account for the difference from hand size.
+            if cards.len() != hero.hand_size.checked_add(hero.hidden_commitments)? {
                 return None;
             }
             cards.sort();
@@ -522,11 +604,10 @@ impl PlayerObservation {
         let Some(hero) = self.heroes.iter().find(|hero| hero.id == hero_id) else {
             return Err(EngineError::InvalidInput("unknown observed hero".into()));
         };
-        let Some(definition) = catalog()?
-            .heroes
-            .get(&hero.name)
-            .filter(|definition| definition.standard || matches!(hero.name.as_str(), "Dodger" | "Min" | "Snorri"))
-        else {
+        validate_checkpoint_sequence(hero.level, checkpoints)?;
+        let Some(definition) = catalog()?.heroes.get(&hero.name).filter(|definition| {
+            definition.standard || matches!(hero.name.as_str(), "Dodger" | "Min" | "Snorri")
+        }) else {
             return Ok(None);
         };
         let reveals = self
@@ -535,19 +616,9 @@ impl PlayerObservation {
             .filter(|(owner, _)| owner == hero_id)
             .map(|(_, card)| card.as_str())
             .collect::<Vec<_>>();
-        if checkpoints.iter().any(|point| {
-            !(1..=hero.level).contains(&point.level)
-                || point.card_items.iter().any(|count| *count < 0)
-        }) || checkpoints
-            .windows(2)
-            .any(|pair| pair[0].level > pair[1].level)
-        {
-            return Err(EngineError::InvalidInput(
-                "invalid public upgrade checkpoints".into(),
-            ));
-        }
-        let swaps_possible = self.heroes.iter().any(|ally| {
-            ally.team == hero.team && ally.name == "Snorri" && (
+        let swaps_possible =
+            self.heroes.iter().any(|ally| {
+                ally.team == hero.team && ally.name == "Snorri" && (
                 self.revealed_cards.iter().any(|(owner, id)| {
                     *owner == ally.id && id == "ancestral_grace"
                 }) || ally.revealed_current.iter().any(|id| id == "ancestral_grace")
@@ -555,9 +626,13 @@ impl PlayerObservation {
                         matches!(card, PublicCard::Revealed(id) if id == "ancestral_grace")
                     })
             )
-        });
+            });
         let Some(mut candidates) = enumerate(
-            definition, hero.level, &reveals, checkpoints, swaps_possible,
+            definition,
+            hero.level,
+            &reveals,
+            checkpoints,
+            swaps_possible,
         ) else {
             return Ok(None);
         };
@@ -655,7 +730,10 @@ fn enumerate(
                 if swaps_possible {
                     // A swap preserves the number of items, but can change
                     // which stat was recorded at an earlier upgrade batch.
-                    point.card_items.into_iter().try_fold(0i64, i64::checked_add)
+                    point
+                        .card_items
+                        .into_iter()
+                        .try_fold(0i64, i64::checked_add)
                         == Some(counts.iter().sum())
                 } else {
                     counts == point.card_items
@@ -793,13 +871,17 @@ fn items_match(
         }
     }
     if let Some(level) = dodger_level {
-        return counts.iter().zip(public).enumerate().all(|(index, (count, wanted))| {
-            if extra && level >= 8 && index == Stat::Attack.index() {
-                count <= wanted
-            } else {
-                count == wanted
-            }
-        });
+        return counts
+            .iter()
+            .zip(public)
+            .enumerate()
+            .all(|(index, (count, wanted))| {
+                if extra && level >= 8 && index == Stat::Attack.index() {
+                    count <= wanted
+                } else {
+                    count == wanted
+                }
+            });
     }
     if extra {
         counts
@@ -823,6 +905,34 @@ mod tests {
         reveals: Vec<String>,
         extra: bool,
         expected: Vec<LoadoutHypothesis>,
+    }
+
+    #[test]
+    fn planning_hand_deficit_must_match_public_commitment_slots() {
+        let fixture =
+            super::super::object_execution::fixture_case("object-execution-card-planning-cycle");
+        let mut session = super::super::NativeSession::compile(
+            serde_json::from_value(fixture["envelope"].clone()).unwrap(),
+        )
+        .unwrap();
+        let player = session.world.heroes[0].id;
+        let opponent = session.world.heroes[1].id;
+        let root = session.player_observation(player).unwrap();
+        let id = root.heroes[1].id.clone();
+        let initial = root.sample_planning_hand(&id, 39).unwrap().unwrap();
+
+        let first = session.world.heroes[1].hand[0];
+        session.commit_card(opponent, first).unwrap();
+        let mut committed = session.player_observation(player).unwrap();
+        assert_eq!(committed.heroes[1].hidden_commitments, 1);
+        assert_eq!(committed.heroes[1].hand_size + 1, root.heroes[1].hand_size);
+        assert!(committed.heroes[1].revealed_current.is_empty());
+        assert_eq!(
+            committed.sample_planning_hand(&id, 39).unwrap().unwrap(),
+            initial
+        );
+        committed.heroes[1].hand_size -= 1;
+        assert!(committed.sample_planning_hand(&id, 39).unwrap().is_none());
     }
 
     #[test]
@@ -871,7 +981,9 @@ mod tests {
             serde_json::from_value(fixture["envelope"].clone()).unwrap(),
         )
         .unwrap();
-        let mut view = session.player_observation(session.world.heroes[0].id).unwrap();
+        let mut view = session
+            .player_observation(session.world.heroes[0].id)
+            .unwrap();
         view.phase = crate::codec::Phase::Resolution;
         view.revealed_cards.clear();
         let hero = &mut view.heroes[1];
@@ -890,13 +1002,19 @@ mod tests {
                 .sample_resolution_hand_with_checkpoints(&id, seed, &[])
                 .unwrap()
                 .unwrap();
-            let sampled: Vec<_> = sample.cards.into_iter().filter(|id| golds.contains(id)).collect();
+            let sampled: Vec<_> = sample
+                .cards
+                .into_iter()
+                .filter(|id| golds.contains(id))
+                .collect();
             assert_eq!(sampled.len(), 1);
             seen.extend(sampled);
         }
         assert_eq!(seen.len(), 3);
 
-        view.heroes[1].revealed_current.push("sting_like_a_bee".into());
+        view.heroes[1]
+            .revealed_current
+            .push("sting_like_a_bee".into());
         view.heroes[1].hand_size = 4;
         let sample = view
             .sample_resolution_hand_with_checkpoints(&id, 0, &[])
@@ -905,7 +1023,11 @@ mod tests {
         assert!(sample.cards.iter().all(|id| !golds.contains(id)));
 
         view.heroes[1].played.push(PublicCard::Hidden);
-        assert!(view.sample_resolution_hand_with_checkpoints(&id, 0, &[]).unwrap().is_none());
+        assert!(
+            view.sample_resolution_hand_with_checkpoints(&id, 0, &[])
+                .unwrap()
+                .is_none()
+        );
 
         view.heroes[1].revealed_current.clear();
         let sample = view
@@ -925,10 +1047,15 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(discarded.cards, sample.cards);
-        assert_eq!(discarded.hidden_gold, Some((HiddenGoldSlot::Discard(0), gold)));
+        assert_eq!(
+            discarded.hidden_gold,
+            Some((HiddenGoldSlot::Discard(0), gold))
+        );
         let preserved: BTreeSet<_> = (0..32)
             .map(|seed| {
-                let (slot, id) = sample_preserved_gold(&view.heroes[1], seed).unwrap().unwrap();
+                let (slot, id) = sample_preserved_gold(&view.heroes[1], seed)
+                    .unwrap()
+                    .unwrap();
                 assert_eq!(slot, HiddenGoldSlot::Discard(0));
                 id
             })
@@ -978,7 +1105,9 @@ mod tests {
             serde_json::from_value(fixture["envelope"].clone()).unwrap(),
         )
         .unwrap();
-        let mut view = session.player_observation(session.world.heroes[0].id).unwrap();
+        let mut view = session
+            .player_observation(session.world.heroes[0].id)
+            .unwrap();
         view.phase = crate::codec::Phase::Resolution;
         view.revealed_cards.clear();
         let hero = &mut view.heroes[1];
@@ -988,15 +1117,30 @@ mod tests {
         hero.discarded.clear();
         hero.revealed_current = vec!["dread_razor".into()];
         let id = hero.id.clone();
-        let sample = view.sample_resolution_hand_with_checkpoints(&id, 39, &[]).unwrap().unwrap();
-        assert_eq!(sample.cards, ["death_trap", "littlefinger_of_death", "shield_of_decay"]);
+        let sample = view
+            .sample_resolution_hand_with_checkpoints(&id, 39, &[])
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            sample.cards,
+            ["death_trap", "littlefinger_of_death", "shield_of_decay"]
+        );
         assert_eq!(sample.loadout, LoadoutHypothesis::default());
 
-        view.revealed_cards.push((id.clone(), "unknown_card".into()));
-        assert!(view.sample_resolution_hand_with_checkpoints(&id, 39, &[]).unwrap().is_none());
+        view.revealed_cards
+            .push((id.clone(), "unknown_card".into()));
+        assert!(
+            view.sample_resolution_hand_with_checkpoints(&id, 39, &[])
+                .unwrap()
+                .is_none()
+        );
         view.revealed_cards.clear();
         view.heroes[1].level = 2;
-        assert!(view.sample_resolution_hand_with_checkpoints(&id, 39, &[]).unwrap().is_none());
+        assert!(
+            view.sample_resolution_hand_with_checkpoints(&id, 39, &[])
+                .unwrap()
+                .is_none()
+        );
 
         view.heroes[1].items[Stat::Defense.index()] = 1;
         view.heroes[1].revealed_current = vec!["finger_of_death".into()];
@@ -1006,11 +1150,14 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(upgraded.loadout.item_card_ids, ["burning_skull"]);
-        assert_eq!(upgraded.cards, ["death_trap", "dread_razor", "shield_of_decay"]);
+        assert_eq!(
+            upgraded.cards,
+            ["death_trap", "dread_razor", "shield_of_decay"]
+        );
     }
 
     #[test]
-    fn visible_discard_constrains_loadout_without_reveal_history() {
+    fn visible_played_and_discarded_cards_constrain_loadout_without_reveal_history() {
         let fixture =
             super::super::object_execution::fixture_case("object-execution-card-planning-cycle");
         let session = super::super::NativeSession::compile(
@@ -1043,6 +1190,12 @@ mod tests {
         assert_eq!(rows[0].active_card_ids, ["expert_duelist"]);
         let sample = observation.sample_planning_hand(&id, 39).unwrap().unwrap();
         assert!(!sample.cards.iter().any(|card| card == "expert_duelist"));
+
+        let hero = &mut observation.heroes[1];
+        hero.played.push(hero.discarded.pop().unwrap());
+        let played = observation.sample_planning_hand(&id, 39).unwrap().unwrap();
+        assert_eq!(played, sample);
+
         observation.heroes[1].hand_size = sample.cards.len() + 1;
         assert!(observation.sample_planning_hand(&id, 39).unwrap().is_none());
     }
@@ -1092,11 +1245,23 @@ mod tests {
     #[test]
     fn revealed_batch_records_only_ordinary_item_deltas() {
         let mut tracked = TrackedUpgrades {
-            known: UpgradeCheckpoint { level: 1, card_items: [0; 6] },
-            pending: Some(UpgradeCheckpoint { level: 4, card_items: [2, 0, 0, 0, 0, 0] }),
+            known: UpgradeCheckpoint {
+                level: 1,
+                card_items: [0; 6],
+            },
+            pending: Some(UpgradeCheckpoint {
+                level: 4,
+                card_items: [2, 0, 0, 0, 0, 0],
+            }),
         };
         let point = tracked.reveal(4, [3, 1, 0, 1, 0, 0]).unwrap();
-        assert_eq!(point, UpgradeCheckpoint { level: 4, card_items: [1, 1, 0, 1, 0, 0] });
+        assert_eq!(
+            point,
+            UpgradeCheckpoint {
+                level: 4,
+                card_items: [1, 1, 0, 1, 0, 0]
+            }
+        );
         assert!(tracked.pending.is_none());
         assert!(tracked.reveal(5, [3, 1, 0, 2, 0, 0]).is_none());
         assert_eq!(tracked.known, point);
@@ -1104,8 +1269,14 @@ mod tests {
 
     #[test]
     fn automatic_ultimate_unlock_preserves_ordinary_items_without_a_prompt() {
-        let before = UpgradeCheckpoint { level: 7, card_items: [1, 2, 1, 1, 1, 0] };
-        let mut tracked = TrackedUpgrades { known: before, pending: None };
+        let before = UpgradeCheckpoint {
+            level: 7,
+            card_items: [1, 2, 1, 1, 1, 0],
+        };
+        let mut tracked = TrackedUpgrades {
+            known: before,
+            pending: None,
+        };
         let after = tracked.reveal(8, [2, 2, 1, 1, 1, 0]).unwrap();
         assert_eq!(after, UpgradeCheckpoint { level: 8, ..before });
         assert_eq!(tracked.known, after);
@@ -1129,17 +1300,42 @@ mod tests {
         let eighth = checkpoint(8, 6);
         assert!(replay_public_upgrade_batches(&[batch(1, initial, eighth)]).is_ok());
         assert!(replay_public_upgrade_batches(&[batch(1, seventh, eighth)]).is_ok());
+        assert!(replay_public_upgrade_batches(&[batch(1, seventh, checkpoint(8, 7))]).is_err());
         assert!(
-            replay_public_upgrade_batches(&[batch(1, seventh, checkpoint(8, 7))]).is_err()
-        );
-        assert!(
-            replay_public_upgrade_batches(&[batch(1, checkpoint(2, 2), checkpoint(3, 2))])
-                .is_err()
+            replay_public_upgrade_batches(&[batch(1, checkpoint(2, 2), checkpoint(3, 2))]).is_err()
         );
         let first = batch(1, initial, checkpoint(2, 0));
         let later = batch(2, checkpoint(3, 2), checkpoint(4, 2));
         assert!(replay_public_upgrade_batches(&[first, later.clone()]).is_err());
         assert!(replay_public_upgrade_batches(&[later]).is_ok());
+    }
+
+    #[test]
+    fn direct_checkpoints_enforce_the_same_item_budget_as_replayed_batches() {
+        let point = |level, attack| UpgradeCheckpoint {
+            level,
+            card_items: [attack, 0, 0, 0, 0, 0],
+        };
+        let second = point(2, 1);
+        let seventh = point(7, 6);
+        let eighth = point(8, 6);
+        assert!(validate_checkpoint_sequence(8, &[second, second, seventh, eighth]).is_ok());
+        for history in [
+            vec![point(1, 1)],
+            vec![point(2, 2)],
+            vec![second, point(2, 0)],
+            vec![second, point(3, 0)],
+            vec![second, point(3, 3)],
+            vec![seventh, point(8, 7)],
+            vec![seventh, second],
+            vec![point(9, 6)],
+        ] {
+            assert!(matches!(
+                validate_checkpoint_sequence(8, &history),
+                Err(EngineError::InvalidInput(_))
+            ));
+        }
+        assert!(validate_checkpoint_sequence(7, &[eighth]).is_err());
     }
 
     #[test]
@@ -1161,7 +1357,10 @@ mod tests {
             card_items: items(2),
         };
         // Level one to four supplies only a combined three-upgrade total.
-        assert_eq!(enumerate(hero, 4, &[], &[level_four], false).unwrap().len(), 2);
+        assert_eq!(
+            enumerate(hero, 4, &[], &[level_four], false).unwrap().len(),
+            2
+        );
         let aggregate = enumerate(hero, 5, &[], &[level_five], false).unwrap();
         assert_eq!(aggregate.len(), 4);
         let observed = enumerate(hero, 5, &[], &[level_four, level_five], false).unwrap();

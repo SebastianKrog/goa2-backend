@@ -31,6 +31,7 @@ from goa2.server.routes_draft import router as draft_router
 from goa2.server.routes_games import router as games_router
 from goa2.server.routes_heroes import router as heroes_router
 from goa2.server.routes_overrides import router as overrides_router
+from goa2.server.rust_hosted import RustHostedGames
 from goa2.server.time_control import resume_timers, stop_timers
 from goa2.server.workers import prewarm_heavy_pool, shutdown_heavy_pool
 from goa2.server.ws import router as ws_router
@@ -144,6 +145,17 @@ def create_app() -> FastAPI:
     _configure_logging()
     app = FastAPI(title="GoA2 API", version="0.1.0", lifespan=lifespan)
     app.state.creation_limiter = CreationLimiter(create_limit_per_hour())
+    app.state.rust_hosted = RustHostedGames.from_environment()
+    for setting, default, attribute in (
+        ("GOA2_RUST_NEW_DRAFTS", "1", "rust_new_drafts"),
+        ("GOA2_RUST_NEW_GAMES", "0", "rust_new_games"),
+    ):
+        value = os.environ.get(setting, default).strip()
+        if value not in {"0", "1"}:
+            raise ValueError(f"{setting} must be 0 or 1")
+        setattr(app.state, attribute, value == "1")
+    if app.state.rust_new_games and app.state.rust_hosted is None:
+        raise ValueError("GOA2_RUST_NEW_GAMES requires the Rust game origin and provisioning token")
 
     # Routers
     app.include_router(heroes_router)

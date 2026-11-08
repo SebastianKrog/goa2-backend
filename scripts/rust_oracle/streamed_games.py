@@ -99,17 +99,12 @@ class StreamWorker:
         )
 
     def records(self, envelope, operations):
+        return self.operation_records("stack_trace_stream", len(operations),
+                                      envelope=envelope, operations=operations)
+
+    def operation_records(self, operation, expected_records, **fields):
         self.process.stdin.write(
-            canonical(
-                {
-                    "schema_version": 1,
-                    "id": 1,
-                    "operation": "stack_trace_stream",
-                    "envelope": envelope,
-                    "operations": operations,
-                }
-            )
-            + "\n"
+            canonical(dict(schema_version=1, id=1, operation=operation, **fields)) + "\n"
         )
         self.process.stdin.flush()
         count = 0
@@ -126,7 +121,7 @@ class StreamWorker:
                 )
             result = packet["result"]
             if result.get("complete") is True:
-                if result.get("records") != count or count != len(operations):
+                if result.get("records") != count or count != expected_records:
                     raise ValueError("incomplete replay stream")
                 return
             if result.get("sequence") != count or "record" not in result:

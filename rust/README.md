@@ -1,10 +1,402 @@
 # Native search engine
 
-Work in progress, following [the implementation plan](../docs/superpowers/plans/2026-10-23-rust-search-engine.md).
-The offline worker runs native planning, resolution search, and complete
-Rust-only matches. Python validates the selected choices and replays.
-Recorded coverage includes all six bundled maps and all 33 registered
-heroes. Playing-strength acceptance and broader rule coverage remain open.
+The offline engine is implemented. The worker runs native planning,
+resolution search, and complete Rust-only matches. Python validates
+selected choices and replays. Recorded coverage includes all six
+bundled maps and all 33 registered heroes.
+
+The two-turn reference policy, serial throughput and decision latency
+are accepted for integration. The next milestone is a Rust backend
+that owns Layout Lab games, followed by web integration on the same
+game runtime. See the
+[implementation plan](../docs/superpowers/plans/2026-10-23-rust-search-engine.md)
+for the runtime boundary, rollout stages and benchmark results.
+
+### Native game setup
+
+Build the static setup pack once with the pinned oracle environment. Rust
+loads the pack with `GameContent::read` and creates games with
+`LiveGame::create`. The pack contains maps, hero/card definitions, and
+unit and token templates. Game creation and play run entirely in Rust.
+
+From the repository root in WSL with the pinned Python environment active.
+The launcher extracts the pinned oracle revision into a temporary directory,
+so current web service changes in the checkout do not affect the exports:
+
+```sh
+setup_cache="$HOME/.cache/goa2-rust"
+mkdir -p "$setup_cache"
+python scripts/rust_oracle/run_pinned.py live_game_content "$setup_cache/live-game-content.json" \
+  --parity-fixtures "$setup_cache/live-game-setup-cases.jsonl.gz"
+GOA2_GAME_CONTENT="$setup_cache/live-game-content.json" \
+GOA2_GAME_SETUP_CASES="$setup_cache/live-game-setup-cases.jsonl.gz" \
+  sh rust/cargo-wsl.sh test --profile iterate -p goa2-core \
+  --test live_game_setup -- --ignored --nocapture
+```
+
+### Frontend projection parity
+
+`LiveGame::client_view` and `client_result` produce recipient-scoped
+frontend responses. A transport must pass the authenticated hero or
+spectator scope and use these responses for live updates.
+
+```sh
+setup_cache="$HOME/.cache/goa2-rust"
+mkdir -p "$setup_cache"
+python scripts/rust_oracle/run_pinned.py live_game_views "$setup_cache/live-game-view-cases.jsonl.gz"
+GOA2_GAME_VIEW_CASES="$setup_cache/live-game-view-cases.jsonl.gz" \
+  sh rust/cargo-wsl.sh test --profile iterate -p goa2-core \
+  --test live_game_views -- --ignored --nocapture
+```
+
+### Local Rust game service
+
+Build the static setup pack above and set `lab_token` to a private shared
+token before starting the local service in WSL:
+
+```sh
+setup_cache="$HOME/.cache/goa2-rust"
+GOA2_GAME_CONTENT="$setup_cache/live-game-content.json" \
+GOA2_GAME_DATABASE="$setup_cache/lab-games.sqlite" \
+GOA2_LAB_TOKEN="$lab_token" \
+  sh rust/cargo-wsl.sh run --profile iterate -p goa2-game-server
+```
+
+The default listener is `127.0.0.1:3288`. Set `GOA2_GAME_BIND` to
+use another local address. The service uses the frontend's bearer tokens and game WebSocket.
+A manual match can supply `time_control` at creation for advisory or
+enforced clocks. All players ready before play. The service resumes
+deadline processing after restart. Lab clones of timed checkpoints
+keep the clock fixed at capture time for repeatable inspection.
+
+A connected human can request a pause in a running timed match. The
+majority is calculated from the human seats connected when the vote opens.
+All seat clocks hold during the vote. Rejection, cancellation, expiry or
+a restart during voting resumes the same prompt without spending the
+held time. An approved pause survives restart and ends when the human
+seats ready. The vote defaults to 120 seconds, configurable with
+`GOA2_OVERRIDE_TIMEOUT_SECONDS`.
+Provide `GOA2_LAB_TOKEN` to enable native checkpoint, restore,
+responder and command endpoints. Lab requests use `X-Lab-Token`.
+Keep the database directory private. A restart reuses saved games
+and their existing player links. In the Layout Lab environment, set
+`GOA2_LAB_RUST_TOKEN` to the same token and select Rust in the quickstart
+picker. If you override the Rust listener port, set
+`GOA2_LAB_RUST_PORT` to match.
+
+Commands can carry `expected_revision` to reject stale writes and
+`client_action_id` to replay the original acknowledgement on retry.
+The checkpoint and acknowledgement are saved in the same SQLite
+transaction before the update reaches any client. A resolution's rollback
+anchor survives restart. Rollback is scoped to the current responder,
+respects foreign decisions and hidden-information boundaries, and issues
+a fresh prompt ID. Opening players can move or request a teammate swap
+before committing. The recipient's consent applies the swap and updates
+the turn's position snapshot. Upgrade previews show an ordered prefix
+and its next options without advancing the revision.
+
+With Lab authorization, `GET /__lab/games/{game}/replay` exports a
+live game archive. `POST /__lab/replay` verifies the archive and returns
+a portable checkpoint for the requested revision, defaulting to the
+latest. The request uses `replay_json` as a string to preserve full
+64-bit seed and timeout inputs. The journal records each committed
+operation in the same transaction as the live checkpoint and verifies
+a checkpoint digest after every reconstructed revision. Archives contain
+private game state, including card choices. Keep them private. Player
+tokens, the Lab token and retry receipts are excluded.
+
+Games already present when the journal is installed start their archive
+at the migration checkpoint. Opening a restored Situation starts a new
+journal. A saved revision during an open pause vote retains the held
+clock, and opening it as a new game clears the hold because there are
+no live voters.
+
+Set a seat's bot policy in the `POST /games` body using
+`"bots": {"hero_brogan": {"kind": "rust"}}`. Rust bots use the
+two-turn Lane Pressure V3 baseline with true-rules knowledge.
+A decision has a five-second search deadline. A human command can
+invalidate an in-flight search, and a timed-out search can still
+submit its best legal result or a native legal fallback. Upgrade
+choices use the bot's own offered options. In timed games the service
+readies bot seats automatically and waits for the human seats. Search
+reserves time to submit before the bot's own deadline. Bot actions
+count as automatic for the inactivity rule. A human can ready to resume
+a suspended game, and the database retains readiness, bot seats and
+public upgrade evidence through restart. Frozen timed Lab fixtures
+use manual seats for reproducible inspection.
+
+Run the process-level smoke test against a disposable database:
+
+```sh
+sh rust/cargo-wsl.sh build --profile iterate -p goa2-game-server
+uv run --no-project --with websockets python scripts/verify_rust_game_server.py \
+  "$setup_cache/target/iterate/goa2-game-server" "$setup_cache/live-game-content.json"
+```
+
+### Player decision history
+
+The frontend's Decisions tab uses
+`GET /games/{game}/overrides/history` with the player's or spectator's
+bearer token. Each committed revision supplies one history entry.
+Card names follow the viewer's current authorized game view. Prompt
+submissions use a generic label to keep hidden selections private.
+Rounds and turns refer to the position before the decision. An
+older replay journal can supply its original entries even when it
+lacks that metadata. The response includes up to the latest 10,000
+entries and the total count. Live replay archives keep their existing
+format.
+
+### Discover native game content
+
+The Rust service exposes `GET /maps`, `GET /heroes` and
+`GET /heroes/metadata`. Request `?include_playtest=true` to include
+playtest heroes in either roster list. Regenerate the embedded catalogue
+when the shared registry or difficulty metadata changes.
+
+```sh
+PYTHONPATH=src uv run python scripts/export_rust_hero_catalogue.py > rust/crates/goa2-game-server/src/hero_catalogue.json
+```
+
+### Package the Linux staging service
+
+Build a release on the target architecture, then pair it with a pack
+exported by the pinned oracle. The package command validates the copied
+binary and pack and writes a deterministic archive for the same inputs.
+
+```sh
+setup_cache="$HOME/.cache/goa2-rust"
+sh rust/cargo-wsl.sh build --locked --release -p goa2-game-server
+python scripts/package_rust_game_server.py \
+  "$setup_cache/target/release/goa2-game-server" \
+  "$setup_cache/live-game-content.json" "$setup_cache/goa2-rust-staging.tar.gz"
+```
+
+Extract the archive into a root-owned release directory and run
+`sha256sum --check SHA256SUMS` there. The bundled systemd unit expects
+`/opt/goa2-rust/current` to point to that directory and uses
+`/var/lib/goa2-rust` for the private SQLite database. Install the unit
+with a dedicated `goa2` account and a root-readable
+`/etc/goa2-rust/server.env` containing `GOA2_GAME_PROVISION_TOKEN`.
+The unit listens on loopback and starts in explicit hosted mode. Before
+opening SQLite it checks the package hashes and verifies the content pack.
+Keep the previous release directory and the SQLite backup for rollback.
+
+`goa2-game-server --check-content PATH` reports the executable and pack
+digests and the oracle identity without opening the database. The live
+health endpoint reports the same identity.
+
+### Route completed web drafts to Rust in staging
+
+Start a separate Rust service with its own SQLite database and set
+`GOA2_GAME_PROVISION_TOKEN` to a private shared secret. The existing
+draft service uses the same secret and `GOA2_RUST_DRAFT_ORIGIN` to
+reach the Rust service over the private network. A completed draft
+preserves the selected map, mode, seats, names, tie breaker and
+clock settings. The draft publishes the seat and spectator links
+after creation succeeds. A retry with the same ID and setup recovers
+the original links across a Rust restart.
+
+Configure `RUST_BACKEND_ORIGIN` for the staging frontend Worker
+to route `/api/games/rust-{id}` requests and game WebSockets to the
+Rust service. Keep its tunnel behind the same Worker-only Access
+policy as the Python origin. The Worker does not carry the
+provisioning secret. The private server-to-server endpoint is
+`PUT /__hosted/games/{game}`. Hosted mode disables direct Rust game
+creation and cannot be combined with a Lab token. Python keeps its
+existing games, and new drafts continue to use Python by default
+when staging provisioning is unset.
+
+Use an environment with the backend's dependencies and the
+`httpx` and `websockets` packages for the hosted verification:
+
+```sh
+PYTHONPATH=src python scripts/verify_rust_hosted_draft.py \
+  "$setup_cache/target/iterate/goa2-game-server" "$setup_cache/live-game-content.json"
+```
+
+The test exercises a real draft, verifies scoped links and
+retries after a lost provisioning reply. Existing draft lobbies are
+in memory. Gameplay survives a Rust restart with its original
+links.
+
+### Verify the staging ingress
+
+Run the staging verifier against the frontend and the separate Rust tunnel
+after configuring Access. Use an idle, untimed Rust match with one player
+link and its spectator link. Set `GOA2_STAGING_SEAT_TOKEN` and
+`GOA2_STAGING_SPECTATOR_TOKEN` in the environment. If the frontend requires
+Access, provide its service-token pair in `GOA2_STAGING_ACCESS_CLIENT_ID`
+and `GOA2_STAGING_ACCESS_CLIENT_SECRET`, or its existing session token in
+`GOA2_STAGING_ACCESS_COOKIE`.
+
+```sh
+python scripts/verify_rust_staging.py \
+  --frontend-origin "$staging_frontend" --rust-origin "$staging_rust_tunnel" \
+  --game-id "$rust_game_id"
+```
+
+The verifier uses `httpx` and `websockets` 15 or later. It checks direct
+origin denial without credentials, blocks on private routes through the
+Worker, player and spectator scope, and reconnect at the same revision.
+Pass `--manifest` with the unpacked `manifest.json` to verify the exact
+running binary and content digests through the Worker. Pass `--share-token`
+to check a published replay at its opening and final decisions. Re-run against the same game and share after the staging service
+restart or database restore.
+
+When staging direct creation is enabled, replace `--game-id "$rust_game_id"`
+with `--exercise` to create one disposable match. Use `--exercise-draft`
+with Rust draft routing enabled to create a two-player lobby, draft and
+claim heroes, and check that both players and the spectator receive
+distinct links to the same Rust match. Both modes verify a card
+commitment, spectator redaction over WebSocket and in the journal, and
+the other player's scoped REST view. Each mode leaves one canary game in
+staging.
+
+### Enable direct Create Game on Rust
+
+Set `GOA2_RUST_NEW_GAMES=1` on the Python web service with the same
+private Rust origin and provisioning token used by drafts. The existing
+Create Game screen can then issue Rust links. The web service applies
+the shared creation limit and retries an uncertain native reply once
+using the same game ID. A direct API request may seat native bots with
+`{"kind": "rust"}`. Requests with classic bot policies use Python.
+Rust games can enable the same planning gold command over REST and
+WebSocket. Set `GOA2_RUST_NEW_GAMES=0` to stop assigning new direct
+games to Rust.
+
+### Pause new Rust drafts and recover a hosted database
+
+Set `GOA2_RUST_NEW_DRAFTS=0` on the Python web service before
+applying its deployment configuration to send new draft
+completions to Python. Keep `GOA2_RUST_DRAFT_ORIGIN`, the shared
+provisioning token, and the Worker's `RUST_BACKEND_ORIGIN` in place
+for existing Rust games, reports, and replays. An in-process retry
+for a draft that already received a Rust game ID keeps its original
+owner. A Python process restart discards open in-memory draft lobbies.
+
+On Linux, stop the game service with SIGTERM for a planned restart.
+Ctrl+C uses the same drain path. The service stops taking new requests,
+closes game sockets with WebSocket code 1012, and wakes the timer, vote
+and bot workers so they can exit. The HTTP and WebSocket drain has a
+10-second deadline. A caller retrying an uncertain write can reuse its
+original client action ID to recover the committed result.
+
+Take an online SQLite backup while the Rust service is running:
+
+```sh
+GOA2_GAME_DATABASE=/var/lib/goa2-rust/games.sqlite \
+  /opt/goa2-rust/current/goa2-game-server --backup /private/backups/games.sqlite
+```
+
+Run the command as the service account or another account with access
+to the database and its WAL. Use an existing private backup directory.
+The command checks the copy and publishes it only if the destination is
+new. The copy includes credentials and unrevealed state. Record the
+release manifest alongside it.
+Restore into a separate directory and verify an existing seat link,
+its current revision and a published replay before switching traffic
+to the restored instance. Keep one process per database.
+
+### Report a hosted Rust game
+
+The in-game report form uses the web app's existing staff inbox.
+The Python web service forwards the reporter's game bearer token
+to the private Rust origin, which supplies the reporter, round,
+turn and exact journal index. The Rust service keeps one private
+replay archive per reported game, extending it through the latest
+reported revision. The report link remains valid after removal of
+the live game. This retained evidence currently has no automatic
+expiration.
+
+Use the existing `GOA2_ADMIN_TOKEN` on the Python web service to
+open the inbox and follow its replay links. Staff use the normal
+`/replays/{game}` and `/replays/{game}/state` endpoints. The Worker
+routes these and report submission to the Python origin. Rust
+validates access on its separate private origin and supplies the
+recorded game state. The draft verifier also exercises report
+submission, access control and triage after restart.
+
+### Share a finished Rust game
+
+The existing **Share replay** button publishes a finished Rust
+game under `/shared/rust-{token}`. A player token is required to
+create the link. The viewer reads it without a game or admin
+token, subject to the site's Access policy. It can inspect card
+faces and both hands from earlier in the finished game.
+
+The server verifies the journal in one forward pass and writes
+the metadata and compressed groups of 32 positions atomically.
+The link survives service restart and removal of the live game.
+Repeat requests return the same link. The frontend Worker routes
+Rust share tokens to `RUST_BACKEND_ORIGIN`.
+
+The staff Replays page combines Rust and Python records under
+the existing admin credential. It can publish a finished Rust
+replay or revoke a published link, including when the live game
+has been removed. The private Rust origin requires the
+provisioning token for catalogue and management requests.
+
+Use the same verified arena fixture as the complete-game check
+below for the hosted share verifier. Use the same Python environment
+as the hosted draft verifier:
+
+```sh
+PYTHONPATH=src python scripts/verify_rust_replay_share.py \
+  "$setup_cache/target/iterate/goa2-game-server" "$setup_cache/live-game-content.json" \
+  "$disposable_lab_data/full-game.json"
+```
+
+Add `--gameplay-only` to check a match through the hosted API and a
+restart without publishing a replay. The verifier provisions a fresh
+game, submits the verified inputs, checks the final round, turn and
+winner, and compares every player and spectator view after restart.
+
+### Verify a complete game through the Lab
+
+Package a rules-ended team match with a passing Python verification from
+the arena store. The fixture carries the unplayed start and decisions.
+Both engine checkpoints preserve the original 64-bit seed.
+
+```sh
+python scripts/rust_oracle/run_pinned.py lab_match_fixture \
+  --store "$arena_store" --report "$report_id" \
+  --server "$HOME/.cache/goa2-rust/target/iterate/goa2-game-server" \
+  --out "$disposable_lab_data/full-game.json"
+```
+
+Start a Rust game server with a disposable database and set distinct Lab
+ports and a disposable `GOA2_LAB_DATA`. Set
+`GOA2_LAB_FULL_GAME_INPUT` to the fixture path and run
+`node test/rust-full-game-e2e.mjs` from the Layout Lab checkout. The
+test clicks the opening card in the mobile UI and uses the frontend's
+game sockets for the rest of the match. It saves and reopens a live
+prompt, compares player and spectator payloads with Python at sampled
+boundaries and verifies the winner displayed by the frontend. It also
+downloads the live archive and imports its opening and final revisions.
+
+### Port curated Lab Situations
+
+Build `goa2-game-server` and run the offline port from the bot checkout.
+The pinned Python oracle exports checkpoints. Use the Lab's configured
+Python backend for exact client payload checks. The executable does
+not open a database or start a listener in this mode.
+
+```sh
+lab=/path/to/goa2-layout-lab
+frontend_backend=/path/to/goa2-backend
+setup_cache="$HOME/.cache/goa2-rust"
+"$setup_cache/oracle-venv/bin/python" scripts/rust_oracle/run_pinned.py port_lab_situations \
+  --frontend-python-path "$frontend_backend/src" \
+  --lab "$lab" --server "$setup_cache/target/iterate/goa2-game-server" \
+  --out "$lab/.layout-lab/rust-library"
+```
+
+Use an empty output directory. `manifest.json` lists verified,
+rejected and deferred Situations. A rejected parity check produces
+a nonzero exit code. Verified ports remain available in the same
+output, and the Lab offers **Open in Rust** for those Situations.
+The original library records stay in place.
+
 All 18 Hanu primary recipes now execute natively, including delegated co-movement,
 alternate-target attacks, initiative/action control and literal delayed Journey
 returns. Shared filter models across generated attacks retain source identity in

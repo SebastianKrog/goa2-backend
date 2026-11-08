@@ -140,6 +140,13 @@ Invalid tokens are rejected with WebSocket close code `4001`. Tokens that don't 
 
 ## REST API Reference
 
+### `GET /health`
+
+Rust reports its engine, rules version, target architecture, binary and
+content SHA-256 digests, and pinned oracle identity. The same static metadata
+is available at `GET /games/{game_id}/health` so same-origin proxies can
+route the request to Rust by game ID. Neither route exposes game data.
+
 ### `GET /heroes`
 
 List released hero IDs. No authentication required.
@@ -181,9 +188,23 @@ With `include_playtest=true`, the response also includes:
 { "id": "Cordelia", "difficulty_stars": 2 }
 ```
 
+### `GET /maps`
+
+List the map IDs loaded by the Rust service. No authentication required.
+The shared Python lobby exposes the corresponding list at `GET /drafts/maps`.
+
+```json
+["across_the_river", "forgotten_island", "magma_and_ice"]
+```
+
 ### `POST /games`
 
 Create a new game. No authentication required.
+
+Deployments with Rust direct creation enabled return a `rust-` game ID
+for human games and games using the native `rust` bot. The seat and
+spectator response shape is the same. Requests using classic bots use
+Python.
 
 **Request body:**
 
@@ -239,6 +260,11 @@ be loaded (including a missing optional Torch installation or an unsafe resolved
 path), the server logs a warning and uses heuristic components instead. The
 persisted specification retains the requested sources and artifact identity.
 Runtime loading happens off the event loop and outside the game lock.
+
+On deployments with Rust direct creation enabled, use
+`{"kind": "rust"}` to seat a native bot. The game can include humans
+and multiple native bots. Native and classic bot kinds are configured
+in separate games. Rust selects the accepted native policy internally.
 
 ```json
 {
@@ -315,9 +341,11 @@ next creation is allowed) and a human-readable `detail`:
 {"detail": "Too many games created from your network; try again in 50 minutes"}
 ```
 
-Only successful creations count; rejected requests (`4xx`, including `429`)
-do not use up the budget. Starting a draft, joining, and playing are not
-limited. The count is held in memory and resets when the server restarts.
+Rejected requests (`4xx`, including `429`) do not use the budget.
+Rust direct creation reserves a slot while provisioning. A connection
+failure with an uncertain result can still use the slot because Rust may
+have committed the game. Starting a draft, joining, and playing are
+unlimited. The count resets when the web service restarts.
 
 ### `GET /games/{game_id}`
 
@@ -372,6 +400,19 @@ The `url` is relative to the API origin and can be opened without a player or
 admin credential. The request waits while the replay is reconstructed and
 baked; heavy replay operations are bounded and may queue behind another share
 or consensus rewind.
+
+Rust shares have a `rust-` token prefix. Their public metadata is
+available at `GET /shared/{token}`. The
+`GET /shared/{token}/state?decision=N` response contains the group
+holding N, with a starting index, a keyframe and one JSON Patch per
+subsequent position. Published Rust replays are retained separately
+from live games and reveal the cards in the completed match.
+
+The existing admin API lists Rust and Python games at `GET /replays`
+and published links at `GET /shares`. Staff can publish a finished
+Rust replay with `POST /replays/{game_id}/share` and revoke its link
+with `DELETE /shares/{token}`. After revocation, new requests for the
+metadata or position groups return `404`.
 
 **Error conditions:**
 
@@ -490,7 +531,11 @@ The `selection` value depends on the input request type — it may be a string
 
 ### `POST /games/{game_id}/advance`
 
-Advance the game state without submitting input. Used when the engine needs to continue processing (e.g., transitioning between phases).
+Advance without submitting input. Python can use this call to continue
+processing between phases. Rust automatically processes through the next
+decision boundary before publishing a revision. On Rust the call returns
+that boundary's scoped result and keeps the revision and prompt ID. It does
+not repeat prior events. Planning still requires a card or a pass.
 
 **Request body:** empty
 
@@ -594,6 +639,12 @@ does not change the response shape.
 - `404` — Game not found
 - `422` — Title empty or too long, or description too long
 - `429` — Report limit for this game reached (10)
+
+For hosted Rust games, the web API uses the same report shape.
+Rust supplies the authenticated reporter and the committed replay
+index. Staff can open that index through the existing admin
+replay endpoint after the live game is removed.
+
 
 ### ActionResultResponse shape
 
@@ -756,6 +807,17 @@ a facedown committed card cannot expose its private identity:
 server validates that the referenced hex or card location is currently on the
 table and discards any client-supplied ping identity or card ID.
 
+#### `POINTER`
+
+Players can share a cursor position using `x` and `z` table coordinates
+or a `target_hero_id` and a board `zone`. Send `hidden: true` to clear it.
+The server relays normalized fields to the other players and spectators
+at most once per connection every 60 ms. Board zones use `COMMIT`,
+`PLAYED`, `ULTIMATE`, `DECK`, `DISCARD`, `SPELLBOOK`, `STATUS`,
+`WISH`, `HAND`, or `SHEET`. Rust requires the target hero to be seated
+in the game. The sender receives no echo. Pointer traffic leaves the
+game revision and replay unchanged.
+
 #### `SET_READY`
 
 Timed matches only. Players may toggle readiness until the final player readies;
@@ -809,6 +871,11 @@ Give gold to a hero (cheats must be enabled and game must be in PLANNING phase):
 - `Expected phase PLANNING, but game is in RESOLUTION` — Gold cheat only works during PLANNING phase
 - `Hero 'X' not found` — The specified hero_id does not exist
 - `Amount must be a positive integer` — The amount must be > 0
+
+Rust handles this command and `POST /games/{game_id}/cheats/gold`
+through the same revision and replay journal as gameplay. An accepted
+grant appears in Decisions and replay as `cheat_gold`. In a timed game
+the table can set up gold during planning before players ready up.
 
 ### Server-to-client messages
 
@@ -2237,6 +2304,11 @@ families follow from what it is for:
 The revealed token is the hero's existing one: it is not rotated, so whoever
 still holds the old link keeps the seat too.
 
+Rust supports player-link votes for human seats and sends approved links
+only to connected human players. A running timed match records its clock
+hold and release while a vote is pending. The credential and the approved
+disclosure stay out of the journal and reconnect messages.
+
 ### WebSocket messages
 
 Client → server:
@@ -2316,9 +2388,11 @@ from the broadcast and re-render.
 
 ### `GET /overrides/schema`
 
-Static, unauthenticated, game-independent — fetch once and cache. Returns the
-full op catalogue with a JSON Schema per op, so clients never hardcode the op
-list:
+Static, unauthenticated, game-independent. Fetch once per engine and cache.
+Rust also serves the same catalogue at `GET /games/{game_id}/overrides/schema`
+so a same-origin proxy can select the Rust service by game ID. Clients can
+fall back to the shared route if an older server returns 404. The response
+contains a JSON Schema for each operation:
 
 ```json
 {"ops": [
@@ -2333,7 +2407,42 @@ Patch ops: `move_entity`, `remove_entity`, `place_entity`, `set_life_counters`,
 `set_gold`, `set_level`, `add_marker`, `remove_marker`, `add_effect`,
 `remove_effect`, `move_card`, `swap_item_card`, `set_item`, `set_wave_counter`,
 `set_tie_breaker_team`.
+Rust accepts value corrections with `set_gold`, `set_level`,
+`set_wave_counter`, `set_tie_breaker_team`, `set_life_counters`, and
+`set_item`. It also accepts `move_entity`, `remove_entity`, `place_entity`,
+`add_marker`, and `remove_marker`. Use a concrete piece ID for a multi-piece
+hero unless exactly one of its pieces is on the board. A board correction
+changes occupancy without triggering movement or defeat effects. A marker
+correction updates the singleton without triggering a placement passive.
+
+Rust also accepts `move_card` and `swap_item_card`. Moving a card to
+`played` uses an already finished turn slot. Moving a committed card
+during planning reopens that commitment. An item swap keeps the sibling in
+the original upgrade's zone and replaces its bonus. Only the owner can
+propose a private card correction or an item swap. A player can propose moving
+another hero's card when it is face up in a public zone. A proposal shares
+its card ID or upgrade color and tier with the table.
+
+Rust also accepts `add_effect` with an ActiveEffect payload and
+`remove_effect` with an effect ID. Adding an effect preserves its supplied
+ID, scope, duration and creation time. Use a unique ID outside the range
+reserved for future generated effects. Removing an effect early updates the
+source card's active status without running the effect's finishing steps.
+Finishing steps stored by an added effect run through the normal native
+expiry path. Supply supported game-step records with their operands. Effect
+payloads are limited to 64 KiB and 64 finishing steps, including nested steps.
+
+Accepted corrections appear as `ov_patch` in the Decisions tab and journal.
+A life-counter correction can end a game or reopen it. If it reopens a timed
+game, the players ready up before its clock runs.
+
 Unstick ops: `skip_input`, `abort_action`, `end_turn`, `force_actor`.
+
+Rust supports these four unstick operations. An approved recovery goes
+through the native journal as `ov_unstick` and publishes the fresh
+state. Skip requires a pending prompt that accepts `SKIP`. Abort,
+end turn, and force actor require resolution. An invalid operation
+rejects the vote with a reason and releases any clock hold.
 (The endpoint output is authoritative; this list is illustrative.)
 
 ### `GET /games/{game_id}/overrides/history`
@@ -2364,6 +2473,19 @@ list so a rewind target index means something to the table:
 - `PROPOSE_OVERRIDE` with `family: "rewind"` takes `to` in this `index` space.
   Rewind depth is unrestricted by design — a table that votes to go back past a
   round boundary has accepted that already-seen cards become hidden again.
+
+The Rust service uses the same response shape for Decisions. Its index
+starts at the first journaled operation, and it returns up to the latest
+10,000 entries alongside the full count. Raw selections are omitted
+from labels. Entries recorded before round and turn metadata was added
+can have nulls in those fields. Rust currently supports individual
+action rollback, table pause, human seat-link votes, and table rewind.
+A Rust rewind appends an `ov_rewind` record and marks abandoned decisions
+as superseded. Its `to` value is the number of journal records to apply
+from the game's starting checkpoint. A rewind preserves the game ID and
+seat links and advances the live revision. Pending inputs get fresh IDs.
+Timed rewinds restore the clock at the selected position and resume a
+running clock from the time the vote is applied.
 
 ---
 

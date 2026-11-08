@@ -218,6 +218,9 @@ impl BodyRules {
             owner: symbols.intern("template-passive-owner"),
         })
     }
+    pub(super) fn template_owner(&self) -> Symbol {
+        self.owner
+    }
     fn kind(&self, effect: Symbol) -> Option<Kind> {
         self.methods
             .iter()

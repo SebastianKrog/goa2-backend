@@ -59,3 +59,10 @@ def _isolate_data_dirs(tmp_path_factory):
                 os.environ.pop(var, None)
             else:
                 os.environ[var] = prev
+
+
+@pytest.fixture
+def mine_game_data(client):
+    response = client.post("/games", json={"red_heroes": ["Min"], "blue_heroes": ["Wasp"]})
+    assert response.status_code == 201
+    return response.json()

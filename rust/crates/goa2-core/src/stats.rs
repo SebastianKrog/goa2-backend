@@ -65,6 +65,16 @@ pub enum MarkerKind {
     Poison,
     Bounty,
 }
+impl MarkerKind {
+    pub(crate) fn name(self) -> &'static str {
+        match self {
+            Self::Venom => "venom",
+            Self::Poison => "poison",
+            Self::Bounty => "bounty",
+        }
+    }
+}
+
 #[derive(Clone, Debug, Hash)]
 pub struct NativeMarker {
     pub key: Symbol,
@@ -105,6 +115,42 @@ impl PerformingCardKeys {
         }
     }
 }
+#[derive(Default)]
+pub(crate) struct MinionDefense {
+    friendly: [i64; 3],
+    enemy: [i64; 3],
+}
+
+impl MinionDefense {
+    const KINDS: [&str; 3] = ["MELEE", "RANGED", "HEAVY"];
+
+    fn add(&mut self, kind: MinionKind, friendly: bool) {
+        let index = match kind {
+            MinionKind::Melee => 0,
+            MinionKind::Ranged => 1,
+            MinionKind::Heavy => 2,
+        };
+        let side = if friendly {
+            &mut self.friendly
+        } else {
+            &mut self.enemy
+        };
+        side[index] += 1;
+    }
+
+    fn modifier(&self) -> i64 {
+        self.friendly.iter().sum::<i64>() - self.enemy.iter().sum::<i64>()
+    }
+
+    pub(crate) fn counts(&self, friendly: bool) -> impl Iterator<Item = (&'static str, i64)> {
+        let side = if friendly { self.friendly } else { self.enemy };
+        Self::KINDS
+            .into_iter()
+            .zip(side)
+            .filter(|(_, count)| *count != 0)
+    }
+}
+
 impl NativeWorld {
     /// Resolve the current nested action from live registers, never from a cache.
     pub fn performing_card(
@@ -115,17 +161,21 @@ impl NativeWorld {
         let Some(hero) = self.hero(unit) else {
             return Ok(None);
         };
+        Ok(self.nested_performing_card(context)?.or(hero.current))
+    }
+
+    pub(crate) fn nested_performing_card(
+        &self,
+        context: &dyn RegisterRead,
+    ) -> Result<Option<CardId>, String> {
         let keys = &self.definitions.stat_context;
-        if let Some(printed) = keys.text(context.get(keys.card))? {
-            let owner = keys.text(context.get(keys.owner))?;
-            if let Some(card) = owner
-                .and_then(|o| self.card_for_hero_printed(o, printed))
-                .or_else(|| self.card_by_printed(printed))
-            {
-                return Ok(Some(card));
-            }
-        }
-        Ok(hero.current)
+        let Some(printed) = keys.text(context.get(keys.card))? else {
+            return Ok(None);
+        };
+        let owner = keys.text(context.get(keys.owner))?;
+        Ok(owner
+            .and_then(|owner| self.card_for_hero_printed(owner, printed))
+            .or_else(|| self.card_by_printed(printed)))
     }
     pub fn computed_stat_in_context(
         &self,
@@ -352,19 +402,27 @@ impl NativeWorld {
         })
     }
     pub fn minion_defense(&self, unit: Symbol, actor: Option<Symbol>) -> Result<i64, String> {
+        Ok(self.minion_defense_contributions(unit, actor)?.modifier())
+    }
+
+    pub(crate) fn minion_defense_contributions(
+        &self,
+        unit: Symbol,
+        actor: Option<Symbol>,
+    ) -> Result<MinionDefense, String> {
+        let mut contributions = MinionDefense::default();
         let Some(target) = self.entity(unit).filter(|entity| {
             matches!(
                 entity.kind,
                 EntityKind::Hero | EntityKind::Piece | EntityKind::Minion
             )
         }) else {
-            return Ok(0);
+            return Ok(contributions);
         };
         let Some(position) = self.position(unit) else {
-            return Ok(0);
+            return Ok(contributions);
         };
         let equivalence = self.illusion_minion_team(actor);
-        let mut total = 0;
         for hex in self.tile_hexes() {
             let distance = position.distance(*hex);
             if (distance != 1 && distance != 2) || !self.effect_connected(position, *hex, &[])? {
@@ -379,24 +437,22 @@ impl NativeWorld {
                     && entity.token_type == Some(self.definitions.illusion_token)
                     && let Some(team) = equivalence
                 {
-                    total += if Some(team) == target.team { 1 } else { -1 };
+                    contributions.add(MinionKind::Melee, Some(team) == target.team);
                 }
                 continue;
             }
-            let minion = entity;
-            if distance == 1 {
-                if minion.team != target.team {
-                    total -= 1;
-                } else if matches!(
-                    minion.minion_kind,
-                    Some(MinionKind::Melee | MinionKind::Heavy)
-                ) {
-                    total += 1;
-                }
-            } else if minion.team != target.team && minion.minion_kind == Some(MinionKind::Ranged) {
-                total -= 1;
+            let kind = entity.minion_kind.ok_or("minion kind is missing")?;
+            let friendly = entity.team == target.team;
+            let supports = match (distance, friendly) {
+                (1, true) => matches!(kind, MinionKind::Melee | MinionKind::Heavy),
+                (1, false) => true,
+                (2, false) => kind == MinionKind::Ranged,
+                _ => false,
+            };
+            if supports {
+                contributions.add(kind, friendly);
             }
         }
-        Ok(total)
+        Ok(contributions)
     }
 }

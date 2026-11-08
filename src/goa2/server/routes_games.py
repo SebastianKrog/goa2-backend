@@ -6,6 +6,7 @@ import uuid
 
 from fastapi import APIRouter, HTTPException, Request
 
+from goa2.data.heroes.registry import HeroRegistry
 from goa2.domain.events import GameEvent, GameEventType
 from goa2.domain.input import InputResponse
 from goa2.domain.models import GamePhase
@@ -41,8 +42,13 @@ from goa2.server.models import (
     UpgradePreviewResponse,
 )
 from goa2.server.player_names import resolve_player_names
-from goa2.server.rate_limit import check_creation_budget, spend_creation_budget
+from goa2.server.rate_limit import (
+    check_creation_budget,
+    refund_creation_budget,
+    spend_creation_budget,
+)
 from goa2.server.result_logging import log_session_result
+from goa2.server.rust_hosted import hosted_games
 from goa2.server.share_mint import mint_replay_share
 from goa2.server.time_control import (
     client_decision_timed_out,
@@ -86,6 +92,40 @@ def _result_to_response(
     )
 
 
+async def _create_rust_game(body: CreateGameRequest, request: Request, ip: str) -> CreateGameResponse:
+    rust = hosted_games(request)
+    name_to_id: dict[str, str] = {}
+    for name in body.red_heroes + body.blue_heroes:
+        hero = HeroRegistry.get(name)
+        if hero is None:
+            raise HTTPException(422, f"Hero '{name}' not found in registry")
+        if name in name_to_id:
+            raise HTTPException(422, f"Hero '{name}' is assigned more than once")
+        name_to_id[name] = str(hero.id)
+    hero_ids = set(name_to_id.values())
+    if body.bots and not body.bots.keys() <= hero_ids:
+        raise HTTPException(422, "A bot seat does not belong to this game")
+
+    game_id = f"rust-{uuid.uuid4().hex}"
+    setup = {
+        **body.model_dump(mode="json", exclude={"player_names", "bots"}),
+        "player_names": resolve_player_names(body.player_names, name_to_id),
+        "seed": int(game_id[-16:], 16),
+    }
+    if body.bots:
+        setup["bots"] = {hero_id: {"kind": "rust"} for hero_id in body.bots}
+
+    # Reserve the slot before yielding to the private origin. An uncertain
+    # outcome may already have committed a game, so only refund a rejection.
+    reservation = spend_creation_budget(request, ip)
+    try:
+        return await rust.create(game_id, setup, hero_ids, direct=True)
+    except HTTPException as error:
+        if 400 <= error.status_code < 500:
+            refund_creation_budget(request, ip, reservation)
+        raise
+
+
 # ---- Endpoints ----
 
 
@@ -100,6 +140,16 @@ async def create_game(
             status_code=400,
             detail=f"Invalid game_type '{body.game_type}'. Must be QUICK or LONG.",
         )
+    bot_kinds = {spec.kind for spec in (body.bots or {}).values()}
+    can_use_rust = request.app.state.rust_new_games and request.app.state.rust_hosted is not None
+    if "rust" in bot_kinds:
+        if not can_use_rust:
+            raise HTTPException(503, "Rust game creation is unavailable")
+        if bot_kinds != {"rust"}:
+            raise HTTPException(422, "Rust and classic bot seats must be in separate games")
+    if can_use_rust and bot_kinds <= {"rust"}:
+        return await _create_rust_game(body, request, ip)
+
     game_seed_id = uuid.uuid4().hex
     game_id = game_seed_id[:12]
     seed = int(game_seed_id, 16)

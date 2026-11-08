@@ -50,6 +50,105 @@ fn defaults() -> Result<&'static Value> {
     .as_ref()
     .map_err(Clone::clone)
 }
+/// Expand the Python ActiveEffect wire defaults without applying gameplay
+/// creation semantics (automatic ID, source, round or activation changes).
+pub(crate) fn table_effect_wire(raw: &Value) -> Result<Value> {
+    fn expand(defaults: &Value, raw: &Value) -> Result<serde_json::Map<String, Value>> {
+        let mut out = defaults
+            .as_object()
+            .ok_or("effect defaults missing")?
+            .clone();
+        for (key, value) in raw.as_object().ok_or("effect payload must be an object")? {
+            let Some(default) = out.get_mut(key) else {
+                return Err(format!("unknown effect field {key}"));
+            };
+            let valid = match default {
+                Value::Bool(_) => value.is_boolean(),
+                Value::Number(_) => value.as_i64().is_some(),
+                Value::String(_) => value.is_string(),
+                Value::Array(_) => value.is_array(),
+                Value::Object(_) => value.is_object(),
+                Value::Null => {
+                    value.is_null()
+                        || match key.as_str() {
+                            "origin_hex" | "isolated_hex" => {
+                                serde_json::from_value::<crate::geometry::Hex>(value.clone())
+                                    .is_ok()
+                            }
+                            "max_value"
+                            | "apply_stat_value_only_if_result_at_least"
+                            | "direction" => value.as_i64().is_some(),
+                            "origin_attack_is_basic" => value.is_boolean(),
+                            _ => value.is_string(),
+                        }
+                }
+            };
+            if !valid {
+                return Err(format!("invalid effect field {key}"));
+            }
+            *default = value.clone();
+        }
+        Ok(out)
+    }
+
+    let catalog = defaults()?;
+    if [
+        "id",
+        "source_id",
+        "effect_type",
+        "scope",
+        "duration",
+        "created_at_turn",
+        "created_at_round",
+    ]
+    .iter()
+    .any(|key| raw.get(*key).is_none())
+        || raw["scope"].get("shape").is_none()
+    {
+        return Err("effect identity, scope, duration and creation time are required".into());
+    }
+    if raw["id"].as_str().is_none_or(str::is_empty)
+        || !catalog["effect_types"]
+            .as_array()
+            .is_some_and(|kinds| kinds.contains(&raw["effect_type"]))
+    {
+        return Err("invalid effect ID or type".into());
+    }
+    let mut fields = expand(&catalog["prototype"], raw)?;
+    fields.insert(
+        "scope".into(),
+        Value::Object(expand(&catalog["prototype"]["scope"], &raw["scope"])?),
+    );
+    let effect = Value::Object(fields);
+    for (name, choices) in [
+        ("named_color", &catalog["colors"]),
+        ("origin_action_type", &catalog["actions"]),
+        (
+            "marker_type",
+            &serde_json::json!(["venom", "poison", "bounty"]),
+        ),
+    ] {
+        if !effect[name].is_null()
+            && !choices
+                .as_array()
+                .is_some_and(|items| items.contains(&effect[name]))
+        {
+            return Err(format!("invalid effect {name}"));
+        }
+    }
+    for name in ["except_card_colors", "allowed_discard_colors"] {
+        if effect[name]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|color| !catalog["colors"].as_array().unwrap().contains(color))
+        {
+            return Err(format!("invalid effect {name}"));
+        }
+    }
+    Ok(effect)
+}
+
 fn optional(value: &Value, key: &str, s: &mut Symbols) -> Result<Option<Symbol>> {
     match value.get(key) {
         None | Some(Value::Null) => Ok(None),

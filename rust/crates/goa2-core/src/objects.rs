@@ -304,6 +304,7 @@ impl FromIterator<Arc<Object>> for ObjectPages {
 struct ArenaLayout {
     aliases: Vec<ObjectId>,
     board_keys: Option<Vec<(crate::geometry::Hex, ObjectId)>>,
+    private_context: Option<(usize, u64)>,
     fingerprint: OnceLock<[u64; 2]>,
 }
 
@@ -562,9 +563,12 @@ impl ObjectArena {
         } else {
             None
         };
+        let private_context = arena.context_edges_are_private(0, None)
+            .then_some((arena.objects.len(), arena.objects.revision));
         arena.layout = Arc::new(ArenaLayout {
             aliases,
             board_keys,
+            private_context,
             fingerprint: OnceLock::new(),
         });
         Ok(arena)
@@ -629,6 +633,14 @@ impl ObjectArena {
             Arc::make_mut(&mut self.objects[id.0]).contents = contents;
             Ok(ObjectValue::Object(id))
         } else {
+            // Setup records an unsigned seed at the root. Rule arithmetic
+            // and ordinary input values still use signed integers.
+            if let [ObjectPathPart::Key(key)] = path.as_slice()
+                && key == "rng_seed"
+                && let Some(seed) = value.as_u64().filter(|&seed| seed > i64::MAX as u64)
+            {
+                return Ok(ObjectValue::Atom(Datum::Unsigned(seed)));
+            }
             Ok(ObjectValue::Atom(Datum::from_json(
                 value,
                 Arc::make_mut(&mut self.symbols),
@@ -710,15 +722,19 @@ impl ObjectArena {
             return false;
         };
         let mut pending = Vec::new();
-        let mut seen = HashSet::new();
+        let mut visited = None;
         let mut next = Some(*root);
-        while let Some(id) = next {
+        while let Some(id) = next.take() {
             if id == target {
                 return true;
             }
             let mut enqueue = |value: &ObjectValue| {
-                if let ObjectValue::Object(child) = value {
-                    pending.push(*child);
+                // Keep the next edge in a local slot. A linear path needs
+                // no allocation for deferred siblings.
+                if let ObjectValue::Object(child) = value
+                    && let Some(sibling) = next.replace(*child)
+                {
+                    pending.push(sibling);
                 }
             };
             match &self.objects[id.0].contents {
@@ -727,11 +743,15 @@ impl ObjectArena {
                     fields.iter().for_each(|(_, value)| enqueue(value));
                 }
             }
-            if pending.is_empty() {
+            if next.is_none() && pending.is_empty() {
                 return false;
             }
+            let seen = visited
+                .get_or_insert_with(HashSet::<_, foldhash::fast::RandomState>::default);
             seen.insert(id);
-            next = std::iter::from_fn(|| pending.pop()).find(|child| !seen.contains(child));
+            if next.is_none_or(|child| seen.contains(&child)) {
+                next = std::iter::from_fn(|| pending.pop()).find(|child| !seen.contains(child));
+            }
         }
         false
     }
@@ -771,6 +791,50 @@ impl ObjectArena {
         }
         Ok(value)
     }
+    pub(crate) fn fresh_context_object_is_private(&self, object: ObjectId) -> bool {
+        self.layout.private_context.is_some_and(|(initial_len, revision)| {
+            object.0 >= initial_len && self.context_edges_are_private(revision, Some(object))
+        })
+    }
+
+    // A new handle cannot occur in an untouched import page. The protected
+    // walk excludes the root's context field. If the root and context have
+    // no other incoming edges, a handle mentioned only by context is private.
+    // Inspect all changed edges, including those excluded by the full walk,
+    // so uncertain cases simply use ordinary protection.
+    fn context_edges_are_private(&self, since: u64, target: Option<ObjectId>) -> bool {
+        let ObjectValue::Object(root) = self.root else {
+            return false;
+        };
+        let context_key = self.symbols.lookup("execution_context");
+        for (index, (page, &revision)) in self.objects.pages.iter()
+            .zip(&self.objects.revisions)
+            .enumerate()
+        {
+            if revision <= since {
+                continue;
+            }
+            for (offset, object) in page.objects.iter().enumerate() {
+                let owner = ObjectId(index * ObjectPages::PAGE_LEN + offset);
+                let forbidden = |value: &ObjectValue| {
+                    matches!(value, ObjectValue::Object(id) if *id == root
+                        || *id == self.context || (Some(*id) == target && owner != self.context))
+                };
+                let unsafe_edge = match &object.contents {
+                    Contents::List(items) => items.iter().any(forbidden),
+                    Contents::Fields(fields) => fields.iter().any(|(key, value)| {
+                        forbidden(value) && !(owner == root && Some(*key) == context_key
+                            && matches!(value, ObjectValue::Object(id) if *id == self.context))
+                    }),
+                };
+                if unsafe_edge {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+
     /// Objects reachable from immutable world/step parameters cannot yet be
     /// mutated by the scalar executor. Set.value and pending input are live
     /// arena payloads; all other step operands still compile as definitions.
@@ -2056,6 +2120,49 @@ mod protection_tests {
         assert!(worker.contains(&ObjectId(65)));
         assert_eq!(root.into_iter().count(), 5);
     }
+    #[test]
+    fn fresh_context_proof_rechecks_rewritten_and_new_pages_after_rollback() {
+        let mut arena = graph();
+        assert!(arena.context_edges_are_private(0, None));
+        let initial = arena.objects.len();
+        let revision = arena.objects.revision;
+        Arc::get_mut(&mut arena.layout).unwrap().private_context = Some((initial, revision));
+        let ObjectValue::Object(private) = arena.list(Vec::new()) else {
+            unreachable!()
+        };
+        let key = arena.symbols.lookup("wrapped").unwrap();
+        arena.set_context(key, ObjectValue::Object(private)).unwrap();
+        assert!(arena.fresh_context_object_is_private(private));
+        assert!(!arena.fresh_context_object_is_private(ObjectId(4)));
+
+        arena.with_rollback(|arena| {
+            arena.append(ObjectId(2), ObjectValue::Object(private)).unwrap();
+            assert!(!arena.fresh_context_object_is_private(private));
+            assert!(arena.readonly_objects().contains(&private));
+        });
+        assert!(arena.fresh_context_object_is_private(private));
+
+        arena.with_rollback(|arena| {
+            let external = arena.list(vec![ObjectValue::Object(arena.context_id())]);
+            arena.set_root(arena.symbols.lookup("world").unwrap(), external).unwrap();
+            assert!(!arena.fresh_context_object_is_private(private));
+            assert!(arena.readonly_objects().contains(&private));
+        });
+        assert!(arena.fresh_context_object_is_private(private));
+    }
+
+    #[test]
+    fn cycle_checks_follow_deferred_siblings_past_existing_cycles() {
+        let mut arena = graph();
+        let cyclic = ObjectValue::Object(ObjectId(2));
+        let leaf = ObjectValue::Object(ObjectId(12));
+        let root = arena.list(vec![leaf, cyclic]);
+        assert!(arena.reaches(&root, ObjectId(12)));
+        assert!(!arena.reaches(&root, ObjectId(5)));
+        assert!(arena.append(ObjectId(12), root).is_err());
+        assert!(arena.sequence(ObjectId(12)).unwrap().is_empty());
+    }
+
     #[test]
     fn readonly_walk_preserves_live_payload_exclusions_aliases_and_cycles() {
         let arena = graph();

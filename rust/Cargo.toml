@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/goa2-core", "crates/goa2-search-cli"]
+members = ["crates/goa2-core", "crates/goa2-search-cli", "crates/goa2-game-server"]
 resolver = "3"
 
 [workspace.package]

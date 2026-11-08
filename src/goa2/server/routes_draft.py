@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 import random
 import time
@@ -37,6 +38,7 @@ from goa2.server.models import (
 )
 from goa2.server.player_names import resolve_player_names
 from goa2.server.rate_limit import check_creation_budget, spend_creation_budget
+from goa2.server.rust_hosted import hosted_games
 
 router = APIRouter(prefix="/drafts", tags=["drafts"])
 
@@ -104,11 +106,46 @@ def _reject_spectator(player: DraftContext) -> None:
         raise HTTPException(status_code=403, detail="Spectators cannot modify the draft")
 
 
-def _maybe_create_game(request: Request, md: ManagedDraft) -> None:
+async def _maybe_create_game(request: Request, md: ManagedDraft) -> None:
     if not service.is_ready_to_create_game(md.state):
         return
     state = md.state
     red_heroes, blue_heroes = service.team_hero_lists(state)
+    player_names = {
+        player.claimed_hero: player.display_name
+        for player in state.players
+        if player.claimed_hero
+    }
+    use_rust = request.app.state.rust_new_drafts and request.app.state.rust_hosted is not None
+    if md.hosted_game_id is not None or use_rust:
+        rust = hosted_games(request)
+        if md.hosted_game_id is None:
+            md.hosted_game_id = f"rust-{uuid.uuid4().hex}"
+        game_id = md.hosted_game_id
+        name_to_id = {}
+        for name in red_heroes + blue_heroes:
+            hero = HeroRegistry.get(name)
+            if hero is None:
+                raise HTTPException(503, "Draft hero is unavailable")
+            name_to_id[name] = hero.id
+        opened = await rust.create(
+            game_id,
+            {
+                "map_name": state.map_name,
+                "red_heroes": red_heroes,
+                "blue_heroes": blue_heroes,
+                "game_type": state.game_type,
+                "cheats_enabled": state.cheats,
+                "seed": int(game_id[-16:], 16),
+                "tie_breaker_team": state.first_team.value if state.first_team else None,
+                "time_control": state.time_control.model_dump(mode="json") if state.time_control else None,
+                "player_names": resolve_player_names(player_names, name_to_id),
+            },
+            set(name_to_id.values()),
+        )
+        token_by_hero = {seat.hero_id: seat.token for seat in opened.player_tokens}
+        _finish_game(md, game_id, name_to_id, token_by_hero, opened.spectator_token)
+        return
     game_seed_id = uuid.uuid4().hex
     game_id = game_seed_id[:12]
     seed = int(game_seed_id, 16)
@@ -125,10 +162,7 @@ def _maybe_create_game(request: Request, md: ManagedDraft) -> None:
     session = GameSession(game_state)
     hero_ids = [h.id for team in game_state.teams.values() for h in team.heroes]
     name_to_id = {h.name: h.id for team in game_state.teams.values() for h in team.heroes}
-    hero_names = resolve_player_names(
-        {p.claimed_hero: p.display_name for p in state.players if p.claimed_hero},
-        name_to_id,
-    )
+    hero_names = resolve_player_names(player_names, name_to_id)
     game_registry = request.app.state.registry
     game = game_registry.create_game(session, hero_ids, game_id=game_id, hero_names=hero_names)
     if game.replay_recorder:
@@ -144,13 +178,24 @@ def _maybe_create_game(request: Request, md: ManagedDraft) -> None:
             player_names=hero_names,
             rules_version=game_state.rules_version,
         )
-    for player in state.players:
-        if player.claimed_hero:
-            hero_id = name_to_id[player.claimed_hero]
-            md.player_game_tokens[player.id] = game.hero_to_token[hero_id]
-    md.game_spectator_token = game.spectator_token
-    state.game_id = game.game_id
-    state.status = DraftStatus.COMPLETE
+    _finish_game(md, game.game_id, name_to_id, game.hero_to_token, game.spectator_token)
+
+
+def _finish_game(
+    md: ManagedDraft,
+    game_id: str,
+    name_to_id: dict[str, str],
+    tokens: dict[str, str],
+    spectator_token: str,
+) -> None:
+    md.player_game_tokens = {
+        player.id: tokens[name_to_id[player.claimed_hero]]
+        for player in md.state.players
+        if player.claimed_hero
+    }
+    md.game_spectator_token = spectator_token
+    md.state.game_id = game_id
+    md.state.status = DraftStatus.COMPLETE
 
 
 # ---- Endpoints ----
@@ -375,7 +420,17 @@ async def claim_hero(
     _reject_spectator(player)
     md = registry.get(draft_id)
     async with md.lock:
+        claimant = service.get_player(md.state, player.player_id)
+        previous_claim = claimant.claimed_hero
+        if md.hosted_game_id and md.state.status is DraftStatus.COMPLETE and previous_claim == body.hero:
+            return _draft_view(md, player.player_id, player.is_spectator)
         service.claim_hero(md.state, player.player_id, body.hero)
-        _maybe_create_game(request, md)
+        try:
+            await _maybe_create_game(request, md)
+        except (HTTPException, asyncio.CancelledError):
+            if md.hosted_game_id:
+                # Leave the last selection available to retry after a refresh.
+                claimant.claimed_hero = previous_claim
+            raise
     await broadcast_draft(md, registry)
     return _draft_view(md, player.player_id, player.is_spectator)

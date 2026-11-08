@@ -18,10 +18,14 @@ use crate::{
     targeting::{UnitCandidates, UnitFilter},
     world::{EntityKind, NativeWorld},
 };
+mod arena_choices;
+mod arena_match;
+pub mod live_game;
 mod loadout;
 mod object_execution;
 mod observation;
 mod offline_match;
+pub use arena_match::{ArenaChoice, ArenaMatch, RecordedArenaChoice};
 pub use loadout::{
     LoadoutHypothesis, PublicUpgradeBatch, SampledHand, UpgradeCheckpoint,
     replay_public_upgrade_batches,
@@ -37,9 +41,10 @@ pub use observation::{
 mod sequences;
 pub use object_execution::LiveEffectExpiry;
 pub use search::{
-    BotPlanningScope, BotTeamPlanningSearch, ForecastNodeShare, GameTurnRollout, JointPlans, OpponentPolicy,
-    PlanningRolloutSample, PlanningSearch, PlanningSearchOptions, ResolutionReuseCensus, ResolutionScoreKind,
-    ResolutionSearch, ResolutionStop, SampledPlanningSearch, SearchEvaluation, SearchLimits,
+    BotPlanningScope, BotTeamPlanningSearch, ForecastNodeShare, GameTurnRollout, JointPlans,
+    OpponentPolicy, PlanningRolloutSample, PlanningSearch, PlanningSearchOptions,
+    ResolutionReuseCensus, ResolutionScoreKind, ResolutionSearch, ResolutionStop,
+    SampledPlanningSearch, SearchEvaluation, SearchLimits,
 };
 pub use sequences::{DecisionMove, PlanningCommitment, SequenceBatch, SequenceVerdict};
 
@@ -959,6 +964,12 @@ pub struct AdvanceResult {
     pub events: Vec<NativeEvent>,
     pub steps: usize,
 }
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkBudget {
+    NodesV1,
+}
+
 pub struct ExecutionBudget<'a> {
     pub deadline: Option<Instant>,
     pub cancelled: Option<&'a AtomicBool>,
@@ -974,6 +985,34 @@ impl Default for ExecutionBudget<'_> {
     }
 }
 impl ExecutionBudget<'_> {
+    pub fn for_search(
+        started: Instant,
+        time_ms: Option<u64>,
+        work_budget: Option<WorkBudget>,
+        workers: usize,
+    ) -> Result<ExecutionBudget<'static>> {
+        let deadline = match (time_ms, work_budget) {
+            (Some(ms), None) if (1..=60_000).contains(&ms) => {
+                Some(started + std::time::Duration::from_millis(ms))
+            }
+            (None, Some(WorkBudget::NodesV1)) if workers == 1 => None,
+            (None, Some(WorkBudget::NodesV1)) => {
+                return Err(EngineError::InvalidInput(
+                    "nodes_v1 requires one search worker".into(),
+                ));
+            }
+            _ => {
+                return Err(EngineError::InvalidInput(
+                    "specify either time_ms in 1..60000 or work_budget nodes_v1".into(),
+                ));
+            }
+        };
+        Ok(ExecutionBudget {
+            deadline,
+            ..ExecutionBudget::default()
+        })
+    }
+
     fn check(&self, steps: usize) -> Result<()> {
         if self.cancelled.is_some_and(|v| v.load(Ordering::Relaxed)) {
             return Err(EngineError::Cancelled);
@@ -995,11 +1034,13 @@ pub struct NativeSession {
     symbols: Arc<Symbols>,
     context: Registers,
     count_observer: crate::data::FilterObservation,
-    objects: Option<object_execution::BoundObjects>,
+    objects: Option<Box<object_execution::BoundObjects>>,
     world: NativeWorld,
     combat_rules: CombatRules,
     marker_rules: MarkerRules,
     attack_rules: AttackRules,
+    // Live frontend metadata. Offline oracle traces compare the frozen rule state.
+    track_attack_source: bool,
     action_rules: ActionRules,
     primary_operands: PrimaryOperands,
     return_rules: Arc<crate::minion_return::ReturnRules>,
@@ -1303,7 +1344,10 @@ impl NativeSession {
             let reflect = projectile("reflect_projectiles", false)?;
             let deflect = projectile("deflect_projectiles", true)?;
             for step in steps.iter_mut().filter(|step| {
-                matches!(step.instruction, Instruction::DefenseText { on_block: true, .. })
+                matches!(
+                    step.instruction,
+                    Instruction::DefenseText { on_block: true, .. }
+                )
             }) {
                 if let Instruction::DefenseText {
                     on_block: true,
@@ -1683,7 +1727,10 @@ impl NativeSession {
         if objects.is_some() {
             // Live pending payloads belong only to arena step objects. Avoid
             // retaining/cloning a stale aggregate in immutable frame templates.
-            for step in steps.iter_mut().filter(|step| step.initial.pending.is_some()) {
+            for step in steps
+                .iter_mut()
+                .filter(|step| step.initial.pending.is_some())
+            {
                 step.initial.pending = None;
             }
         }
@@ -1698,11 +1745,12 @@ impl NativeSession {
             symbols,
             context,
             count_observer: crate::data::FilterObservation::default(),
-            objects,
+            objects: objects.map(Box::new),
             world,
             combat_rules,
             marker_rules,
             attack_rules,
+            track_attack_source: false,
             action_rules,
             primary_operands,
             return_rules,
@@ -3771,6 +3819,7 @@ impl NativeSession {
                             self.planning.actor,
                             &spec,
                             frame.attack_followup,
+                            self.track_attack_source,
                         )
                         .map_err(unsupported)?
                     else {

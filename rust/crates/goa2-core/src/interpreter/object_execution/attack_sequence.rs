@@ -18,6 +18,7 @@ struct AttackExpansionPlan {
     values: AttackValues,
     ranged: bool,
     initiative: bool,
+    source_card: Option<Datum>,
     filters: Vec<ObjectValue>,
 }
 impl NativeSession {
@@ -120,6 +121,14 @@ impl NativeSession {
             .attack_rules
             .values(&self.world, &inputs, &self.symbols, actor, &spec)
             .map_err(unsupported)?;
+        let source_card = self
+            .track_attack_source
+            .then(|| {
+                self.attack_rules
+                    .source_card(&self.world, &inputs, &self.symbols, actor)
+            })
+            .transpose()
+            .map_err(unsupported)?;
         let filters = if select {
             self.unit_filter_list_bound(objects, step, Field::TargetFilters)?
         } else {
@@ -139,6 +148,7 @@ impl NativeSession {
                 values,
                 ranged: spec.ranged,
                 initiative: spec.initiative,
+                source_card,
                 filters,
             }),
         })
@@ -192,6 +202,9 @@ impl NativeSession {
             (Field::AttackBasic, Datum::Bool(plan.values.basic)),
         ] {
             objects.write(objects.phases.k(field), value)?;
+        }
+        if let Some(source_card) = plan.source_card {
+            objects.write(objects.phases.k(Field::AttackSourceCard), source_card)?;
         }
         let mut children = Vec::new();
         if plan.select {

@@ -456,7 +456,6 @@ impl NativeSession {
         objects: &mut BoundObjects,
         step: ObjectId,
     ) -> Result<Option<NativeEvent>> {
-        let p = &objects.phases;
         let context = |name| -> Result<Option<Symbol>> {
             let value = self
                 .symbols
@@ -475,17 +474,11 @@ impl NativeSession {
         ) else {
             return Ok(None);
         };
-        if item == target {
-            return Ok(None);
-        }
         self.sync_card_collections_bound(objects)?;
         let Some(owner) = self.world.hero(hero) else {
             return Ok(None);
         };
         let owner = owner.id;
-        let model = self
-            .hero_model_bound(objects, owner)
-            .ok_or_else(|| unsupported("item swap model missing"))?;
         let find = |printed| {
             self.world
                 .hero(owner)
@@ -502,10 +495,25 @@ impl NativeSession {
         let (Some(a), Some(b)) = (find(item), find(target)) else {
             return Ok(None);
         };
+        self.swap_item_instances_bound(objects, owner, a, b)
+    }
+
+    pub(super) fn swap_item_instances_bound(
+        &mut self,
+        objects: &mut BoundObjects,
+        owner: Symbol,
+        a: CardId,
+        b: CardId,
+    ) -> Result<Option<NativeEvent>> {
+        let p = &objects.phases;
+        let model = self
+            .hero_model_bound(objects, owner)
+            .ok_or_else(|| unsupported("item swap model missing"))?;
         let a_row = self.world.card(a).unwrap();
         let b_row = self.world.card(b).unwrap().clone();
         let a_def = &self.world.definitions.cards[a_row.definition];
         let b_def = &self.world.definitions.cards[b_row.definition];
+        let target = b_def.printed_id;
         let (Some(old_stat), Some(new_stat)) = (a_def.item, b_def.item) else {
             return Ok(None);
         };

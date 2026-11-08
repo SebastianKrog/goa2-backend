@@ -1,0 +1,174 @@
+{
+  "heroes": [
+    "Arien",
+    "Bain",
+    "Brogan",
+    "Brynn",
+    "Cordelia",
+    "Cutter",
+    "Dodger",
+    "Emmitt",
+    "Garrus",
+    "Gydion",
+    "Hanu",
+    "Ignatia",
+    "Min",
+    "Misa",
+    "Mortimer",
+    "Mrak",
+    "NebKher",
+    "Razzle",
+    "Rowenna",
+    "Sabina",
+    "Silverarrow",
+    "Snorri",
+    "Swift",
+    "Takahide",
+    "Tali",
+    "Tigerclaw",
+    "Trinkets",
+    "Ursafar",
+    "Wasp",
+    "Whisper",
+    "Widget",
+    "Wuk",
+    "Xargatha"
+  ],
+  "playtest_heroes": [
+    "Cordelia"
+  ],
+  "metadata": [
+    {
+      "id": "Arien",
+      "difficulty_stars": 1
+    },
+    {
+      "id": "Xargatha",
+      "difficulty_stars": 1
+    },
+    {
+      "id": "Wasp",
+      "difficulty_stars": 1
+    },
+    {
+      "id": "Brogan",
+      "difficulty_stars": 1
+    },
+    {
+      "id": "Tigerclaw",
+      "difficulty_stars": 1
+    },
+    {
+      "id": "Sabina",
+      "difficulty_stars": 1
+    },
+    {
+      "id": "Dodger",
+      "difficulty_stars": 1
+    },
+    {
+      "id": "Bain",
+      "difficulty_stars": 2
+    },
+    {
+      "id": "Whisper",
+      "difficulty_stars": 2
+    },
+    {
+      "id": "Rowenna",
+      "difficulty_stars": 2
+    },
+    {
+      "id": "Ursafar",
+      "difficulty_stars": 2
+    },
+    {
+      "id": "Min",
+      "difficulty_stars": 2
+    },
+    {
+      "id": "Misa",
+      "difficulty_stars": 2
+    },
+    {
+      "id": "Garrus",
+      "difficulty_stars": 2
+    },
+    {
+      "id": "Silverarrow",
+      "difficulty_stars": 2
+    },
+    {
+      "id": "Cordelia",
+      "difficulty_stars": 2
+    },
+    {
+      "id": "Mortimer",
+      "difficulty_stars": 3
+    },
+    {
+      "id": "Widget",
+      "difficulty_stars": 3
+    },
+    {
+      "id": "Trinkets",
+      "difficulty_stars": 3
+    },
+    {
+      "id": "Tali",
+      "difficulty_stars": 3
+    },
+    {
+      "id": "Brynn",
+      "difficulty_stars": 3
+    },
+    {
+      "id": "Cutter",
+      "difficulty_stars": 3
+    },
+    {
+      "id": "Hanu",
+      "difficulty_stars": 3
+    },
+    {
+      "id": "Mrak",
+      "difficulty_stars": 3
+    },
+    {
+      "id": "Swift",
+      "difficulty_stars": 3
+    },
+    {
+      "id": "Wuk",
+      "difficulty_stars": 3
+    },
+    {
+      "id": "Emmitt",
+      "difficulty_stars": 4
+    },
+    {
+      "id": "Gydion",
+      "difficulty_stars": 4
+    },
+    {
+      "id": "Ignatia",
+      "difficulty_stars": 4
+    },
+    {
+      "id": "NebKher",
+      "difficulty_stars": 4
+    },
+    {
+      "id": "Razzle",
+      "difficulty_stars": 4
+    },
+    {
+      "id": "Snorri",
+      "difficulty_stars": 4
+    },
+    {
+      "id": "Takahide",
+      "difficulty_stars": 4
+    }
+  ]
+}

@@ -76,6 +76,42 @@ impl NativeSession {
             Ok(())
         })
     }
+    pub(in crate::interpreter) fn apply_preview_upgrade(
+        &mut self,
+        hero: Symbol,
+        card: &str,
+    ) -> Result<()> {
+        let rules = self
+            .round_rules
+            .as_ref()
+            .ok_or_else(|| unsupported("upgrade rules missing"))?
+            .clone();
+        let selected = self
+            .symbols
+            .lookup(card)
+            .filter(|selected| {
+                rules.options(&self.world, hero).iter().any(|option| {
+                    option.pair.iter().any(|id| {
+                        self.world.card(*id).is_some_and(|row| {
+                            self.world.definitions.cards[row.definition].printed_id == *selected
+                        })
+                    })
+                })
+            })
+            .ok_or_else(|| {
+                EngineError::InvalidInput("Card is not a legal upgrade in this preview".into())
+            })?;
+        if self.objects.is_some() {
+            self.with_live_objects(|session, objects| {
+                session.apply_upgrade_bound(objects, hero, selected)
+            })
+        } else {
+            rules
+                .apply(&mut self.world, &mut self.round, hero, selected)
+                .map_err(card_error)
+        }
+    }
+
     fn upgrade_card_state_bound(
         &mut self,
         objects: &mut BoundObjects,

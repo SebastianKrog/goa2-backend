@@ -52,9 +52,13 @@ fn read_case<T: serde::de::DeserializeOwned>(entry: &Value) -> T {
 }
 
 fn case(name: &str) -> Value {
+    indexed_case("object-execution.json", name)
+}
+
+fn indexed_case(index_name: &str, name: &str) -> Value {
     let base = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures"));
     let index: Value = serde_json::from_reader(std::io::BufReader::new(
-        fixture_cache::open(base.join("object-execution.json")).unwrap(),
+        fixture_cache::open(base.join(index_name)).unwrap(),
     ))
     .unwrap();
     let entry = index["cases"]
@@ -378,6 +382,51 @@ fn appending_through_context_cannot_silently_mutate_unbound_world_lists() {
     let error = session.advance(&ExecutionBudget::default()).unwrap_err();
     assert!(error.to_string().contains("unbound world/step operand"));
     assert!(session.export_envelope().unwrap().state["teams"] == before);
+}
+
+#[test]
+fn restoring_an_empty_action_type_stack_leaves_its_world_alias_unchanged() {
+    use goa2_core::codec::ObjectPathPart::Key;
+
+    let mut source = source("object-execution-scope-action-type-empty");
+    let stack = vec![
+        Key("execution_context".into()),
+        Key("action_type_stack".into()),
+    ];
+    let effects = vec![Key("active_effects".into())];
+    assert_eq!(source.state["active_effects"], json!([]));
+    assert_eq!(
+        source.state["execution_context"]["action_type_stack"],
+        json!([])
+    );
+    for binding in &mut source.object_bindings {
+        binding.paths.retain(|path| path != &stack);
+    }
+    source
+        .object_bindings
+        .retain(|binding| !binding.paths.is_empty());
+    source
+        .object_bindings
+        .iter_mut()
+        .find(|binding| binding.paths.contains(&effects))
+        .unwrap()
+        .paths
+        .push(stack.clone());
+    source.validate().unwrap();
+    let mut session = NativeSession::compile(source).unwrap();
+    session.advance_prefix(1).unwrap();
+    let after = session.export_envelope().unwrap();
+    assert_eq!(
+        after.state["execution_context"]["current_action_type"],
+        "DEFENSE"
+    );
+    assert_eq!(after.state["active_effects"], json!([]));
+    assert!(
+        after
+            .object_bindings
+            .iter()
+            .any(|binding| { binding.paths.contains(&effects) && binding.paths.contains(&stack) })
+    );
 }
 
 #[test]
@@ -3728,4 +3777,284 @@ fn session_rollback_restores_live_branches_and_staged_transitions() {
         }
     }
     assert_eq!(checked, names.len());
+}
+
+#[test]
+fn live_game_planning_and_mid_decision_restore() {
+    use goa2_core::{
+        codec::Phase,
+        interpreter::live_game::{GameCheckpoint, LiveGame, PlayerCommand},
+    };
+
+    let fixture = indexed_case(
+        "complete-games.json",
+        "complete-game-live-forgotten_island-progress-11",
+    );
+    let envelope = serde_json::from_value(fixture["envelope"].clone()).unwrap();
+    let budget = ExecutionBudget::default();
+    let (mut game, opened) = LiveGame::import(envelope, &budget).unwrap();
+    assert_eq!(opened.position.phase, Phase::Planning);
+    assert!(opened.events.is_empty());
+
+    let commit = |card_id: &str| PlayerCommand::Commit {
+        card_id: card_id.into(),
+    };
+    assert!(
+        game.submit("hero_brogan", 0, commit("aspiring_duelist"), &budget)
+            .is_err()
+    );
+    assert_eq!(game.position().revision, 0);
+    game.submit("hero_arien", 0, commit("aspiring_duelist"), &budget)
+        .unwrap();
+    assert!(
+        game.submit("hero_arien", 0, PlayerCommand::Uncommit, &budget)
+            .is_err()
+    );
+    game.submit("hero_arien", 1, PlayerCommand::Uncommit, &budget)
+        .unwrap();
+    game.submit("hero_arien", 2, commit("aspiring_duelist"), &budget)
+        .unwrap();
+    game.submit("hero_brogan", 3, commit("mad_dash"), &budget)
+        .unwrap();
+    game.submit("hero_tigerclaw", 4, commit("hit_and_run"), &budget)
+        .unwrap();
+    let before = serde_json::to_value(game.checkpoint().unwrap()).unwrap();
+    let short_budget = ExecutionBudget {
+        max_steps: 1,
+        ..budget
+    };
+    assert!(matches!(
+        game.submit("hero_sabina", 5, commit("listen_up"), &short_budget),
+        Err(EngineError::StepLimit)
+    ));
+    assert_eq!(
+        serde_json::to_value(game.checkpoint().unwrap()).unwrap(),
+        before
+    );
+
+    let resolution = game
+        .submit("hero_sabina", 5, commit("listen_up"), &budget)
+        .unwrap();
+    assert_eq!(resolution.position.phase, Phase::Resolution);
+    assert_eq!(resolution.position.revision, 6);
+    let heroes = ["hero_arien", "hero_brogan", "hero_tigerclaw", "hero_sabina"];
+    let prompts: Vec<_> = heroes
+        .iter()
+        .filter_map(|hero| game.request_for(hero).map(|r| (*hero, r)))
+        .collect();
+    assert_eq!(prompts.len(), 1);
+    let (owner, prompt) = &prompts[0];
+    assert_eq!(prompt["request_type"], "CHOOSE_ACTION");
+    let other = heroes.into_iter().find(|hero| hero != owner).unwrap();
+
+    let saved = serde_json::to_value(game.checkpoint().unwrap()).unwrap();
+    let checkpoint: GameCheckpoint = serde_json::from_value(saved.clone()).unwrap();
+    let mut restored = LiveGame::restore(checkpoint, &budget).unwrap();
+    assert_eq!(restored.position(), game.position());
+    assert_eq!(restored.request_for(owner).as_ref(), Some(prompt));
+
+    let input = |request_id: &str, selection: &str| PlayerCommand::Input {
+        request_id: request_id.into(),
+        selection: json!(selection),
+    };
+    let request_id = prompt["id"].as_str().unwrap();
+    for (actor, command) in [
+        (other, input(request_id, "FAST_TRAVEL")),
+        (*owner, input("stale-request", "FAST_TRAVEL")),
+        (*owner, input(request_id, "NOT_AN_ACTION")),
+    ] {
+        assert!(matches!(
+            restored.submit(actor, 6, command, &budget),
+            Err(EngineError::InvalidInput(_))
+        ));
+    }
+    assert_eq!(
+        serde_json::to_value(restored.checkpoint().unwrap()).unwrap(),
+        saved
+    );
+
+    let continued = restored
+        .submit(owner, 6, input(request_id, "FAST_TRAVEL"), &budget)
+        .unwrap();
+    assert_eq!(
+        continued,
+        game.submit(owner, 6, input(request_id, "FAST_TRAVEL"), &budget)
+            .unwrap()
+    );
+    assert_eq!(
+        serde_json::to_value(restored.checkpoint().unwrap()).unwrap(),
+        serde_json::to_value(game.checkpoint().unwrap()).unwrap(),
+    );
+}
+
+#[test]
+fn live_game_finishes_a_recorded_game_without_a_turn_cap() {
+    use goa2_core::{
+        codec::Phase,
+        interpreter::live_game::{LiveGame, PlayerCommand},
+    };
+
+    let fixture = indexed_case(
+        "complete-games.json",
+        "complete-game-live-forgotten_island-progress-11",
+    );
+    let envelope: StateEnvelope = serde_json::from_value(fixture["envelope"].clone()).unwrap();
+    let budget = ExecutionBudget::default();
+    let (mut game, _) = LiveGame::import(envelope.clone(), &budget).unwrap();
+    let heroes = ["hero_arien", "hero_brogan", "hero_tigerclaw", "hero_sabina"];
+    let mut events = Vec::new();
+    for (index, operation) in fixture["operations"].as_array().unwrap().iter().enumerate() {
+        let (actor, command) = match operation["kind"].as_str().unwrap() {
+            "advance_prefix" => continue,
+            "commit" => {
+                let actor = operation["hero"].as_str().unwrap();
+                let id = operation["card"].as_u64().unwrap() as usize;
+                let instance = &envelope.instances[id];
+                let definition = &envelope.definitions[instance.definition as usize];
+                let card_id = definition
+                    .fields
+                    .get("id")
+                    .or_else(|| instance.fields.get("id"))
+                    .and_then(Value::as_str)
+                    .unwrap()
+                    .to_owned();
+                (actor, PlayerCommand::Commit { card_id })
+            }
+            "input" => {
+                let selection = operation["selection"].clone();
+                let (actor, request) = heroes
+                    .into_iter()
+                    .filter(|hero| {
+                        selection["hero_id"]
+                            .as_str()
+                            .is_none_or(|owner| owner == *hero)
+                    })
+                    .find_map(|hero| game.request_for(hero).map(|request| (hero, request)))
+                    .unwrap_or_else(|| panic!("no responder for operation {index} {operation}"));
+                // The low-level trace omits session-level rollback management.
+                // The Python GameSession skips these three confirmations after
+                // foreign responses when there is no owner action to undo.
+                if [4595, 4642, 5091].contains(&index) {
+                    assert_eq!(selection, "CONFIRM");
+                    assert!(!request["options"].as_array().unwrap().iter()
+                        .any(|option| option["id"] == "CONFIRM"));
+                    continue;
+                }
+                let request_id = request["id"].as_str().unwrap().to_owned();
+                (
+                    actor,
+                    PlayerCommand::Input {
+                        request_id,
+                        selection,
+                    },
+                )
+            }
+            other => panic!("unexpected recorded operation {other}"),
+        };
+        let revision = game.position().revision;
+        let transition = game
+            .submit(actor, revision, command, &budget)
+            .unwrap_or_else(|error| panic!("operation {index} {operation}: {error}"));
+        events.extend(transition.events);
+    }
+
+    let end = game.position();
+    assert_eq!(end.phase, Phase::GameOver);
+    assert_eq!(end.revision, 875);
+    let result = end.outcome.unwrap();
+    assert_eq!(result.winner_team.as_deref(), Some("BLUE"));
+    assert_eq!(result.condition, "LAST_PUSH");
+    assert_eq!(events.last().unwrap()["event_type"], "GAME_OVER");
+    let saved = serde_json::to_value(game.checkpoint().unwrap()).unwrap();
+    assert!(
+        !saved["upgrade_history"]["batches"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+    let restored =
+        LiveGame::restore(serde_json::from_value(saved.clone()).unwrap(), &budget).unwrap();
+    assert_eq!(
+        serde_json::to_value(restored.checkpoint().unwrap()).unwrap(),
+        saved
+    );
+}
+
+#[test]
+fn live_game_scopes_simultaneous_upgrade_prompts() {
+    use goa2_core::interpreter::live_game::{LiveGame, PlayerCommand};
+
+    let mut envelope = source("object-execution-upgrade-live-Arien-1-single-0");
+    envelope.state["pending_upgrades"]["hero_brogan"] = json!(1);
+    envelope.state["execution_context"]["pending_alias"]["hero_brogan"] = json!(1);
+    let budget = ExecutionBudget::default();
+    let (mut game, _) = LiveGame::import(envelope, &budget).unwrap();
+
+    let arien = game.request_for("hero_arien").unwrap();
+    let brogan = game.request_for("hero_brogan").unwrap();
+    assert_eq!(arien["id"], brogan["id"]);
+    for (hero, request) in [("hero_arien", &arien), ("hero_brogan", &brogan)] {
+        let players = request["context"]["players"].as_object().unwrap();
+        assert_eq!(players.len(), 1);
+        assert!(players.contains_key(hero));
+    }
+    assert!(game.request_for("hero_hanu").is_none());
+    let request_id = arien["id"].as_str().unwrap();
+    let cards = ["expert_duelist".to_owned()];
+    let before = serde_json::to_value(game.checkpoint().unwrap()).unwrap();
+    let preview = game.preview_upgrades("hero_arien", request_id, &cards).unwrap();
+    assert_eq!(preview["remaining"], 0);
+    assert_eq!(preview["options"], json!([]));
+    assert!(game.preview_upgrades("hero_hanu", request_id, &cards).is_err());
+    assert!(game.preview_upgrades("hero_arien", "stale", &cards).is_err());
+    assert!(game.preview_upgrades("hero_arien", request_id, &["unknown".into()]).is_err());
+    assert_eq!(serde_json::to_value(game.checkpoint().unwrap()).unwrap(), before);
+    let upgrade = || PlayerCommand::Input {
+        request_id: arien["id"].as_str().unwrap().to_owned(),
+        selection: json!({"hero_id": "hero_arien", "card_id": "expert_duelist"}),
+    };
+    assert!(matches!(
+        game.submit("hero_brogan", 0, upgrade(), &budget),
+        Err(EngineError::InvalidInput(_))
+    ));
+    game.submit("hero_arien", 0, upgrade(), &budget).unwrap();
+    assert_eq!(preview["view"], game.client_view(Some("hero_arien")).unwrap()["view"]);
+    assert!(game.request_for("hero_arien").is_none());
+    assert!(game.request_for("hero_brogan").is_some());
+}
+
+#[test]
+fn live_game_bot_uses_legal_fallback_at_deadline_and_honors_cancel() {
+    use goa2_core::interpreter::live_game::LiveGame;
+
+    let fixture = indexed_case(
+        "complete-games.json",
+        "complete-game-live-forgotten_island-progress-11",
+    );
+    let envelope = serde_json::from_value(fixture["envelope"].clone()).unwrap();
+    let rules = ExecutionBudget::default();
+    let (mut game, _) = LiveGame::import(envelope, &rules).unwrap();
+    let expired = ExecutionBudget {
+        deadline: Some(Instant::now()),
+        ..rules
+    };
+    let stop = AtomicBool::new(true);
+    let cancelled = ExecutionBudget {
+        cancelled: Some(&stop),
+        ..rules
+    };
+    assert!(matches!(
+        game.recommend_bot("hero_arien", &cancelled),
+        Err(EngineError::Cancelled)
+    ));
+    let decision = game.recommend_bot("hero_arien", &expired).unwrap().unwrap();
+    assert!(decision.used_fallback);
+    assert_eq!(game.position().revision, 0);
+    game.submit("hero_arien", 0, decision.command, &rules)
+        .unwrap();
+    assert!(
+        game.recommend_bot("hero_arien", &expired)
+            .unwrap()
+            .is_none()
+    );
 }

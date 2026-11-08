@@ -5,7 +5,9 @@ mod sequence_legality;
 mod simulation_bench;
 use goa2_core::codec::StateEnvelope;
 use goa2_core::geometry::{BoardGeometry, MovementQuery, TileSpec};
-use goa2_core::interpreter::{EngineError, ExecutionBudget, NativeSession};
+use goa2_core::interpreter::{
+    ArenaChoice, ArenaMatch, EngineError, ExecutionBudget, NativeSession, RecordedArenaChoice,
+};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::io::{self, BufRead, Write};
@@ -124,7 +126,8 @@ enum Operation {
         max_nodes: usize,
         #[serde(default)]
         evaluation: goa2_core::interpreter::SearchEvaluation,
-        time_ms: u64,
+        time_ms: Option<u64>,
+        work_budget: Option<goa2_core::interpreter::WorkBudget>,
         rollout_turns: Option<u8>,
         planning_sample_seed: Option<u64>,
         resolution_sample_seed: Option<u64>,
@@ -156,7 +159,8 @@ enum Operation {
         max_nodes: usize,
         #[serde(default)]
         evaluation: goa2_core::interpreter::SearchEvaluation,
-        time_ms: u64,
+        time_ms: Option<u64>,
+        work_budget: Option<goa2_core::interpreter::WorkBudget>,
         rollout_turns: Option<u8>,
         workers: Option<usize>,
         bot_team: Option<resolution_search::BotTeam>,
@@ -184,6 +188,19 @@ enum Operation {
     CheckSequences {
         envelope: StateEnvelope,
         sequences: Vec<Vec<sequence_legality::WireMove>>,
+    },
+    ArenaStart {
+        envelope: StateEnvelope,
+        turns: u8,
+    },
+    ArenaSubmit {
+        revision: u64,
+        choice: ArenaChoice,
+    },
+    ArenaReplay {
+        envelope: StateEnvelope,
+        turns: u8,
+        choices: Vec<RecordedArenaChoice>,
     },
     OfflineMatch {
         envelope: StateEnvelope,
@@ -264,13 +281,14 @@ fn execute(
     request: Request,
     started: Instant,
     board: &mut Option<(BoardGeometry, goa2_core::geometry::Occupancy)>,
+    arena: &mut Option<ArenaMatch>,
 ) -> Result<Value, String> {
     if request.schema_version != 1 {
         return Err("unsupported protocol schema".into());
     }
     match request.operation {
         Operation::Capabilities => Ok(
-            json!({"plain_fast_travel":true,"unit_selection_traces":true,"acting_piece_traces":true,"action_recipes":true,"fast_travel_zones":true,"planning_phase_traces":true,"card_models":true,"scalar_stats":true,"native_step_traces":true,"streamed_step_traces":true,"state_codec":true,"sequence_legality":true,"resolution_search":true,"prepare_search":true,"plain_board_movement":true,"stateful_plain_movement":true,"game_transitions":false,"search":false,"rules_versions":[]}),
+            json!({"plain_fast_travel":true,"unit_selection_traces":true,"acting_piece_traces":true,"action_recipes":true,"fast_travel_zones":true,"planning_phase_traces":true,"card_models":true,"scalar_stats":true,"native_step_traces":true,"streamed_step_traces":true,"state_codec":true,"sequence_legality":true,"resolution_search":true,"prepare_search":true,"arena_match_v1":true,"nodes_v1":true,"plain_board_movement":true,"stateful_plain_movement":true,"game_transitions":false,"search":false,"rules_versions":[]}),
         ),
         Operation::PrepareSearch => {
             NativeSession::prepare_search().map_err(|error| error.to_string())?;
@@ -310,26 +328,55 @@ fn execute(
             Ok(json!({"recipe_id": "lab-attack-range-v1", "value": value}))
         }
         Operation::SearchGreedy {
-            envelope, player_id, controlled_ids, turns, max_nodes, seed, time_ms,
-            fixed_card_order, defer_upgrades, positional_ordering, position_first, tactical_replies, reuse_movement, profile, evaluation,
+            envelope,
+            player_id,
+            controlled_ids,
+            turns,
+            max_nodes,
+            seed,
+            time_ms,
+            fixed_card_order,
+            defer_upgrades,
+            positional_ordering,
+            position_first,
+            tactical_replies,
+            reuse_movement,
+            profile,
+            evaluation,
         } => {
             let budget = resolution_search::time_budget(started, time_ms)?;
             let mut session = resolution_search::compile_with_budget(envelope, &budget)?;
             let player = sequence_legality::player(&mut session, player_id)?;
             let controlled = match controlled_ids {
-                Some(ids) => ids.into_iter().map(|id| sequence_legality::player(&mut session, id))
+                Some(ids) => ids
+                    .into_iter()
+                    .map(|id| sequence_legality::player(&mut session, id))
                     .collect::<Result<Vec<_>, _>>()?,
                 None => vec![player],
             };
             let options = goa2_core::interpreter::GreedySearchOptions {
-                controlled: &controlled, turns, max_nodes, seed, evaluation, fixed_card_order,
+                controlled: &controlled,
+                turns,
+                max_nodes,
+                seed,
+                evaluation,
+                fixed_card_order,
                 defer_upgrades: defer_upgrades.unwrap_or(true),
                 positional_ordering: positional_ordering.unwrap_or(true),
-                position_first, tactical_replies, reuse_movement: reuse_movement.unwrap_or(true), profile,
+                position_first,
+                tactical_replies,
+                reuse_movement: reuse_movement.unwrap_or(true),
+                profile,
             };
-            let result = session.search_greedy(player, options, &budget).map_err(|e| e.to_string())?;
-            let replay = result.best.as_ref().map(|plan| session.greedy_trace_json(plan))
-                .transpose().map_err(|e| e.to_string())?;
+            let result = session
+                .search_greedy(player, options, &budget)
+                .map_err(|e| e.to_string())?;
+            let replay = result
+                .best
+                .as_ref()
+                .map(|plan| session.greedy_trace_json(plan))
+                .transpose()
+                .map_err(|e| e.to_string())?;
             Ok(json!({
                 "score": result.best.map(|plan| plan.score), "replay": replay,
                 "nodes": result.nodes, "completed_sequences": result.completed_sequences,
@@ -357,6 +404,7 @@ fn execute(
             max_nodes,
             evaluation,
             time_ms,
+            work_budget,
             rollout_turns,
             planning_sample_seed,
             resolution_sample_seed,
@@ -366,7 +414,13 @@ fn execute(
             upgrade_checkpoints,
             opponent_policy,
         } => {
-            let budget = resolution_search::time_budget(started, time_ms)?;
+            let budget = goa2_core::interpreter::ExecutionBudget::for_search(
+                started,
+                time_ms,
+                work_budget,
+                resolution_sample_workers.unwrap_or(1),
+            )
+            .map_err(|error| error.to_string())?;
             let checkpoints =
                 resolve_upgrade_evidence(upgrade_checkpoints, public_upgrade_batches)?;
             if checkpoints.is_some()
@@ -426,6 +480,7 @@ fn execute(
             max_nodes,
             evaluation,
             time_ms,
+            work_budget,
             rollout_turns,
             workers,
             upgrade_checkpoints,
@@ -435,7 +490,13 @@ fn execute(
             if reply_probe_cap.is_some() && bot_team.is_none() {
                 return Err("reply_probe_cap requires scoped bot planning".into());
             }
-            let budget = resolution_search::time_budget(started, time_ms)?;
+            let budget = goa2_core::interpreter::ExecutionBudget::for_search(
+                started,
+                time_ms,
+                work_budget,
+                workers.unwrap_or(1),
+            )
+            .map_err(|error| error.to_string())?;
             let upgrade_checkpoints =
                 resolve_upgrade_evidence(upgrade_checkpoints, public_upgrade_batches)?;
             resolution_search::sampled_planning(
@@ -506,6 +567,17 @@ fn execute(
             envelope,
             sequences,
         } => sequence_legality::check(envelope, sequences),
+        Operation::ArenaStart { envelope, turns } => {
+            let mut game = ArenaMatch::start(envelope, turns).map_err(|error| error.to_string())?;
+            let position = game.position().map_err(|error| error.to_string())?;
+            *arena = Some(game);
+            Ok(position)
+        }
+        Operation::ArenaSubmit { revision, choice } => arena
+            .as_mut()
+            .ok_or("arena match has not started")?
+            .submit(revision, choice)
+            .map_err(|error| error.to_string()),
         Operation::OfflineMatch {
             envelope,
             turns,
@@ -537,15 +609,25 @@ fn execute(
             workers.unwrap_or(1),
             lab_evaluation,
         ),
-        Operation::ResolutionReuseCensus { envelope, depth, max_nodes } => {
+        Operation::ResolutionReuseCensus {
+            envelope,
+            depth,
+            max_nodes,
+        } => {
             let mut session = NativeSession::compile(envelope).map_err(|e| e.to_string())?;
-            session.advance_to_decision(&ExecutionBudget::default()).map_err(|e| e.to_string())?;
-            let census = session.resolution_reuse_census(depth, max_nodes).map_err(|e| e.to_string())?;
+            session
+                .advance_to_decision(&ExecutionBudget::default())
+                .map_err(|e| e.to_string())?;
+            let census = session
+                .resolution_reuse_census(depth, max_nodes)
+                .map_err(|e| e.to_string())?;
             serde_json::to_value(census).map_err(|e| e.to_string())
         }
-        Operation::FingerprintBench { envelope, iterations, operations } => {
-            simulation_bench::measure_fingerprints(envelope, iterations, operations)
-        }
+        Operation::FingerprintBench {
+            envelope,
+            iterations,
+            operations,
+        } => simulation_bench::measure_fingerprints(envelope, iterations, operations),
         Operation::SimulationBench {
             envelope,
             operations,
@@ -604,7 +686,9 @@ fn execute(
             envelope,
             operations,
         } => goa2_core::diagnostics::card_trace(envelope, operations),
-        Operation::StackTraceStream { .. } => Err("streamed trace requires an output sink".into()),
+        Operation::StackTraceStream { .. } | Operation::ArenaReplay { .. } => {
+            Err("streamed trace requires an output sink".into())
+        }
         Operation::StackTrace {
             envelope,
             operations,
@@ -839,8 +923,17 @@ fn stack_trace_stream(
     operations: Vec<Value>,
     out: &mut impl Write,
 ) -> io::Result<()> {
+    stream_records(id, out, |emit| {
+        replay_trace_checked(envelope, operations, emit)
+    })
+}
+fn stream_records(
+    id: Value,
+    out: &mut impl Write,
+    produce: impl FnOnce(&mut dyn FnMut(Value) -> Result<(), String>) -> Result<(), String>,
+) -> io::Result<()> {
     let mut count = 0;
-    let result = replay_trace_checked(envelope, operations, |record| {
+    let result = produce(&mut |record| {
         write_packet(out,&json!({"schema_version":1,"id":id,"ok":true,"result":{"sequence":count,"record":record}})).map_err(|e|e.to_string())?;
         count += 1;
         Ok(())
@@ -855,6 +948,7 @@ fn stack_trace_stream(
 }
 fn main() -> io::Result<()> {
     let mut board = None;
+    let mut arena = None;
     let mut out = io::BufWriter::new(io::stdout().lock());
     for line in io::stdin().lock().lines() {
         let line = line?;
@@ -872,9 +966,24 @@ fn main() -> io::Result<()> {
                 stack_trace_stream(id, envelope, operations, &mut out)?;
                 continue;
             }
+            Ok(Request {
+                schema_version: 1,
+                id,
+                operation:
+                    Operation::ArenaReplay {
+                        envelope,
+                        turns,
+                        choices,
+                    },
+            }) => {
+                stream_records(id, &mut out, |emit| {
+                    ArenaMatch::replay(envelope, turns, choices, emit)
+                })?;
+                continue;
+            }
             Ok(request) => {
                 let id = request.id.clone();
-                match execute(request, started, &mut board) {
+                match execute(request, started, &mut board, &mut arena) {
                     Ok(result) => json!({"schema_version":1,"id":id,"ok":true,"result":result}),
                     Err(error) => json!({"schema_version":1,"id":id,"ok":false,"error":error}),
                 }
@@ -904,7 +1013,8 @@ mod tests {
                 player_id: "hero_arien".into(),
                 max_depth: 1,
                 max_nodes: 16,
-                time_ms: 1,
+                time_ms: Some(1),
+                work_budget: None,
                 rollout_turns: None,
                 planning_sample_seed: None,
                 resolution_sample_seed: None,
@@ -917,7 +1027,7 @@ mod tests {
             },
         };
         let started = Instant::now() - std::time::Duration::from_secs(1);
-        let error = execute(request, started, &mut None).unwrap_err();
+        let error = execute(request, started, &mut None, &mut None).unwrap_err();
         assert_eq!(error, "search deadline reached during request setup");
     }
 
@@ -1022,12 +1132,12 @@ mod tests {
             json!({"schema_version":1,"id":1,"operation":"load_board","tiles":[]}),
         )
         .unwrap();
-        execute(request, Instant::now(), &mut board).unwrap();
+        execute(request, Instant::now(), &mut board, &mut None).unwrap();
         let bad = serde_json::from_value(
             json!({"schema_version":99,"id":2,"operation":"load_board","tiles":[]}),
         )
         .unwrap();
-        assert!(execute(bad, Instant::now(), &mut board).is_err());
+        assert!(execute(bad, Instant::now(), &mut board, &mut None).is_err());
         assert!(board.is_some());
     }
 }

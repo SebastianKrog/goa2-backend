@@ -1,10 +1,12 @@
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/rust_oracle"))
 
+import oracle
 from oracle import Worker, WorkerUnavailable
 
 
@@ -36,6 +38,28 @@ for line in sys.stdin:
         assert worker.process.poll() is not None
         with pytest.raises(RuntimeError, match="retired"):
             worker.request("ready")
+    finally:
+        worker.close()
+
+
+def test_completed_reply_is_discarded_if_the_caller_wakes_after_deadline(monkeypatch):
+    worker = Worker([sys.executable, "-c", "import sys; sys.stdin.read()"])
+    clock = SimpleNamespace(now=1.0)
+    real_wait = oracle.wait
+
+    def wait_after_deadline(futures, **kwargs):
+        result = real_wait(futures, **kwargs)
+        clock.now = 2.0
+        return result
+
+    monkeypatch.setattr(oracle, "time", SimpleNamespace(perf_counter=lambda: clock.now))
+    monkeypatch.setattr(oracle, "wait", wait_after_deadline)
+    monkeypatch.setattr(worker, "_exchange", lambda request_id, _: request_id)
+    try:
+        with pytest.raises(TimeoutError, match="reply missed the decision deadline"):
+            worker.request("ready", decision_deadline=2.0)
+        assert worker.process.poll() is None
+        assert worker.request("ready") == 2
     finally:
         worker.close()
 

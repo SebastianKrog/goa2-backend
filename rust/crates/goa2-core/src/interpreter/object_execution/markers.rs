@@ -53,6 +53,47 @@ impl NativeSession {
         let key = self
             .spatial_text_bound(objects, step, Field::MarkerType)?
             .ok_or_else(|| unsupported("marker kind missing"))?;
+        if remove {
+            return self.prepare_marker_update(objects, key, None, false);
+        }
+        let mut target = self.truthy_symbol_bound(
+            objects,
+            objects.arena.field(step, objects.phases.k(Field::TargetId)),
+        )?;
+        if target.is_none()
+            && let Some(key) = self.truthy_symbol_bound(
+                objects,
+                objects
+                    .arena
+                    .field(step, objects.phases.k(Field::TargetKey)),
+            )?
+        {
+            target = self.truthy_symbol_bound(objects, objects.arena.context_value(key))?;
+        }
+        let Some(target) = target else {
+            return Ok(MarkerPlan::Skip);
+        };
+        let source = self
+            .planning
+            .actor
+            .filter(|id| !self.symbols.name(*id).is_empty())
+            .unwrap_or(objects.phases.k(Field::SystemName));
+        let Some(ObjectValue::Atom(Datum::Int(value))) =
+            objects.arena.field(step, objects.phases.k(Field::Value))
+        else {
+            return Err(unsupported("marker value must be an integer"));
+        };
+        self.phase_generation_check(0, 1)?;
+        self.prepare_marker_update(objects, key, Some((target, source, value)), true)
+    }
+
+    pub(super) fn prepare_marker_update(
+        &self,
+        objects: &BoundObjects,
+        key: Symbol,
+        placement: Option<(Symbol, Symbol, i64)>,
+        passive: bool,
+    ) -> Result<MarkerPlan> {
         let kind = self.marker_kind_bound(key)?;
         let dictionary = objects.phases.root(&objects.arena, Field::Markers)?;
         if objects.arena.kind(dictionary) != ObjectKind::Dict {
@@ -70,41 +111,8 @@ impl NativeSession {
             None => None,
             _ => return Err(unsupported("marker must be a mutable model")),
         };
-        let (target, source, value, event) = if remove {
-            if model.is_none() {
-                return Ok(MarkerPlan::Skip);
-            }
-            (None, None, 0, MarkerEvent::Removed { kind: key })
-        } else {
-            let mut target = self.truthy_symbol_bound(
-                objects,
-                objects.arena.field(step, objects.phases.k(Field::TargetId)),
-            )?;
-            if target.is_none()
-                && let Some(key) = self.truthy_symbol_bound(
-                    objects,
-                    objects
-                        .arena
-                        .field(step, objects.phases.k(Field::TargetKey)),
-                )?
-            {
-                target = self.truthy_symbol_bound(objects, objects.arena.context_value(key))?;
-            }
-            let Some(target) = target else {
-                return Ok(MarkerPlan::Skip);
-            };
-            let source = self
-                .planning
-                .actor
-                .filter(|id| !self.symbols.name(*id).is_empty())
-                .unwrap_or(objects.phases.k(Field::SystemName));
-            let Some(ObjectValue::Atom(Datum::Int(value))) =
-                objects.arena.field(step, objects.phases.k(Field::Value))
-            else {
-                return Err(unsupported("marker value must be an integer"));
-            };
-            self.phase_generation_check(0, 1)?;
-            (
+        let (target, source, value, event) = match placement {
+            Some((target, source, value)) => (
                 Some(target),
                 Some(source),
                 value,
@@ -114,7 +122,9 @@ impl NativeSession {
                     target,
                     value,
                 },
-            )
+            ),
+            None if model.is_some() => (None, None, 0, MarkerEvent::Removed { kind: key }),
+            None => return Ok(MarkerPlan::Skip),
         };
         let mut rows = Vec::new();
         for (row_key, row_value) in objects
@@ -170,7 +180,7 @@ impl NativeSession {
             value,
             rows,
             event,
-            passive: !remove,
+            passive,
         })
     }
     pub(super) fn marker_bound(

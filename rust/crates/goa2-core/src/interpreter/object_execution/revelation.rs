@@ -56,7 +56,7 @@ impl NativeSession {
             .initiative_reversed(self.round.round, self.world.combat.turn);
         crate::planning::rank_actors(&self.world, &ids, reversed).map_err(card_error)
     }
-    fn hero_phase_step_bound(
+    pub(super) fn hero_phase_step_bound(
         &mut self,
         objects: &mut BoundObjects,
         name: &str,
@@ -720,5 +720,82 @@ impl NativeSession {
             }),
             None,
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::interpreter::UpgradeCheckpoint;
+
+    #[test]
+    fn retired_tier_two_reveal_narrows_the_hand_after_snapshot_restore() {
+        let fixture = super::super::fixture_case("object-execution-card-planning-cycle");
+        let mut envelope: crate::codec::StateEnvelope =
+            serde_json::from_value(fixture["envelope"].clone()).unwrap();
+        let hero = envelope.state["teams"]
+            .as_object_mut()
+            .unwrap()
+            .values_mut()
+            .flat_map(|team| team["heroes"].as_array_mut().unwrap())
+            .find(|hero| hero["id"] == "hero_arien")
+            .unwrap();
+        // These four ordinary items match two legal level-five loadouts.
+        hero["level"] = json!(5);
+        hero["items"] = json!({"ATTACK": 1, "DEFENSE": 1, "INITIATIVE": 1, "RANGE": 1});
+        let mut session = NativeSession::compile(envelope).unwrap();
+        let arien = session.symbols.lookup("hero_arien").unwrap();
+        let viewer = session.symbols.lookup("hero_brogan").unwrap();
+        let historical_card = session.symbols.lookup("expert_duelist").unwrap();
+        let checkpoints = [UpgradeCheckpoint {
+            level: 5,
+            card_items: [1, 1, 0, 1, 1, 0],
+        }];
+        let before = session.player_observation(viewer).unwrap();
+        let ambiguous = before
+            .loadout_hypotheses_with_checkpoints("hero_arien", &checkpoints)
+            .unwrap()
+            .unwrap();
+        assert_eq!(ambiguous.len(), 2);
+
+        session
+            .with_live_objects(|worker, objects| {
+                worker.reveal_knowledge_bound(objects, arien, historical_card)
+            })
+            .unwrap();
+        let revealed = session.player_observation(viewer).unwrap();
+        let restored = NativeSession::compile(session.export_envelope().unwrap()).unwrap();
+        let restored_viewer = restored.symbols.lookup("hero_brogan").unwrap();
+        let reconnected = restored.player_observation(restored_viewer).unwrap();
+        assert_eq!(reconnected, revealed);
+        assert_eq!(
+            reconnected.revealed_cards,
+            [("hero_arien".into(), "expert_duelist".into())],
+        );
+
+        let rows = reconnected
+            .loadout_hypotheses_with_checkpoints("hero_arien", &checkpoints)
+            .unwrap()
+            .unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(
+            rows[0].active_card_ids,
+            ["deluge", "magical_current", "rogue_wave"]
+        );
+        assert_eq!(
+            rows[0].item_card_ids,
+            [
+                "arcane_whirlpool",
+                "master_duelist",
+                "raging_stream",
+                "slippery_ground"
+            ],
+        );
+        let hand = reconnected
+            .sample_planning_hand_with_checkpoints("hero_arien", 39, &checkpoints)
+            .unwrap()
+            .unwrap();
+        assert!(hand.retired.iter().any(|card| card == "expert_duelist"));
+        assert!(!hand.cards.iter().any(|card| card == "expert_duelist"));
     }
 }

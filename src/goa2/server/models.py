@@ -14,9 +14,9 @@ from goa2.server.player_names import MAX_PLAYER_NAME_LENGTH
 
 
 class CreateBotSpec(BaseModel):
-    """Public declaration of one bounded classic bot seat."""
+    """Public declaration of one bounded bot seat."""
 
-    kind: Literal["random", "heuristic", "ismcts"]
+    kind: Literal["random", "heuristic", "ismcts", "rust"]
     search: SearchSettings | None = None
 
     @field_validator("search")

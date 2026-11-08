@@ -51,6 +51,14 @@ impl NativeSession {
         let Some(objects) = &self.objects else {
             return Ok(self.planning.committed_cards(hero));
         };
+        self.observed_planning_cards_bound(objects, hero)
+    }
+
+    pub(super) fn observed_planning_cards_bound(
+        &self,
+        objects: &BoundObjects,
+        hero: Symbol,
+    ) -> Result<(Option<CardId>, Option<CardId>)> {
         let card = |field| {
             let collection = objects.phases.root(&objects.arena, field)?;
             match objects.arena.field(collection, hero) {
@@ -254,14 +262,7 @@ impl NativeSession {
         let observation = self.player_observation(player)?;
         self.validate_sampled_resolution_effects()?;
         self.validate_sampled_effect_cards(&observation)?;
-        if sample.upgrade_checkpoints.is_some_and(|rows| {
-            rows.keys()
-                .any(|id| !observation.heroes.iter().any(|hero| hero.id == *id))
-        }) {
-            return Err(EngineError::InvalidInput(
-                "upgrade checkpoints name an unknown hero".into(),
-            ));
-        }
+        observation.validate_upgrade_evidence(sample.upgrade_checkpoints)?;
         let mut samples = (0..seeds.len()).map(|_| Vec::new()).collect::<Vec<_>>();
         for (index, hero) in self.world.heroes.iter().enumerate() {
             if hero.id == player {
@@ -404,14 +405,7 @@ impl NativeSession {
         known: &[Symbol],
     ) -> Result<Vec<PlanningHandSample>> {
         let mut observation = self.player_observation(player)?;
-        if checkpoints.is_some_and(|rows| {
-            rows.keys()
-                .any(|id| !observation.heroes.iter().any(|hero| hero.id == *id))
-        }) {
-            return Err(EngineError::InvalidInput(
-                "upgrade checkpoints name an unknown hero".into(),
-            ));
-        }
+        observation.validate_upgrade_evidence(checkpoints)?;
         if self.planning.phase != Phase::Planning {
             return Err(unsupported("sampled worlds require planning"));
         }
@@ -437,6 +431,7 @@ impl NativeSession {
                 [None, None]
             };
             for card in fixed.iter().flatten() {
+                public.hidden_commitments -= 1;
                 let row = self
                     .world
                     .card(*card)
@@ -1229,6 +1224,9 @@ impl NativeSession {
             }
         }
         let hand = self.hero_card_values_bound(objects, model, Field::Hand)?;
+        if first.is_some() && hand.is_empty() {
+            return Ok(Vec::new());
+        }
         let mut choices = Vec::new();
         for value in hand {
             let ObjectValue::Atom(Datum::Instance(id)) = value else {
@@ -1694,7 +1692,7 @@ impl NativeSession {
         }
         Ok(())
     }
-    fn clear_planning_requests_bound(
+    pub(super) fn clear_planning_requests_bound(
         &mut self,
         objects: &mut BoundObjects,
         hero: Symbol,

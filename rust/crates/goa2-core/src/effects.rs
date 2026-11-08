@@ -315,6 +315,12 @@ impl NativeWorld {
         self.has_effects = !self.effects.instances.is_empty();
         self.refresh_card_auras();
     }
+    pub(crate) fn restore_effect_instance(&mut self, effect: EffectInstance) {
+        let linked_card = effect.linked_card;
+        self.effects.instances.push(effect);
+        self.update_effect_card_flags(linked_card.into_iter().collect());
+    }
+
     pub fn remove_effects(&mut self, ids: &[Symbol]) {
         let cards = self
             .effects

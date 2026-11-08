@@ -44,6 +44,7 @@ pub struct AttackRules {
     default_target: Symbol,
     ranged: Symbol,
     attacker: Symbol,
+    source_card: Symbol,
     damage: Symbol,
     initiative: Symbol,
     basic: Symbol,
@@ -57,6 +58,7 @@ impl AttackRules {
             default_target: s.intern("victim_id"),
             ranged: s.intern("attack_is_ranged"),
             attacker: s.intern("attacker_id"),
+            source_card: s.intern("attack_source_card_id"),
             damage: s.intern("attack_damage"),
             initiative: s.intern("defense_uses_initiative"),
             basic: s.intern("attack_is_basic"),
@@ -71,6 +73,7 @@ impl AttackRules {
         actor: Option<Symbol>,
         spec: &AttackSpec,
         followup: Option<Symbol>,
+        track_source: bool,
     ) -> Result<Option<AttackExpansion>, String> {
         let Some((key, select)) = self.target(ctx, symbols, spec, followup) else {
             return Ok(None);
@@ -102,11 +105,35 @@ impl AttackRules {
         ctx.set(self.damage, Datum::Int(damage));
         ctx.set(self.initiative, Datum::Bool(spec.initiative));
         ctx.set(self.basic, Datum::Bool(basic));
+        if track_source {
+            let source = self.source_card(world, ctx, symbols, actor)?;
+            ctx.set(self.source_card, source);
+        }
         Ok(Some(AttackExpansion {
             binding: AttackBinding { key, damage, range },
             select,
         }))
     }
+    pub(crate) fn source_card(
+        &self,
+        world: &NativeWorld,
+        ctx: &dyn RegisterRead,
+        symbols: &Symbols,
+        actor: Option<Symbol>,
+    ) -> Result<Datum, String> {
+        let Some(actor) = actor.filter(|id| !symbols.name(*id).is_empty()) else {
+            return Ok(Datum::Null);
+        };
+        let card = world
+            .nested_performing_card(ctx)?
+            .or_else(|| world.hero(actor)?.current);
+        Ok(card
+            .and_then(|id| world.card(id))
+            .map_or(Datum::Null, |card| {
+                Datum::Text(world.definitions.cards[card.definition].printed_id)
+            }))
+    }
+
     pub fn target(
         &self,
         ctx: &dyn RegisterRead,

@@ -18,6 +18,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from goa2.server import shares
 from goa2.server.admin import require_admin
 from goa2.server.replay import index_for_round_turn
+from goa2.server.rust_hosted import hosted_games, is_rust_game
 
 __all__ = ["admin_router", "router"]
 
@@ -29,9 +30,9 @@ admin_router = APIRouter(prefix="/shares", tags=["shares"], dependencies=[Depend
 
 
 @admin_router.get("")
-def list_shares() -> list[dict[str, Any]]:
+def list_shares(request: Request) -> list[dict[str, Any]]:
     """Live shares, newest first — what the replay list uses to badge rows."""
-    return [
+    out = [
         {
             "token": m["token"],
             "game_id": m["game_id"],
@@ -42,10 +43,17 @@ def list_shares() -> list[dict[str, Any]]:
         }
         for m in shares.list_shares()
     ]
+    if request.app.state.rust_hosted is not None:
+        out.extend(request.app.state.rust_hosted.share_catalog())
+    out.sort(key=lambda row: row.get("created_at") or 0, reverse=True)
+    return out
 
 
 @admin_router.delete("/{token}", status_code=204)
-def revoke_share(token: str) -> None:
+def revoke_share(token: str, request: Request) -> None:
+    if is_rust_game(token):
+        hosted_games(request).revoke_share(token)
+        return
     if not shares.revoke_share(token):
         raise HTTPException(status_code=404, detail="Share not found")
 

@@ -117,9 +117,11 @@ def verify_native_run(
     def native_choice(state, prompt, revision, player):
         nonlocal worker
         started = perf_counter()
+        deadline = started + decision_ms / 1_000
         envelope, _ = export_state_with_shared_objects(state, instance_exporter=export_instances)
-        wire = dict(envelope=envelope, player_id=player, max_depth=1,
-                    max_nodes=512, time_ms=decision_ms, timeout=decision_ms / 1_000 + 2)
+        # Reserve 10 ms for Python validation after the worker exchange.
+        wire = dict(envelope=envelope, player_id=player, max_depth=1, max_nodes=512,
+                    decision_deadline=deadline - 0.010, transport_reserve=0.015)
         if apply:
             wire["rollout_turns"] = 2
         validation = dict(player_id=player, controlled_ids={player},
@@ -139,11 +141,14 @@ def verify_native_run(
                     wire["planning_sample_seed"] = 39
                 result = worker.request("search_resolution", **wire)
                 move = validate_resolution(state, prompt, result, **validation)
+            if perf_counter() >= deadline:
+                raise ValueError("recommendation validation exceeded the decision deadline")
         except (TimeoutError, WorkerUnavailable) as error:
             totals[f"{phase}_fallback"] += 1
             failures[str(error)] += 1
-            worker.close()
-            worker = Worker(command)
+            if worker.process.poll() is not None:
+                worker.close()
+                worker = Worker(command)
         except (RuntimeError, ValueError) as error:
             totals[f"{phase}_fallback"] += 1
             failures[str(error)] += 1
@@ -216,8 +221,8 @@ def describe_state_difference(expected, actual, path="state"):
     return f"{path} differs (Python {repr(expected)[:160]}, Rust {repr(actual)[:160]})"
 
 
-def trace_policy(map_id, trace, *, observe=None):
-    from automata.runtime.legality import DecisionMove, check_moves, check_sequences
+def trace_policy(map_id, trace, *, observe=None, live_session=None):
+    from automata.runtime.legality import DecisionMove, _Cursor, check_moves, check_sequences
     from goa2.engine.phases import hero_can_play_two_cards
 
     def replay(state, prompt, revision):
@@ -239,6 +244,9 @@ def trace_policy(map_id, trace, *, observe=None):
                 assert move.player_id == prompt.player_id and any(
                     move.selection == option.id for option in prompt.options
                 ), (map_id, revision, row, prompt.model_dump(mode="json"))
+                return move
+            if live_session is not None:
+                _Cursor(live_session, prompt).check_input(move)
                 return move
             verdict = check_moves(state, [move]).results[0]
             assert verdict.legal is True, (
@@ -271,7 +279,8 @@ def trace_policy(map_id, trace, *, observe=None):
                 moves.append(DecisionMove("CARD", hero.id, second))
             elif not second_slot and len(hero.hand) > 1 and hero_can_play_two_cards(hero):
                 moves.append(DecisionMove("FINISH_PLANNING", hero.id))
-        assert check_sequences(state, [moves]).results[0].legal is True, row
+        if live_session is None:
+            assert check_sequences(state, [moves]).results[0].legal is True, row
         return moves
 
     return replay
@@ -528,6 +537,31 @@ def verify_rust_match_replay(
     return results
 
 
+def verify_work_budget(worker, map_id, root):
+    policy = dict(
+        depth=2, max_nodes=8192, resolution_max_nodes=2048, work_budget="nodes_v1",
+        rollout_turns=2, evaluation="lane_pressure_v3", greedy_card_order=True,
+        planning_workers=1, sampled_worlds=2,
+    )
+    for limits in (policy, dict(policy, max_nodes=1, resolution_max_nodes=1)):
+        pair = (limits, limits)
+        first, repeated = verify_rust_match_replay(
+            worker, map_id, root, 4, seed=39, policy_pairs=(pair, pair),
+        )
+        assert first == repeated, (map_id, limits["max_nodes"])
+        assert first["work_budget"] == "nodes_v1"
+        for stats in first["policies"]:
+            assert 0 < stats["planning_nodes"] <= stats["planning"] * limits["max_nodes"]
+            assert 0 < stats["resolution_nodes"] <= (
+                (stats["resolution"] - stats["forced"]) * limits["resolution_max_nodes"]
+            )
+            assert "planning_micros" not in stats and "resolution_micros" not in stats
+            if limits["max_nodes"] == 1:
+                assert stats["planning_fallbacks"]
+        print(f"{map_id} nodes_v1 {limits['max_nodes']}/{limits['resolution_max_nodes']} "
+              f"deterministic result SHA-256: {digest(first)}")
+
+
 def verify_strength_trial(worker, map_id, root, seed, decision_ms):
     common = dict(depth=1, max_nodes=4096, time_ms=decision_ms, evaluation="lab_attack_range_v1")
     one_turn = dict(common, rollout_turns=1)
@@ -698,6 +732,11 @@ def verify_strength_baseline(
         policy_names = ("eighth", "quarter")
         candidate = dict(policy, forecast_node_share="eighth")
         pairs = ((candidate, policy), (policy, candidate))
+    elif trial == "forecast_value":
+        label = "Fixed-opponent forecast trial"
+        policy_names = ("four-turn-forecast", "lowest-defense")
+        control = dict(policy, forecast_node_share="zero")
+        pairs = ((policy, control), (control, policy))
     elif trial == "followup_width":
         label = "Coordinated follow-up width trial"
         policy_names = ("balanced-four", "legacy-two")
@@ -739,6 +778,11 @@ def verify_strength_baseline(
         label = "Attack-target extension trial"
         policy_names = ("attack-extension", "fixed-depth")
         candidate = dict(policy, opponent_policy="adversarial_attack_targets")
+        pairs = ((candidate, policy), (policy, candidate))
+    elif trial == "movement_extension":
+        label = "Movement-target extension trial"
+        policy_names = ("movement-extension", "fixed-depth")
+        candidate = dict(policy, opponent_policy="adversarial_movement_targets")
         pairs = ((candidate, policy), (policy, candidate))
     elif trial == "reply_width":
         label = "Planning reply width trial"
@@ -1319,6 +1363,41 @@ def verify_scoped_planning(worker, map_id, root):
     print(f"{map_id} turn {root.turn}: scoped plans legal in Python across all four modes")
 
 
+def verify_last_card_closes_second_slot(worker):
+    from goa2.engine.phases import planning_open_for_second_card
+    from planning_validation import validate_commitments
+
+    opening = setup(["Arien", "Emmitt"], ["Brogan", "Tigerclaw"])
+    player, ally = "hero_arien", "hero_emmitt"
+    bots = [player, ally]
+    for hand_size in (2, 1):
+        state = deepcopy(opening)
+        emmitt = state.get_hero(ally)
+        emmitt.level = 8
+        for card in emmitt.hand[hand_size:]:
+            emmitt.discard_card(card)
+        commit_card(state, ally, emmitt.hand[0])
+        assert planning_open_for_second_card(state, ally) == (hand_size == 2)
+
+        envelope, _ = export_state_with_shared_objects(state)
+        for max_nodes in (1, 8192):
+            result = worker.request(
+                "search_sampled_planning", envelope=envelope, player_id=player,
+                seed=39, cap=2, max_depth=1, max_nodes=max_nodes, time_ms=5000,
+                rollout_turns=2, workers=2,
+                bot_team={"mode": "coordinated", "bot_ids": bots, "worlds": 2},
+            )
+            validate_commitments(
+                state, envelope, result, player_id=player, controlled_ids=bots,
+                searched_revision=1, live_revision=1, require_score=max_nodes > 1,
+            )
+            expected = bots if hand_size == 2 else [player]
+            assert [row["player_id"] for row in result["commitments"]] == expected
+            if max_nodes == 1:
+                assert result["score"] is None
+    print("Python validated scored and fallback plans with an open or exhausted second slot")
+
+
 def verify_scoped_worker_scaling(worker, map_id, root):
     from planning_validation import validate_commitments
 
@@ -1435,29 +1514,33 @@ def verify_public_upgrade_replay(worker, root):
         envelope=envelope, player_id="hero_arien", seed=39, cap=2,
         max_depth=1, max_nodes=512, time_ms=10_000,
     )
-    impossible = dict(batch, after={"level": 2, "card_items": [2, 0, 0, 0, 0, 0]})
-    try:
-        worker.request("search_sampled_planning", public_upgrade_batches=[impossible], **options)
-    except RuntimeError as error:
-        assert "invalid public upgrade batch" in str(error)
-    else:
-        raise AssertionError("search accepted more card items than crossed upgrade levels")
+    def require_rejection(message, **evidence):
+        try:
+            worker.request("search_sampled_planning", **options, **evidence)
+        except RuntimeError as error:
+            assert message in str(error)
+        else:
+            raise AssertionError(f"search accepted invalid upgrade evidence: {evidence}")
+
+    impossible = {"level": 2, "card_items": [2, 0, 0, 0, 0, 0]}
+    require_rejection("invalid public upgrade batch",
+                      public_upgrade_batches=[dict(batch, after=impossible)])
+    require_rejection("invalid public upgrade checkpoints",
+                      upgrade_checkpoints={str(hero.id): [before, impossible]})
+    require_rejection("invalid public upgrade checkpoints",
+                      upgrade_checkpoints={"hero_arien": [{"level": 1, "card_items": [1, 0, 0, 0, 0, 0]}]})
     for workers in (1, 2):
         direct = worker.request(
             "search_sampled_planning", workers=workers,
-            upgrade_checkpoints={str(hero.id): [before, after]}, **options,
+            upgrade_checkpoints={str(hero.id): [before, before, after]}, **options,
         )
         replay = worker.request(
             "search_sampled_planning", workers=workers,
             public_upgrade_batches=[batch, batch], **options,
         )
         assert replay == direct
-    try:
-        worker.request("search_sampled_planning", upgrade_checkpoints={"typo": [before]}, **options)
-    except RuntimeError as error:
-        assert "upgrade checkpoints name an unknown hero" in str(error)
-    else:
-        raise AssertionError("search ignored an unknown hero in upgrade evidence")
+    require_rejection("upgrade checkpoints name an unknown hero",
+                      upgrade_checkpoints={"typo": [before]})
 
 
 def verify_upgrade_batch_sizes(worker, opening):
@@ -2036,6 +2119,8 @@ def main():
                       help="Validate native suggestions while Python runs this many turns")
     mode.add_argument("--native-turns", type=int,
                       help="Apply validated native suggestions through Python for this many turns")
+    mode.add_argument("--verify-work-budget", action="store_true",
+                      help="Replay fixed-node matches twice and check exact result digests")
     mode.add_argument("--replay-terminal", action="store_true",
                       help="Validate Rust-selected finishing moves from recorded late-game states")
     mode.add_argument("--roster-sweep-turns", type=int,
@@ -2121,6 +2206,8 @@ def main():
                       help="Measure the fixed Rust policy against itself on the tuning corpus")
     mode.add_argument("--forecast-share-trial", action="store_true",
                       help="Compare quarter and eighth forecast budgets in side-swapped tuning games")
+    mode.add_argument("--forecast-value-trial", action="store_true",
+                      help="Compare greedy forecasts with the fixed lowest-defense opponent policy")
     mode.add_argument("--followup-width-trial", action="store_true",
                       help="Compare balanced four-row and legacy two-row coordinated follow-ups")
     mode.add_argument("--horizon-trial", action="store_true",
@@ -2141,6 +2228,8 @@ def main():
                       help="Compare adversarial planning replies with fixed greedy forecast opposition")
     mode.add_argument("--attack-extension-trial", action="store_true",
                       help="Extend attack-target search at the depth cutoff while holding the horizon fixed")
+    mode.add_argument("--movement-extension-trial", action="store_true",
+                      help="Compare a bounded movement shortlist at the depth cutoff with first legal")
     mode.add_argument("--reply-width-trial", action="store_true",
                       help="Compare eight and four planning replies at equal budgets")
     mode.add_argument("--world-count-trial", action="store_true",
@@ -2177,10 +2266,11 @@ def main():
     if args.candidate_rollout_turns is not None and not args.horizon_trial:
         parser.error("--candidate-rollout-turns requires --horizon-trial")
     strength_screen = (
-        args.strength_baseline or args.forecast_share_trial
+        args.strength_baseline or args.forecast_share_trial or args.forecast_value_trial
         or args.followup_width_trial or args.horizon_trial or args.lane_timing_trial
         or args.node_budget_trial or args.decision_depth_trial or args.attack_extension_trial
         or args.planning_opposition_trial or args.tactical_forecast_trial
+        or args.movement_extension_trial
         or args.reply_width_trial or args.world_count_trial or args.planning_seed_trial
     )
     if (args.strength_map or args.strength_midgame) and not strength_screen:
@@ -2322,6 +2412,7 @@ def main():
         if strength_screen or args.lane_timing_held_out:
             trial = (
                 "forecast_share" if args.forecast_share_trial else
+                "forecast_value" if args.forecast_value_trial else
                 "followup_width" if args.followup_width_trial else
                 "horizon" if args.horizon_trial else
                 "lane_timing" if args.lane_timing_trial or args.lane_timing_held_out else
@@ -2330,6 +2421,7 @@ def main():
                 "attack_extension" if args.attack_extension_trial else
                 "tactical_forecast" if args.tactical_forecast_trial else
                 "planning_opposition" if args.planning_opposition_trial else
+                "movement_extension" if args.movement_extension_trial else
                 "reply_width" if args.reply_width_trial else
                 "world_count" if args.world_count_trial else
                 "planning_seed" if args.planning_seed_trial else None
@@ -2371,6 +2463,9 @@ def main():
                 seed=args.game_seed,
                 game_type="QUICK" if args.strength_trial else "LONG",
             )
+            if args.verify_work_budget:
+                verify_work_budget(worker, map_id, opening)
+                continue
             if args.strength_trial:
                 verify_strength_trial(worker, map_id, opening, args.game_seed, args.decision_ms)
                 continue
@@ -2435,6 +2530,7 @@ def main():
                 if map_id == "forgotten_island":
                     verify_concealed_discard_planning(worker)
                     verify_visible_ally_affects_plan(worker)
+                    verify_last_card_closes_second_slot(worker)
                 verify_sampled_planning(worker, map_id, opening)
                 verify_scoped_planning(worker, map_id, opening)
                 verify_shown_commitments(worker, opening)

@@ -7,6 +7,7 @@ from statistics import mean
 
 HOEFFDING = "hoeffding_paired_v1"
 BETTING = "betting_paired_v1"
+TRIAGE = "triage_v2"
 BET_FRACTIONS = (0.0625, 0.125, 0.25, 0.5, 0.75, 0.9)
 
 
@@ -20,7 +21,7 @@ def validate_acceptance(config, starts):
         "advance_at", "stop_below", "max_unfinished_rate", "max_fallback_rate",
         "track", "effect", "alpha",
     }
-    if (not isinstance(config, dict) or config.keys() - {"method"} != expected
+    if (not isinstance(config, dict) or config.keys() - {"method", "screening"} != expected
             or not isinstance(config["extend_batches"], list)):
         raise ValueError("invalid arena acceptance fields")
     counts = [config["preflight_pairs"], config["screen_pairs"],
@@ -36,6 +37,8 @@ def validate_acceptance(config, starts):
             raise ValueError(f"invalid acceptance value for {key}")
     if config.get("method", HOEFFDING) not in (HOEFFDING, BETTING):
         raise ValueError("unknown arena confidence method")
+    if "screening" in config and config["screening"] != TRIAGE:
+        raise ValueError("unknown arena screening policy")
     track = config["track"]
     if track not in ("stronger", "non_inferior", "equivalent"):
         raise ValueError("unknown acceptance track")
@@ -169,9 +172,12 @@ def guardrail(summary, config):
         return "no completed arena games"
     if (outcomes.get("unfinished", 0) + outcomes.get("individual_winner", 0)) / games > config["max_unfinished_rate"]:
         return "unfinished-game guardrail exceeded"
+    over_limit = []
     for role, work in summary["work"].items():
         requests = sum(value for key, value in work.items() if key.endswith("_requests"))
         fallbacks = sum(value for key, value in work.items() if key.endswith(("_unsupported", "_unscored")))
         if requests and fallbacks / requests > config["max_fallback_rate"]:
-            return f"{role} fallback guardrail exceeded"
-    return None
+            over_limit.append(role)
+    if len(over_limit) == 2 and config.get("screening") == TRIAGE:
+        return "candidate and baseline both exceeded the fallback guardrail"
+    return f"{over_limit[0]} fallback guardrail exceeded" if over_limit else None

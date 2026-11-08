@@ -8,6 +8,7 @@
     "coordinated": true
   },
   "acceptance": {
+    "screening": "triage_v2",
     "preflight_pairs": 1,
     "screen_pairs": 3,
     "extend_batches": [

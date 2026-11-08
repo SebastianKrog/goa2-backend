@@ -51,6 +51,19 @@ scoring. To recalibrate, run `run_pinned.py arena_calibrate` with the
 worker, referee, per-phase cap sweeps and an absolute
 `--midgame-corpus` pointing to `rust/tests/fixtures/complete-games-hanu.json`.
 
+Register one generated profile per tuning batch, then submit its candidates
+with the same profile ID. Change the template's tuning and holdout seeds
+between batches. The tuning seed rotates the three screening maps and draws
+fresh rosters. Holdout starts use a separate seed stream.
+
+A negative or tied screen is recorded as `screened_out`. A tied screen
+can be reopened with `arena_queue extend-tie JOB --evidence "REPORT_ID and observed benefit"`.
+Guardrail failures are recorded as `unhealthy`, with a joint reason when
+both sides exceed the fallback ceiling. Candidates that clear tuning wait
+at `awaiting_confirmation`. After reviewing the batch, select up to two
+with `arena_queue confirm JOB [JOB]`. Only those jobs run the held-out games.
+Start the queue worker again after review if it has already drained.
+
 ### Native game setup
 
 Build the static setup pack once with the pinned oracle environment. Rust

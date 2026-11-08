@@ -21,7 +21,7 @@ COMMON = {
     "sample_worlds": integer(1, 8),
     "evaluation": choice("material_position", "lab_attack_range_v1",
                          *(f"lane_pressure_v{version}" for version in range(1, 6)),
-                         "lane_pressure_v3_accumulated_gold"),
+                         "lane_pressure_v3_accumulated_gold", "wave_breakthrough"),
 }
 
 FIELDS = {

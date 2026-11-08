@@ -7,7 +7,7 @@ from pathlib import Path
 from random import Random
 
 from arena_acceptance import confirmation_pair_counts, validate_acceptance
-from arena_reports import _write
+from arena_reports import _write, sha256_file
 from oracle import ROOT, canonical, digest
 
 MAPS = ("forgotten_island", "across_the_river", "magma_and_ice",
@@ -70,27 +70,55 @@ def generate_profile(template, output):
     if len({row["envelope"] for row in paths}) != len(paths):
         raise ValueError("arena recipe generated duplicate starts")
     profile = {
-        "schema_version": 1, "name": template["name"], "parameters": template["parameters"],
+        "schema_version": template.get("schema_version", 2),
+        "name": template["name"], "parameters": template["parameters"],
         "acceptance": config, "starts": paths,
         "recipe": {"version": "arena_starts_v1", "tuning_seed": seeds[0], "holdout_seed": seeds[1]},
     }
+    if "budget_calibration" in template:
+        profile["budget_calibration"] = template["budget_calibration"]
     path = output / "profile.json"
     _write(path, canonical(profile).encode("utf-8"))
     return path
+
+
+def apply_calibrated_tier(template, path, target_ms):
+    calibration = json.loads(path.read_text(encoding="utf-8"))
+    if template.get("schema_version", 2) != 2 or calibration.get("protocol") != "nodes_v2":
+        raise ValueError("calibrated node tiers require arena v2")
+    tier = next((row for row in calibration["node_tiers"] if row["target_ms"] == target_ms), None)
+    if tier is None:
+        raise ValueError(f"no calibration tier for {target_ms} ms")
+    for phase in ("planning", "resolution"):
+        key = f"{phase}_nodes"
+        value = tier[key]
+        if type(value) is not int or value <= 0:
+            raise ValueError(f"invalid {phase} node count")
+        template["parameters"][key] = value
+    template["budget_calibration"] = {
+        "target_ms": target_ms, "report_sha256": sha256_file(path),
+        "worker_sha256": calibration["worker_sha256"],
+    }
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--template", type=Path, required=True)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--calibration", type=Path)
+    parser.add_argument("--target-ms", type=int)
     parser.add_argument("--assumed-advantage", type=float)
     parser.add_argument("--power", type=float, default=0.8,
                         help="target power for the Hoeffding sizing bound")
     args = parser.parse_args()
+    if (args.calibration is None) != (args.target_ms is None):
+        parser.error("--calibration and --target-ms must be supplied together")
     if args.output is None and args.assumed_advantage is None:
         parser.error("provide --output, --assumed-advantage, or both")
     try:
         template = json.loads(args.template.read_text(encoding="utf-8"))
+        if args.calibration is not None:
+            apply_calibrated_tier(template, args.calibration, args.target_ms)
         if args.assumed_advantage is not None:
             print(canonical(confirmation_pair_counts(template["acceptance"], args.assumed_advantage, args.power)))
         if args.output is not None:

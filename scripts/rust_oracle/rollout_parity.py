@@ -690,11 +690,11 @@ def paired_strength_p_value(margins):
 STRENGTH_MIDGAME_MAPS = ("forgotten_island", "magma_and_ice")
 
 
-def strength_start_positions(maps, selected_map, *, held_out, midgame, game_type):
+def strength_start_positions(maps, selected_map, *, held_out, midgame, game_type, midgame_corpus=None):
     if midgame:
         from simulation_bench import read_case, read_index, workloads
 
-        corpus = ROOT / "rust/tests/fixtures/complete-games-hanu.json"
+        corpus = midgame_corpus or ROOT / "rust/tests/fixtures/complete-games-hanu.json"
         index, _ = read_index(corpus)
         for entry in index["cases"]:
             map_id = next(name for name in STRENGTH_MIDGAME_MAPS if name in entry["name"])

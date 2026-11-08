@@ -410,6 +410,10 @@ impl Game {
         self.credentials.bots.contains_key(hero)
     }
 
+    pub fn bot_ids(&self) -> impl Iterator<Item = &str> {
+        self.credentials.bots.keys().map(String::as_str)
+    }
+
     pub fn player_link(&self, hero: &str) -> Option<Value> {
         self.credentials.player_tokens.iter().find(|seat| seat.hero_id == hero).map(|seat| {
             json!({"type": "PLAYER_LINK_REVEALED", "hero_id": hero, "token": seat.token})

@@ -1,6 +1,6 @@
 import pytest
 
-from arena_calibrate import run_cases, summarize
+from arena_calibrate import recommend_node_tiers, run_cases, summarize
 
 
 class Worker:
@@ -35,3 +35,18 @@ def test_repeated_budget_rejects_a_changed_result():
     with pytest.raises(ValueError, match="node-budget result changed"):
         run_cases(VaryingWorker(), [{"phase": "planning", "operation": "planning", "request": {}}],
                   {"planning": [2]}, 2)
+
+
+def test_recommended_tiers_use_cap_hit_times_and_mark_extrapolation():
+    rows = [
+        dict(phase=phase, cap=cap, cutoffs=hits, cutoff_p50_ms=elapsed)
+        for phase in ("planning", "resolution")
+        for cap, hits, elapsed in [(1024, 3, 100), (2048, 3, 200), (4096, 0, None)]
+    ]
+    tiers = recommend_node_tiers(rows)
+    assert [tier["target_ms"] for tier in tiers] == [100, 200, 500, 1000, 2000, 5000, 10000]
+    assert tiers[0]["planning_nodes"] == 1024
+    assert tiers[1]["resolution_nodes"] == 2048
+    assert tiers[1]["extrapolated"] == []
+    assert tiers[2]["extrapolated"] == ["planning", "resolution"]
+    assert tiers[-1]["planning_nodes"] == 102400

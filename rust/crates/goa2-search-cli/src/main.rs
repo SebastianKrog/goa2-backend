@@ -133,6 +133,7 @@ enum Operation {
         resolution_sample_seed: Option<u64>,
         resolution_sample_worlds: Option<usize>,
         resolution_sample_workers: Option<usize>,
+        arena_bot_ids: Option<Vec<String>>,
         public_upgrade_batches: Option<Vec<goa2_core::interpreter::PublicUpgradeBatch>>,
         upgrade_checkpoints: Option<UpgradeCheckpoints>,
         #[serde(default)]
@@ -288,7 +289,7 @@ fn execute(
     }
     match request.operation {
         Operation::Capabilities => Ok(
-            json!({"plain_fast_travel":true,"unit_selection_traces":true,"acting_piece_traces":true,"action_recipes":true,"fast_travel_zones":true,"planning_phase_traces":true,"card_models":true,"scalar_stats":true,"native_step_traces":true,"streamed_step_traces":true,"state_codec":true,"sequence_legality":true,"resolution_search":true,"prepare_search":true,"arena_match_v1":true,"nodes_v1":true,"plain_board_movement":true,"stateful_plain_movement":true,"game_transitions":false,"search":false,"rules_versions":[]}),
+            json!({"plain_fast_travel":true,"unit_selection_traces":true,"acting_piece_traces":true,"action_recipes":true,"fast_travel_zones":true,"planning_phase_traces":true,"card_models":true,"scalar_stats":true,"native_step_traces":true,"streamed_step_traces":true,"state_codec":true,"sequence_legality":true,"resolution_search":true,"prepare_search":true,"arena_match_v1":true,"nodes_v1":true,"nodes_v2":true,"plain_board_movement":true,"stateful_plain_movement":true,"game_transitions":false,"search":false,"rules_versions":[]}),
         ),
         Operation::PrepareSearch => {
             NativeSession::prepare_search().map_err(|error| error.to_string())?;
@@ -410,6 +411,7 @@ fn execute(
             resolution_sample_seed,
             resolution_sample_worlds,
             resolution_sample_workers,
+            arena_bot_ids,
             public_upgrade_batches,
             upgrade_checkpoints,
             opponent_policy,
@@ -437,10 +439,16 @@ fn execute(
             {
                 return Err("resolution sample settings require resolution_sample_seed".into());
             }
+            let arena_v2 = work_budget == Some(goa2_core::interpreter::WorkBudget::NodesV2);
+            if !arena_v2 && arena_bot_ids.is_some() {
+                return Err("arena_bot_ids requires work_budget nodes_v2".into());
+            }
+            let arena_bots = arena_v2.then(|| arena_bot_ids.unwrap_or_else(|| vec![player_id.clone()]));
             resolution_search::search(
                 envelope,
                 player_id,
                 budget,
+                arena_bots,
                 rollout_turns,
                 resolution_sample_seed.map(|seed| {
                     (
@@ -505,6 +513,7 @@ fn execute(
                 bot_team,
                 (seed, cap),
                 budget,
+                work_budget == Some(goa2_core::interpreter::WorkBudget::NodesV2),
                 goa2_core::interpreter::PlanningSearchOptions {
                     rollout_turns,
                     workers: workers.unwrap_or(1),

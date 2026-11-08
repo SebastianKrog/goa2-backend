@@ -17,10 +17,11 @@ def boolean(value):
 
 COMMON = {
     "max_depth": integer(0, 8),
-    "rollout_turns": integer(1, 3),
+    "rollout_turns": integer(1, 4),
     "sample_worlds": integer(1, 8),
     "evaluation": choice("material_position", "lab_attack_range_v1",
-                         *(f"lane_pressure_v{version}" for version in range(1, 6))),
+                         *(f"lane_pressure_v{version}" for version in range(1, 6)),
+                         "lane_pressure_v3_accumulated_gold"),
 }
 
 FIELDS = {

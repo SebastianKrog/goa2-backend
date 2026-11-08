@@ -1,0 +1,58 @@
+{
+  "schema_version": 2,
+  "protocol": "nodes_v2",
+  "worker_sha256": "da60da8e5fb693e3e71f5674d83e10de0d46ded9af004536662d5e764e8fb8d8",
+  "referee_sha256": "29486d265685bdd500fb4f04408fbdb9322cf6d757fcb020239ae6af6f414bb7",
+  "cpu_model": "Intel(R) Core(TM) i5-10400F CPU @ 2.90GHz",
+  "machine": "Linux-6.18.54.1-microsoft-standard-WSL2-x86_64-with-glibc2.43",
+  "calibration_sha256": "04e0ef13afdb5c207ed7dabfedf0294afb68fbbb11d6d95a13d2709cef832a79",
+  "measurements": 224,
+  "cases_by_phase": {
+    "planning": 6,
+    "resolution": 10
+  },
+  "node_tiers": [
+    {
+      "target_ms": 100,
+      "planning_nodes": 1152,
+      "resolution_nodes": 1024,
+      "extrapolated": []
+    },
+    {
+      "target_ms": 200,
+      "planning_nodes": 3264,
+      "resolution_nodes": 2688,
+      "extrapolated": []
+    },
+    {
+      "target_ms": 500,
+      "planning_nodes": 9920,
+      "resolution_nodes": 7680,
+      "extrapolated": []
+    },
+    {
+      "target_ms": 1000,
+      "planning_nodes": 20672,
+      "resolution_nodes": 15680,
+      "extrapolated": []
+    },
+    {
+      "target_ms": 2000,
+      "planning_nodes": 41152,
+      "resolution_nodes": 31552,
+      "extrapolated": []
+    },
+    {
+      "target_ms": 5000,
+      "planning_nodes": 102784,
+      "resolution_nodes": 79232,
+      "extrapolated": []
+    },
+    {
+      "target_ms": 10000,
+      "planning_nodes": 205760,
+      "resolution_nodes": 158592,
+      "extrapolated": []
+    }
+  ]
+}

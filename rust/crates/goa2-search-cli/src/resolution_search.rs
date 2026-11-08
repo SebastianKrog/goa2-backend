@@ -12,6 +12,7 @@ pub(super) fn search(
     envelope: StateEnvelope,
     player_id: String,
     budget: ExecutionBudget<'_>,
+    arena_bots: Option<Vec<String>>,
     rollout_turns: Option<u8>,
     resolution_sample: Option<(PlanningRolloutSample<'_>, usize, usize)>,
     planning_sample: Option<PlanningRolloutSample<'_>>,
@@ -22,8 +23,16 @@ pub(super) fn search(
     session
         .advance_to_decision(&budget)
         .map_err(|error| error.to_string())?;
-    let result = match resolution_sample {
-        Some(sample) => session.search_resolution_worlds(
+    let result = match (arena_bots, resolution_sample) {
+        (Some(bots), Some((sample, worlds, 1))) => {
+            let bots = bots.into_iter().map(|id| super::sequence_legality::player(&mut session, id))
+                .collect::<Result<Vec<_>, _>>()?;
+            session.search_node_limited_resolution(
+                player, sample, worlds, &bots, limits, rollout_turns.unwrap_or(4), &budget,
+            )
+        }
+        (Some(_), _) => return Err("arena v2 requires a sampled resolution root and one worker".into()),
+        (None, Some(sample)) => session.search_resolution_worlds(
             player,
             sample,
             limits,
@@ -31,7 +40,7 @@ pub(super) fn search(
             planning_sample,
             &budget,
         ),
-        None => session.search_resolution_with_sampled_turn_rollout(
+        (None, None) => session.search_resolution_with_sampled_turn_rollout(
             player,
             limits,
             rollout_turns,
@@ -158,6 +167,7 @@ pub(super) fn sampled_planning(
     bot_team: Option<BotTeam>,
     (seed, cap): (u64, usize),
     budget: ExecutionBudget<'_>,
+    arena_v2: bool,
     options: PlanningSearchOptions<'_>,
     limits: SearchLimits,
 ) -> Result<Value, String> {
@@ -173,21 +183,21 @@ pub(super) fn sampled_planning(
             .iter()
             .map(|id| super::sequence_legality::player(&mut session, id.clone()))
             .collect::<Result<Vec<_>, _>>()?;
-        let result = session
-            .search_bot_team_planning(
-                player,
-                BotPlanningScope {
-                    bots: &bots,
-                    mode,
-                    worlds: worlds.unwrap_or(1),
-                    seed,
-                },
-                cap,
-                limits,
-                options,
+        let scope = BotPlanningScope {
+            bots: &bots,
+            mode,
+            worlds: worlds.unwrap_or(1),
+            seed,
+        };
+        let result = if arena_v2 {
+            session.search_node_limited_planning(
+                player, scope, cap, limits,
+                PlanningSearchOptions { rollout_turns: Some(options.rollout_turns.unwrap_or(4)), ..options },
                 &budget,
             )
-            .map_err(|error| error.to_string())?;
+        } else {
+            session.search_bot_team_planning(player, scope, cap, limits, options, &budget)
+        }.map_err(|error| error.to_string())?;
         let commitments = result
             .commitments
             .iter()
@@ -219,6 +229,9 @@ pub(super) fn sampled_planning(
             "total_cells": result.matrix.total_cells,
             "nodes": result.matrix.nodes,
         }));
+    }
+    if arena_v2 {
+        return Err("arena v2 requires scoped bot planning".into());
     }
     let result = session
         .search_sampled_planning_with_options(player, seed, cap, limits, options, &budget)

@@ -12,6 +12,45 @@ game runtime. See the
 [implementation plan](../docs/superpowers/plans/2026-10-23-rust-search-engine.md)
 for the runtime boundary, rollout stages and benchmark results.
 
+### Arena v2
+
+New arena profiles use selective four-turn search with the `nodes_v2`
+work budget. The node cap is shared across forecasting, the short pass
+and the selective pass. Reaching the cap interrupts expansion and keeps
+the best completed choice. Search can also stop when it has resolved
+the position or its shortlist has settled. The cap does not set the
+width, rollout horizon or forecast allowance. The scorer records the
+chosen caps and cutoff counts with each match.
+
+The [calibrated node tiers](arena/v2-node-tiers.json) approximate
+end-to-end decision times on the reference WSL machine. The table uses
+224 observations across six planning and ten resolution positions. The
+full report is retained locally at
+`$HOME/.local/share/goa2-arena-v2/calibration.json`. Planning and
+resolution use separate node counts. These durations label the fixed
+budgets. Match scoring uses node counts, with wall time used only by
+the transport watchdog to abort a stalled worker.
+
+Build the arena worker and create a profile from the bundled LONG
+template. The template uses the one-second tier by default. Set
+`--target-ms` to pin a different tier.
+
+```sh
+oracle_python="$HOME/.cache/goa2-rust/oracle-venv/bin/python"
+arena_store="$HOME/.local/share/goa2-arena-v2"
+sh rust/cargo-wsl.sh build --offline --locked --profile iterate -p goa2-search-cli
+"$oracle_python" scripts/rust_oracle/run_pinned.py arena_profiles \
+  --template rust/arena/v2-long.json --calibration rust/arena/v2-node-tiers.json \
+  --target-ms 1000 --output "$arena_store/profile"
+```
+
+Use a v2-capable standard and candidate when registering and submitting
+a new queue comparison. The match referee needs only the existing
+rules protocol. The queue verifies each saved match against Python after
+scoring. To recalibrate, run `run_pinned.py arena_calibrate` with the
+worker, referee, per-phase cap sweeps and an absolute
+`--midgame-corpus` pointing to `rust/tests/fixtures/complete-games-hanu.json`.
+
 ### Native game setup
 
 Build the static setup pack once with the pinned oracle environment. Rust
@@ -959,7 +998,7 @@ The wrapper keeps build artifacts on the Linux filesystem at
 files stay in the bot checkout. Plain `cargo` also works on other supported hosts.
 Keep the source checkout on the Linux filesystem as well as the build outputs;
 using `/mnt/c` for source can trigger WSL's Cargo performance notice.
-The active checkout on this machine is `/home/sebastian/projects/goa2-backend-bots`.
+The active checkout on this machine is `/home/user/projects/goa2-backend-bots`.
 The Windows checkout is retained as a committed backup and frozen Python runtime.
 No neural model, training runtime, server startup or lab restart is required.
 
@@ -1061,14 +1100,14 @@ file share. From PowerShell, set these paths to the preserved runtime and active
 checkout (do not edit the Windows backup):
 
 ```powershell
-$oraclePython = 'C:/Users/Sebastian/Documents/GitHub/goa2-backend-bots/.venv/Scripts/python.exe'
+$oraclePython = 'C:/Users/user/Documents/GitHub/goa2-backend-bots/.venv/Scripts/python.exe'
 $engineRoot = '\\wsl.localhost\Ubuntu\home\sebastian\projects\goa2-backend-bots'
-& $oraclePython "$engineRoot/scripts/rust_oracle/oracle.py" verify-movement -- wsl.exe --exec /home/sebastian/.cache/goa2-rust/target/release/goa2-search-cli
-& $oraclePython "$engineRoot/scripts/rust_oracle/state_codec.py" verify -- wsl.exe --exec /home/sebastian/.cache/goa2-rust/target/release/goa2-search-cli
-& $oraclePython "$engineRoot/scripts/rust_oracle/stack_traces.py" verify -- wsl.exe --exec /home/sebastian/.cache/goa2-rust/target/release/goa2-search-cli
-& $oraclePython "$engineRoot/scripts/rust_oracle/model_traces.py" verify -- wsl.exe --exec /home/sebastian/.cache/goa2-rust/target/release/goa2-search-cli
-& $oraclePython "$engineRoot/scripts/rust_oracle/planning_traces.py" verify -- wsl.exe --exec /home/sebastian/.cache/goa2-rust/target/release/goa2-search-cli
-& $oraclePython "$engineRoot/scripts/rust_oracle/action_traces.py" verify -- wsl.exe --exec /home/sebastian/.cache/goa2-rust/target/release/goa2-search-cli
+& $oraclePython "$engineRoot/scripts/rust_oracle/oracle.py" verify-movement -- wsl.exe --exec /home/user/.cache/goa2-rust/target/release/goa2-search-cli
+& $oraclePython "$engineRoot/scripts/rust_oracle/state_codec.py" verify -- wsl.exe --exec /home/user/.cache/goa2-rust/target/release/goa2-search-cli
+& $oraclePython "$engineRoot/scripts/rust_oracle/stack_traces.py" verify -- wsl.exe --exec /home/user/.cache/goa2-rust/target/release/goa2-search-cli
+& $oraclePython "$engineRoot/scripts/rust_oracle/model_traces.py" verify -- wsl.exe --exec /home/user/.cache/goa2-rust/target/release/goa2-search-cli
+& $oraclePython "$engineRoot/scripts/rust_oracle/planning_traces.py" verify -- wsl.exe --exec /home/user/.cache/goa2-rust/target/release/goa2-search-cli
+& $oraclePython "$engineRoot/scripts/rust_oracle/action_traces.py" verify -- wsl.exe --exec /home/user/.cache/goa2-rust/target/release/goa2-search-cli
 ```
 
 Replace the Linux executable path if using another user or target directory.

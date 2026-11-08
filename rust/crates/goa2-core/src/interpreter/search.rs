@@ -39,6 +39,7 @@ pub enum SearchEvaluation {
     LanePressureV2,
     LanePressureV3,
     LanePressureV3AccumulatedGold,
+    WaveBreakthrough,
     LanePressureV4,
     LanePressureV5,
 }
@@ -2912,7 +2913,13 @@ impl NativeSession {
                 }
             }
             let [friendly, enemy] = minions;
-            score += 0.30 * (friendly - enemy) / (friendly + enemy + 1.0);
+            score += if matches!(evaluation, SearchEvaluation::WaveBreakthrough) {
+                // Clearing the last blocker matters more when a friendly wave survives.
+                let chance = |own, opposing| (own / (own + 2.0)) / (1.0 + opposing);
+                0.60 * (chance(friendly, enemy) - chance(enemy, friendly))
+            } else {
+                0.30 * (friendly - enemy) / (friendly + enemy + 1.0)
+            };
             for hero in &self.world.heroes {
                 let advances = timed_push && depth != 0.0 && ((hero.team == team) == (depth > 0.0));
                 advancing_heroes += usize::from(advances);
@@ -2922,7 +2929,9 @@ impl NativeSession {
                 } else {
                     positions.filter_map(|hex| {
                         if (matches!(evaluation,
-                            SearchEvaluation::LanePressureV3 | SearchEvaluation::LanePressureV3AccumulatedGold
+                            SearchEvaluation::LanePressureV3
+                                | SearchEvaluation::LanePressureV3AccumulatedGold
+                                | SearchEvaluation::WaveBreakthrough
                         ) || timed_push)
                             && let Some(distance) = zone.spawns.iter()
                                 .filter(|spawn| spawn.team != hero.team)

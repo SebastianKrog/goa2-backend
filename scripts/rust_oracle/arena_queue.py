@@ -17,7 +17,7 @@ from tempfile import NamedTemporaryFile
 from threading import Event
 
 from arena_acceptance import guardrail, held_out, stages, validate_acceptance
-from arena_match import score_match
+from arena_match import SCORER_BUDGETS, score_match
 from arena_policy import load_policy, validate_policy
 from arena_reports import (
     _sync_directory, _write, load_report, load_start, read_report, save_report, save_start,
@@ -161,10 +161,10 @@ def init_standard(db, store, repo, ref, referee, policy_path=None):
 
 def load_profile(store, path):
     profile = json.loads(path.read_text(encoding="utf-8"))
-    if (not isinstance(profile, dict) or profile.get("schema_version") != 1
+    if (not isinstance(profile, dict) or profile.get("schema_version") not in (1, 2)
             or not isinstance(profile.get("name"), str) or not profile["name"]
             or not isinstance(profile.get("starts"), list)):
-        raise ValueError("arena profile requires schema_version 1, a name and a starts list")
+        raise ValueError("arena profile requires schema_version 1 or 2, a name and a starts list")
     parameters = profile.get("parameters")
     if (not isinstance(parameters, dict) or set(parameters) != {"turns", "planning_nodes", "resolution_nodes", "coordinated"}
             or type(parameters["turns"]) is not int or not 1 <= parameters["turns"] <= 64
@@ -195,7 +195,7 @@ def load_profile(store, path):
         # Replay the same preflight starts twice and compare their full results.
         count = acceptance["preflight_pairs"]
         starts = starts[:count] + starts
-    return dict(profile, starts=starts, scorer="arena_search_v1")
+    return dict(profile, starts=starts, scorer=f"arena_search_v{profile['schema_version']}")
 
 
 def register_profile(db, store, path):
@@ -329,6 +329,7 @@ def run_match(db, store, job, match, manifest, binaries, *, interrupted=None):
     profile = manifest["profile"]
     start = profile["starts"][match["pair"]]
     parameters = profile["parameters"].copy()
+    parameters["work_budget"] = SCORER_BUDGETS[profile["scorer"]]
     config = profile.get("acceptance")
     if config is not None and match["pair"] < 2 * config["preflight_pairs"]:
         parameters["turns"] = 1
@@ -380,6 +381,7 @@ def run_match(db, store, job, match, manifest, binaries, *, interrupted=None):
 
 def preflight(store, manifest, binaries, starts):
     roles = dict(binaries, referee=manifest["referee"])
+    work_budget = SCORER_BUDGETS[manifest["profile"]["scorer"]]
     with ExitStack() as stack:
         workers = {}
         for role, identity in roles.items():
@@ -390,7 +392,7 @@ def preflight(store, manifest, binaries, starts):
                 worker = stack.enter_context(closing(Worker([str(path)])))
                 workers[identity] = (role, worker, worker.request("capabilities", timeout=30))
             caps = workers[identity][2]
-            required = ("arena_match_v1",) if role == "referee" else ("state_codec", "nodes_v1")
+            required = ("arena_match_v1",) if role == "referee" else ("state_codec", work_budget)
             if not all(caps.get(item) for item in (*required, "sequence_legality")):
                 raise ValueError(f"arena protocol is incompatible for {role}")
         for identity in dict.fromkeys(starts):
@@ -473,7 +475,7 @@ def run_job(db, store, row, match_workers=1):
         recover_attempts(db, store, job)
         if digest(manifest["profile"]) != manifest["profile_sha256"]:
             raise ValueError("queued arena profile integrity check failed")
-        if manifest["profile"].get("scorer") != "arena_search_v1":
+        if manifest["profile"].get("scorer") not in SCORER_BUDGETS:
             raise ValueError("unsupported arena scoring profile")
         repo = Path(manifest["repo"])
         binaries = {}

@@ -14,10 +14,17 @@ from arena_reports import save_report, sha256_file
 from oracle import Worker, digest
 
 
+SCORER_BUDGETS = {"arena_search_v1": "nodes_v1", "arena_search_v2": "nodes_v2"}
+
+
 def play_match(referee, workers, envelope, *, turns, seed, planning_nodes,
                resolution_nodes, coordinated=False, watchdog=120, opponent_policies=None,
-               observe=None, record=None, observe_request=None, policy_profiles=None):
-    options = {"work_budget": "nodes_v1", "max_depth": 2, "rollout_turns": 2,
+               observe=None, record=None, observe_request=None, policy_profiles=None,
+               work_budget="nodes_v2"):
+    if work_budget not in SCORER_BUDGETS.values():
+        raise ValueError("unsupported arena work budget")
+    selective = work_budget == "nodes_v2"
+    options = {"work_budget": work_budget, "rollout_turns": 4 if selective else 2,
                "evaluation": "lane_pressure_v3"}
     opponent_policies = opponent_policies or {}
     policy_profiles = {side: validate_policy(policy) for side, policy in (policy_profiles or {}).items()}
@@ -35,7 +42,8 @@ def play_match(referee, workers, envelope, *, turns, seed, planning_nodes,
 
     def recommend(team, phase, operation, **fields):
         work[team][f"{phase}_requests"] += 1
-        request = dict(options, **fields)
+        depth = (3 if phase == "planning" else 5) if selective else 2
+        request = dict(options, max_depth=depth, **fields)
         apply_policy(request, phase, policy_profiles.get(team, {}).get(phase, {}))
         if observe_request is not None:
             observe_request(phase, operation, request, position)
@@ -52,6 +60,8 @@ def play_match(referee, workers, envelope, *, turns, seed, planning_nodes,
         if type(nodes) is not int or not 0 <= nodes <= fields["max_nodes"]:
             raise ValueError("worker exceeded the match node budget")
         work[team][f"{phase}_nodes"] += nodes
+        if selective and nodes == fields["max_nodes"]:
+            work[team][f"{phase}_node_cutoffs"] += 1
         if result["score"] is None and result.get("shallow_score") is None:
             work[team][f"{phase}_unscored"] += 1
             return None
@@ -74,7 +84,7 @@ def play_match(referee, workers, envelope, *, turns, seed, planning_nodes,
                 team, player = first["team"], first["player_id"]
                 response = recommend(
                     team, "planning", "search_sampled_planning", player_id=player,
-                    seed=epoch_seed, cap=4, reply_cap=4, max_nodes=planning_nodes,
+                    seed=epoch_seed, cap=8 if selective else 4, reply_cap=4, max_nodes=planning_nodes,
                     greedy_card_order=True,
                     bot_team={"mode": "coordinated" if coordinated else "true_rules",
                               "bot_ids": rosters[team] if coordinated else [player],
@@ -99,8 +109,10 @@ def play_match(referee, workers, envelope, *, turns, seed, planning_nodes,
                 response = recommend(
                     team, "resolution", "search_resolution", player_id=choice["player_id"],
                     max_nodes=resolution_nodes, resolution_sample_seed=epoch_seed,
-                    resolution_sample_worlds=2, planning_sample_seed=epoch_seed,
+                    resolution_sample_worlds=2,
                     opponent_policy=opponent_policies.get(team, "adversarial"), **shared,
+                    **({"arena_bot_ids": rosters[team] if coordinated else [choice["player_id"]]}
+                       if selective else {"planning_sample_seed": epoch_seed}),
                 )
                 if response is not None:
                     move = response["decision"]
@@ -143,7 +155,7 @@ def score_match(paths, envelope, *, record=None, expected_binaries=None, **param
     state = result["endpoint"].pop("state")
     result["endpoint"]["rust_state_sha256"] = digest(state)
     result["binaries"] = binaries
-    result["parameters"] = dict(parameters, work_budget="nodes_v1")
+    result["parameters"] = {"work_budget": "nodes_v2", **parameters}
     result["rules"] = {
         key: envelope[key] for key in ("schema_version", "oracle_revision", "source_sha256", "rules_version")
     }
@@ -164,6 +176,7 @@ def main():
     parser.add_argument("--planning-nodes", type=int, required=True)
     parser.add_argument("--resolution-nodes", type=int, required=True)
     parser.add_argument("--coordinated", action="store_true")
+    parser.add_argument("--work-budget", choices=tuple(SCORER_BUDGETS.values()), default="nodes_v2")
     args = parser.parse_args()
     if min(args.planning_nodes, args.resolution_nodes) < 1 or not 0 <= args.seed < 1 << 64:
         parser.error("node caps must be positive and seed must be an unsigned 64-bit integer")
@@ -178,7 +191,8 @@ def main():
     result = score_match(
         paths, envelope, turns=args.turns, seed=args.seed,
         planning_nodes=args.planning_nodes, resolution_nodes=args.resolution_nodes,
-        coordinated=args.coordinated, **({"policy_profiles": policies} if policies else {}),
+        coordinated=args.coordinated, work_budget=args.work_budget,
+        **({"policy_profiles": policies} if policies else {}),
     )
     report_id = save_report(args.store, envelope, result)
     print(json.dumps(dict(result, report_id=report_id, start_sha256=digest(envelope)),

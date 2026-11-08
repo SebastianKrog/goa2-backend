@@ -535,7 +535,7 @@ impl NativeSession {
             profile.search_ns = elapsed_ns(start);
         }
         match outcome {
-            Ok(()) | Err(EngineError::Deadline | EngineError::Cancelled) => Ok(search.result),
+            Ok(()) | Err(EngineError::Deadline | EngineError::Cancelled | EngineError::NodeLimit) => Ok(search.result),
             Err(error) => Err(error),
         }
     }
@@ -625,6 +625,14 @@ impl GreedyTraversal<'_, '_, '_> {
         fork
     }
 
+    fn charge_node(&mut self) -> Result<()> {
+        if !self.budget.reserve_search_nodes(1) {
+            return Err(EngineError::NodeLimit);
+        }
+        self.result.nodes += 1;
+        Ok(())
+    }
+
     fn run(&mut self, worker: &mut NativeSession) -> Result<()> {
         let limit = self.options.max_nodes;
         let seed_divisor = if self.options.turns == 4 { 2 } else { 8 };
@@ -673,7 +681,7 @@ impl GreedyTraversal<'_, '_, '_> {
             let mut commitments = vec![plan];
             commitments.extend_from_slice(&opponents);
             let branch_limit = self.result.nodes + quota;
-            self.result.nodes += 1;
+            self.charge_node()?;
             self.path.push(GreedyStep::Planning(commitments.clone()));
             let result = worker.with_joint_planning(&commitments, |branch| {
                 self.visit(branch, branch_limit)
@@ -744,7 +752,7 @@ impl GreedyTraversal<'_, '_, '_> {
                 unreachable!("fixed choices are issued inputs");
             };
             let (token, selection) = (*token, selection.clone());
-            self.result.nodes += 1;
+            self.charge_node()?;
             self.path.push(GreedyStep::Input(decision));
             // The caller already owns a rollback scope or a private fork.
             worker.last_request = None;
@@ -833,7 +841,7 @@ impl GreedyTraversal<'_, '_, '_> {
             // Reserve work for competing root choices instead of exhausting
             // the budget under the first card order.
             let branch_limit = self.branch_limit(limit, count - index, balance_cards);
-            self.result.nodes += 1;
+            self.charge_node()?;
             self.path.push(step.clone());
             let result = match step {
                 GreedyStep::Planning(commitments) => worker
@@ -919,7 +927,7 @@ impl GreedyTraversal<'_, '_, '_> {
             let quota = if discovery_deadline.is_some() { quota.min(128) } else { quota };
             let plan_limit = self.result.nodes + quota;
             plan.extend_from_slice(&fixed);
-            self.result.nodes += 1;
+            self.charge_node()?;
             self.path.push(GreedyStep::Planning(plan.clone()));
             let result = worker.with_joint_planning(&plan, |branch| {
                 self.collect_position_routes(branch, turn, plan_limit, 0, &mut routes, None)
@@ -1053,7 +1061,9 @@ impl GreedyTraversal<'_, '_, '_> {
                     result?;
                     continue;
                 }
-                self.result.nodes += replay_cost;
+                if self.budget.search_nodes.is_none() {
+                    self.result.nodes += replay_cost;
+                }
                 let result = worker.with_rollback(|branch| {
                     self.replay_position_steps(branch, &route.steps)?;
                     self.path.extend(route.steps);
@@ -1085,7 +1095,9 @@ impl GreedyTraversal<'_, '_, '_> {
                 self.result.resumed_position_routes += 1;
                 *state
             } else {
-                self.result.nodes += route.steps.len();
+                if self.budget.search_nodes.is_none() {
+                    self.result.nodes += route.steps.len();
+                }
                 root.with_rollback(|branch| {
                     self.replay_position_steps(branch, &route.steps)?;
                     Ok(self.fork_profiled(branch))
@@ -1148,7 +1160,7 @@ impl GreedyTraversal<'_, '_, '_> {
                 if self.result.nodes >= branch_limit {
                     break;
                 }
-                self.result.nodes += 1;
+                self.charge_node()?;
                 let world = &mut planning[world_index];
                 let worker = world
                     .worker
@@ -1198,6 +1210,9 @@ impl GreedyTraversal<'_, '_, '_> {
     ) -> Result<()> {
         let start = self.profile_clock();
         for step in steps {
+            if self.budget.search_nodes.is_some() {
+                self.charge_node()?;
+            }
             self.advance_profiled(branch)?;
             match step {
                 GreedyStep::Planning(plan) => {
@@ -1264,7 +1279,7 @@ impl GreedyTraversal<'_, '_, '_> {
                     unreachable!("position choices are issued inputs");
                 };
                 let (token, selection) = (*token, selection.clone());
-                self.result.nodes += 1;
+                self.charge_node()?;
                 self.path.push(GreedyStep::Input(decision));
                 frame.child = Some(worker.begin_rollback_checkpoint(true)?);
                 worker.submit(token, selection)?;
@@ -1394,7 +1409,7 @@ impl GreedyTraversal<'_, '_, '_> {
                 unreachable!("position choices are issued inputs");
             };
             self.budget.check(0)?;
-            self.result.nodes += 1;
+            self.charge_node()?;
             self.result.positional_probes += 1;
             let score = worker.with_consumed_request(|branch| {
                 branch.submit(*token, selection.clone())?;
@@ -1446,7 +1461,7 @@ impl GreedyTraversal<'_, '_, '_> {
                 unreachable!("token swaps are issued inputs");
             };
             self.budget.check(0)?;
-            self.result.nodes += 1;
+            self.charge_node()?;
             self.result.positional_probes += 1;
             let position = worker.with_consumed_request(|branch| {
                 branch.submit(token, selection)?;
@@ -1557,7 +1572,7 @@ impl GreedyTraversal<'_, '_, '_> {
                 continue;
             }
             let (token, selection) = (*token, selection.clone());
-            self.result.nodes += 1;
+            self.charge_node()?;
             self.result.upgrade_discovery_steps += 1;
             self.path.push(GreedyStep::Input(choice));
             let result = worker.with_consumed_request(|branch| {
@@ -1725,7 +1740,7 @@ impl GreedyTraversal<'_, '_, '_> {
                             continue;
                         }
                         plan.extend_from_slice(&fixed);
-                        search.result.nodes += 1;
+                        search.charge_node()?;
                         search.path.push(GreedyStep::Planning(plan.clone()));
                         let result = planning.with_joint_planning(&plan, |branch| {
                             groups[index].push((
@@ -1810,7 +1825,7 @@ impl GreedyTraversal<'_, '_, '_> {
                         let available = hand_limit - search.result.nodes;
                         let plan_limit = search.result.nodes + (available / (count - index)).max(1);
                         plan.extend_from_slice(&fixed);
-                        search.result.nodes += 1;
+                        search.charge_node()?;
                         search.path.push(GreedyStep::Planning(plan.clone()));
                         let result = planning
                             .with_joint_planning(&plan, |branch| search.visit(branch, plan_limit));
@@ -2005,7 +2020,7 @@ impl GreedyTraversal<'_, '_, '_> {
                 };
                 let (source, uses) = &mut live[index];
                 *uses -= 1;
-                self.result.nodes += 1;
+                self.charge_node()?;
                 let (token, selection) = (*token, selection.clone());
                 let mut child = if *uses == 0 {
                     let mut child = source.take().expect("last use owns its world");
@@ -2144,7 +2159,7 @@ impl GreedyTraversal<'_, '_, '_> {
             unreachable!("attack choices are issued inputs");
         };
         self.budget.check(0)?;
-        self.result.nodes += 1;
+        self.charge_node()?;
         self.result.tactical_probes += 1;
         let target = worker.with_consumed_request(|branch| {
             branch.submit(*token, selection.clone())?;
@@ -2231,7 +2246,7 @@ impl GreedyTraversal<'_, '_, '_> {
                 unreachable!("attack targets are issued inputs");
             };
             self.budget.check(0)?;
-            self.result.nodes += 1;
+            self.charge_node()?;
             self.result.tactical_probes += 1;
             let score = worker.with_consumed_request(|branch| {
                 branch.submit(*token, selection.clone())?;

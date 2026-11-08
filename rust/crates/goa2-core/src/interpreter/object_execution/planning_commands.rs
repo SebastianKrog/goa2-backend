@@ -147,7 +147,7 @@ impl NativeSession {
         operation: impl FnOnce(&mut Self) -> Result<T>,
     ) -> Result<T> {
         let samples = self
-            .resolution_samples(player, sample, &[sample.seed])?
+            .resolution_samples(player, sample, &[sample.seed], &[])?
             .pop()
             .unwrap();
         self.with_installed_resolution_samples(player, samples, Some(sample.seed), operation)
@@ -158,6 +158,7 @@ impl NativeSession {
         player: Symbol,
         sample: super::super::PlanningRolloutSample<'_>,
         worlds: usize,
+        bots: &[Symbol],
         budget: &ExecutionBudget<'_>,
     ) -> Result<Vec<Self>> {
         budget.check(0)?;
@@ -168,7 +169,7 @@ impl NativeSession {
                     .wrapping_add((index as u64).wrapping_mul(0x9e3779b97f4a7c15))
             })
             .collect::<Vec<_>>();
-        let samples = self.resolution_samples(player, sample, &seeds)?;
+        let samples = self.resolution_samples(player, sample, &seeds, bots)?;
         samples
             .into_iter()
             .zip(seeds)
@@ -236,6 +237,7 @@ impl NativeSession {
         player: Symbol,
         sample: super::super::PlanningRolloutSample<'_>,
         seeds: &[u64],
+        bots: &[Symbol],
     ) -> Result<Vec<Vec<PlanningHandSample>>> {
         let cleanup_battle = self.planning.phase == Phase::Cleanup
             && self.stack.last().is_some_and(|frame| {
@@ -264,7 +266,11 @@ impl NativeSession {
         self.validate_sampled_effect_cards(&observation)?;
         observation.validate_upgrade_evidence(sample.upgrade_checkpoints)?;
         let mut samples = (0..seeds.len()).map(|_| Vec::new()).collect::<Vec<_>>();
+        let team = self.world.hero(player).map(|hero| hero.team);
         for (index, hero) in self.world.heroes.iter().enumerate() {
+            if hero.id != player && Some(hero.team) == team && bots.contains(&hero.id) {
+                continue;
+            }
             if hero.id == player {
                 for (world, seed) in samples.iter_mut().zip(seeds) {
                     if let Some(sample) = self.preserved_gold_sample(&observation, index, *seed)? {
@@ -2017,7 +2023,7 @@ mod tests {
 
             // Level-one hands are uniquely determined. Perturb a different
             // hero's concealed hand explicitly to test the prompt dependency.
-            let mut samples = root.resolution_samples(request.owner, sample, &[39])
+            let mut samples = root.resolution_samples(request.owner, sample, &[39], &[])
                 .unwrap().remove(0);
             let hidden = samples.iter_mut()
                 .find(|row| root.symbols.name(row.hero) == "hero_swift").unwrap();
@@ -2223,11 +2229,12 @@ mod tests {
         let budget = ExecutionBudget::default();
         root.advance_to_decision(&budget).unwrap();
         let owner = root.last_request.as_ref().unwrap().owner;
+        let team = root.world.hero(owner).unwrap().team;
         let other = root
             .world
             .heroes
             .iter()
-            .find(|hero| hero.id != owner)
+            .find(|hero| hero.id != owner && hero.team == team)
             .unwrap();
         let (hero, protected) = (other.id, [other.current, other.extra]);
         let view = root.player_observation(owner).unwrap();
@@ -2271,6 +2278,15 @@ mod tests {
             seed: 39,
             upgrade_checkpoints: None,
         };
+        let roster = root.world.heroes.iter().map(|hero| hero.id).collect::<Vec<_>>();
+        let scoped = root.resolution_samples(owner, sample, &[39], &roster).unwrap();
+        assert!(!scoped[0].iter().any(|row| row.hero == hero));
+        for enemy in root.world.heroes.iter().filter(|hero| hero.team != team) {
+            assert!(scoped[0].iter().any(|row| row.hero == enemy.id));
+        }
+        let worlds = alternate.sampled_resolution_workers(owner, sample, 1, &roster, &budget).unwrap();
+        assert_eq!(worlds[0].world.hero(hero).unwrap().hand, alternate.world.hero(hero).unwrap().hand);
+
         let run = |session: &mut NativeSession, worlds, workers| {
             let before = session.semantic_state().unwrap();
             let result = session

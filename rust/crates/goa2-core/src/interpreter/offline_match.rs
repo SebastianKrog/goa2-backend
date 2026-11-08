@@ -68,6 +68,11 @@ impl OfflinePolicy {
     }
 
     fn budget_from(self, started: Instant) -> Result<ExecutionBudget<'static>> {
+        if self.work_budget == Some(WorkBudget::NodesV2) {
+            return Err(EngineError::InvalidInput(
+                "nodes_v2 uses the versioned arena policy worker".into(),
+            ));
+        }
         ExecutionBudget::for_search(
             started, self.time_ms, self.work_budget, self.planning_workers.unwrap_or(1),
         )

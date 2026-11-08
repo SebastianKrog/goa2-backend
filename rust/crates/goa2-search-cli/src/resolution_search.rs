@@ -28,7 +28,8 @@ pub(super) fn search(
             let bots = bots.into_iter().map(|id| super::sequence_legality::player(&mut session, id))
                 .collect::<Result<Vec<_>, _>>()?;
             session.search_node_limited_resolution(
-                player, sample, worlds, &bots, limits, rollout_turns.unwrap_or(4), &budget,
+                // This candidate enables the experiment for arena resolution only.
+                player, sample, worlds, &bots, true, limits, rollout_turns.unwrap_or(4), &budget,
             )
         }
         (Some(_), _) => return Err("arena v2 requires a sampled resolution root and one worker".into()),

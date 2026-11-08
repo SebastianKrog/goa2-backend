@@ -401,7 +401,29 @@ impl ObjectArena {
     pub(crate) fn commit_rollback(&mut self, checkpoint: ArenaCheckpoint) {
         self.journal.existing_objects = checkpoint.parent_existing_objects;
         let nested = checkpoint.parent_existing_objects.is_some();
-        if !nested {
+        if let Some(parent_object_count) = checkpoint.parent_existing_objects {
+            // A parent snapshot (or truncation of a new object) already undoes
+            // these edits. The parent can still change the list without logging
+            // a delta, so retaining child deltas could undo against stale indices.
+            let entries = &mut self.journal.entries;
+            let mut retained = checkpoint.entry_count;
+            for index in checkpoint.entry_count..entries.len() {
+                let covered = match &entries[index] {
+                    ArenaUndo::ListAppend(id)
+                    | ArenaUndo::ListRemove(id, ..)
+                    | ArenaUndo::ListReplace(id, ..) => {
+                        id.0 >= parent_object_count
+                            || checkpoint.parent_recorded.objects.contains(id.0)
+                    }
+                    _ => false,
+                };
+                if !covered {
+                    entries.swap(retained, index);
+                    retained += 1;
+                }
+            }
+            entries.truncate(retained);
+        } else {
             self.journal.entries.truncate(checkpoint.entry_count);
         }
         self.restore_recorded_slots(checkpoint.parent_recorded, nested);
@@ -2087,6 +2109,28 @@ mod protection_tests {
             Err("cancel")
         });
         assert_eq!(result, Err("cancel"));
+        assert_eq!(format!("{arena:?}"), before);
+    }
+
+    #[test]
+    fn committed_child_list_deltas_do_not_outlive_the_parent_snapshot() {
+        let mut arena = graph();
+        let before = format!("{arena:?}");
+        arena.with_rollback(|arena| {
+            let existing = ObjectId(4);
+            arena.clear_list(existing).unwrap();
+            let ObjectValue::Object(new) = arena.list(vec![]) else { unreachable!() };
+            for list in [existing, new] {
+                let card = ObjectValue::Atom(Datum::Int(1));
+                arena.append(list, card.clone()).unwrap();
+                arena.append(list, card.clone()).unwrap();
+                let child = arena.begin_rollback();
+                arena.list_pop(list).unwrap();
+                arena.set_index(list, 0, card).unwrap();
+                arena.commit_rollback(child);
+                arena.clear_list(list).unwrap();
+            }
+        });
         assert_eq!(format!("{arena:?}"), before);
     }
 

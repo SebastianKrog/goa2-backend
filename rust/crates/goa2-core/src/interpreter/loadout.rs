@@ -445,6 +445,44 @@ impl PlayerObservation {
         hero_id: &str,
         checkpoints: &[UpgradeCheckpoint],
     ) -> Result<Option<impl Fn(u64) -> Option<SampledHand> + use<'a>>> {
+        Ok(self.ordinary_hand_hypotheses(hero_id, checkpoints)?.map(|(hands, golds, hand)| {
+            move |seed| hand(sample_index(seed, hands), sample_index(seed ^ 0x81f2b1aa727ea991, golds))
+        }))
+    }
+
+    pub(super) fn resolution_hand_hypotheses(
+        &self,
+        hero_id: &str,
+        checkpoints: &[UpgradeCheckpoint],
+    ) -> Result<Option<Vec<(SampledHand, u32)>>> {
+        if self.phase != crate::codec::Phase::Resolution {
+            return Ok(None);
+        }
+        let Some((hands, golds, build)) = self.ordinary_hand_hypotheses(hero_id, checkpoints)? else {
+            return Ok(None);
+        };
+        if hands.saturating_mul(golds) > 16 {
+            return Ok(None);
+        }
+        let mut weighted: Vec<(SampledHand, u32)> = Vec::new();
+        for index in 0..hands {
+            for gold in 0..golds {
+                let Some(hand) = build(index, gold) else { continue };
+                if let Some((_, weight)) = weighted.iter_mut().find(|(row, _)| *row == hand) {
+                    *weight += 1;
+                } else {
+                    weighted.push((hand, 1));
+                }
+            }
+        }
+        Ok((!weighted.is_empty()).then_some(weighted))
+    }
+
+    fn ordinary_hand_hypotheses<'a>(
+        &'a self,
+        hero_id: &str,
+        checkpoints: &[UpgradeCheckpoint],
+    ) -> Result<Option<(usize, usize, impl Fn(usize, usize) -> Option<SampledHand> + use<'a>)>> {
         if hero_id == self.private.hero {
             return Ok(None);
         }
@@ -506,8 +544,14 @@ impl PlayerObservation {
             };
             loadouts
         };
-        Ok(Some(move |seed| {
-            let selected = sample_index(seed, loadouts.len());
+        let fixed_starting_gold = hidden_gold_slot.is_none()
+            && self.phase == crate::codec::Phase::Planning && self.round == 1 && self.turn == 1;
+        let golds = if hero.level < 8 && public_golds == 0 && !fixed_starting_gold {
+            definition.cyclic_golds.len().max(1)
+        } else {
+            1
+        };
+        Ok(Some((loadouts.len(), golds, move |selected: usize, gold_index: usize| {
             let loadout = &loadouts[selected];
             let upgraded = definition
                 .cards
@@ -542,18 +586,13 @@ impl PlayerObservation {
                         .cloned(),
                 );
             } else if public_golds == 0 && !definition.cyclic_golds.is_empty() {
-                let gold = if hidden_gold_slot.is_none()
-                    && self.phase == crate::codec::Phase::Planning
-                    && self.round == 1
-                    && self.turn == 1
-                {
+                let gold = if fixed_starting_gold {
                     definition
                         .starting
                         .iter()
                         .find(|id| definition.cyclic_golds.contains(id))?
                 } else {
-                    &definition.cyclic_golds
-                        [sample_index(seed ^ 0x81f2b1aa727ea991, definition.cyclic_golds.len())]
+                    &definition.cyclic_golds[gold_index]
                 };
                 if let Some(slot) = hidden_gold_slot {
                     hidden_gold = Some((slot, gold.clone()));
@@ -587,7 +626,7 @@ impl PlayerObservation {
                 retired,
                 hidden_gold,
             })
-        }))
+        })))
     }
 
     /// Candidate upgrade paths for a publicly identified hero. Unsupported or
@@ -996,6 +1035,11 @@ mod tests {
         hero.revealed_current.clear();
         let id = hero.id.clone();
         let golds = &catalog().unwrap().heroes["Takahide"].cyclic_golds;
+        let weighted = view.resolution_hand_hypotheses(&id, &[]).unwrap().unwrap();
+        assert_eq!(weighted.len(), golds.len());
+        assert!(weighted.iter().all(|(hand, weight)| {
+            *weight == 1 && hand.cards.iter().filter(|card| golds.contains(card)).count() == 1
+        }));
         let mut seen = BTreeSet::new();
         for seed in 0..32 {
             let sample = view

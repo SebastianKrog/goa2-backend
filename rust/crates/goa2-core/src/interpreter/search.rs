@@ -142,6 +142,14 @@ struct LiveResolution<'a> {
     bots: &'a [Symbol],
     incumbent: Option<&'a DecisionMove>,
     ranking: &'a mut Vec<(usize, i64)>,
+    probabilistic_hand_responses: bool,
+}
+
+#[derive(Clone, Copy)]
+struct HandBelief<'a> {
+    known: &'a [Symbol],
+    upgrade_checkpoints: Option<&'a std::collections::BTreeMap<String, Vec<super::UpgradeCheckpoint>>>,
+    turn: i128,
 }
 
 struct PlanningWorld {
@@ -1793,6 +1801,7 @@ impl NativeSession {
             shared_nodes: partition.shared_nodes,
             guard_hidden: false,
             allow_simulated_upgrades: false,
+            hand_belief: None,
             planning_sample: None,
             future_planning: None,
             forecast_changes: 0,
@@ -1927,6 +1936,7 @@ impl NativeSession {
         sample: PlanningRolloutSample<'_>,
         worlds: usize,
         bots: &[Symbol],
+        probabilistic_hand_responses: bool,
         limits: SearchLimits,
         rollout_turns: u8,
         budget: &ExecutionBudget<'_>,
@@ -1939,14 +1949,14 @@ impl NativeSession {
         }
         let mut ranking = Vec::new();
         let mut best = self.search_live_bot_resolution(
-            player, sample, worlds, bots, None, &mut ranking,
+            player, sample, worlds, bots, None, &mut ranking, probabilistic_hand_responses,
             SearchLimits { max_depth: limits.max_depth.min(2), max_nodes: 8_192, ..limits },
             rollout_turns.min(2), &budget,
         )?;
         if meter.remaining() > 0 && best.score != Some(WIN)
             && let Some(deeper) = retain_arena_backup(self.search_live_bot_resolution(
                 player, sample, worlds, bots,
-                best.score.map(|_| &best.decision), &mut ranking,
+                best.score.map(|_| &best.decision), &mut ranking, probabilistic_hand_responses,
                 SearchLimits { max_nodes: ARENA_SEARCH_CEILING, ..limits },
                 rollout_turns, &budget,
             ))?
@@ -1970,6 +1980,7 @@ impl NativeSession {
         bots: &[Symbol],
         incumbent: Option<&DecisionMove>,
         ranking: &mut Vec<(usize, i64)>,
+        probabilistic_hand_responses: bool,
         limits: SearchLimits,
         rollout_turns: u8,
         budget: &ExecutionBudget<'_>,
@@ -1978,7 +1989,7 @@ impl NativeSession {
         // Keep each sampled world consistent at future planning boundaries.
         self.search_resolution_worlds_inner(
             player, (sample, worlds, 1), limits, Some(rollout_turns), None,
-            Some(LiveResolution { bots, incumbent, ranking }), budget,
+            Some(LiveResolution { bots, incumbent, ranking, probabilistic_hand_responses }), budget,
         )
     }
 
@@ -2051,6 +2062,10 @@ impl NativeSession {
             shared_nodes: (workers > 1).then_some(&shared_nodes),
             guard_hidden: true,
             allow_simulated_upgrades: live.is_some(),
+            hand_belief: live.as_ref().filter(|scope| scope.probabilistic_hand_responses).map(|scope| {
+                HandBelief { known: scope.bots, upgrade_checkpoints: sample.upgrade_checkpoints,
+                             turn: self.search_turn_index() }
+            }),
             planning_sample,
             future_planning: None,
             forecast_changes: 0,
@@ -2495,6 +2510,7 @@ impl NativeSession {
                 shared_nodes: None,
                 guard_hidden,
                 allow_simulated_upgrades: false,
+                hand_belief: None,
                 planning_sample,
                 future_planning: None,
                 forecast_changes: 0,
@@ -2611,6 +2627,7 @@ impl NativeSession {
             shared_nodes: None,
             guard_hidden: false,
             allow_simulated_upgrades: false,
+            hand_belief: None,
             planning_sample: None,
             future_planning: None,
             forecast_changes: 0,
@@ -3121,6 +3138,7 @@ struct Search<'a, 'b> {
     planning_sample: Option<PlanningRolloutSample<'a>>,
     guard_hidden: bool,
     allow_simulated_upgrades: bool,
+    hand_belief: Option<HandBelief<'a>>,
     forecast_changes: usize,
     forecast_checks: usize,
     forecast_matches: usize,
@@ -3235,6 +3253,7 @@ impl Search<'_, '_> {
                     if branch.last_request.is_none()
                         && !matches!(branch.planning.phase, Phase::Planning | Phase::GameOver)
                         && branch.search_turn_index() < cutoff
+                        && short.pending_hand_branch(branch)?.is_none()
                     {
                         return Ok(None);
                     }
@@ -3464,6 +3483,8 @@ impl Search<'_, '_> {
                 // This prompt is generated on a sampled future position. It has
                 // no pending real upgrade choices to reveal.
                 worker.advance_objects(&budget, Some(1), false)?
+            } else if let Some(belief) = self.hand_belief.filter(|belief| belief.turn == worker.search_turn_index()) {
+                worker.advance_search_objects_before_hand(&budget, self.player, belief.known)?
             } else {
                 worker.advance_search_objects(&budget, self.player)?
             };
@@ -3473,6 +3494,58 @@ impl Search<'_, '_> {
             remaining -= advance.steps;
         }
         Ok(())
+    }
+
+    fn pending_hand_branch(&self, worker: &NativeSession) -> Result<Option<Symbol>> {
+        match self.hand_belief.filter(|belief| belief.turn == worker.search_turn_index()) {
+            Some(belief) => worker.pending_hidden_hand_reader(self.player, belief.known),
+            None => Ok(None),
+        }
+    }
+
+    fn weighted_hand_response(
+        &mut self,
+        worker: &mut NativeSession,
+        target: Symbol,
+        mut continue_search: impl FnMut(&mut Self, &mut NativeSession) -> Result<Option<ValueBound>>,
+    ) -> Result<Option<ValueBound>> {
+        let belief = self.hand_belief.take().expect("a hand branch requires a belief");
+        let result = (|| {
+            let observation = worker.player_observation(self.player)?;
+            let id = worker.symbols.name(target);
+            let evidence = belief.upgrade_checkpoints.and_then(|rows| rows.get(id))
+                .map(Vec::as_slice).unwrap_or_default();
+            let hypotheses = observation.resolution_hand_hypotheses(id, evidence);
+            let Some(hypotheses) = (match hypotheses {
+                Ok(hands) => hands,
+                Err(EngineError::Unsupported(_) | EngineError::InvalidInput(_)) => None,
+                Err(error) => return Err(error),
+            }) else {
+                return worker.with_rollback(|branch| {
+                    self.advance(branch)?;
+                    continue_search(self, branch)
+                });
+            };
+            let mut sum = 0i128;
+            let mut weight_total = 0i128;
+            let mut resolved = true;
+            for (hand, weight) in hypotheses {
+                if !self.reserve_node() {
+                    return Ok(None);
+                }
+                let value = worker.with_hidden_hand_hypothesis(target, &hand, |branch| {
+                    self.advance(branch)?;
+                    continue_search(self, branch)
+                })?;
+                let Some(value) = value else { return Ok(None) };
+                sum += i128::from(value.score) * i128::from(weight);
+                weight_total += i128::from(weight);
+                resolved &= value.resolved;
+            }
+            Ok(Some(ValueBound { score: (sum / weight_total) as i64, resolved }))
+        })();
+        self.hand_belief = Some(belief);
+        result
     }
 
     fn rollout(
@@ -3496,6 +3569,29 @@ impl Search<'_, '_> {
     ) -> Result<Option<GameTurnRollout>> {
         loop {
             self.budget.check(0)?;
+            if worker.search_turn_index() < cutoff
+                && let Some(target) = self.pending_hand_branch(worker)?
+            {
+                let mut witness = None;
+                let expected = self.weighted_hand_response(worker, target, |search, branch| {
+                    let Some(leaf) = search.rollout_with_history(
+                        branch, cutoff, capture_state, lab_evaluation, history.clone(),
+                    )? else { return Ok(None) };
+                    let value = ValueBound { score: leaf.score, resolved: leaf.reached_cutoff(cutoff) };
+                    // Preserve an early endpoint if any positive-mass branch
+                    // could not reach the requested horizon.
+                    if witness.is_none() || !value.resolved {
+                        witness = Some(leaf);
+                    }
+                    Ok(Some(value))
+                })?;
+                return Ok(expected.map(|value| {
+                    let mut leaf = witness.expect("scored hand branch has an endpoint");
+                    leaf.score = value.score;
+                    leaf.nodes = self.nodes;
+                    leaf
+                }));
+            }
             if worker.planning.phase == Phase::GameOver
                 || worker.search_turn_index() >= cutoff
                 || (self.guard_hidden && worker.last_request.is_none()
@@ -3819,6 +3915,11 @@ impl Search<'_, '_> {
                         }
                     }));
                 }
+            }
+            if let Some(target) = self.pending_hand_branch(worker)? {
+                return self.weighted_hand_response(worker, target, |search, branch| {
+                    search.value(branch, depth, i64::MIN, i64::MAX)
+                });
             }
             let terminal = worker.last_request.is_none()
                 || matches!(worker.planning.phase, Phase::Planning | Phase::GameOver);
@@ -4182,6 +4283,7 @@ mod tests {
                 planning_sample: None,
                 guard_hidden: false,
                 allow_simulated_upgrades: false,
+                hand_belief: None,
                 forecast_changes: 0,
                 forecast_checks: 0,
                 forecast_matches: 0,
@@ -4283,6 +4385,7 @@ mod tests {
             shared_nodes: None,
             guard_hidden: false,
             allow_simulated_upgrades: false,
+            hand_belief: None,
             planning_sample: None,
             future_planning: None,
             forecast_changes: 0,
@@ -4375,6 +4478,7 @@ mod tests {
                     shared_nodes: None,
                     guard_hidden: false,
                     allow_simulated_upgrades: false,
+                    hand_belief: None,
                     planning_sample: None,
                     forecast_changes: 0,
                     forecast_checks: 0,
@@ -4423,6 +4527,7 @@ mod tests {
             shared_nodes: None,
             guard_hidden: false,
             allow_simulated_upgrades: false,
+            hand_belief: None,
             planning_sample: None,
             future_planning: None,
             forecast_changes: 0,
@@ -4581,6 +4686,7 @@ mod tests {
                 shared_nodes: None,
                 guard_hidden: false,
                 allow_simulated_upgrades: false,
+                hand_belief: None,
                 planning_sample: None,
                 future_planning: None,
                 forecast_changes: 0,
@@ -4738,6 +4844,7 @@ mod tests {
                     shared_nodes: None,
                     guard_hidden: false,
                     allow_simulated_upgrades: false,
+                    hand_belief: None,
                     planning_sample: None,
                     future_planning: None,
                     forecast_changes: 0,
@@ -4902,7 +5009,7 @@ mod tests {
         let before = root.semantic_state().unwrap();
         let result = root.search_node_limited_resolution(
             player, PlanningRolloutSample { seed: 39, upgrade_checkpoints: None },
-            2, &[player], limits, 4, &budget,
+            2, &[player], false, limits, 4, &budget,
         ).unwrap();
         assert_eq!(result.nodes, limits.max_nodes);
         assert_eq!(result.stop, ResolutionStop::NodeLimit);
@@ -4982,6 +5089,7 @@ mod tests {
             shared_nodes: None,
             guard_hidden: true,
             allow_simulated_upgrades: true,
+            hand_belief: None,
             planning_sample: None,
             forecast_changes: 0,
             forecast_checks: 0,
@@ -5004,7 +5112,7 @@ mod tests {
         }).sum::<i128>();
         let mut ranking = Vec::new();
         let reference = root.search_live_bot_resolution(
-            player, sample, 2, &[player], None, &mut ranking,
+            player, sample, 2, &[player], None, &mut ranking, false,
             SearchLimits {
                 max_depth: 1,
                 max_nodes: 4_096,
@@ -5017,7 +5125,7 @@ mod tests {
         assert!(ranking.len() > 1);
         assert!(ranking.windows(2).all(|pair| pair[0].1 >= pair[1].1));
         let limited = root.search_live_bot_resolution(
-            player, sample, 2, &[player], Some(incumbent), &mut ranking,
+            player, sample, 2, &[player], Some(incumbent), &mut ranking, false,
             SearchLimits {
                 max_depth: 1,
                 max_nodes: search.nodes,
@@ -5057,6 +5165,7 @@ mod tests {
             shared_nodes: None,
             guard_hidden: true,
             allow_simulated_upgrades: false,
+            hand_belief: None,
             planning_sample: None,
             forecast_changes: 0,
             forecast_checks: 0,
@@ -5101,6 +5210,7 @@ mod tests {
             shared_nodes: None,
             guard_hidden: true,
             allow_simulated_upgrades: false,
+            hand_belief: None,
             planning_sample: Some(PlanningRolloutSample {
                 seed: 17,
                 upgrade_checkpoints: None,
@@ -5663,6 +5773,7 @@ mod tests {
             shared_nodes: None,
             guard_hidden: false,
             allow_simulated_upgrades: false,
+            hand_belief: None,
             planning_sample: None,
             future_planning: None,
             forecast_changes: 0,
@@ -5948,6 +6059,7 @@ mod tests {
             shared_nodes: None,
             guard_hidden: false,
             allow_simulated_upgrades: false,
+            hand_belief: None,
             planning_sample: None,
             future_planning: None,
             forecast_changes: 0,
@@ -6039,6 +6151,7 @@ mod tests {
             shared_nodes: None,
             guard_hidden: false,
             allow_simulated_upgrades: false,
+            hand_belief: None,
             planning_sample: None,
             future_planning: None,
             forecast_changes: 0,
@@ -6095,6 +6208,7 @@ mod tests {
             shared_nodes: None,
             guard_hidden: false,
             allow_simulated_upgrades: false,
+            hand_belief: None,
             planning_sample: None,
             future_planning: None,
             forecast_changes: 0,

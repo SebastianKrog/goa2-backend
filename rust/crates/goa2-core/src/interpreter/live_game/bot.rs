@@ -262,6 +262,7 @@ impl LiveGame {
                     &bots,
                     incumbent,
                     &mut ranking,
+                    false,
                     limits,
                     horizon,
                     budget,

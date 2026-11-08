@@ -180,6 +180,84 @@ impl NativeSession {
             .collect()
     }
 
+    pub(in crate::interpreter) fn pending_hidden_hand_reader(
+        &self,
+        viewer: Symbol,
+        known: &[Symbol],
+    ) -> Result<Option<Symbol>> {
+        if self.last_request.is_some() {
+            return Ok(None);
+        }
+        match (&self.objects, self.stack.last()) {
+            (Some(objects), Some(frame)) => {
+                self.hidden_hand_reader(objects, frame.instruction, frame.object, viewer, known)
+            }
+            _ => Ok(None),
+        }
+    }
+
+    pub(super) fn hidden_hand_reader(
+        &self,
+        objects: &BoundObjects,
+        instruction: usize,
+        step: Option<ObjectId>,
+        viewer: Symbol,
+        known: &[Symbol],
+    ) -> Result<Option<Symbol>> {
+        let Some(step) = step else { return Ok(None) };
+        let instruction = &self.steps[instruction].instruction;
+        let key_field = match instruction {
+            Instruction::LiveReaction => Field::TargetPlayerKey,
+            Instruction::LiveForceDiscard | Instruction::LiveColorDiscard
+            | Instruction::LiveDiscardOrDefeat => Field::VictimKey,
+            _ => return Ok(None),
+        };
+        if objects.arena.field(step, objects.pending)
+            .is_some_and(|input| objects.arena.truthy(&input))
+        {
+            return Ok(None);
+        }
+        let direct = if matches!(instruction, Instruction::LiveForceDiscard) {
+            self.truthy_symbol_bound(objects, objects.arena.field(step, objects.phases.k(Field::Victim)))?
+        } else {
+            None
+        };
+        let target = if direct.is_some() {
+            direct
+        } else if let Some(key) = self.truthy_symbol_bound(
+            objects, objects.arena.field(step, objects.phases.k(key_field)),
+        )? {
+            self.truthy_symbol_bound(objects, objects.arena.context_value(key))?
+        } else {
+            None
+        };
+        let viewer_team = self.world.hero(viewer).map(|row| row.team);
+        Ok(target.and_then(|id| self.world.hero(id))
+            .filter(|hero| hero.id != viewer
+                && !(Some(hero.team) == viewer_team && known.contains(&hero.id)))
+            .map(|hero| hero.id))
+    }
+
+    pub(in crate::interpreter) fn with_hidden_hand_hypothesis<T>(
+        &mut self,
+        hero: Symbol,
+        hand: &super::super::SampledHand,
+        operation: impl FnOnce(&mut Self) -> Result<T>,
+    ) -> Result<T> {
+        self.with_rollback(|worker| {
+            let row = worker.world.hero(hero).ok_or_else(|| unsupported("hidden hand owner missing"))?;
+            let protected = [row.current, row.extra];
+            worker.with_live_objects(|session, objects| {
+                session.replace_sampled_hand(objects, hero, hand, protected)?;
+                session.sync_card_collections_bound(objects)?;
+                session.world.refresh_card_auras();
+                objects.readonly.take();
+                Ok(())
+            })?;
+            operation(worker)
+        })
+    }
+
     pub(super) fn search_step_reads_concealed_state(
         &self,
         objects: &BoundObjects,
@@ -2327,6 +2405,32 @@ mod tests {
         assert_eq!(limited.score, None);
         assert_eq!(limited.stop, crate::interpreter::ResolutionStop::NodeLimit);
         assert_eq!(root.semantic_state().unwrap(), before);
+    }
+
+    #[test]
+    fn probabilistic_search_pauses_before_hidden_defense_and_discard() {
+        for (name, discard) in [
+            ("object-execution-live-reaction-Takahide-prompt-invalid-pass", false),
+            ("object-execution-forced-discard-plain", true),
+        ] {
+            let fixture = fixture_case(name);
+            let mut root = NativeSession::compile(
+                serde_json::from_value(fixture["envelope"].clone()).unwrap()
+            ).unwrap();
+            let budget = ExecutionBudget::default();
+            let mut ordinary = root.clone();
+            ordinary.advance_to_decision(&budget).unwrap();
+            let request = ordinary.last_request.as_ref().unwrap();
+            assert_eq!(request.discard, discard);
+            let owner = request.owner;
+            let team = root.world.hero(owner).unwrap().team;
+            let viewer = root.world.heroes.iter().find(|hero| hero.team != team).unwrap().id;
+            root.advance_search_objects_before_hand(&budget, viewer, &[viewer]).unwrap();
+            assert!(root.last_request.is_none());
+            assert_eq!(root.pending_hidden_hand_reader(viewer, &[viewer]).unwrap(), Some(owner));
+            root.advance_search_objects(&budget, viewer).unwrap();
+            assert_eq!(root.last_request.as_ref(), Some(request));
+        }
     }
 
     #[test]

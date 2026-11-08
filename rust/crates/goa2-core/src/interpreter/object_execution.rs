@@ -1657,7 +1657,7 @@ impl NativeSession {
         include_request: bool,
     ) -> Result<AdvanceResult> {
         let mut result = self.with_live_objects(|session, objects| {
-            session.run_objects(objects, budget, stop_after, None)
+            session.run_objects(objects, budget, stop_after, None, None)
         })?;
         if include_request {
             result.request = self.last_request.clone();
@@ -1765,7 +1765,18 @@ impl NativeSession {
         viewer: Symbol,
     ) -> Result<AdvanceResult> {
         self.with_live_objects(|session, objects| {
-            session.run_objects(objects, budget, None, Some(viewer))
+            session.run_objects(objects, budget, None, Some(viewer), None)
+        })
+    }
+
+    pub(super) fn advance_search_objects_before_hand(
+        &mut self,
+        budget: &ExecutionBudget<'_>,
+        viewer: Symbol,
+        known: &[Symbol],
+    ) -> Result<AdvanceResult> {
+        self.with_live_objects(|session, objects| {
+            session.run_objects(objects, budget, None, Some(viewer), Some(known))
         })
     }
 
@@ -1775,6 +1786,7 @@ impl NativeSession {
         budget: &ExecutionBudget<'_>,
         stop_after: Option<usize>,
         search_viewer: Option<Symbol>,
+        hand_scope: Option<&[Symbol]>,
     ) -> Result<AdvanceResult> {
         let mut result = AdvanceResult::default();
         if self.planning.phase == Phase::GameOver {
@@ -1842,6 +1854,12 @@ impl NativeSession {
                             .context_value(key)
                             .is_some_and(|value| !matches!(value, ObjectValue::Atom(Datum::Null)))
                     });
+            if !skipped
+                && let Some((viewer, known)) = search_viewer.zip(hand_scope)
+                && self.hidden_hand_reader(objects, top_instruction, top_object, viewer, known)?.is_some()
+            {
+                return Ok(result);
+            }
             if let Some(viewer) = search_viewer
                 && !skipped
                 && self.search_step_reads_concealed_state(

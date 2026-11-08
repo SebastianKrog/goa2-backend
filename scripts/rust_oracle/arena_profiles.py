@@ -51,8 +51,21 @@ def generate_profile(template, output):
     if any(type(seed) is not int or not 0 <= seed < 2**64 for seed in seeds):
         raise ValueError("recipe seeds must be unsigned 64-bit integers")
     heroes = sorted(HeroRegistry.list_heroes())
-    screen_starts = (generated_starts("screen", seeds[0], screen, heroes,
-                                      map_offset=seeds[0] % len(MAPS))
+    fixed_screen = template.get("screen_cases", [])
+    if (not isinstance(fixed_screen, list) or len(fixed_screen) > screen
+            or (fixed_screen and not triage)):
+        raise ValueError("fixed screen cases require available Arena v2 screening slots")
+    for row in fixed_screen:
+        if (not isinstance(row, dict) or row.keys() != {"map_id", "seed", "red", "blue"}
+                or row["map_id"] not in MAPS or type(row["seed"]) is not int
+                or not 0 <= row["seed"] < 2**64
+                or any(not isinstance(row[side], list) or len(row[side]) != 2
+                       or any(name not in heroes for name in row[side]) for side in ("red", "blue"))
+                or len(set(row["red"] + row["blue"])) != 4):
+            raise ValueError("invalid fixed LONG 2v2 screening case")
+    screen_starts = ([(row["map_id"], row["seed"], row["red"], row["blue"]) for row in fixed_screen]
+                     + list(generated_starts("screen", seeds[0], screen - len(fixed_screen),
+                                             heroes, map_offset=seeds[0] % len(MAPS)))
                      if triage else STRENGTH_SCREEN_STARTS[:screen])
     cases = [
         *PREFLIGHT[:preflight], *screen_starts,

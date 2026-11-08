@@ -1,0 +1,13 @@
+{
+  "planning": {
+    "evaluation": "lane_pressure_v3_accumulated_gold"
+  },
+  "resolution": {
+    "evaluation": "lane_pressure_v3_accumulated_gold"
+  },
+  "stall": {
+    "turns": 6,
+    "progress": "lane",
+    "evaluation": "stall_lane_presence"
+  }
+}

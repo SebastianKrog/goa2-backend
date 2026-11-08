@@ -24,7 +24,15 @@ COMMON = {
                          "lane_pressure_v3_accumulated_gold", "wave_breakthrough"),
 }
 
+STALL_EVALUATIONS = (
+    "stall_lane_advance", "stall_wave_clear", "stall_minion_approach", "stall_hero_threat",
+    "stall_crossfire", "stall_next_wave", "stall_lane_presence", "stall_life_pressure",
+    "stall_attack_ready", "stall_gold_discount",
+)
+
 FIELDS = {
+    "stall": {"turns": integer(4, 6), "progress": choice("combat", "lane"),
+              "evaluation": choice(*STALL_EVALUATIONS)},
     "planning": dict(
         COMMON, cap=integer(1, 32), reply_cap=integer(1, 32), reply_probe_cap=integer(1, 32),
         forecast_node_share=choice("zero", "eighth", "quarter"), greedy_card_order=boolean,
@@ -39,7 +47,7 @@ FIELDS = {
 
 def validate_policy(policy):
     if not isinstance(policy, dict) or policy.keys() - FIELDS.keys():
-        raise ValueError("arena policy accepts only planning and resolution settings")
+        raise ValueError("arena policy accepts only planning, resolution and stall settings")
     normalized = {}
     for phase, fields in policy.items():
         validators = FIELDS[phase]
@@ -48,6 +56,8 @@ def validate_policy(policy):
         for key, value in fields.items():
             if not validators[key](value):
                 raise ValueError(f"invalid arena {phase} policy setting {key}")
+        if phase == "stall" and fields.keys() != validators.keys():
+            raise ValueError("stall policy requires turns, progress and evaluation")
         if fields.get("fixed_future_planning") and fields.get("branch_future_planning"):
             raise ValueError("choose at most one future planning mode")
         if fields:

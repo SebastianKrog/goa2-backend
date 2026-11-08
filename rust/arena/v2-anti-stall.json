@@ -1,0 +1,43 @@
+{
+  "schema_version": 2,
+  "name": "selective-four-turn-anti-stall",
+  "parameters": {
+    "turns": 64,
+    "planning_nodes": 20672,
+    "resolution_nodes": 15680,
+    "coordinated": true
+  },
+  "acceptance": {
+    "screening": "triage_v2",
+    "preflight_pairs": 1,
+    "screen_pairs": 3,
+    "extend_batches": [
+      3
+    ],
+    "confirm_pairs": 30,
+    "advance_at": 0.16666666666666666,
+    "stop_below": 0,
+    "max_unfinished_rate": 0.25,
+    "max_fallback_rate": 0.01,
+    "track": "stronger",
+    "effect": 0,
+    "alpha": 0.05,
+    "method": "betting_paired_v1"
+  },
+  "tuning_seed": 3534830054,
+  "holdout_seed": 1308722124,
+  "screen_cases": [
+    {
+      "map_id": "forgotten_island",
+      "seed": 7756608106287379788,
+      "red": [
+        "Brynn",
+        "Bain"
+      ],
+      "blue": [
+        "NebKher",
+        "Snorri"
+      ]
+    }
+  ]
+}

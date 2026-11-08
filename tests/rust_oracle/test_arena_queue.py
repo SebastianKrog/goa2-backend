@@ -241,6 +241,20 @@ def test_enqueue_retains_commits_and_normalizes_start_paths(tmp_path):
     assert manifest["profile"]["starts"][0]["start_sha256"] == digest({"state": {}})
     assert git("rev-parse", f"refs/goa2-arena/pinned/{first}") == first
 
+    with closing(arena_queue.open_queue(store)) as db:
+        with pytest.raises(ValueError, match="accepted standard changed"):
+            arena_queue.set_standard(db, repo, "HEAD", "HEAD", None, "Use combined control")
+        new_standard = arena_queue.set_standard(
+            db, repo, "HEAD", first, baseline_policy, "Use combined control",
+        )
+        assert new_standard["commit"] == git("rev-parse", "HEAD")
+        assert new_standard["policy"] == {"planning": {"forecast_node_share": "eighth"}}
+        previous, updated, reason = db.execute("SELECT previous, next, reason FROM standard_changes").fetchone()
+        assert json.loads(previous)["commit"] == first
+        assert json.loads(updated) == new_standard
+        assert reason == "Use combined control"
+        assert arena_queue.describe_jobs(db, store, identity)[0]["manifest"] == manifest
+
 
 def stage_profile(store, *, track="stronger", confirm=12, advance_at=0.25, method=None, triage=False):
     starts = [{"start_sha256": save_start(store, {"state": {"fixture": index}}), "seed": index}

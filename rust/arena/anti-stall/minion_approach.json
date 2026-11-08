@@ -1,0 +1,13 @@
+{
+  "planning": {
+    "evaluation": "lane_pressure_v3_accumulated_gold"
+  },
+  "resolution": {
+    "evaluation": "lane_pressure_v3_accumulated_gold"
+  },
+  "stall": {
+    "turns": 4,
+    "progress": "combat",
+    "evaluation": "stall_minion_approach"
+  }
+}

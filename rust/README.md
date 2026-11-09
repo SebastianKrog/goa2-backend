@@ -64,6 +64,14 @@ at `awaiting_confirmation`. After reviewing the batch, select up to two
 with `arena_queue confirm JOB [JOB]`. Only those jobs run the held-out games.
 Start the queue worker again after review if it has already drained.
 
+### Live bot scoring
+
+Live Rust bots use accumulated-gold scoring in planning and resolution.
+After four full turns without a battle-zone shift or wave-counter change,
+they add the Lane Advance bonus until lane progress resumes. The quiet-turn
+clock is saved in live checkpoints and restored with rewinds. An older
+checkpoint starts a fresh clock at its saved turn.
+
 ### Native game setup
 
 Build the static setup pack once with the pinned oracle environment. Rust

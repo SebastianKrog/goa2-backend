@@ -504,6 +504,7 @@ impl LiveGame {
                 .ok_or_else(|| invalid("game revision exhausted"))?,
             upgrade_history: self.upgrade_history.clone(),
             rollback: self.rollback.clone(),
+            lane_progress: self.lane_progress.clone(),
             clock: self.clock.clone(),
         };
         let clock = &mut next.clock.as_mut().unwrap().clock;
@@ -822,6 +823,7 @@ impl LiveGame {
                 .ok_or_else(|| invalid("game revision exhausted"))?,
             upgrade_history: self.upgrade_history.clone(),
             rollback: self.rollback.clone(),
+            lane_progress: self.lane_progress.clone(),
             clock: self.clock.clone(),
         };
         let clock = &mut next.clock.as_mut().unwrap().clock;

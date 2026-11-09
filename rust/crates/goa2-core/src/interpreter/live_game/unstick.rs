@@ -33,6 +33,7 @@ impl LiveGame {
                 .ok_or_else(|| invalid("game revision exhausted"))?,
             upgrade_history: self.upgrade_history.clone(),
             rollback: None,
+            lane_progress: self.lane_progress.clone(),
             clock: self.clock.clone(),
         };
         next.begin_table_edit_clock(now);

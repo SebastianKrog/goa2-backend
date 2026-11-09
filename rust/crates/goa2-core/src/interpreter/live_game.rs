@@ -15,6 +15,7 @@ use std::sync::Arc;
 
 mod bot;
 mod clock;
+mod lane_progress;
 mod patch;
 mod rollback;
 mod seed;
@@ -90,6 +91,15 @@ pub struct GameCheckpoint {
     upgrade_history: Option<PublicUpgradeHistory>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     rollback: Option<StateEnvelope>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    lane_progress: Option<lane_progress::LaneProgressCheckpoint>,
+}
+
+impl GameCheckpoint {
+    /// Reproduce the checkpoint wire format used by journals before lane progress was tracked.
+    pub fn omit_lane_progress(&mut self) {
+        self.lane_progress = None;
+    }
 }
 
 #[derive(Debug, PartialEq, Serialize)]
@@ -120,7 +130,8 @@ pub struct LiveGame {
     session: NativeSession,
     revision: u64,
     upgrade_history: PublicUpgradeHistory,
-    rollback: Option<Arc<NativeSession>>,
+    rollback: Option<Arc<rollback::ActionAnchor>>,
+    lane_progress: lane_progress::LaneProgress,
     clock: Option<clock::TimeControl>,
 }
 
@@ -139,8 +150,8 @@ impl LiveGame {
         rollback: Option<StateEnvelope>,
         budget: &ExecutionBudget<'_>,
     ) -> Result<(Self, GameTransition)> {
-        let (mut game, transition) = Self::open(envelope, 0, None, budget)?;
-        game.restore_rollback(rollback, budget)?;
+        let (mut game, transition) = Self::open(envelope, 0, None, None, budget)?;
+        game.restore_rollback(rollback, None, budget)?;
         Ok((game, transition))
     }
 
@@ -152,12 +163,17 @@ impl LiveGame {
             checkpoint.envelope,
             checkpoint.revision,
             checkpoint.upgrade_history,
+            checkpoint.lane_progress.as_ref().map(|lane| lane.quiet_since),
             budget,
         )?;
         if !transition.events.is_empty() {
             return Err(invalid("live game checkpoint is between decisions"));
         }
-        game.restore_rollback(checkpoint.rollback, budget)?;
+        game.restore_rollback(
+            checkpoint.rollback,
+            checkpoint.lane_progress.and_then(|lane| lane.rollback_quiet_since),
+            budget,
+        )?;
         Ok(game)
     }
 
@@ -165,6 +181,7 @@ impl LiveGame {
         mut envelope: StateEnvelope,
         revision: u64,
         upgrade_history: Option<PublicUpgradeHistory>,
+        lane_quiet_since: Option<i128>,
         budget: &ExecutionBudget<'_>,
     ) -> Result<(Self, GameTransition)> {
         let clock = clock::TimeControl::take_from(&mut envelope)?;
@@ -174,11 +191,13 @@ impl LiveGame {
             Some(history) => history,
             None => PublicUpgradeHistory::new(&session)?,
         };
+        let lane_progress = lane_progress::LaneProgress::new(&session, lane_quiet_since)?;
         let mut game = Self {
             session,
             revision,
             upgrade_history,
             rollback: None,
+            lane_progress,
             clock,
         };
         game.validate_clock_roster()?;
@@ -204,9 +223,24 @@ impl LiveGame {
             rollback: self
                 .rollback
                 .as_deref()
-                .map(NativeSession::export_envelope)
+                .map(|anchor| anchor.session.export_envelope())
                 .transpose()?,
+            lane_progress: Some(lane_progress::LaneProgressCheckpoint {
+                quiet_since: self.lane_progress.quiet_since,
+                rollback_quiet_since: self.rollback.as_ref()
+                    .map(|anchor| anchor.lane_progress.quiet_since),
+            }),
         })
+    }
+
+    /// Match the clock initialization when a legacy checkpoint is opened.
+    pub fn reset_legacy_lane_progress(&mut self) -> Result<()> {
+        self.lane_progress = lane_progress::LaneProgress::new(&self.session, None)?;
+        if let Some(anchor) = &mut self.rollback {
+            let anchor = Arc::make_mut(anchor);
+            anchor.lane_progress = lane_progress::LaneProgress::new(&anchor.session, None)?;
+        }
+        Ok(())
     }
 
     pub fn position(&self) -> GamePosition {
@@ -370,6 +404,7 @@ impl LiveGame {
             revision,
             upgrade_history: self.upgrade_history.clone(),
             rollback: self.rollback.clone(),
+            lane_progress: self.lane_progress.clone(),
             clock: self.clock.clone(),
         };
         let ready = match &command {
@@ -560,6 +595,7 @@ impl LiveGame {
             Phase::LevelUp => self.upgrade_history.begin_batch(&self.session)?,
             _ => {}
         }
+        self.lane_progress.observe(&self.session);
         Ok(GameTransition {
             position: self.position(),
             events,

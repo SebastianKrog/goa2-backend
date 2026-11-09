@@ -328,17 +328,21 @@ impl Archive {
             if let Some(rebase_ms) = rebase_ms {
                 next.rebase_clock_after_processing(rebase_ms);
             }
-            let checkpoint = next
+            let mut checkpoint = next
                 .checkpoint()
                 .map_err(|error| invalid_at(entry.revision, &error))?;
-            let bytes = serde_json::to_vec(&checkpoint).map_err(ApiError::internal)?;
-            if next.position().revision != entry.revision
-                || sha256(&bytes) != entry.checkpoint_sha256
-            {
-                return Err(invalid_at(
-                    entry.revision,
-                    &"reconstructed checkpoint differs",
-                ));
+            let mut bytes = serde_json::to_vec(&checkpoint).map_err(ApiError::internal)?;
+            if sha256(&bytes) != entry.checkpoint_sha256 {
+                checkpoint.omit_lane_progress();
+                bytes = serde_json::to_vec(&checkpoint).map_err(ApiError::internal)?;
+                if sha256(&bytes) != entry.checkpoint_sha256 {
+                    return Err(invalid_at(entry.revision, &"reconstructed checkpoint differs"));
+                }
+                next.reset_legacy_lane_progress()
+                    .map_err(|error| invalid_at(entry.revision, &error))?;
+            }
+            if next.position().revision != entry.revision {
+                return Err(invalid_at(entry.revision, &"reconstructed checkpoint differs"));
             }
             if last_rewind_use.contains_key(&entry.revision) {
                 rewind_checkpoints.insert(entry.revision, bytes);
@@ -347,5 +351,78 @@ impl Archive {
         }
         let _ = visit(&engine, None)?;
         Ok((engine, self.hero_names))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use goa2_core::interpreter::live_game::{GameContent, GameMode, GameSetup};
+    use std::{env, fs::File, io::BufReader};
+
+    #[test]
+    #[ignore = "requires GOA2_GAME_CONTENT from live_game_content.py"]
+    fn replay_accepts_legacy_entries_followed_by_live_lane_progress() {
+        let content = GameContent::read(BufReader::new(
+            File::open(env::var("GOA2_GAME_CONTENT").unwrap()).unwrap(),
+        ))
+        .unwrap();
+        let budget = ExecutionBudget::default();
+        let (game, _) = LiveGame::create(
+            &content,
+            &GameSetup {
+                map: "forgotten_island".into(),
+                red_heroes: vec!["Arien".into()],
+                blue_heroes: vec!["Brogan".into()],
+                seed: 29,
+                mode: GameMode::Long,
+                cheats_enabled: false,
+                tie_breaker: None,
+            },
+            &budget,
+        )
+        .unwrap();
+        let mut start = game.checkpoint().unwrap();
+        start.omit_lane_progress();
+        let start = serde_json::to_vec(&start).unwrap();
+        let wave = PatchCommand::SetWaveCounter {
+            lane_id: "lane_1".into(),
+            value: 2,
+        };
+        let (after_wave, _) = game.prepare_patch(&wave, 0, &budget).unwrap();
+        let mut old_checkpoint = after_wave.checkpoint().unwrap();
+        old_checkpoint.omit_lane_progress();
+        let old_hash = sha256(&serde_json::to_vec(&old_checkpoint).unwrap());
+
+        let resumed = LiveGame::restore(old_checkpoint, &budget).unwrap();
+        let gold = PatchCommand::SetGold {
+            hero_id: "hero_arien".into(),
+            value: 1,
+        };
+        let (after_gold, _) = resumed.prepare_patch(&gold, 0, &budget).unwrap();
+        let current_checkpoint = serde_json::to_vec(&after_gold.checkpoint().unwrap()).unwrap();
+        let patch = |revision, checkpoint_sha256, command| Entry {
+            revision,
+            checkpoint_sha256,
+            decision: Decision {
+                at_ms: 0,
+                rebase_ms: None,
+                operation: Operation::Patch {
+                    proposer: "hero_arien".into(),
+                    command,
+                },
+            },
+        };
+        let archive = Archive::new(
+            0,
+            2,
+            &start,
+            vec![patch(1, old_hash, wave), patch(2, sha256(&current_checkpoint), gold)],
+            BTreeMap::new(),
+            BTreeSet::new(),
+        )
+        .unwrap();
+        let (replayed, _) = archive.restore(None).unwrap();
+        assert_eq!(serde_json::to_vec(&replayed.checkpoint().unwrap()).unwrap(), current_checkpoint);
     }
 }

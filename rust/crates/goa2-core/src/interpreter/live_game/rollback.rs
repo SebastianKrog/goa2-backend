@@ -7,6 +7,12 @@ use crate::{
 };
 use std::sync::Arc;
 
+#[derive(Clone)]
+pub(super) struct ActionAnchor {
+    pub(super) session: NativeSession,
+    pub(super) lane_progress: super::lane_progress::LaneProgress,
+}
+
 const FROZEN: &str = "rollback_frozen";
 const REANCHOR: &str = "rollback_reanchor_pending";
 
@@ -14,12 +20,13 @@ impl LiveGame {
     pub(super) fn restore_rollback(
         &mut self,
         envelope: Option<StateEnvelope>,
+        lane_quiet_since: Option<i128>,
         budget: &ExecutionBudget<'_>,
     ) -> Result<()> {
         let Some(envelope) = envelope else {
             return Ok(());
         };
-        let (anchor, _) = Self::open(envelope, 0, None, budget)?;
+        let (anchor, _) = Self::open(envelope, 0, None, lane_quiet_since, budget)?;
         if !anchor.session.owner_prompt()
             || anchor.session.confirmation_prompt()
             || anchor.session.rollback_flag(FROZEN)
@@ -27,7 +34,10 @@ impl LiveGame {
         {
             return Err(invalid("Invalid rollback anchor"));
         }
-        self.rollback = Some(Arc::new(anchor.session));
+        self.rollback = Some(Arc::new(ActionAnchor {
+            session: anchor.session,
+            lane_progress: anchor.lane_progress,
+        }));
         if !self.can_rollback() {
             return Err(invalid(
                 "Rollback anchor belongs to another decision segment",
@@ -45,9 +55,9 @@ impl LiveGame {
 
     fn anchor_matches_turn(&self) -> bool {
         self.rollback.as_ref().is_some_and(|anchor| {
-            self.session.resolution_owner() == anchor.resolution_owner()
-                && self.session.round.round == anchor.round.round
-                && self.session.world.combat.turn == anchor.world.combat.turn
+            self.session.resolution_owner() == anchor.session.resolution_owner()
+                && self.session.round.round == anchor.session.round.round
+                && self.session.world.combat.turn == anchor.session.world.combat.turn
         })
     }
 
@@ -68,7 +78,10 @@ impl LiveGame {
         }
         if self.rollback.is_none() && !self.session.confirmation_prompt() {
             self.session.set_reanchor(false)?;
-            self.rollback = Some(Arc::new(self.session.clone()));
+            self.rollback = Some(Arc::new(ActionAnchor {
+                session: self.session.clone(),
+                lane_progress: self.lane_progress.clone(),
+            }));
         }
         Ok(())
     }
@@ -120,7 +133,8 @@ impl LiveGame {
             .rollback
             .as_ref()
             .ok_or_else(|| invalid("No rollback anchor"))?;
-        let mut restored = (**anchor).clone();
+        let mut restored = anchor.session.clone();
+        let lane_progress = anchor.lane_progress.clone();
         let anchor_request = restored
             .last_request
             .as_ref()
@@ -131,6 +145,7 @@ impl LiveGame {
         restored.refresh_pending_request()?;
         let next_id = restored.request_token(restored.last_request.as_ref().unwrap().id);
         self.preserve_response_credit(&previous_id, next_id);
+        self.lane_progress = lane_progress;
         self.session = restored;
         Ok(())
     }

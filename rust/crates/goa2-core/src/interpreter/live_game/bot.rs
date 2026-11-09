@@ -55,6 +55,20 @@ impl LiveGame {
         Ok(false)
     }
 
+    fn bot_limits(&self, max_depth: u8, max_nodes: usize) -> SearchLimits {
+        let evaluation = if self.lane_progress.needs_lane_advance() {
+            SearchEvaluation::StallLaneAdvance
+        } else {
+            SearchEvaluation::LanePressureV3AccumulatedGold
+        };
+        SearchLimits {
+            max_depth,
+            max_nodes,
+            opponent_policy: OpponentPolicy::Adversarial,
+            evaluation,
+        }
+    }
+
     fn bot_seed(&self) -> u64 {
         let position = self.position();
         self.session.source.state["rng_seed"]
@@ -123,7 +137,7 @@ impl LiveGame {
             selected = search(
                 REFERENCE_HORIZON,
                 4,
-                limits(2, 262_144),
+                self.bot_limits(2, 262_144),
                 &reference_budget(budget),
                 None,
             )?
@@ -135,7 +149,7 @@ impl LiveGame {
                 && let Some(deeper) = search(
                     LIVE_HORIZON,
                     8,
-                    limits(3, 1_048_576),
+                    self.bot_limits(3, 1_048_576),
                     budget,
                     selected.as_ref().map(|plan| plan.commitments.as_slice()),
                 )?
@@ -274,19 +288,19 @@ impl LiveGame {
             let mut best = if phase == Phase::Resolution {
                 search(
                     REFERENCE_HORIZON,
-                    limits(2, 32_768),
+                    self.bot_limits(2, 32_768),
                     None,
                     &reference_budget(budget),
                 )?
             } else {
-                search(1, limits(2, 8_192), None, budget)?
+                search(1, self.bot_limits(2, 8_192), None, budget)?
             };
             if phase == Phase::Resolution
                 && can_refine(budget)
                 && best.as_ref().is_none_or(|search| search.score != Some(WIN))
                 && let Some(deeper) = search(
                     LIVE_HORIZON,
-                    limits(5, 262_144),
+                    self.bot_limits(5, 262_144),
                     best.as_ref().map(|row| &row.decision),
                     budget,
                 )?
@@ -379,15 +393,6 @@ pub(super) fn command_for(session: &NativeSession, choice: DecisionMove) -> Resu
     })
 }
 
-fn limits(max_depth: u8, max_nodes: usize) -> SearchLimits {
-    SearchLimits {
-        max_depth,
-        max_nodes,
-        opponent_policy: OpponentPolicy::Adversarial,
-        evaluation: SearchEvaluation::LanePressureV3,
-    }
-}
-
 fn optional_search<T>(result: Result<T>) -> Result<Option<T>> {
     match result {
         Ok(value) => Ok(Some(value)),
@@ -415,4 +420,63 @@ fn input_is_legal(worker: &mut NativeSession, player: Symbol, choice: &DecisionM
         && worker
             .validate_sequence_input(player, Some(*token), selection)
             .is_ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::interpreter::object_execution::fixture_case;
+
+    fn live_planning_game() -> LiveGame {
+        let fixture = fixture_case("object-execution-card-planning-cycle");
+        let envelope = serde_json::from_value(fixture["envelope"].clone()).unwrap();
+        LiveGame::import(envelope, &ExecutionBudget::default())
+            .unwrap()
+            .0
+    }
+
+    #[test]
+    fn lane_advance_activates_after_four_completed_quiet_turns_and_resets_on_progress() {
+        let mut game = live_planning_game();
+        for quiet_turns in 0..=4 {
+            assert_eq!(
+                matches!(game.bot_limits(2, 1024).evaluation, SearchEvaluation::StallLaneAdvance),
+                quiet_turns == 4,
+            );
+            if quiet_turns < 4 {
+                if game.session.world.combat.turn == 4 {
+                    game.session.world.combat.turn = 1;
+                    game.session.round.round += 1;
+                } else {
+                    game.session.world.combat.turn += 1;
+                }
+                game.lane_progress.observe(&game.session);
+            }
+        }
+
+        // A same-turn wave change resets the clock without counting that turn as quiet.
+        game.session.world.waves[0].1 -= 1;
+        game.lane_progress.observe(&game.session);
+        assert_eq!(game.lane_progress.quiet_since, game.session.search_turn_index() + 1);
+        assert!(matches!(
+            game.bot_limits(2, 1024).evaluation,
+            SearchEvaluation::LanePressureV3AccumulatedGold,
+        ));
+    }
+
+    #[test]
+    fn lane_advance_clock_restores_and_legacy_checkpoints_start_a_fresh_clock() {
+        let game = live_planning_game();
+        let budget = ExecutionBudget::default();
+        let mut checkpoint = game.checkpoint().unwrap();
+        checkpoint.lane_progress.as_mut().unwrap().quiet_since = game.session.search_turn_index() - 4;
+        let bytes = serde_json::to_vec(&checkpoint).unwrap();
+        let restored = LiveGame::restore(serde_json::from_slice(&bytes).unwrap(), &budget).unwrap();
+        assert!(restored.lane_progress.needs_lane_advance());
+
+        checkpoint.omit_lane_progress();
+        let bytes = serde_json::to_vec(&checkpoint).unwrap();
+        let restored = LiveGame::restore(serde_json::from_slice(&bytes).unwrap(), &budget).unwrap();
+        assert!(!restored.lane_progress.needs_lane_advance());
+    }
 }

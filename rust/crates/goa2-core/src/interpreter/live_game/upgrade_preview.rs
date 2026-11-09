@@ -43,6 +43,7 @@ impl LiveGame {
             revision: self.revision,
             upgrade_history: self.upgrade_history.clone(),
             rollback: None,
+            lane_progress: self.lane_progress.clone(),
             clock: self.clock.clone(),
         };
         for card in cards {

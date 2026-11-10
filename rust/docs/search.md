@@ -33,3 +33,9 @@ session/search/arena imports use the explicitly experimental facade described in
 [API boundaries](audits/api-boundaries.md); this does not stabilize arena slots or
 private fingerprints. The [worker examples](worker-protocol-examples.json) are
 schema contracts, distinct from admitted gameplay/throughput inputs.
+
+The [maintenance baseline](audits/performance-baseline.md) records pinned release
+artifacts, two content identities, hardware, fixed work and raw measurements for
+startup, memory, clone/restore, preparation, throughput and cooperative response.
+Deadline-limited response and fixed-work comparisons remain separate; no strength
+claim or full refactor baseline is inferred from the opening-position benchmark.

@@ -24,6 +24,16 @@
           "kind": "qualified-use"
         },
         {
+          "consumer": "rust/crates/goa2-core/examples/maintenance_bench.rs",
+          "line": 2,
+          "kind": "use-tree"
+        },
+        {
+          "consumer": "rust/crates/goa2-core/examples/maintenance_bench.rs",
+          "line": 151,
+          "kind": "qualified-use"
+        },
+        {
           "consumer": "rust/crates/goa2-core/tests/contracts.rs",
           "line": 2,
           "kind": "use-tree"
@@ -135,12 +145,12 @@
         },
         {
           "consumer": "rust/crates/goa2-game-server/src/store.rs",
-          "line": 10,
+          "line": 12,
           "kind": "use-tree"
         },
         {
           "consumer": "rust/crates/goa2-game-server/src/store.rs",
-          "line": 10,
+          "line": 12,
           "kind": "qualified-use"
         },
         {
@@ -828,6 +838,11 @@
       ],
       "consumers": [
         {
+          "consumer": "rust/crates/goa2-core/examples/maintenance_bench.rs",
+          "line": 2,
+          "kind": "use-tree"
+        },
+        {
           "consumer": "rust/crates/goa2-core/src/diagnostics.rs",
           "line": 2,
           "kind": "use-tree"
@@ -1494,6 +1509,11 @@
       ],
       "reexports": [],
       "consumers": [
+        {
+          "consumer": "rust/crates/goa2-core/examples/maintenance_bench.rs",
+          "line": 74,
+          "kind": "qualified-use"
+        },
         {
           "consumer": "rust/crates/goa2-core/src/actions.rs",
           "line": 3,
@@ -4286,7 +4306,7 @@
         },
         {
           "consumer": "rust/crates/goa2-game-server/src/store.rs",
-          "line": 3,
+          "line": 5,
           "kind": "use-tree"
         }
       ],
@@ -7528,6 +7548,16 @@
       "decision": "Retain dense and object-aware implementations; selection is determined by admitted state/bindings, not a caller filename. Full unique regression migration required before retirement."
     },
     {
+      "consumer": "rust/crates/goa2-core/examples/maintenance_bench.rs",
+      "entrypoints_or_representation_terms": [
+        "LiveGame::create",
+        "LiveGame::restore",
+        "NativeSession::compile",
+        "prepare_submission"
+      ],
+      "decision": "Retain dense and object-aware implementations; selection is determined by admitted state/bindings, not a caller filename. Full unique regression migration required before retirement."
+    },
+    {
       "consumer": "rust/crates/goa2-core/src/api.rs",
       "entrypoints_or_representation_terms": [
         "LiveGame::create",
@@ -8449,6 +8479,62 @@
     }
   ],
   "panic_assumptions": [
+    {
+      "source": "rust/crates/goa2-core/examples/maintenance_bench.rs",
+      "line": 55,
+      "expression": ".unwrap(",
+      "category": "validated-native-invariant-review",
+      "context": "let catalog_warm = measure(|| NativeSession::prepare_search().unwrap(), 100);"
+    },
+    {
+      "source": "rust/crates/goa2-core/examples/maintenance_bench.rs",
+      "line": 88,
+      "expression": ".unwrap(",
+      "category": "validated-native-invariant-review",
+      "context": "LiveGame::restore(serde_json::from_slice(&checkpoint).unwrap(), &budget).unwrap(),"
+    },
+    {
+      "source": "rust/crates/goa2-core/examples/maintenance_bench.rs",
+      "line": 88,
+      "expression": ".unwrap(",
+      "category": "validated-native-invariant-review",
+      "context": "LiveGame::restore(serde_json::from_slice(&checkpoint).unwrap(), &budget).unwrap(),"
+    },
+    {
+      "source": "rust/crates/goa2-core/examples/maintenance_bench.rs",
+      "line": 104,
+      "expression": ".unwrap(",
+      "category": "validated-native-invariant-review",
+      "context": ".unwrap(),"
+    },
+    {
+      "source": "rust/crates/goa2-core/examples/maintenance_bench.rs",
+      "line": 111,
+      "expression": ".unwrap(",
+      "category": "validated-native-invariant-review",
+      "context": "black_box(LiveGame::create(&content, &setup, &budget).unwrap());"
+    },
+    {
+      "source": "rust/crates/goa2-core/examples/maintenance_bench.rs",
+      "line": 129,
+      "expression": "assert!",
+      "category": "validated-native-invariant-review",
+      "context": "assert!(decisions.windows(2).all(|pair| pair[0] == pair[1]));"
+    },
+    {
+      "source": "rust/crates/goa2-core/examples/maintenance_bench.rs",
+      "line": 147,
+      "expression": ".unwrap(",
+      "category": "validated-native-invariant-review",
+      "context": "let signalled = signal.join().unwrap();"
+    },
+    {
+      "source": "rust/crates/goa2-core/examples/maintenance_bench.rs",
+      "line": 169,
+      "expression": "assert_eq!",
+      "category": "validated-native-invariant-review",
+      "context": "assert_eq!(serde_json::to_vec(&root.checkpoint()?)?, before);"
+    },
     {
       "source": "rust/crates/goa2-core/src/actions.rs",
       "line": 486,
@@ -12077,6 +12163,7 @@
     "rust/crates/goa2-game-server/src/replay.rs": 23,
     "rust/crates/goa2-game-server/src/store.rs": 8,
     "rust/crates/goa2-game-server/src/store/migrations.rs": 40,
+    "rust/crates/goa2-game-server/src/store/unsigned.rs": 13,
     "rust/crates/goa2-search-cli/src/main.rs": 108,
     "rust/crates/goa2-search-cli/src/simulation_bench.rs": 27
   },

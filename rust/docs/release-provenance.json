@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "status": "internal verified candidate, not approved for distribution or promotion",
+  "source_commit": "ed1597be1de77d1adb409de9d3f79564af203ee2",
+  "branch": "bots-upstream",
+  "compiler": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+  "profile": "release",
+  "architecture": "x86_64-unknown-linux-gnu",
+  "package_sha256": "9b5196ef70858b6aea6a9cc8d38d6d394eb6ddf175601deea38fa47638b15d45",
+  "package_bytes": 5452002,
+  "package_manifest": {
+    "format_version": 1,
+    "service": {
+      "engine": "rust",
+      "server_version": "0.1.0",
+      "rules_version": 9,
+      "target_arch": "x86_64",
+      "target_os": "linux",
+      "binary_sha256": "ae044349fb917f4e109c5f3c9092bc34a50e437eae23b267346420d9ec245e99",
+      "content_sha256": "69ce2e47927eab8427fa8c2932f369044a30297716f1a4402a1ba6e1673c3ee2",
+      "content": {
+        "version": 1,
+        "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+        "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+        "map_count": 1,
+        "hero_count": 7
+      }
+    }
+  },
+  "all_embedded_checksums_verified": true,
+  "schemas": {
+    "state_envelope": 1,
+    "rules": 9,
+    "checkpoint": 1,
+    "resume": 1,
+    "private_replay": 1,
+    "database": 3
+  },
+  "verification": {
+    "native": 402,
+    "ignored": 64,
+    "tooling": 44,
+    "service_scenarios": 15,
+    "historical_rows": 4,
+    "actual_binary_backup_rollback": 1,
+    "cold_native": 402
+  },
+  "backup_policy": "Consistent SQLite backup API under the running binary, verify scoped links/receipts/replay/share metadata; retain matching approved secure binary, content and pre-upgrade backup. Stop service before replacement. Never open newer live database with an older unguarded binary.",
+  "release_blockers": [
+    "full admitted corpus and independent full-content acquisition",
+    "public source/content/fixture rights and final tree/history review",
+    "named owner/destination/security contacts",
+    "distribution authenticity and remote/final acceptance"
+  ],
+  "published": false,
+  "deployed": false
+}

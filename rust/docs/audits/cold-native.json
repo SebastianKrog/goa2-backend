@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "scope": "Native project dependency acquisition/build; full corpus/content distribution still requires its independent route.",
+  "source_files": 1130,
+  "initial_cargo_home_empty": true,
+  "initial_target_empty": true,
+  "original_git_history_in_snapshot": false,
+  "shared_project_caches_used": false,
+  "installed_compiler_reused": true,
+  "registry_archives": 96,
+  "registry_archive_bytes": 10422362,
+  "commands": [
+    {
+      "argv": [
+        "cargo",
+        "fetch",
+        "--locked",
+        "--target",
+        "x86_64-unknown-linux-gnu"
+      ],
+      "exit_code": 0,
+      "seconds": 9.019647293000162
+    },
+    {
+      "argv": [
+        "cargo",
+        "build",
+        "--locked",
+        "--workspace"
+      ],
+      "exit_code": 0,
+      "seconds": 155.07102993600165
+    },
+    {
+      "argv": [
+        "/workspace/.goa2-tools/venv/bin/python",
+        "tools/check.py",
+        "quality"
+      ],
+      "exit_code": 0,
+      "seconds": 105.38669290600046
+    },
+    {
+      "argv": [
+        "/workspace/.goa2-tools/venv/bin/python",
+        "tools/check.py",
+        "quick"
+      ],
+      "exit_code": 0,
+      "seconds": 389.4772830040001,
+      "native_tests": 402
+    },
+    {
+      "argv": [
+        "cargo",
+        "run",
+        "--locked",
+        "-p",
+        "goa2-core",
+        "--example",
+        "local_game"
+      ],
+      "exit_code": 0,
+      "seconds": 142.42698042700067
+    }
+  ]
+}

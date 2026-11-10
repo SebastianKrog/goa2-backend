@@ -1,0 +1,47 @@
+{
+  "producer_commit": "f0fb93e117f358266ef522e6d5f23d3452e83e97",
+  "matrix": [
+    {
+      "source_database_version": 0,
+      "consumer_database_version": 3,
+      "expected": 1,
+      "executed": 1,
+      "failed": 0,
+      "scope": "load/scopes/links/receipt/replay/share/command/event-order/restart/retry/rollback"
+    },
+    {
+      "source_database_version": 1,
+      "consumer_database_version": 3,
+      "expected": 1,
+      "executed": 1,
+      "failed": 0,
+      "scope": "load/scopes/links/receipt/replay/share/command/event-order/restart/retry/rollback"
+    },
+    {
+      "source_database_version": 2,
+      "consumer_database_version": 3,
+      "expected": 1,
+      "executed": 1,
+      "failed": 0,
+      "scope": "load/scopes/links/receipt/replay/share/command/event-order/restart/retry/rollback"
+    },
+    {
+      "source_database_version": 3,
+      "consumer_database_version": 3,
+      "expected": 1,
+      "executed": 1,
+      "failed": 0,
+      "scope": "load/scopes/links/receipt/replay/share/command/event-order/restart/retry/rollback"
+    }
+  ],
+  "future_database_rejected_without_mutation": true,
+  "rollback": {
+    "expected": 1,
+    "executed": 1,
+    "failed": 0,
+    "from_database_version": 3,
+    "restored_matching_backup_version": 0,
+    "old_binary_on_new_live_database_attempted": false
+  },
+  "full_frozen_parity": false
+}

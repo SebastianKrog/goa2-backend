@@ -38,3 +38,11 @@ Hosted ingress/Worker and backup verification remain a separate release gate.
 The [online WAL rehearsal](audits/server-harness.md#online-backup-and-restoration-c08-02)
 provides a reproducible `--suite backup` command and its exact retained-data checks.
 Historical binary rollback and hosted promotion remain separate acceptance gates.
+
+The [historical archive rehearsal](../tests/compatibility/README.md) exercises
+schema 0–3 migration and rollback using the actual pre-cleanup producer and its
+matching pre-upgrade backup. Its obsolete SQLite makes that binary a test
+instrument only. A real rollback requires a secure approved matching binary and
+backup; never open a newer live database with an older unguarded binary.
+[Internal candidate notes](release-notes.md) and [provenance](release-provenance.json)
+record the current security fix, package identity and unresolved release gates.

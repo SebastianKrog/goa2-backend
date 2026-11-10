@@ -447,6 +447,72 @@
       "status": "included"
     },
     {
+      "consumer": "rust/docs/audits/fourth-ten.md",
+      "link": "fourth-ten.json",
+      "target": "rust/docs/audits/fourth-ten.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/fourth-ten.md",
+      "link": "cold-native.json",
+      "target": "rust/docs/audits/cold-native.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/fourth-ten.md",
+      "link": "../../tests/compatibility/README.md",
+      "target": "rust/tests/compatibility/README.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/fourth-ten.md",
+      "link": "historical-matrix.json",
+      "target": "rust/docs/audits/historical-matrix.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/fourth-ten.md",
+      "link": "dependency-review.json",
+      "target": "rust/docs/audits/dependency-review.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/fourth-ten.md",
+      "link": "../release-notes.md",
+      "target": "rust/docs/release-notes.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/fourth-ten.md",
+      "link": "../release-provenance.json",
+      "target": "rust/docs/release-provenance.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/fourth-ten.md",
+      "link": "../../benchmarks/inputs.json",
+      "target": "rust/benchmarks/inputs.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/fourth-ten.md",
+      "link": "../../benchmarks/maintenance-v1-results.json",
+      "target": "rust/benchmarks/maintenance-v1-results.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/fourth-ten.md",
+      "link": "performance-baseline.md",
+      "target": "rust/docs/audits/performance-baseline.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/fourth-ten.md",
+      "link": "performance-baseline.md#catalog-and-footprint-decision",
+      "target": "rust/docs/audits/performance-baseline.md",
+      "status": "included"
+    },
+    {
       "consumer": "rust/docs/audits/material-ownership.md",
       "link": "material-inventory.json",
       "target": "rust/docs/audits/material-inventory.json",
@@ -537,6 +603,18 @@
       "status": "included"
     },
     {
+      "consumer": "rust/docs/audits/performance-baseline.md",
+      "link": "../../benchmarks/maintenance-v1-results.json",
+      "target": "rust/benchmarks/maintenance-v1-results.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/performance-baseline.md",
+      "link": "performance-summary.json",
+      "target": "rust/docs/audits/performance-summary.json",
+      "status": "included"
+    },
+    {
       "consumer": "rust/docs/audits/second-ten.md",
       "link": "second-ten.json",
       "target": "rust/docs/audits/second-ten.json",
@@ -600,6 +678,12 @@
       "consumer": "rust/docs/audits/third-ten.md",
       "link": "third-ten.json",
       "target": "rust/docs/audits/third-ten.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/third-ten.md",
+      "link": "fourth-ten.md",
+      "target": "rust/docs/audits/fourth-ten.md",
       "status": "included"
     },
     {
@@ -675,6 +759,12 @@
       "status": "included"
     },
     {
+      "consumer": "rust/docs/cleanup-checklist.md",
+      "link": "audits/fourth-ten.md",
+      "target": "rust/docs/audits/fourth-ten.md",
+      "status": "included"
+    },
+    {
       "consumer": "rust/docs/compatibility.md",
       "link": "worker-operations.json",
       "target": "rust/docs/worker-operations.json",
@@ -705,6 +795,18 @@
       "status": "included"
     },
     {
+      "consumer": "rust/docs/compatibility.md",
+      "link": "../tests/compatibility/README.md",
+      "target": "rust/tests/compatibility/README.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/compatibility.md",
+      "link": "audits/historical-matrix.json",
+      "target": "rust/docs/audits/historical-matrix.json",
+      "status": "included"
+    },
+    {
       "consumer": "rust/docs/contributing.md",
       "link": "../README.md",
       "target": "rust/README.md",
@@ -729,9 +831,33 @@
       "status": "included"
     },
     {
+      "consumer": "rust/docs/license-review.md",
+      "link": "audits/dependency-review.json",
+      "target": "rust/docs/audits/dependency-review.json",
+      "status": "included"
+    },
+    {
       "consumer": "rust/docs/operations.md",
       "link": "audits/server-harness.md#online-backup-and-restoration-c08-02",
       "target": "rust/docs/audits/server-harness.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/operations.md",
+      "link": "../tests/compatibility/README.md",
+      "target": "rust/tests/compatibility/README.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/operations.md",
+      "link": "release-notes.md",
+      "target": "rust/docs/release-notes.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/operations.md",
+      "link": "release-provenance.json",
+      "target": "rust/docs/release-provenance.json",
       "status": "included"
     },
     {
@@ -765,6 +891,30 @@
       "status": "included"
     },
     {
+      "consumer": "rust/docs/readiness.md",
+      "link": "audits/fourth-ten.md",
+      "target": "rust/docs/audits/fourth-ten.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/release-notes.md",
+      "link": "release-provenance.json",
+      "target": "rust/docs/release-provenance.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/release-notes.md",
+      "link": "operations.md",
+      "target": "rust/docs/operations.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/release-notes.md",
+      "link": "readiness.md",
+      "target": "rust/docs/readiness.md",
+      "status": "included"
+    },
+    {
       "consumer": "rust/docs/search.md",
       "link": "readiness.md",
       "target": "rust/docs/readiness.md",
@@ -792,6 +942,12 @@
       "consumer": "rust/docs/search.md",
       "link": "worker-protocol-examples.json",
       "target": "rust/docs/worker-protocol-examples.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/search.md",
+      "link": "audits/performance-baseline.md",
+      "target": "rust/docs/audits/performance-baseline.md",
       "status": "included"
     },
     {
@@ -834,6 +990,30 @@
       "consumer": "rust/docs/testing.md",
       "link": "audits/versions-and-robustness.md",
       "target": "rust/docs/audits/versions-and-robustness.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/testing.md",
+      "link": "audits/cold-native.json",
+      "target": "rust/docs/audits/cold-native.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/testing.md",
+      "link": "audits/historical-matrix.json",
+      "target": "rust/docs/audits/historical-matrix.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/testing.md",
+      "link": "../tests/compatibility/README.md",
+      "target": "rust/tests/compatibility/README.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/testing.md",
+      "link": "audits/dependency-review.json",
+      "target": "rust/docs/audits/dependency-review.json",
       "status": "included"
     },
     {

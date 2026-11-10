@@ -47,3 +47,11 @@ worker error strings/correlation and all 39 operations while migrating maintaine
 adapter imports. Typed diagnostic categories remain internal. [Version constants](audits/versions-and-robustness.md)
 centralize active readers/writers without rewriting frozen/historical literals or
 relaxing any supported-boundary disagreement checks.
+
+The [admitted historical archive](../tests/compatibility/README.md) now covers
+actual pre-cleanup checkpoint/replay/database production and explicitly derived
+numbered schema intermediates. All four schema rows pass ordered commands,
+scoped reads, restart, retry and rollback; [matrix evidence](audits/historical-matrix.json)
+also records future-version nonmutation and actual matching-backup binary rollback.
+Full frozen physical-object/alias differential evidence remains independently gated
+on acquisition; this archive does not replace those suites or broaden supported versions.

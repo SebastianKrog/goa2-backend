@@ -1,13 +1,13 @@
 {
   "schema_version": 1,
   "manifest": "rust/extraction-manifest.json",
-  "selected_files": 1119,
+  "selected_files": 1141,
   "group_counts": {
     "deployment": 11,
-    "development": 671,
+    "development": 691,
     "historical": 2,
-    "reference-verification": 248,
-    "runtime": 187
+    "reference-verification": 249,
+    "runtime": 188
   },
   "embedded_inputs": [
     {
@@ -342,11 +342,11 @@
   ],
   "python_import_counts": {
     "compatible-python-service": 5,
-    "included-module": 1384,
+    "included-module": 1389,
     "optional-layout-lab": 4,
     "pinned-oracle-source": 1405,
-    "python-stdlib": 729,
-    "third-party-runtime": 73
+    "python-stdlib": 775,
+    "third-party-runtime": 74
   },
   "python_imports": [
     {
@@ -398,6 +398,18 @@
       "category": "included-module"
     },
     {
+      "consumer": "rust/tests/tooling/test_historical_archive.py",
+      "line": 10,
+      "input": "pytest",
+      "category": "third-party-runtime"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_historical_archive.py",
+      "line": 14,
+      "input": "scripts/rust_verification/history.py",
+      "category": "included-module"
+    },
+    {
       "consumer": "rust/tools/baseline_games.py",
       "line": 14,
       "input": "scripts/rust_verification/baselines.py",
@@ -410,6 +422,12 @@
       "category": "included-module"
     },
     {
+      "consumer": "rust/tools/cold_build.py",
+      "line": 13,
+      "input": "rust/tools/extract.py",
+      "category": "included-module"
+    },
+    {
       "consumer": "rust/tools/documentation_audit.py",
       "line": 12,
       "input": "rust/tools/dependency_audit.py",
@@ -419,6 +437,18 @@
       "consumer": "rust/tools/extract.py",
       "line": 10,
       "input": "rust/tools/dependency_audit.py",
+      "category": "included-module"
+    },
+    {
+      "consumer": "rust/tools/historical_compatibility.py",
+      "line": 11,
+      "input": "scripts/rust_verification/history.py",
+      "category": "included-module"
+    },
+    {
+      "consumer": "rust/tools/maintenance_measurements.py",
+      "line": 17,
+      "input": "scripts/rust_verification/process.py",
       "category": "included-module"
     },
     {
@@ -14354,6 +14384,12 @@
       "category": "included-module"
     },
     {
+      "consumer": "scripts/rust_verification/history.py",
+      "line": 15,
+      "input": "scripts/rust_verification/process.py",
+      "category": "included-module"
+    },
+    {
       "consumer": "scripts/rust_verification/process.py",
       "line": 11,
       "input": "websockets.sync.client",
@@ -17652,6 +17688,11 @@
       "expression": "Path(__file__).resolve().parents[2] / 'tools'"
     },
     {
+      "consumer": "rust/tests/tooling/test_historical_archive.py",
+      "line": 12,
+      "expression": "Path(__file__).resolve().parents[3]"
+    },
+    {
       "consumer": "rust/tools/baseline_games.py",
       "line": 9,
       "expression": "Path(__file__).resolve().parents[2]"
@@ -17667,6 +17708,11 @@
       "expression": "Path(__file__).resolve().parents[1]"
     },
     {
+      "consumer": "rust/tools/cold_build.py",
+      "line": 15,
+      "expression": "Path(__file__).resolve().parents[2]"
+    },
+    {
       "consumer": "rust/tools/content.py",
       "line": 14,
       "expression": "Path(__file__).resolve().parents[1]"
@@ -17674,6 +17720,11 @@
     {
       "consumer": "rust/tools/dependency_audit.py",
       "line": 15,
+      "expression": "Path(__file__).resolve().parents[2]"
+    },
+    {
+      "consumer": "rust/tools/dependency_review.py",
+      "line": 12,
       "expression": "Path(__file__).resolve().parents[2]"
     },
     {
@@ -17693,6 +17744,16 @@
     },
     {
       "consumer": "rust/tools/gates.py",
+      "line": 15,
+      "expression": "Path(__file__).resolve().parents[2]"
+    },
+    {
+      "consumer": "rust/tools/historical_compatibility.py",
+      "line": 9,
+      "expression": "Path(__file__).resolve().parents[2]"
+    },
+    {
+      "consumer": "rust/tools/maintenance_measurements.py",
       "line": 15,
       "expression": "Path(__file__).resolve().parents[2]"
     },
@@ -18017,6 +18078,18 @@
       "disposition": "review"
     },
     {
+      "consumer": "rust/tests/tooling/test_historical_archive.py",
+      "line": 16,
+      "input": "rust/tests/compatibility",
+      "disposition": "directory resolved by included tool"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_historical_archive.py",
+      "line": 17,
+      "input": "rust/content/smoke-game.json",
+      "disposition": "included"
+    },
+    {
       "consumer": "rust/tools/baseline_games.py",
       "line": 21,
       "input": "rust/content/smoke-game.json",
@@ -18215,6 +18288,36 @@
       "disposition": "original Python/history documentation; not an ordinary native build dependency"
     },
     {
+      "consumer": "rust/tools/dependency_review.py",
+      "line": 23,
+      "input": "rust/Cargo.toml",
+      "disposition": "included"
+    },
+    {
+      "consumer": "rust/tools/dependency_review.py",
+      "line": 72,
+      "input": "rust/deny.toml",
+      "disposition": "included"
+    },
+    {
+      "consumer": "rust/tools/dependency_review.py",
+      "line": 64,
+      "input": "rust/Cargo.toml",
+      "disposition": "included"
+    },
+    {
+      "consumer": "rust/tools/dependency_review.py",
+      "line": 77,
+      "input": "rust/Cargo.lock",
+      "disposition": "included"
+    },
+    {
+      "consumer": "rust/tools/dependency_review.py",
+      "line": 78,
+      "input": "rust/deny.toml",
+      "disposition": "included"
+    },
+    {
       "consumer": "rust/tools/documentation_audit.py",
       "line": 116,
       "input": "rust/README.md",
@@ -18260,6 +18363,42 @@
       "consumer": "rust/tools/gates.py",
       "line": 21,
       "input": "rust/oracle-manifest.json",
+      "disposition": "included"
+    },
+    {
+      "consumer": "rust/tools/historical_compatibility.py",
+      "line": 19,
+      "input": "rust/tests/compatibility",
+      "disposition": "directory resolved by included tool"
+    },
+    {
+      "consumer": "rust/tools/maintenance_measurements.py",
+      "line": 145,
+      "input": "rust/crates/goa2-core/examples/maintenance_bench.rs",
+      "disposition": "included"
+    },
+    {
+      "consumer": "rust/tools/maintenance_measurements.py",
+      "line": 146,
+      "input": "rust/crates/goa2-core/examples/maintenance_bench.rs",
+      "disposition": "included"
+    },
+    {
+      "consumer": "rust/tools/maintenance_measurements.py",
+      "line": 154,
+      "input": "rust/content/manifest.json",
+      "disposition": "included"
+    },
+    {
+      "consumer": "rust/tools/maintenance_measurements.py",
+      "line": 65,
+      "input": "rust/oracle-manifest.json",
+      "disposition": "included"
+    },
+    {
+      "consumer": "rust/tools/maintenance_measurements.py",
+      "line": 131,
+      "input": "rust/content/manifest.json",
       "disposition": "included"
     },
     {
@@ -19193,6 +19332,9 @@
       "rust/tools/boundary_inventory.py",
       "rust/tools/documentation_audit.py",
       "rust/tools/extract.py"
+    ],
+    "rust/tools/extract.py": [
+      "rust/tools/cold_build.py"
     ],
     "scripts/rust_oracle/action_builders.py": [
       "tests/rust_oracle/test_live_card_actions.py"
@@ -20414,11 +20556,17 @@
       "rust/tests/tooling/test_cleanup_audits.py",
       "rust/tools/baseline_games.py"
     ],
+    "scripts/rust_verification/history.py": [
+      "rust/tests/tooling/test_historical_archive.py",
+      "rust/tools/historical_compatibility.py"
+    ],
     "scripts/rust_verification/process.py": [
+      "rust/tools/maintenance_measurements.py",
       "scripts/rust_verification/auth.py",
       "scripts/rust_verification/backup.py",
       "scripts/rust_verification/bots.py",
       "scripts/rust_verification/clocks.py",
+      "scripts/rust_verification/history.py",
       "scripts/rust_verification/shutdown.py",
       "scripts/rust_verification/votes.py",
       "scripts/verify_rust_game_server.py"

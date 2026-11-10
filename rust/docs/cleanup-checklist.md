@@ -10,7 +10,8 @@ smoke pass does not establish its wider acceptance criterion.
 The [ten-task follow-up](audits/next-ten.md) closes the ten checked items below.
 The [second ten-task follow-up](audits/second-ten.md) closes ten further items.
 The [third ten-task follow-up](audits/third-ten.md) closes ten further items.
-**30 completed; 54 remain open.** All other acceptance gates retain their scope.
+The [fourth ten-task follow-up](audits/fourth-ten.md) closes ten further items.
+**40 completed; 44 remain open.** All other acceptance gates retain their scope.
 
 The implemented baseline already includes catalog relocation, bundled smoke
 inputs/content, native CI definitions, SQLite migrations, service suites,
@@ -75,7 +76,7 @@ acceptance. Native/Python CI definitions and local quick/quality checks exist.
 - [ ] **C04-05** Acquire the admitted setup/view inputs and explicitly run their ignored gates. Record variables, selected names and nonzero expected/executed counts; an ignored gate is not a pass.
 - [x] **C04-06** Replace remaining generic expensive-tier command descriptions with executable, pinned workload commands and required inputs. Cover setup/view, restore, performance/strength and hosted integration, with accountable owners and event/schedule triggers.
 - [x] **C04-07** Verify CI change selection enforces the appropriate reference/restore gates for engine, worker, codec/arena and fixture changes; releases must run the full required matrix regardless of a narrow file diff.
-- [ ] **C04-08** Establish periodic cold-acquisition/build verification. If CI caches are introduced, use them only as accelerators and test a path that does not depend on warm caches.
+- [x] **C04-08** Establish periodic cold-acquisition/build verification. If CI caches are introduced, use them only as accelerators and test a path that does not depend on warm caches.
 - [ ] **C04-09** Run the workflow remotely and record actual job results, including separate Python tooling/script checks. Local successes alone do not establish a successful remote CI run.
 
 ## C05 — Compatibility policy and regressions (P0)
@@ -83,8 +84,8 @@ acceptance. Native/Python CI definitions and local quick/quality checks exist.
 Owner: engine and service maintainers. Depends on C01 and C04 automated gates.
 The compatibility matrix and small checkpoint/privacy/rejection tests exist.
 
-- [ ] **C05-01** Assemble admitted historical checkpoint, replay/share and SQLite examples for every version claimed as supported; record producer, consumer, schema, expected behavior and migration path.
-- [ ] **C05-02** Complete and run that historical compatibility matrix through load, commands, restart, retry and rollback. Retain ordered-event, digest and physical-object/alias evidence from the full suites.
+- [x] **C05-01** Assemble admitted historical checkpoint, replay/share and SQLite examples for every version claimed as supported; record producer, consumer, schema, expected behavior and migration path.
+- [x] **C05-02** Complete and run that historical compatibility matrix through load, commands, restart, retry and rollback. Retain ordered-event, digest and physical-object/alias evidence from the full suites.
 - [x] **C05-03** Audit absent optional fields, unknown-field rejection and unsupported future versions across supported serialized boundaries. Add missing regressions without duplicating already passing contracts or weakening deliberate oracle/rules rejection.
 - [x] **C05-04** Finish audience/contract coverage for actor, teammate/team decisions, spectator, private replay and public shares. Fill gaps for simultaneous metadata, hidden decisions, generic prompts, request freshness, full-width seeds/times and stale-command protection.
 - [x] **C05-05** Classify retained compatibility shims as required, temporary or obsolete, each with named consumer, test, removal condition and migration note. Keep dense execution, codec-only diagnostics, baseline policy controls and plain/gzip readers while their consumers remain.
@@ -111,9 +112,9 @@ contribution/security/conduct materials are preparation drafts, not rights appro
 - [ ] **C07-04** Establish a private security reporting destination, supported-release window and conduct reporting/appeal route, and finalize the draft policies without invented contacts or promises.
 - [ ] **C07-05** Review the exact public tree for credentials, private replay/game state, databases, environment files, personal paths, generated blobs and nonredistributable material. Include historical documents and exported artifacts; `.gitignore` is not proof of absence.
 - [ ] **C07-06** Confirm clean initial snapshot versus filtered-history release strategy. If retaining history, audit the history as well; preserve source/oracle provenance and original-commit mappings without rewriting the original repository.
-- [ ] **C07-07** Run maintained dependency license/advisory tooling against the locked graph, resolve findings and document exceptions. The committed license metadata inventory does not establish an advisory scan or license approval.
+- [x] **C07-07** Run maintained dependency license/advisory tooling against the locked graph, resolve findings and document exceptions. The committed license metadata inventory does not establish an advisory scan or license approval.
 - [ ] **C07-08** Add accurate repository/description/readme metadata once the destination is known; finalize contribution, changelog and community materials against the actual public payload.
-- [ ] **C07-09** Prepare release notes/provenance naming source commit, compiler/profile, supported architecture, content hash, schemas/migration requirements, verification counts and backup/rollback instructions.
+- [x] **C07-09** Prepare release notes/provenance naming source commit, compiler/profile, supported architecture, content hash, schemas/migration requirements, verification counts and backup/rollback instructions.
 - [ ] **C07-10** Decide the authenticity mechanism for public binary/content distribution and document how consumers verify it; checksums alone do not identify the publisher.
 - [x] **C07-11** Keep crates.io disabled unless naming, API stability, data packaging, metadata and package verification are deliberately completed. Record this as a retained policy if public source hosting is the only intended release.
 
@@ -122,9 +123,9 @@ contribution/security/conduct materials are preparation drafts, not rights appro
 Owner: service maintainers. Depends on C04/C05. Split process suites and atomic,
 idempotent schema v1–v3 migration tests already pass locally.
 
-- [ ] **C08-01** Extend the migration archive matrix to retained historical databases and realistic combinations of replay journals, credentials, accepted-action receipts and share metadata. Preserve actual process restart/failure behavior alongside unit tests.
+- [x] **C08-01** Extend the migration archive matrix to retained historical databases and realistic combinations of replay journals, credentials, accepted-action receipts and share metadata. Preserve actual process restart/failure behavior alongside unit tests.
 - [x] **C08-02** Rehearse consistent WAL backup and restoration on disposable data, then verify links, revisions, receipts, replay reconstruction and share metadata after reopening the restored database.
-- [ ] **C08-03** Rehearse binary rollback with the matching database backup across supported migration boundaries; record when a newer schema prevents direct rollback.
+- [x] **C08-03** Rehearse binary rollback with the matching database backup across supported migration boundaries; record when a newer schema prevents direct rollback.
 - [ ] **C08-04** Run the extended replay/share service verifier for the final candidate and close any coverage gaps across auth/views, retries/concurrency, clocks/votes, persistence and bots.
 - [x] **C08-05** Audit blocking work, lock scope, bot cancellation, deadline recovery and shutdown across transport, orchestration, persistence and replay boundaries; address concrete problems with their own regressions.
 - [x] **C08-06** Evaluate whether a server library/test harness would materially improve testing and boundaries. Record retain/defer or implement the justified change; preserve real cross-process checks either way.
@@ -161,9 +162,9 @@ with C08–C10. Acquisition/atomicity and small privacy/stale-input tests exist.
 - [x] **C11-01** Audit panic assumptions at external content, archive, envelope, worker JSON, WebSocket and persisted-data boundaries. Distinguish trusted imports and test-only unwraps from actual reachable failures; preserve explicit size/entity/step/execution limits.
 - [x] **C11-02** Add targeted property/fuzz cases for malformed envelopes, reference tables, hex coordinates, catalog deserialization, replay inputs and command sequences where current tests leave meaningful risk.
 - [x] **C11-03** Extend invariant coverage for rejected-input nonmutation, worker isolation, physical-card identity, save/restore equivalence and recipient privacy, using concrete gaps rather than duplicating existing checks.
-- [ ] **C11-04** Establish reproducible benchmark inputs/results with content/oracle identity, compiler/profile, hardware, seed, policy, workload and units; record fixed-work comparisons separately from deadline-limited strength/quality.
-- [ ] **C11-05** Measure cold startup, memory, clone/restore cost, throughput, decision latency and cancellation responsiveness for the retained baseline and relevant future changes.
-- [ ] **C11-06** Review catalog parsing/initialization and binary footprint after relocation. Optimize only where measurement justifies it, preserving immutable process-wide caches and private continuation state with correctness/identity checks.
+- [x] **C11-04** Establish reproducible benchmark inputs/results with content/oracle identity, compiler/profile, hardware, seed, policy, workload and units; record fixed-work comparisons separately from deadline-limited strength/quality.
+- [x] **C11-05** Measure cold startup, memory, clone/restore cost, throughput, decision latency and cancellation responsiveness for the retained baseline and relevant future changes.
+- [x] **C11-06** Review catalog parsing/initialization and binary footprint after relocation. Optimize only where measurement justifies it, preserving immutable process-wide caches and private continuation state with correctness/identity checks.
 
 ## C12 — Final standalone extraction and acceptance (P0)
 

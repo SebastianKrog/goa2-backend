@@ -2,7 +2,8 @@
 
 Completed on `bots-upstream` after `c001c6a9`, 10 November 2026. The
 [structured evidence](third-ten.json) records the actual checks and limits.
-The checklist now has **30 completed and 54 open tasks**.
+At the end of this batch the checklist had **30 completed and 54 open tasks**.
+See the [fourth batch](fourth-ten.md) for subsequent evidence.
 
 | Task | Result / maintained proof |
 | --- | --- |

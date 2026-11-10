@@ -109,3 +109,22 @@ normal native suite. Run the real JSON-lines rejection/correlation check from th
 repository root with `python3 rust/tools/worker_contracts.py --binary /absolute/path/goa2-search-cli`.
 See [versions and robustness](audits/versions-and-robustness.md) for exact scope;
 these bounded cases do not substitute for full external parity or restore scans.
+
+## Cold native, historical and dependency checks
+
+The weekly/manual `cold-native` workflow uses `tools/cold_build.py` with new
+Cargo/target directories and no original Git history; installed pinned compiler
+reuse is explicit. From the repository root:
+
+```sh
+python3 rust/tools/cold_build.py --work /absolute/path/new-cold-run --report /absolute/path/new-cold-report.json
+python3 rust/tools/historical_compatibility.py verify --binary /absolute/path/goa2-game-server --content rust/content/smoke-game.json
+cargo install cargo-deny --version 0.20.2 --locked --root /absolute/path/scanner
+python3 rust/tools/dependency_review.py --scanner /absolute/path/scanner/bin/cargo-deny --output /absolute/path/new-scan.json
+```
+
+[Cold evidence](audits/cold-native.json), [historical matrix](audits/historical-matrix.json),
+[archive provenance](../tests/compatibility/README.md) and [dependency review](audits/dependency-review.json)
+record exact scope. Remote workflow results remain open. Historical matrix
+verification needs the admitted archive and native binary, not original history
+or Python gameplay. Full frozen cases remain a separate required tier.

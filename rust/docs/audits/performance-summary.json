@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "source_commit": "ed1597be1de77d1adb409de9d3f79564af203ee2",
+  "medians": [
+    {
+      "id": "smoke-game.json",
+      "content_sha256": "69ce2e47927eab8427fa8c2932f369044a30297716f1a4402a1ba6e1673c3ee2",
+      "hero_count": 7,
+      "content_read_ms": 113.460006,
+      "catalog_first_prepare_ms": 357.399214,
+      "catalog_warm_prepare_ns": 6.02,
+      "setup_ms": 19.8630732,
+      "clone_drop_us": 6.222285,
+      "restore_parse_ms": 23.960703074999998,
+      "prepare_commit_us": 15.34657,
+      "fixed_search_ms": 1.5490535,
+      "fixed_search_per_second": 645.5554956623513,
+      "timed_decision_ms": 5.027685,
+      "cancel_response_us": 401.88,
+      "process_peak_rss_kib": 152552,
+      "server_ready_ms": 58.451318,
+      "first_game_ms": 316.608317,
+      "second_game_ms": 42.619916,
+      "server_after_games_rss_kib": 149252,
+      "checkpoint_bytes": 300429
+    },
+    {
+      "id": "live-game-content.json",
+      "content_sha256": "4b7520f058d68dda93efb15837d0b657332a1a3132d37148c14a9bb2968ff651",
+      "hero_count": 33,
+      "content_read_ms": 962.483137,
+      "catalog_first_prepare_ms": 188.836649,
+      "catalog_warm_prepare_ns": 5.96,
+      "setup_ms": 21.2218085,
+      "clone_drop_us": 6.165095,
+      "restore_parse_ms": 23.101614899999998,
+      "prepare_commit_us": 17.004830000000002,
+      "fixed_search_ms": 1.11572425,
+      "fixed_search_per_second": 896.2788072411261,
+      "timed_decision_ms": 5.032216,
+      "cancel_response_us": 476.205,
+      "process_peak_rss_kib": 167544,
+      "server_ready_ms": 122.417677,
+      "first_game_ms": 394.101725,
+      "second_game_ms": 42.619823,
+      "server_after_games_rss_kib": 163772,
+      "checkpoint_bytes": 300429
+    }
+  ],
+  "binary_sections_bytes": {
+    "server": {
+      "text": 21222058,
+      "data": 167984,
+      "bss": 3496,
+      "file": 23363784
+    },
+    "benchmark": {
+      "text": 15682569,
+      "data": 70272,
+      "bss": 3520,
+      "file": 16666376
+    }
+  },
+  "catalog_decision": "Retain immutable process-wide caches and current package placement; no optimization justified by this small baseline; representative full parity/restore required before representation changes."
+}

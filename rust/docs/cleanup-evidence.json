@@ -347,7 +347,26 @@
       "evidence": "audits/third-ten.json",
       "summary": "audits/third-ten.md",
       "remaining_checklist_tasks": 54
+    },
+    {
+      "date": "2026-11-10",
+      "completed_tasks": [
+        "C04-08",
+        "C05-01",
+        "C05-02",
+        "C07-07",
+        "C07-09",
+        "C08-01",
+        "C08-03",
+        "C11-04",
+        "C11-05",
+        "C11-06"
+      ],
+      "implementation_commit": "ed1597be1de77d1adb409de9d3f79564af203ee2",
+      "evidence": "audits/fourth-ten.json",
+      "summary": "audits/fourth-ten.md",
+      "remaining_checklist_tasks": 44
     }
   ],
-  "latest_verification": "audits/third-ten.json"
+  "latest_verification": "audits/fourth-ten.json"
 }

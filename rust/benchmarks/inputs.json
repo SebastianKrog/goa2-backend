@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "scope": "Ownership/identity inventory, not fresh benchmark results. Runtime catalogs remain in content/catalogs; parity indices and smoke data retain their existing roles.",
+  "scope": "Ownership/identity inventory plus the separately admitted maintenance-v1 baseline; full parity/strength inputs retain independent acquisition gates.",
   "inputs": [
     {
       "id": "matched-simulation-replays",
@@ -124,6 +124,32 @@
       "generator_note": "The recorded hash identifies the maintained generator/tool. Admitted case identities and original provenance remain in their corpus/smoke manifests; no regeneration is asserted by this inventory.",
       "original_source_commit": "dcd00e0cf609dc84eb879394398aec80b1d1de4a",
       "provenance_manifest": "rust/tests/fixtures/smoke/manifest.json"
+    },
+    {
+      "id": "maintenance-v1",
+      "class": "native fixed-work maintenance and separate timed-response baseline",
+      "location": [
+        "rust/content/smoke-game.json",
+        "external full pack identified in maintenance-v1-results.json"
+      ],
+      "generator": {
+        "path": "rust/crates/goa2-core/examples/maintenance_bench.rs",
+        "sha256": "193e57da3b8ed129a9eebbb4e2a2a9156238daa41dfb9732e2ffe834296a15c2"
+      },
+      "runner": "rust/tools/maintenance_measurements.py",
+      "source_commit": "ed1597be1de77d1adb409de9d3f79564af203ee2",
+      "content_sha256": [
+        "69ce2e47927eab8427fa8c2932f369044a30297716f1a4402a1ba6e1673c3ee2",
+        "4b7520f058d68dda93efb15837d0b657332a1a3132d37148c14a9bb2968ff651"
+      ],
+      "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+      "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+      "results": "rust/benchmarks/maintenance-v1-results.json",
+      "consumers": [
+        "engine/service/search maintenance and future same-work comparisons"
+      ],
+      "owner": "engine/service/search maintainers",
+      "full_parity_or_strength_claimed": false
     }
   ]
 }

@@ -164,6 +164,10 @@ mod tests {
         serde_json::to_value(session.export_envelope().unwrap()).unwrap()
     }
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: frozen late-generation payload is not bundled; see docs/testing.md"
+    )]
     fn journey_aggregate_counter_guard_precedes_both_creations_and_stack_pop() {
         for counter in [i64::MAX, i64::MAX - 1] {
             let mut worker = session("create-plain-move-True");
@@ -180,6 +184,10 @@ mod tests {
         }
     }
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: frozen late-generation payload is not bundled; see docs/testing.md"
+    )]
     fn journey_generated_step_guard_precedes_immunity_creation() {
         let mut worker = session("create-plain-move-True");
         worker.next_step = u64::MAX - 1;
@@ -188,6 +196,10 @@ mod tests {
         assert_eq!(snapshot(&worker), before);
     }
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: frozen late-generation payload is not bundled; see docs/testing.md"
+    )]
     fn journey_dedup_needs_no_generated_step_or_entity_capacity() {
         let mut worker = session("create-existing-both-move-True");
         worker.next_step = u64::MAX - 1;
@@ -198,6 +210,10 @@ mod tests {
         assert_eq!(worker.world.next_entity_id, i64::MAX);
     }
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: frozen late-generation payload is not bundled; see docs/testing.md"
+    )]
     fn journey_bound_finishing_models_are_private_between_search_workers() {
         let root = session("create-plain-move-True");
         let before = snapshot(&root);

@@ -371,6 +371,10 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: frozen late-generation payload is not bundled; see docs/testing.md"
+    )]
     fn upgrade_items_are_hidden_from_other_viewers_until_reveal() {
         let fixture = super::super::object_execution::fixture_case(
             "object-execution-upgrade-live-Arien-3-single-0",

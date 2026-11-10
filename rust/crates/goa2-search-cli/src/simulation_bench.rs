@@ -418,24 +418,33 @@ pub(super) fn measure(
 mod tests {
     use super::*;
     fn case() -> (StateEnvelope, Vec<Value>) {
+        // This contract only needs a four-seat planning root, not a complete-game
+        // archive. Reuse the byte-verified smoke input; full-game replay stays in
+        // the separately selected differential tier.
         let base =
             std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures"));
         let index: Value = serde_json::from_reader(
-            crate::fixture_cache::open(base.join("complete-games-hanu.json")).unwrap(),
+            crate::fixture_cache::open(base.join("object-execution.json")).unwrap(),
         )
         .unwrap();
-        let row = &index["cases"][0];
+        let row = index["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["name"] == "object-execution-card-planning-cycle")
+            .unwrap();
         let case: Value = serde_json::from_reader(
             crate::fixture_cache::open(base.join(row["path"].as_str().unwrap())).unwrap(),
         )
         .unwrap();
-        let mut commands = case["operations"].as_array().unwrap()[..4].to_vec();
-        assert!(commands.iter().all(|op| op["kind"] == "commit"));
+        let envelope: StateEnvelope = serde_json::from_value(case["envelope"].clone()).unwrap();
+        let mut commands = envelope.state["teams"].as_object().unwrap().values()
+            .flat_map(|team| team["heroes"].as_array().unwrap())
+            .map(|hero| json!({"kind":"commit", "hero":hero["id"], "card":hero["hand"][0]["$goa2_instance"]}))
+            .collect::<Vec<_>>();
+        assert_eq!(commands.len(), 4);
         commands.push(json!({"kind":"advance"}));
-        (
-            serde_json::from_value(case["envelope"].clone()).unwrap(),
-            commands,
-        )
+        (envelope, commands)
     }
     #[test]
     fn benchmark_clones_root_and_matches_ordinary_engine_replay() {

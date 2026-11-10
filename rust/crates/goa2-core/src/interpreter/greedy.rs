@@ -2605,6 +2605,10 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: frozen late-generation payload is not bundled; see docs/testing.md"
+    )]
     fn deferred_first_plays_keep_only_compatible_upgrade_paths() {
         use std::collections::{HashMap, HashSet};
 

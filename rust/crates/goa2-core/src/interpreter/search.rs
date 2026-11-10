@@ -5999,6 +5999,10 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: frozen late-generation payload is not bundled; see docs/testing.md"
+    )]
     fn scoped_search_prefers_an_eligible_bot_for_a_team_prompt() {
         let fixture = super::super::object_execution::fixture_case(
             "object-execution-hero-respawn-live-ordinary-first",
@@ -6044,6 +6048,10 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: frozen late-generation payload is not bundled; see docs/testing.md"
+    )]
     fn fixed_policy_expands_only_the_first_opposing_move() {
         let fixture = super::super::object_execution::fixture_case(
             "object-execution-hero-respawn-live-ordinary-first",
@@ -6104,6 +6112,10 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: frozen late-generation payload is not bundled; see docs/testing.md"
+    )]
     fn preferred_root_move_is_searched_first_without_changing_complete_result() {
         let fixture = super::super::object_execution::fixture_case(
             "object-execution-hero-respawn-live-ordinary-first",

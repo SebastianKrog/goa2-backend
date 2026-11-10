@@ -9363,6 +9363,10 @@ mod tests {
         }
     }
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: exhaustive restoration matrix; requires complete named case family"
+    )]
     fn standalone_mine_choices_restore_at_every_instruction() {
         for variant in [
             "plain",
@@ -9401,6 +9405,10 @@ mod tests {
         }
     }
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: exhaustive restoration matrix; requires complete named case family"
+    )]
     fn ordered_mine_trigger_chains_restore_tokens_discards_and_rollback_flags() {
         for variant in [
             "dud",
@@ -9431,6 +9439,10 @@ mod tests {
         }
     }
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: exhaustive restoration matrix; requires complete named case family"
+    )]
     fn automatic_mine_movement_restores_every_instruction_and_generated_snapshot() {
         for kind in ["dud", "blast"] {
             for route in ["corridor", "choice"] {
@@ -9568,6 +9580,10 @@ mod tests {
         ));
     }
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: exhaustive restoration matrix; requires complete named case family"
+    )]
     fn effect_discard_steps_restore_at_every_instruction() {
         for variant in [
             "plain",
@@ -9619,6 +9635,10 @@ mod tests {
         }
     }
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: exhaustive restoration matrix; requires complete named case family"
+    )]
     fn selected_shield_expiry_survives_restore_without_finishing_steps() {
         for variant in ["plain", "current", "linked-expiry", "basic", "non-basic"] {
             let mut direct =
@@ -9703,6 +9723,10 @@ mod tests {
         assert!(Arc::ptr_eq(&a.world.definitions, &b.world.definitions));
     }
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: exhaustive restoration matrix; requires complete named case family"
+    )]
     fn granted_and_ordinary_wild_hunt_restore_every_instruction() {
         for variant in [
             "plain",
@@ -9832,6 +9856,10 @@ mod tests {
         assert_eq!(root.semantic_state().unwrap(), before);
     }
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: exhaustive restoration matrix; requires complete named case family"
+    )]
     fn provider_marking_matches_rows_even_when_inactive_or_carrier_is_missing() {
         for variant in [
             "plain",
@@ -9897,6 +9925,10 @@ mod tests {
         }
     }
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: exhaustive restore scan needs the verified canonical corpus"
+    )]
     fn effect_reaction_and_illusion_traces_restore_every_instruction() {
         let base =
             std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures"));
@@ -10020,6 +10052,10 @@ mod tests {
         );
     }
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: exhaustive restore scan needs the verified canonical corpus"
+    )]
     fn effect_targeting_pre_actions_and_projectiles_restore_every_instruction() {
         let base =
             std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures"));
@@ -10224,6 +10260,10 @@ mod tests {
         );
     }
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: exhaustive restoration matrix; requires complete named case family"
+    )]
     fn effect_movement_sequences_restore_every_instruction() {
         for variant in [
             "base-plain",
@@ -10256,6 +10296,10 @@ mod tests {
         }
     }
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: exhaustive restoration matrix; requires complete named case family"
+    )]
     fn controlled_prompts_restore_original_actor_metadata_and_request_identity() {
         for variant in [
             "active",
@@ -10363,6 +10407,10 @@ mod tests {
         session.advance_prefix(1).unwrap();
     }
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: exhaustive restoration matrix; requires complete named case family"
+    )]
     fn effect_aware_movement_restores_at_every_instruction() {
         for name in [
             "base-plain",
@@ -10395,6 +10443,10 @@ mod tests {
         }
     }
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: exhaustive restoration matrix; requires complete named case family"
+    )]
     fn active_repeat_validation_restores_at_every_instruction() {
         for variant in [
             "blocked",
@@ -10737,6 +10789,10 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: exhaustive restore scan needs the verified canonical corpus"
+    )]
     fn effect_aware_cleanup_upgrades_and_reset_restore_every_instruction() {
         let base =
             std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures"));
@@ -11158,6 +11214,10 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: exhaustive restore scan needs the verified canonical corpus"
+    )]
     fn effect_aware_battles_restore_every_instruction() {
         let base =
             std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures"));
@@ -11279,6 +11339,10 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: exhaustive restore scan needs the verified canonical corpus"
+    )]
     fn effect_aware_minion_returns_restore_every_instruction() {
         let base =
             std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures"));
@@ -11386,6 +11450,10 @@ mod tests {
         ));
     }
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: exhaustive restoration matrix; requires complete named case family"
+    )]
     fn primary_effects_restore_every_instruction_with_frozen_stats_and_exact_events() {
         fn finish(mut session: NativeSession, restore: bool) -> (Value, Vec<Value>) {
             let mut events = Vec::new();

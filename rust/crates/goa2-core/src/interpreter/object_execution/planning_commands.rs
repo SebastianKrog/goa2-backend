@@ -2032,6 +2032,10 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: frozen late-generation payload is not bundled; see docs/testing.md"
+    )]
     fn sampled_round_minion_defeat_requires_the_selector_binding() {
         for card in ["final_embrace", "constrict"] {
             let fixture = fixture_case(&format!(

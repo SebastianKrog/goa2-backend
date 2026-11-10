@@ -4,11 +4,8 @@ use crate::{
     game::{Server, portable_checkpoint},
 };
 use goa2_core::{
+    api::{ExecutionBudget, GameCheckpoint, LiveGame, PlayerCommand},
     codec::StateEnvelope,
-    interpreter::{
-        ExecutionBudget,
-        live_game::{GameCheckpoint, LiveGame, PlayerCommand},
-    },
 };
 use serde::Deserialize;
 use serde_json::{Value, json};

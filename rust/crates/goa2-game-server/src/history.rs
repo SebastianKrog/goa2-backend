@@ -1,6 +1,6 @@
 //! Player-scoped labels for the existing Decisions tab.
 use crate::replay::{Entry, Operation};
-use goa2_core::interpreter::live_game::{GamePosition, PlayerCommand};
+use goa2_core::api::{GamePosition, PlayerCommand};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;

@@ -307,10 +307,9 @@ pub(super) fn visible_events(
         .iter()
         .map(|source| {
             let mut event = source.clone();
-            match source["event_type"].as_str() {
-                // These engine events expressly expose a card face to every viewer.
-                Some("GUESSED_CARD_REVEALED" | "CARD_REVEALED") => return event,
-                _ => {}
+            // These engine events expressly expose a card face to every viewer.
+            if let Some("GUESSED_CARD_REVEALED" | "CARD_REVEALED") = source["event_type"].as_str() {
+                return event;
             }
             private.sanitize(&mut event["metadata"], false);
             if source["event_type"] != "MINE_TRIGGERED"

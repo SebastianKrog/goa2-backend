@@ -1,6 +1,6 @@
 //! Ephemeral messages for authenticated connections at the same table.
 use crate::{ApiError, Result, blocking, game::Game};
-use goa2_core::{geometry::Hex, interpreter::live_game::TableCardSlot};
+use goa2_core::{api::TableCardSlot, geometry::Hex};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::{

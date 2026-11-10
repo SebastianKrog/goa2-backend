@@ -16,7 +16,7 @@ impl SpellBodies {
         let data = DATA
             .get_or_init(|| {
                 let data: Value = serde_json::from_str(include_str!(
-                    "../../../../../tests/fixtures/spell-builders.json"
+                    "../../../../../content/catalogs/spell-builders.json"
                 ))
                 .map_err(|e| e.to_string())?;
                 if data["schema_version"] != 1

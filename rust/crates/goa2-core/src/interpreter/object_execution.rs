@@ -1856,7 +1856,9 @@ impl NativeSession {
                     });
             if !skipped
                 && let Some((viewer, known)) = search_viewer.zip(hand_scope)
-                && self.hidden_hand_reader(objects, top_instruction, top_object, viewer, known)?.is_some()
+                && self
+                    .hidden_hand_reader(objects, top_instruction, top_object, viewer, known)?
+                    .is_some()
             {
                 return Ok(result);
             }
@@ -4162,6 +4164,10 @@ mod rollback_tests {
     }
 
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: frozen late-generation payload is not bundled; see docs/testing.md"
+    )]
     fn generated_respawn_options_are_legal_and_leave_the_live_prompt_intact() {
         use super::super::{DecisionMove, ExecutionBudget, SequenceVerdict};
         let mut session = object_session("object-execution-hero-respawn-live-ordinary-first");
@@ -4247,6 +4253,10 @@ mod rollback_tests {
     }
 
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: frozen late-generation payload is not bundled; see docs/testing.md"
+    )]
     fn session_rollback_restores_world_rows_across_nested_staging() {
         let mut session = object_session("object-execution-hero-respawn-live-ordinary-first");
         let initial = session.world.cards()[0].clone();
@@ -4472,6 +4482,10 @@ mod rollback_tests {
     }
 
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: frozen late-generation payload is not bundled; see docs/testing.md"
+    )]
     fn session_rollback_recovers_arena_when_live_dispatch_panics() {
         let mut session = object_session("object-execution-hero-respawn-live-ordinary-first");
         let before = serde_json::to_value(session.export_envelope().unwrap()).unwrap();

@@ -1,0 +1,312 @@
+{
+  "schema_version": 1,
+  "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+  "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+  "bridge_sha256": {
+    "scripts/rust_oracle/run_pinned.py": "62375d3f61981e0e961fc2794f730d28ce08bbaa64ff16469f31926ce6f5790e",
+    "scripts/rust_oracle/simulation_bench.py": "c1f4caa6754e4ea001cbcb9033014c1eeb75d69c7046f2f4d8cf176f28aa0574",
+    "scripts/rust_oracle/rollout_parity.py": "ab82909a6cd0bf5b69bc6135d806ddb5eae2c13ab55b0b6bae80380804952888",
+    "scripts/verify_rust_hosted_draft.py": "479f12af82a8d81bbf50f82b0c3b662b6fa73c388e83b92a2337cbe36bd5d5ca",
+    "scripts/verify_rust_staging.py": "cb4f962f5b62488317649ef594bacd1ba5ea01ac53985721903b6aca94c903fc"
+  },
+  "execution_policy": "validate/show do not run gates. Required inputs are explicit; missing files fail before execution. Hosts and credentials are supplied only by the caller. Reference sweeps are not claimed passed by catalog validation.",
+  "gates": [
+    {
+      "id": "setup-parity",
+      "owner": "engine maintainers",
+      "when": "setup/content changes, weekly reference backstop, release candidate",
+      "scope": "All supplied setup cases; test asserts a nonempty opening-state/identity comparison.",
+      "required_variables": [
+        "GOA2_GAME_CONTENT",
+        "GOA2_GAME_SETUP_CASES"
+      ],
+      "input_files": [
+        "GOA2_GAME_CONTENT",
+        "GOA2_GAME_SETUP_CASES"
+      ],
+      "commands": [
+        {
+          "argv": [
+            "cargo",
+            "test",
+            "--manifest-path",
+            "${ROOT}/rust/Cargo.toml",
+            "--locked",
+            "--profile",
+            "iterate",
+            "-p",
+            "goa2-core",
+            "--test",
+            "live_game_setup",
+            "native_setup_matches_pinned_python",
+            "--",
+            "--ignored",
+            "--exact",
+            "--nocapture"
+          ],
+          "minimum_tests": 1
+        }
+      ]
+    },
+    {
+      "id": "view-parity",
+      "owner": "engine/service maintainers",
+      "when": "view/privacy changes, weekly reference backstop, release candidate",
+      "scope": "Every supplied actor/spectator projection, request and event in the admitted view corpus.",
+      "required_variables": [
+        "GOA2_GAME_VIEW_CASES"
+      ],
+      "input_files": [
+        "GOA2_GAME_VIEW_CASES"
+      ],
+      "commands": [
+        {
+          "argv": [
+            "cargo",
+            "test",
+            "--manifest-path",
+            "${ROOT}/rust/Cargo.toml",
+            "--locked",
+            "--profile",
+            "iterate",
+            "-p",
+            "goa2-core",
+            "--test",
+            "live_game_views",
+            "native_frontend_projections_match_pinned_python",
+            "--",
+            "--ignored",
+            "--exact",
+            "--nocapture"
+          ],
+          "minimum_tests": 1
+        }
+      ]
+    },
+    {
+      "id": "timed-bot-native",
+      "owner": "service/search maintainers",
+      "when": "clock/bot/budget changes and release candidate",
+      "scope": "Ignored native seat-clock regression, not a strength benchmark.",
+      "required_variables": [
+        "GOA2_GAME_CONTENT"
+      ],
+      "input_files": [
+        "GOA2_GAME_CONTENT"
+      ],
+      "commands": [
+        {
+          "argv": [
+            "cargo",
+            "test",
+            "--manifest-path",
+            "${ROOT}/rust/Cargo.toml",
+            "--locked",
+            "--profile",
+            "iterate",
+            "-p",
+            "goa2-core",
+            "--test",
+            "live_game_setup",
+            "timed_bot_search_respects_each_seats_clock",
+            "--",
+            "--ignored",
+            "--exact",
+            "--nocapture"
+          ],
+          "minimum_tests": 1
+        }
+      ]
+    },
+    {
+      "id": "full-differential",
+      "owner": "engine maintainers",
+      "when": "engine/worker/fixture changes, weekly reference backstop and release candidate",
+      "scope": "Full preflight plus full-feature suites and four explicitly ignored CLI replay gates.",
+      "required_variables": [
+        "GOA2_FIXTURE_CACHE"
+      ],
+      "input_directories": [
+        "GOA2_FIXTURE_CACHE"
+      ],
+      "commands": [
+        {
+          "argv": [
+            "${PYTHON}",
+            "${ROOT}/rust/tools/check.py",
+            "full",
+            "--profile",
+            "iterate"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "restore-exhaustive",
+      "owner": "engine maintainers",
+      "when": "codec/arena/restore changes, weekly reference backstop and release candidate",
+      "scope": "Complete admitted live corpus at every shared execution boundary; optional GOA2_RESTORE_SHARD is checked by the native gate.",
+      "required_variables": [
+        "GOA2_FIXTURE_CACHE"
+      ],
+      "input_directories": [
+        "GOA2_FIXTURE_CACHE"
+      ],
+      "commands": [
+        {
+          "argv": [
+            "${PYTHON}",
+            "${ROOT}/rust/tools/check.py",
+            "restore",
+            "--profile",
+            "iterate"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "simulation-benchmark",
+      "owner": "search maintainers",
+      "when": "hot-path changes and release candidate; manual fixed-work evidence run",
+      "scope": "Five alternating samples, eight matched iterations per workload; Python validation outside native timers. No reduced or synthetic replacement for the two complete-game inputs.",
+      "required_variables": [
+        "GOA2_ORACLE_SOURCE",
+        "GOA2_FIXTURE_CACHE",
+        "GOA2_SEARCH_BINARY",
+        "GOA2_BENCHMARK_OUTPUT"
+      ],
+      "input_files": [
+        "GOA2_ORACLE_SOURCE",
+        "GOA2_SEARCH_BINARY"
+      ],
+      "input_directories": [
+        "GOA2_FIXTURE_CACHE"
+      ],
+      "output_paths": [
+        "GOA2_BENCHMARK_OUTPUT"
+      ],
+      "commands": [
+        {
+          "argv": [
+            "${PYTHON}",
+            "${ROOT}/rust/tools/fixtures.py",
+            "verify",
+            "--full",
+            "--family",
+            "complete-games-hanu"
+          ]
+        },
+        {
+          "argv": [
+            "${PYTHON}",
+            "${ROOT}/scripts/rust_oracle/run_pinned.py",
+            "simulation_bench",
+            "--worker",
+            "${GOA2_SEARCH_BINARY}",
+            "--samples",
+            "5",
+            "--iterations",
+            "8",
+            "--compare-rollback",
+            "--output",
+            "${GOA2_BENCHMARK_OUTPUT}"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "strength-baseline",
+      "owner": "search maintainers",
+      "when": "search-policy changes and release candidate; manual matched evaluation",
+      "scope": "Pinned tuning-map LONG self-play baseline with the source-defined fixed policy/paired starts; report quality separately from simulation throughput. Command defaults are pinned by bridge hashes.",
+      "required_variables": [
+        "GOA2_ORACLE_SOURCE",
+        "GOA2_SEARCH_BINARY"
+      ],
+      "input_files": [
+        "GOA2_ORACLE_SOURCE",
+        "GOA2_SEARCH_BINARY"
+      ],
+      "commands": [
+        {
+          "argv": [
+            "${PYTHON}",
+            "${ROOT}/scripts/rust_oracle/run_pinned.py",
+            "rollout_parity",
+            "--worker",
+            "${GOA2_SEARCH_BINARY}",
+            "--strength-baseline",
+            "--strength-map",
+            "forgotten_island",
+            "--strength-game-type",
+            "LONG"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "hosted-local-contract",
+      "owner": "service/release maintainers",
+      "when": "hosted provisioning/draft changes and pre-promotion; explicitly selected local compatible Python service",
+      "scope": "Disposable native process/database and in-process compatible Python hosted adapter. This does not exercise deployed Worker/Access routing.",
+      "required_variables": [
+        "GOA2_SERVICE_PYTHON",
+        "GOA2_SERVICE_SOURCE",
+        "GOA2_GAME_BINARY",
+        "GOA2_GAME_CONTENT"
+      ],
+      "input_files": [
+        "GOA2_SERVICE_PYTHON",
+        "GOA2_GAME_BINARY",
+        "GOA2_GAME_CONTENT"
+      ],
+      "input_directories": [
+        "GOA2_SERVICE_SOURCE"
+      ],
+      "commands": [
+        {
+          "argv": [
+            "${GOA2_SERVICE_PYTHON}",
+            "${ROOT}/scripts/verify_rust_hosted_draft.py",
+            "${GOA2_GAME_BINARY}",
+            "${GOA2_GAME_CONTENT}"
+          ]
+        }
+      ],
+      "environment": {
+        "PYTHONPATH": "${GOA2_SERVICE_SOURCE}"
+      }
+    },
+    {
+      "id": "hosted-staging-readonly",
+      "owner": "release maintainers",
+      "when": "explicit deployed-frontend integration verification before promotion",
+      "scope": "Read-only verification of a named untimed staging game, ingress and reconnect. No --exercise/--exercise-draft writes are included. Existing verifier reads its Access and player/spectator credentials from the environment.",
+      "required_variables": [
+        "GOA2_FRONTEND_ORIGIN",
+        "GOA2_RUST_ORIGIN",
+        "GOA2_STAGING_GAME_ID",
+        "GOA2_RELEASE_MANIFEST"
+      ],
+      "input_files": [
+        "GOA2_RELEASE_MANIFEST"
+      ],
+      "commands": [
+        {
+          "argv": [
+            "${PYTHON}",
+            "${ROOT}/scripts/verify_rust_staging.py",
+            "--frontend-origin",
+            "${GOA2_FRONTEND_ORIGIN}",
+            "--rust-origin",
+            "${GOA2_RUST_ORIGIN}",
+            "--game-id",
+            "${GOA2_STAGING_GAME_ID}",
+            "--manifest",
+            "${GOA2_RELEASE_MANIFEST}"
+          ]
+        }
+      ]
+    }
+  ]
+}

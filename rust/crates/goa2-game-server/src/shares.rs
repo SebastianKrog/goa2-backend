@@ -5,8 +5,8 @@ use crate::{
 };
 use flate2::{Compression, write::GzEncoder};
 use goa2_core::{
+    api::{LiveGame, PlayerCommand, StartingPositionCommand},
     codec::Phase,
-    interpreter::live_game::{LiveGame, PlayerCommand, StartingPositionCommand},
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -154,7 +154,7 @@ impl Share {
             }
 
             let frame = replay_frame(engine, first, total)?;
-            if index % GROUP_SIZE == 0 {
+            if index.is_multiple_of(GROUP_SIZE) {
                 if let Some(done) = group.take() {
                     append(done)?;
                 }

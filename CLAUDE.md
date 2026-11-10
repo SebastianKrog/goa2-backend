@@ -4,6 +4,12 @@ This file is the single source of truth for AI coding agents working in this
 repository (Claude Code, Codex, Gemini, etc.). `AGENTS.md` and `GEMINI.md` are
 symlinks to this file — edit this file only.
 
+## Native Rust work
+
+For the Rust engine, service, worker and standalone cleanup, follow
+[`rust/AGENTS.md`](rust/AGENTS.md) and [`rust/README.md`](rust/README.md).
+The Python guidance below remains for the reference implementation.
+
 ## Project Overview
 
 Guards of Atlantis II (GoA2) backend - a deterministic, stack-based game engine for a hexagonal tactical game, with a FastAPI server layer for client integration. Built with Python 3.11+ and Pydantic V2.
@@ -15,7 +21,7 @@ For client integration details, see [docs/CLIENT_INTEGRATION_GUIDE.md](docs/CLIE
 
 ## Shared frontend decisions and engine facts
 
-The frontend's agreed [shared decisions plan](../goa2-frontend/docs/plans/shared-decisions-engine-facts.md)
+The frontend's agreed [shared decision facts contract](docs/SHARED_DECISION_FACTS_COMPATIBILITY.md)
 defines the shared migration boundary. Optional `decision_context` on requests
 and `battle_zone_minion_counts` on views implement its additive engine facts.
 The engine owns offered choices, decision semantics and computed gameplay

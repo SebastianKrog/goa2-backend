@@ -207,7 +207,10 @@ struct ObjectPages {
 
 impl std::fmt::Debug for ObjectPages {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.debug_list().entries(self.pages.iter().map(|page| &page.objects)).finish()
+        formatter
+            .debug_list()
+            .entries(self.pages.iter().map(|page| &page.objects))
+            .finish()
     }
 }
 
@@ -227,16 +230,20 @@ impl ObjectPages {
     fn get(&self, index: usize) -> Option<&Arc<Object>> {
         self.pages
             .get(index / Self::PAGE_LEN)?
-            .objects.get(index % Self::PAGE_LEN)
+            .objects
+            .get(index % Self::PAGE_LEN)
     }
 
     fn touch(&mut self, page: usize) {
-        self.revision = self.revision.checked_add(1).expect("arena revision exhausted");
+        self.revision = self
+            .revision
+            .checked_add(1)
+            .expect("arena revision exhausted");
         self.revisions[page] = self.revision;
     }
 
     fn push(&mut self, object: Arc<Object>) {
-        if self.len % Self::PAGE_LEN == 0 {
+        if self.len.is_multiple_of(Self::PAGE_LEN) {
             self.pages.push(Arc::new(ObjectPage {
                 objects: Vec::with_capacity(Self::PAGE_LEN),
                 fingerprint: OnceLock::new(),
@@ -244,7 +251,9 @@ impl ObjectPages {
             self.revisions.push(0);
         }
         self.touch(self.pages.len() - 1);
-        Arc::make_mut(self.pages.last_mut().unwrap()).objects_mut().push(object);
+        Arc::make_mut(self.pages.last_mut().unwrap())
+            .objects_mut()
+            .push(object);
         self.len += 1;
     }
 
@@ -258,7 +267,9 @@ impl ObjectPages {
         let tail = len % Self::PAGE_LEN;
         if tail != 0 && self.pages.last().unwrap().objects.len() > tail {
             self.touch(pages - 1);
-            Arc::make_mut(self.pages.last_mut().unwrap()).objects_mut().truncate(tail);
+            Arc::make_mut(self.pages.last_mut().unwrap())
+                .objects_mut()
+                .truncate(tail);
         }
         self.len = len;
     }
@@ -284,7 +295,9 @@ impl std::hash::Hash for ObjectPages {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.len.hash(state);
         for page in &self.pages {
-            page.fingerprint.get_or_init(|| page.recompute_fingerprint()).hash(state);
+            page.fingerprint
+                .get_or_init(|| page.recompute_fingerprint())
+                .hash(state);
         }
     }
 }
@@ -585,7 +598,8 @@ impl ObjectArena {
         } else {
             None
         };
-        let private_context = arena.context_edges_are_private(0, None)
+        let private_context = arena
+            .context_edges_are_private(0, None)
             .then_some((arena.objects.len(), arena.objects.revision));
         arena.layout = Arc::new(ArenaLayout {
             aliases,
@@ -596,7 +610,11 @@ impl ObjectArena {
         Ok(arena)
     }
     pub(crate) fn board_key(&self, index: usize) -> Option<ObjectId> {
-        self.layout.board_keys.as_ref()?.get(index).map(|(_, id)| *id)
+        self.layout
+            .board_keys
+            .as_ref()?
+            .get(index)
+            .map(|(_, id)| *id)
     }
     fn import(
         &mut self,
@@ -768,8 +786,8 @@ impl ObjectArena {
             if next.is_none() && pending.is_empty() {
                 return false;
             }
-            let seen = visited
-                .get_or_insert_with(HashSet::<_, foldhash::fast::RandomState>::default);
+            let seen =
+                visited.get_or_insert_with(HashSet::<_, foldhash::fast::RandomState>::default);
             seen.insert(id);
             if next.is_none_or(|child| seen.contains(&child)) {
                 next = std::iter::from_fn(|| pending.pop()).find(|child| !seen.contains(child));
@@ -814,9 +832,11 @@ impl ObjectArena {
         Ok(value)
     }
     pub(crate) fn fresh_context_object_is_private(&self, object: ObjectId) -> bool {
-        self.layout.private_context.is_some_and(|(initial_len, revision)| {
-            object.0 >= initial_len && self.context_edges_are_private(revision, Some(object))
-        })
+        self.layout
+            .private_context
+            .is_some_and(|(initial_len, revision)| {
+                object.0 >= initial_len && self.context_edges_are_private(revision, Some(object))
+            })
     }
 
     // A new handle cannot occur in an untouched import page. The protected
@@ -829,7 +849,10 @@ impl ObjectArena {
             return false;
         };
         let context_key = self.symbols.lookup("execution_context");
-        for (index, (page, &revision)) in self.objects.pages.iter()
+        for (index, (page, &revision)) in self
+            .objects
+            .pages
+            .iter()
             .zip(&self.objects.revisions)
             .enumerate()
         {
@@ -845,8 +868,10 @@ impl ObjectArena {
                 let unsafe_edge = match &object.contents {
                     Contents::List(items) => items.iter().any(forbidden),
                     Contents::Fields(fields) => fields.iter().any(|(key, value)| {
-                        forbidden(value) && !(owner == root && Some(*key) == context_key
-                            && matches!(value, ObjectValue::Object(id) if *id == self.context))
+                        forbidden(value)
+                            && !(owner == root
+                                && Some(*key) == context_key
+                                && matches!(value, ObjectValue::Object(id) if *id == self.context))
                     }),
                 };
                 if unsafe_edge {
@@ -884,7 +909,10 @@ impl ObjectArena {
     pub(crate) fn readonly_step_objects(&self, step: ObjectId) -> ProtectedObjects {
         self.readonly_reachable::<true>(vec![step])
     }
-    fn readonly_reachable<const RETAIN_ORDER: bool>(&self, mut queue: Vec<ObjectId>) -> ProtectedObjects {
+    fn readonly_reachable<const RETAIN_ORDER: bool>(
+        &self,
+        mut queue: Vec<ObjectId>,
+    ) -> ProtectedObjects {
         let mut protected = ProtectedObjects::new(self.objects.len());
         // Resolve exclusions once per walk; scalar fields cannot add graph edges.
         let live_fields = [
@@ -2119,7 +2147,9 @@ mod protection_tests {
         arena.with_rollback(|arena| {
             let existing = ObjectId(4);
             arena.clear_list(existing).unwrap();
-            let ObjectValue::Object(new) = arena.list(vec![]) else { unreachable!() };
+            let ObjectValue::Object(new) = arena.list(vec![]) else {
+                unreachable!()
+            };
             for list in [existing, new] {
                 let card = ObjectValue::Atom(Datum::Int(1));
                 arena.append(list, card.clone()).unwrap();
@@ -2175,12 +2205,16 @@ mod protection_tests {
             unreachable!()
         };
         let key = arena.symbols.lookup("wrapped").unwrap();
-        arena.set_context(key, ObjectValue::Object(private)).unwrap();
+        arena
+            .set_context(key, ObjectValue::Object(private))
+            .unwrap();
         assert!(arena.fresh_context_object_is_private(private));
         assert!(!arena.fresh_context_object_is_private(ObjectId(4)));
 
         arena.with_rollback(|arena| {
-            arena.append(ObjectId(2), ObjectValue::Object(private)).unwrap();
+            arena
+                .append(ObjectId(2), ObjectValue::Object(private))
+                .unwrap();
             assert!(!arena.fresh_context_object_is_private(private));
             assert!(arena.readonly_objects().contains(&private));
         });
@@ -2188,7 +2222,9 @@ mod protection_tests {
 
         arena.with_rollback(|arena| {
             let external = arena.list(vec![ObjectValue::Object(arena.context_id())]);
-            arena.set_root(arena.symbols.lookup("world").unwrap(), external).unwrap();
+            arena
+                .set_root(arena.symbols.lookup("world").unwrap(), external)
+                .unwrap();
             assert!(!arena.fresh_context_object_is_private(private));
             assert!(arena.readonly_objects().contains(&private));
         });

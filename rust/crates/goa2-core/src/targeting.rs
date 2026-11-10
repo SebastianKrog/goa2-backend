@@ -51,7 +51,10 @@ pub enum UnitFilter {
     BehindEmpty(crate::spatial::Origin),
     Spatial(HexFilter),
     AdjacentContext(Symbol),
-    AdjacentToken { kind: Symbol, max_range: i64 },
+    AdjacentToken {
+        kind: Symbol,
+        max_range: i64,
+    },
     EmptyNeighbor,
     Displacement(crate::validation::DisplacementKind),
     Team(Relation),
@@ -431,18 +434,25 @@ impl UnitFilter {
                 }
             }
             Self::AdjacentToken { kind, max_range } => {
-                let Some((actor, target)) = context.actor.and_then(|actor| world.position(actor))
-                    .zip(world.position(id)) else {
+                let Some((actor, target)) = context
+                    .actor
+                    .and_then(|actor| world.position(actor))
+                    .zip(world.position(id))
+                else {
                     return Ok(false);
                 };
                 let mut found = false;
                 for neighbor in target.neighbors() {
-                    if world.occupant(neighbor).and_then(|id| world.entity(id))
+                    if world
+                        .occupant(neighbor)
+                        .and_then(|id| world.entity(id))
                         .is_some_and(|entity| {
                             entity.kind == EntityKind::Token && entity.token_type == Some(*kind)
                         })
                         && world.effect_connected(target, neighbor, &[])?
-                        && crate::queries::topology_distance(world, actor, neighbor)?.threshold_order(*max_range).is_le()
+                        && crate::queries::topology_distance(world, actor, neighbor)?
+                            .threshold_order(*max_range)
+                            .is_le()
                     {
                         found = true;
                         break;

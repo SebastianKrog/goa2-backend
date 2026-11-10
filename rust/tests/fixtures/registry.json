@@ -1,0 +1,421 @@
+{
+  "schema_version": 1,
+  "families": [
+    {
+      "family": "cache-identities",
+      "path": "cache-identities.json",
+      "category": "reference-metadata",
+      "sha256": "c50f255ec405d9433619c1ca4b45118d9a0f6289f6b0d1b61bf9df2f2a8096e6",
+      "schema_version": null,
+      "case_count": 0,
+      "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+      "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+      "generator": "See docs/archive/fixture-history.md and scripts/rust_oracle/",
+      "consumers": [
+        "goa2-core/tests",
+        "goa2-core inline tests",
+        "goa2-search-cli inline tests"
+      ],
+      "acquisition": "pinned export or separately verified cache; no public artifact URL established",
+      "licensing": "requires upstream/content rights review before public distribution",
+      "owner": "engine maintainers",
+      "retention": "retain unique coverage; no retirement authorized"
+    },
+    {
+      "family": "complete-games-hanu",
+      "path": "complete-games-hanu.json",
+      "category": "parity-index",
+      "sha256": "98629b81fbfee0723a1f13bb33997a6118f5d997284e1510b978d4b7cc4e8d9b",
+      "schema_version": 2,
+      "case_count": 2,
+      "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+      "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+      "generator": "hanu_complete_games.py",
+      "consumers": [
+        "goa2-core/tests",
+        "goa2-core inline tests",
+        "goa2-search-cli inline tests"
+      ],
+      "acquisition": "pinned export or separately verified cache; no public artifact URL established",
+      "licensing": "requires upstream/content rights review before public distribution",
+      "owner": "engine maintainers",
+      "retention": "retain unique coverage; no retirement authorized"
+    },
+    {
+      "family": "complete-games",
+      "path": "complete-games.json",
+      "category": "parity-index",
+      "sha256": "dd0324823fe1a0987f5cbd28253fb77a1191040bc45ea86dba6217041b49ed4b",
+      "schema_version": 2,
+      "case_count": 2,
+      "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+      "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+      "generator": "complete_games.py",
+      "consumers": [
+        "goa2-core/tests",
+        "goa2-core inline tests",
+        "goa2-search-cli inline tests"
+      ],
+      "acquisition": "pinned export or separately verified cache; no public artifact URL established",
+      "licensing": "requires upstream/content rights review before public distribution",
+      "owner": "engine maintainers",
+      "retention": "retain unique coverage; no retirement authorized"
+    },
+    {
+      "family": "effect-errors",
+      "path": "effect-errors.json",
+      "category": "reference-metadata",
+      "sha256": "65cf7f235539fbce24fc79cf37a9511f27f408ca6b5983aba8add6c6ccd0a37d",
+      "schema_version": 1,
+      "case_count": 1,
+      "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+      "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+      "generator": "See docs/archive/fixture-history.md and scripts/rust_oracle/",
+      "consumers": [
+        "goa2-core/tests",
+        "goa2-core inline tests",
+        "goa2-search-cli inline tests"
+      ],
+      "acquisition": "pinned export or separately verified cache; no public artifact URL established",
+      "licensing": "requires upstream/content rights review before public distribution",
+      "owner": "engine maintainers",
+      "retention": "retain unique coverage; no retirement authorized"
+    },
+    {
+      "family": "mine-reference-errors",
+      "path": "mine-reference-errors.json",
+      "category": "reference-metadata",
+      "sha256": "f812fe99bbdae685875a66b187db9fb7c49acde90c7b8226ea35254c10244f4d",
+      "schema_version": 1,
+      "case_count": 0,
+      "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+      "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+      "generator": "See docs/archive/fixture-history.md and scripts/rust_oracle/",
+      "consumers": [
+        "goa2-core/tests",
+        "goa2-core inline tests",
+        "goa2-search-cli inline tests"
+      ],
+      "acquisition": "pinned export or separately verified cache; no public artifact URL established",
+      "licensing": "requires upstream/content rights review before public distribution",
+      "owner": "engine maintainers",
+      "retention": "retain unique coverage; no retirement authorized"
+    },
+    {
+      "family": "movement",
+      "path": "movement.json",
+      "category": "smoke",
+      "sha256": "ea66feeb03a6f3be357cf8bc576221cef5b4f9ce223e017a8d412df19e2ea981",
+      "schema_version": 1,
+      "case_count": 9,
+      "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+      "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+      "generator": "See docs/archive/fixture-history.md and scripts/rust_oracle/",
+      "consumers": [
+        "goa2-core/tests",
+        "goa2-core inline tests",
+        "goa2-search-cli inline tests"
+      ],
+      "acquisition": "pinned export or separately verified cache; no public artifact URL established",
+      "licensing": "requires upstream/content rights review before public distribution",
+      "owner": "engine maintainers",
+      "retention": "retain unique coverage; no retirement authorized"
+    },
+    {
+      "family": "object-arena",
+      "path": "object-arena.json",
+      "category": "parity-index",
+      "sha256": "d2d7dd3f7af4efb88edd4d0e33abdc84578661a479ff0226a9a55921e71bae47",
+      "schema_version": 2,
+      "case_count": 12,
+      "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+      "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+      "generator": "shared_objects.py",
+      "consumers": [
+        "goa2-core/tests",
+        "goa2-core inline tests",
+        "goa2-search-cli inline tests"
+      ],
+      "acquisition": "pinned export or separately verified cache; no public artifact URL established",
+      "licensing": "requires upstream/content rights review before public distribution",
+      "owner": "engine maintainers",
+      "retention": "retain unique coverage; no retirement authorized"
+    },
+    {
+      "family": "object-execution",
+      "path": "object-execution.json",
+      "category": "parity-index",
+      "sha256": "c7596d5d31cd15b0970d512d2128bab0601c0bdcaf78765a99076663050026f5",
+      "schema_version": 2,
+      "case_count": 17347,
+      "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+      "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+      "generator": "object_execution_traces.py export",
+      "consumers": [
+        "goa2-core/tests",
+        "goa2-core inline tests",
+        "goa2-search-cli inline tests"
+      ],
+      "acquisition": "pinned export or separately verified cache; no public artifact URL established",
+      "licensing": "requires upstream/content rights review before public distribution",
+      "owner": "engine maintainers",
+      "retention": "retain unique coverage; no retirement authorized"
+    },
+    {
+      "family": "stack-traces",
+      "path": "stack-traces.json",
+      "category": "parity-index",
+      "sha256": "325972050946e1937ef9f48bbe062ee78a2b13a7f5c58f59e2a13d5d0b44f594",
+      "schema_version": 2,
+      "case_count": 6592,
+      "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+      "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+      "generator": "stack_traces.py export",
+      "consumers": [
+        "goa2-core/tests",
+        "goa2-core inline tests",
+        "goa2-search-cli inline tests"
+      ],
+      "acquisition": "pinned export or separately verified cache; no public artifact URL established",
+      "licensing": "requires upstream/content rights review before public distribution",
+      "owner": "engine maintainers",
+      "retention": "retain unique coverage; no retirement authorized"
+    },
+    {
+      "family": "states",
+      "path": "states.json",
+      "category": "smoke",
+      "sha256": "a73d3e4dd13e67a020a3406caaaeddb9aee26bf5e558f1a09502c259afccb82f",
+      "schema_version": 1,
+      "case_count": 3,
+      "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+      "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+      "generator": "See docs/archive/fixture-history.md and scripts/rust_oracle/",
+      "consumers": [
+        "goa2-core/tests",
+        "goa2-core inline tests",
+        "goa2-search-cli inline tests"
+      ],
+      "acquisition": "pinned export or separately verified cache; no public artifact URL established",
+      "licensing": "requires upstream/content rights review before public distribution",
+      "owner": "engine maintainers",
+      "retention": "retain unique coverage; no retirement authorized"
+    },
+    {
+      "family": "action-validation",
+      "path": "action-validation.json",
+      "category": "external-parity",
+      "expected_payloads": 1,
+      "raw_sha256": "17fe7a73de239d19ea32e9108e9ea2fd2be7254da7905162acabd4acd2a2caba",
+      "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+      "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+      "purpose": "Retained monolithic reference family consumed by full-feature integration tests; no replacement or retirement authorized.",
+      "generator": "scripts/rust_oracle/; see archived fixture history",
+      "consumers": [
+        "goa2-core integration tests",
+        "reference tooling"
+      ],
+      "licensing": "public redistribution review pending",
+      "owner": "engine maintainers",
+      "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE"
+    },
+    {
+      "family": "actions",
+      "path": "actions.json",
+      "category": "external-parity",
+      "expected_payloads": 1,
+      "raw_sha256": "e56d1401b1528c8cb231ad042a98e97c5d1520bda1bd1b4da7020d37bf4ebf0d",
+      "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+      "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+      "purpose": "Retained monolithic reference family consumed by full-feature integration tests; no replacement or retirement authorized.",
+      "generator": "scripts/rust_oracle/; see archived fixture history",
+      "consumers": [
+        "goa2-core integration tests",
+        "reference tooling"
+      ],
+      "licensing": "public redistribution review pending",
+      "owner": "engine maintainers",
+      "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE"
+    },
+    {
+      "family": "card-equality",
+      "path": "card-equality.json",
+      "category": "external-parity",
+      "expected_payloads": 1,
+      "raw_sha256": "f5805a07c262e5c6c32b3f3c13a72c903892ca6f041a532dc602235bb1aec56e",
+      "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+      "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+      "purpose": "Retained monolithic reference family consumed by full-feature integration tests; no replacement or retirement authorized.",
+      "generator": "scripts/rust_oracle/; see archived fixture history",
+      "consumers": [
+        "goa2-core integration tests",
+        "reference tooling"
+      ],
+      "licensing": "public redistribution review pending",
+      "owner": "engine maintainers",
+      "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE"
+    },
+    {
+      "family": "displacement-validation",
+      "path": "displacement-validation.json",
+      "category": "external-parity",
+      "expected_payloads": 1,
+      "raw_sha256": "0169ea6b7ca1eca59362894e86685da892002719450587e87bdc4664148e40c5",
+      "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+      "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+      "purpose": "Retained monolithic reference family consumed by full-feature integration tests; no replacement or retirement authorized.",
+      "generator": "scripts/rust_oracle/; see archived fixture history",
+      "consumers": [
+        "goa2-core integration tests",
+        "reference tooling"
+      ],
+      "licensing": "public redistribution review pending",
+      "owner": "engine maintainers",
+      "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE"
+    },
+    {
+      "family": "effect-stats",
+      "path": "effect-stats.json",
+      "category": "external-parity",
+      "expected_payloads": 1,
+      "raw_sha256": "fd2390280ac5f9b2010cb35905aaab31ba9da1e5af1ad33cadb828a386dad8a2",
+      "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+      "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+      "purpose": "Retained monolithic reference family consumed by full-feature integration tests; no replacement or retirement authorized.",
+      "generator": "scripts/rust_oracle/; see archived fixture history",
+      "consumers": [
+        "goa2-core integration tests",
+        "reference tooling"
+      ],
+      "licensing": "public redistribution review pending",
+      "owner": "engine maintainers",
+      "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE"
+    },
+    {
+      "family": "effects",
+      "path": "effects.json",
+      "category": "external-parity",
+      "expected_payloads": 1,
+      "raw_sha256": "71cac5a0cb1dff0cd0d180f7dc5320e463285abc678e047b8608876bc793048d",
+      "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+      "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+      "purpose": "Retained monolithic reference family consumed by full-feature integration tests; no replacement or retirement authorized.",
+      "generator": "scripts/rust_oracle/; see archived fixture history",
+      "consumers": [
+        "goa2-core integration tests",
+        "reference tooling"
+      ],
+      "licensing": "public redistribution review pending",
+      "owner": "engine maintainers",
+      "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE"
+    },
+    {
+      "family": "hex-filters",
+      "path": "hex-filters.json",
+      "category": "external-parity",
+      "expected_payloads": 1,
+      "raw_sha256": "5c7419ef60244962a13d2bb219ab61eb82b4c550e46f7e9b06d2e170d2572ce6",
+      "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+      "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+      "purpose": "Retained monolithic reference family consumed by full-feature integration tests; no replacement or retirement authorized.",
+      "generator": "scripts/rust_oracle/; see archived fixture history",
+      "consumers": [
+        "goa2-core integration tests",
+        "reference tooling"
+      ],
+      "licensing": "public redistribution review pending",
+      "owner": "engine maintainers",
+      "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE"
+    },
+    {
+      "family": "mine-paths",
+      "path": "mine-paths.json",
+      "category": "external-parity",
+      "expected_payloads": 1,
+      "raw_sha256": "d2032e0fc76f8e96255d596529f8ebb28ab26c0c29d2c9a36cfa30a2d37d772f",
+      "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+      "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+      "purpose": "Retained monolithic reference family consumed by full-feature integration tests; no replacement or retirement authorized.",
+      "generator": "scripts/rust_oracle/; see archived fixture history",
+      "consumers": [
+        "goa2-core integration tests",
+        "reference tooling"
+      ],
+      "licensing": "public redistribution review pending",
+      "owner": "engine maintainers",
+      "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE"
+    },
+    {
+      "family": "models",
+      "path": "models.json",
+      "category": "external-parity",
+      "expected_payloads": 1,
+      "raw_sha256": "be80a1b1900a8aeb30fd01fb1d0223b5fa46aeacd43c63138b8608fa5d260e5e",
+      "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+      "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+      "purpose": "Retained monolithic reference family consumed by full-feature integration tests; no replacement or retirement authorized.",
+      "generator": "scripts/rust_oracle/; see archived fixture history",
+      "consumers": [
+        "goa2-core integration tests",
+        "reference tooling"
+      ],
+      "licensing": "public redistribution review pending",
+      "owner": "engine maintainers",
+      "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE"
+    },
+    {
+      "family": "planning",
+      "path": "planning.json",
+      "category": "external-parity",
+      "expected_payloads": 1,
+      "raw_sha256": "800d68731c339c711ac9c1139dbecf541c8f3128a7a2bce409eef86274d8c634",
+      "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+      "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+      "purpose": "Retained monolithic reference family consumed by full-feature integration tests; no replacement or retirement authorized.",
+      "generator": "scripts/rust_oracle/; see archived fixture history",
+      "consumers": [
+        "goa2-core integration tests",
+        "reference tooling"
+      ],
+      "licensing": "public redistribution review pending",
+      "owner": "engine maintainers",
+      "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE"
+    },
+    {
+      "family": "targeting",
+      "path": "targeting.json",
+      "category": "external-parity",
+      "expected_payloads": 1,
+      "raw_sha256": "10dd13c877fdfb51201732f53a3e0bf9b0c1833b5fdfd35d83be761dcdc18010",
+      "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+      "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+      "purpose": "Retained monolithic reference family consumed by full-feature integration tests; no replacement or retirement authorized.",
+      "generator": "scripts/rust_oracle/; see archived fixture history",
+      "consumers": [
+        "goa2-core integration tests",
+        "reference tooling"
+      ],
+      "licensing": "public redistribution review pending",
+      "owner": "engine maintainers",
+      "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE"
+    },
+    {
+      "family": "terrain-validation",
+      "path": "terrain-validation.json",
+      "category": "external-parity",
+      "expected_payloads": 1,
+      "raw_sha256": "78de54b483a84ff5aacc669c1085e8ffbe2d5383240cd63221ed6cb5acb2986b",
+      "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+      "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+      "purpose": "Retained monolithic reference family consumed by full-feature integration tests; no replacement or retirement authorized.",
+      "generator": "scripts/rust_oracle/; see archived fixture history",
+      "consumers": [
+        "goa2-core integration tests",
+        "reference tooling"
+      ],
+      "licensing": "public redistribution review pending",
+      "owner": "engine maintainers",
+      "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE"
+    }
+  ]
+}

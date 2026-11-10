@@ -428,6 +428,10 @@ mod tests {
         worker.import_selection(&serde_json::json!({"hero_id":worker.symbols.name(p.hero),"card_id":worker.symbols.name(printed)})).unwrap()
     }
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: frozen late-generation payload is not bundled; see docs/testing.md"
+    )]
     fn request_exhaustion_rejects_before_pop_and_existing_request_is_reused() {
         let mut worker = object_session("object-execution-upgrade-live-Arien-1-single-0");
         worker.next_request = u64::MAX;
@@ -451,6 +455,10 @@ mod tests {
         );
     }
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: frozen late-generation payload is not bundled; see docs/testing.md"
+    )]
     fn final_upgrade_generation_guard_preserves_cards_items_pending_and_reveals() {
         let mut worker = object_session("object-execution-upgrade-live-pending-valid");
         worker.next_step = u64::MAX;
@@ -467,6 +475,10 @@ mod tests {
         assert_eq!(before.object_bindings, after.object_bindings);
     }
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: frozen late-generation payload is not bundled; see docs/testing.md"
+    )]
     fn invalid_batch_submit_keeps_issued_token_and_all_authoritative_state() {
         let mut worker = object_session("object-execution-upgrade-live-Arien-3-single-0");
         let req = worker.advance_prefix(1).unwrap().request.unwrap();
@@ -489,6 +501,10 @@ mod tests {
         assert_eq!(worker.round.pending[0].1, 2);
     }
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: frozen late-generation payload is not bundled; see docs/testing.md"
+    )]
     fn upgrade_clones_keep_physical_hands_items_and_pending_maps_private() {
         let mut root = object_session("object-execution-upgrade-live-Arien-3-single-0");
         let req = root.advance_prefix(1).unwrap().request.unwrap();
@@ -507,6 +523,10 @@ mod tests {
         assert_eq!(root.export_envelope().unwrap().state, before.state);
     }
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: frozen late-generation payload is not bundled; see docs/testing.md"
+    )]
     fn shared_item_dictionary_refreshes_every_hero_cache() {
         let mut worker = object_session("object-execution-upgrade-live-shared-items");
         let req = worker.advance_prefix(1).unwrap().request.unwrap();
@@ -522,6 +542,10 @@ mod tests {
         assert!(worker.world.hero(a).unwrap().items.iter().any(|n| *n > 0));
     }
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: frozen late-generation payload is not bundled; see docs/testing.md"
+    )]
     fn reset_requires_no_request_or_step_generation_and_retains_defeated_alias() {
         let mut worker = object_session("object-execution-upgrade-live-reset-defeated");
         worker.next_step = u64::MAX;

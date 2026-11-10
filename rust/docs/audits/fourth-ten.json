@@ -1,0 +1,360 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-10",
+  "branch": "bots-upstream",
+  "implementation_commit": "ed1597be1de77d1adb409de9d3f79564af203ee2",
+  "completed_tasks": [
+    "C04-08",
+    "C05-01",
+    "C05-02",
+    "C07-07",
+    "C07-09",
+    "C08-01",
+    "C08-03",
+    "C11-04",
+    "C11-05",
+    "C11-06"
+  ],
+  "checklist": {
+    "completed": 40,
+    "open": 44
+  },
+  "native": {
+    "compiler": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+    "profile": "iterate",
+    "expected": 402,
+    "executed": 402,
+    "failed": 0,
+    "ignored": 64,
+    "full_parity": false
+  },
+  "tooling": {
+    "expected": 44,
+    "executed": 44,
+    "failed": 0,
+    "extracted_expected": 44,
+    "extracted_executed": 44,
+    "extracted_failed": 0
+  },
+  "service": {
+    "suites": [
+      {
+        "suite": "auth",
+        "expected": 2,
+        "executed": 2,
+        "failed": 0,
+        "missing": 0
+      },
+      {
+        "suite": "bots",
+        "expected": 3,
+        "executed": 3,
+        "failed": 0,
+        "missing": 0
+      },
+      {
+        "suite": "clocks",
+        "expected": 2,
+        "executed": 2,
+        "failed": 0,
+        "missing": 0
+      },
+      {
+        "suite": "votes",
+        "expected": 6,
+        "executed": 6,
+        "failed": 0,
+        "missing": 0
+      },
+      {
+        "suite": "shutdown",
+        "expected": 1,
+        "executed": 1,
+        "failed": 0,
+        "missing": 0
+      },
+      {
+        "suite": "backup",
+        "expected": 1,
+        "executed": 1,
+        "failed": 0,
+        "missing": 0
+      }
+    ],
+    "expected": 15,
+    "executed": 15,
+    "failed": 0
+  },
+  "historical": {
+    "producer_commit": "f0fb93e117f358266ef522e6d5f23d3452e83e97",
+    "matrix": [
+      {
+        "source_database_version": 0,
+        "consumer_database_version": 3,
+        "expected": 1,
+        "executed": 1,
+        "failed": 0,
+        "scope": "load/scopes/links/receipt/replay/share/command/event-order/restart/retry/rollback"
+      },
+      {
+        "source_database_version": 1,
+        "consumer_database_version": 3,
+        "expected": 1,
+        "executed": 1,
+        "failed": 0,
+        "scope": "load/scopes/links/receipt/replay/share/command/event-order/restart/retry/rollback"
+      },
+      {
+        "source_database_version": 2,
+        "consumer_database_version": 3,
+        "expected": 1,
+        "executed": 1,
+        "failed": 0,
+        "scope": "load/scopes/links/receipt/replay/share/command/event-order/restart/retry/rollback"
+      },
+      {
+        "source_database_version": 3,
+        "consumer_database_version": 3,
+        "expected": 1,
+        "executed": 1,
+        "failed": 0,
+        "scope": "load/scopes/links/receipt/replay/share/command/event-order/restart/retry/rollback"
+      }
+    ],
+    "future_database_rejected_without_mutation": true,
+    "rollback": {
+      "expected": 1,
+      "executed": 1,
+      "failed": 0,
+      "from_database_version": 3,
+      "restored_matching_backup_version": 0,
+      "old_binary_on_new_live_database_attempted": false
+    },
+    "full_frozen_parity": false
+  },
+  "dependency_review": "dependency-review.json",
+  "cold_native": "cold-native.json",
+  "cold_snapshot_runtime_files": 194,
+  "cold_snapshot_runtime_mismatches": 0,
+  "performance": {
+    "raw_results": "../../benchmarks/maintenance-v1-results.json",
+    "summary": "performance-summary.json",
+    "review": "performance-baseline.md",
+    "packs": 2,
+    "fresh_benchmark_processes": 6,
+    "fresh_database_server_starts": 6,
+    "fixed_work_agrees_in_all_runs": true,
+    "observed_cancellations": 6,
+    "strength_claimed": false,
+    "catalog_optimization": "retain immutable caches/current placement; no speculative optimization"
+  },
+  "release_provenance": "../release-provenance.json",
+  "quality": {
+    "rustfmt": true,
+    "strict_clippy_all_targets_all_features": true,
+    "rustdoc": true,
+    "compiled_embedding_example": true,
+    "python_black_and_strict_ruff": true,
+    "documentation_link_failures": 0,
+    "diff_check": true
+  },
+  "full_preflight": {
+    "exit_code": 1,
+    "results": [
+      {
+        "family": "complete-games-hanu",
+        "expected": 2,
+        "executed": 0,
+        "missing": 2,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "complete-games",
+        "expected": 2,
+        "executed": 0,
+        "missing": 2,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "object-arena",
+        "expected": 12,
+        "executed": 0,
+        "missing": 12,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "object-execution",
+        "expected": 17347,
+        "executed": 0,
+        "missing": 17347,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "stack-traces",
+        "expected": 6592,
+        "executed": 0,
+        "missing": 6592,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "action-validation",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "actions",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "card-equality",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "displacement-validation",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "effect-stats",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "effects",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "hex-filters",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "mine-paths",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "models",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "planning",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "targeting",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "terrain-validation",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      }
+    ],
+    "missing_indexed_cases": 23955,
+    "missing_monolithic_payloads": 12,
+    "changed_case_admitted": false
+  },
+  "quick_data": {
+    "expected": 572,
+    "executed": 572,
+    "failed": 0,
+    "missing": 0
+  },
+  "extraction": {
+    "scope": "Final documentation/tooling rehearsal, not approved C12 payload",
+    "original_git_history_required": false,
+    "selected_files": 1141,
+    "source_map_sha256": "a8677c385e90af91e519ace2835e32dc6e25d8e04647926ccc764e7200e63e5f",
+    "runtime_files_match_candidate": true,
+    "gate_definitions_validated": 9,
+    "documentation_link_failures": 0,
+    "unresolved_embedded_dependencies": 0,
+    "quick_data_executed": 572,
+    "historical_rows": 4,
+    "worker_process": {
+      "expected": 71,
+      "executed": 71,
+      "rejected": 69,
+      "successful_after_rejections": 2,
+      "failed": 0,
+      "scope": "Transport/schema only; unavailable native workloads are not executed."
+    },
+    "prohibited_database_env_paths": []
+  },
+  "catalog_content_index_oracle_bytes_changed": false,
+  "remote_ci_claimed": false,
+  "publication_performed": false,
+  "deployment_performed": false,
+  "original_history_rewritten": false,
+  "commands": [
+    "python rust/tools/cold_build.py --work NEW_DIRECTORY --report NEW_REPORT",
+    "python rust/tools/historical_compatibility.py verify --binary CURRENT_SERVER --content rust/content/smoke-game.json --producer-binary ADMITTED_OLD_SERVER",
+    "python rust/tools/dependency_review.py --scanner CARGO_DENY_0_20_2 --output NEW_REPORT",
+    "cargo build --locked --release --workspace --bins --example maintenance_bench (cwd rust)",
+    "python rust/tools/maintenance_measurements.py --benchmark-binary RELEASE_EXAMPLE --server-binary RELEASE_SERVER --content rust/content/smoke-game.json --content VERIFIED_FULL_PACK --repetitions 3 --output NEW_REPORT",
+    "python scripts/package_rust_game_server.py RELEASE_SERVER rust/content/smoke-game.json NEW_ARCHIVE",
+    "python -m pytest -q rust/tests/tooling tests/rust_oracle/test_fixture_cache.py",
+    "python rust/tools/fixtures.py verify --full"
+  ],
+  "scratch_cleanup": "Removed only regenerable targets from both owned disposable cold-build runs after retaining source maps, dependency archives, command logs and reports; no source/fixtures/unique evidence deleted."
+}

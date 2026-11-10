@@ -1,0 +1,674 @@
+{
+  "schema_version": 1,
+  "scope": "repository-owned rust/artifacts tree; external /workspace/work and user data are outside deletion/inventory authority",
+  "milestones": [
+    {
+      "path": "rust/artifacts/arena-battle-final-validation.json",
+      "sha256": "1d143cc8eb695092111a81fcc8638a78534a7471886a9602a0018d6b3348591f",
+      "bytes": 3204,
+      "last_change_commit": "dcd00e0cf609dc84eb879394398aec80b1d1de4a",
+      "last_change_date": "2026-11-03T18:43:10+01:00",
+      "recorded_context": {
+        "$.verification_scope": "All core unit tests, the new battle restoration gate, full canonical/live CLI replays, battle and dynamic passive source contracts. Other existing integration suites and the older exhaustive all-corpus restoration gate were not rerun for this increment."
+      },
+      "compiler": "not_recorded; do not infer from the current compiler",
+      "embedded_regression_candidate_paths": [],
+      "references": [
+        "docs/superpowers/plans/2026-10-23-rust-search-engine.md",
+        "rust/docs/archive/development-history.md",
+        "rust/docs/archive/fixture-history.md"
+      ],
+      "decision": "retain original bytes in original repository; exclude from standalone runtime/public payload until rights/provenance review; metadata inventory remains in snapshot",
+      "retirement_authorized": false
+    },
+    {
+      "path": "rust/artifacts/arena-cleanup-final-validation.json",
+      "sha256": "87efea74372cf8775a065de62c2545a0931361523821f4c55492041b50809183",
+      "bytes": 2441,
+      "last_change_commit": "dcd00e0cf609dc84eb879394398aec80b1d1de4a",
+      "last_change_date": "2026-11-03T18:43:10+01:00",
+      "recorded_context": {
+        "$.verification_scope": "All core unit tests, the cleanup restoration gate, full canonical/live CLI replays, and cleanup/battle/dynamic-passive source contracts. Other existing integration suites and the older exhaustive all-corpus restoration gate were not rerun for this increment."
+      },
+      "compiler": "not_recorded; do not infer from the current compiler",
+      "embedded_regression_candidate_paths": [],
+      "references": [
+        "docs/superpowers/plans/2026-10-23-rust-search-engine.md",
+        "rust/docs/archive/development-history.md",
+        "rust/docs/archive/fixture-history.md"
+      ],
+      "decision": "retain original bytes in original repository; exclude from standalone runtime/public payload until rights/provenance review; metadata inventory remains in snapshot",
+      "retirement_authorized": false
+    },
+    {
+      "path": "rust/artifacts/arien-primary-final-validation.json",
+      "sha256": "c8190fa2d9dc8ccf9c57d2750c570d311300d8851b883206f0fbbcb064abe86f",
+      "bytes": 1501,
+      "last_change_commit": "d4b430f214e12a5b6d6d7527594575372afe0bae",
+      "last_change_date": "2026-11-03T08:23:18+01:00",
+      "recorded_context": {},
+      "compiler": "not_recorded; do not infer from the current compiler",
+      "embedded_regression_candidate_paths": [],
+      "references": [],
+      "decision": "retain original bytes in original repository; exclude from standalone runtime/public payload until rights/provenance review; metadata inventory remains in snapshot",
+      "retirement_authorized": false
+    },
+    {
+      "path": "rust/artifacts/attack-final-validation.json",
+      "sha256": "a73038e0833b3952ad39230a272d15bb6fe55fb2e502c77e11b1f66db3e7f64a",
+      "bytes": 642,
+      "last_change_commit": "d4b430f214e12a5b6d6d7527594575372afe0bae",
+      "last_change_date": "2026-11-03T08:23:18+01:00",
+      "recorded_context": {},
+      "compiler": "not_recorded; do not infer from the current compiler",
+      "embedded_regression_candidate_paths": [],
+      "references": [],
+      "decision": "retain original bytes in original repository; exclude from standalone runtime/public payload until rights/provenance review; metadata inventory remains in snapshot",
+      "retirement_authorized": false
+    },
+    {
+      "path": "rust/artifacts/brogan-primary-final-validation.json",
+      "sha256": "058e570b8ce432f67ae4573e3479a7a645b519fddfb7e0be5425f32499b62ed3",
+      "bytes": 2028,
+      "last_change_commit": "d4b430f214e12a5b6d6d7527594575372afe0bae",
+      "last_change_date": "2026-11-03T08:23:18+01:00",
+      "recorded_context": {},
+      "compiler": "not_recorded; do not infer from the current compiler",
+      "embedded_regression_candidate_paths": [],
+      "references": [],
+      "decision": "retain original bytes in original repository; exclude from standalone runtime/public payload until rights/provenance review; metadata inventory remains in snapshot",
+      "retirement_authorized": false
+    },
+    {
+      "path": "rust/artifacts/card-action-final-validation.json",
+      "sha256": "c6e8ba973e92fe8d505c2c79f7f5b1346f1393331368cad3d0b3f47c773523a4",
+      "bytes": 1058,
+      "last_change_commit": "d4b430f214e12a5b6d6d7527594575372afe0bae",
+      "last_change_date": "2026-11-03T08:23:18+01:00",
+      "recorded_context": {},
+      "compiler": "not_recorded; do not infer from the current compiler",
+      "embedded_regression_candidate_paths": [],
+      "references": [],
+      "decision": "retain original bytes in original repository; exclude from standalone runtime/public payload until rights/provenance review; metadata inventory remains in snapshot",
+      "retirement_authorized": false
+    },
+    {
+      "path": "rust/artifacts/copied-action-final-validation.json",
+      "sha256": "6940966aae233ad28a60be0e0f790c653f1696b5aac6c72c4213fbde6add1d84",
+      "bytes": 1873,
+      "last_change_commit": "d4b430f214e12a5b6d6d7527594575372afe0bae",
+      "last_change_date": "2026-11-03T08:23:18+01:00",
+      "recorded_context": {
+        "$.merge_encoding_benchmark.scope": "corpus merge encoding, not engine search throughput"
+      },
+      "compiler": "not_recorded; do not infer from the current compiler",
+      "embedded_regression_candidate_paths": [],
+      "references": [],
+      "decision": "retain original bytes in original repository; exclude from standalone runtime/public payload until rights/provenance review; metadata inventory remains in snapshot",
+      "retirement_authorized": false
+    },
+    {
+      "path": "rust/artifacts/defense-bodies-final-validation.json",
+      "sha256": "efbf40b26c5d3358c29915a7801502b8ef255bcb9c246868d93b279e054bc20d",
+      "bytes": 2043,
+      "last_change_commit": "d4b430f214e12a5b6d6d7527594575372afe0bae",
+      "last_change_date": "2026-11-03T08:23:18+01:00",
+      "recorded_context": {
+        "$.committed": false
+      },
+      "compiler": "not_recorded; do not infer from the current compiler",
+      "embedded_regression_candidate_paths": [],
+      "references": [],
+      "decision": "retain original bytes in original repository; exclude from standalone runtime/public payload until rights/provenance review; metadata inventory remains in snapshot",
+      "retirement_authorized": false
+    },
+    {
+      "path": "rust/artifacts/dynamic-passive-final-validation.json",
+      "sha256": "7967e0a96626ee6b411766008c4c09d4c96595b1e404f0c973774b2cd8aed75e",
+      "bytes": 1887,
+      "last_change_commit": "dcd00e0cf609dc84eb879394398aec80b1d1de4a",
+      "last_change_date": "2026-11-03T18:43:10+01:00",
+      "recorded_context": {
+        "$.verification_scope": "All core unit tests, the new bounded restoration gate, full canonical/live CLI replay, affected source contracts. Other pre-existing integration suites and the older exhaustive all-corpus restoration gate were not rerun in this increment.",
+        "$.arena_lane_check_scope": "Live null lane operand and empty authoritative battle-zone mapping; other cases remain guarded before pop."
+      },
+      "compiler": "not_recorded; do not infer from the current compiler",
+      "embedded_regression_candidate_paths": [],
+      "references": [
+        "docs/superpowers/plans/2026-10-23-rust-search-engine.md",
+        "rust/docs/archive/development-history.md",
+        "rust/docs/archive/fixture-history.md"
+      ],
+      "decision": "retain original bytes in original repository; exclude from standalone runtime/public payload until rights/provenance review; metadata inventory remains in snapshot",
+      "retirement_authorized": false
+    },
+    {
+      "path": "rust/artifacts/effect-creation-final-validation.json",
+      "sha256": "81c20dd2f7d1d8e8f797cfae3debc1cf3d9b16a9cbb2bc5358844a02eb1136e7",
+      "bytes": 1566,
+      "last_change_commit": "d4b430f214e12a5b6d6d7527594575372afe0bae",
+      "last_change_date": "2026-11-03T08:23:18+01:00",
+      "recorded_context": {
+        "$.committed": false
+      },
+      "compiler": "not_recorded; do not infer from the current compiler",
+      "embedded_regression_candidate_paths": [],
+      "references": [],
+      "decision": "retain original bytes in original repository; exclude from standalone runtime/public payload until rights/provenance review; metadata inventory remains in snapshot",
+      "retirement_authorized": false
+    },
+    {
+      "path": "rust/artifacts/gydion-primary-final-validation.json",
+      "sha256": "5e9fa2ddbf70441cb2d1e1e62b1bf464370e616dd0412f503a892acbaf8ccfbf",
+      "bytes": 2000,
+      "last_change_commit": "d4b430f214e12a5b6d6d7527594575372afe0bae",
+      "last_change_date": "2026-11-03T08:23:18+01:00",
+      "recorded_context": {},
+      "compiler": "not_recorded; do not infer from the current compiler",
+      "embedded_regression_candidate_paths": [],
+      "references": [
+        "docs/superpowers/plans/2026-10-23-rust-search-engine.md",
+        "rust/docs/archive/development-history.md",
+        "rust/docs/archive/fixture-history.md"
+      ],
+      "decision": "retain original bytes in original repository; exclude from standalone runtime/public payload until rights/provenance review; metadata inventory remains in snapshot",
+      "retirement_authorized": false
+    },
+    {
+      "path": "rust/artifacts/marker-swap-final-validation.json",
+      "sha256": "83f702fcaf3edb411b834799c6aed723900a47091ef8d032a13a02592864feee",
+      "bytes": 1558,
+      "last_change_commit": "d4b430f214e12a5b6d6d7527594575372afe0bae",
+      "last_change_date": "2026-11-03T08:23:18+01:00",
+      "recorded_context": {
+        "$.committed": false
+      },
+      "compiler": "not_recorded; do not infer from the current compiler",
+      "embedded_regression_candidate_paths": [],
+      "references": [],
+      "decision": "retain original bytes in original repository; exclude from standalone runtime/public payload until rights/provenance review; metadata inventory remains in snapshot",
+      "retirement_authorized": false
+    },
+    {
+      "path": "rust/artifacts/min-primary-final-validation.json",
+      "sha256": "48de87a1bccfe1e76e625496cda82de8e9b332a3d91f1b0fee9601f465e4ee09",
+      "bytes": 2144,
+      "last_change_commit": "5b642383066e29bec2ff564f5fc9c1087e9a1e46",
+      "last_change_date": "2026-11-03T12:27:20+01:00",
+      "recorded_context": {},
+      "compiler": "not_recorded; do not infer from the current compiler",
+      "embedded_regression_candidate_paths": [],
+      "references": [
+        "docs/superpowers/plans/2026-10-23-rust-search-engine.md",
+        "rust/docs/archive/development-history.md",
+        "rust/docs/archive/fixture-history.md"
+      ],
+      "decision": "retain original bytes in original repository; exclude from standalone runtime/public payload until rights/provenance review; metadata inventory remains in snapshot",
+      "retirement_authorized": false
+    },
+    {
+      "path": "rust/artifacts/mind-grip-final-validation.json",
+      "sha256": "6635bc2f90179f0e06f934ee5b406eacce04e25ed590de6e99faa580f2e9abc3",
+      "bytes": 1519,
+      "last_change_commit": "d4b430f214e12a5b6d6d7527594575372afe0bae",
+      "last_change_date": "2026-11-03T08:23:18+01:00",
+      "recorded_context": {},
+      "compiler": "not_recorded; do not infer from the current compiler",
+      "embedded_regression_candidate_paths": [],
+      "references": [],
+      "decision": "retain original bytes in original repository; exclude from standalone runtime/public payload until rights/provenance review; metadata inventory remains in snapshot",
+      "retirement_authorized": false
+    },
+    {
+      "path": "rust/artifacts/misa-primary-final-validation.json",
+      "sha256": "88ace6948bc46c90e0925f6f6c9f9d29ffb490ece9381349a085a8b119e66413",
+      "bytes": 2317,
+      "last_change_commit": "d4b430f214e12a5b6d6d7527594575372afe0bae",
+      "last_change_date": "2026-11-03T08:23:18+01:00",
+      "recorded_context": {},
+      "compiler": "not_recorded; do not infer from the current compiler",
+      "embedded_regression_candidate_paths": [],
+      "references": [
+        "docs/superpowers/plans/2026-10-23-rust-search-engine.md",
+        "rust/docs/archive/development-history.md",
+        "rust/docs/archive/fixture-history.md"
+      ],
+      "decision": "retain original bytes in original repository; exclude from standalone runtime/public payload until rights/provenance review; metadata inventory remains in snapshot",
+      "retirement_authorized": false
+    },
+    {
+      "path": "rust/artifacts/perform-primary-final-validation.json",
+      "sha256": "367d6755b7c404965e56b0ccf001a0d21e7f00e653e9ddf0b65cad64b458064f",
+      "bytes": 1042,
+      "last_change_commit": "d4b430f214e12a5b6d6d7527594575372afe0bae",
+      "last_change_date": "2026-11-03T08:23:18+01:00",
+      "recorded_context": {},
+      "compiler": "not_recorded; do not infer from the current compiler",
+      "embedded_regression_candidate_paths": [],
+      "references": [],
+      "decision": "retain original bytes in original repository; exclude from standalone runtime/public payload until rights/provenance review; metadata inventory remains in snapshot",
+      "retirement_authorized": false
+    },
+    {
+      "path": "rust/artifacts/pre-action-final-validation.json",
+      "sha256": "30c4a6c91b6b7ef5903c88d5130edb40416fe138bafbe980535c6b1888f15fa1",
+      "bytes": 643,
+      "last_change_commit": "d4b430f214e12a5b6d6d7527594575372afe0bae",
+      "last_change_date": "2026-11-03T08:23:18+01:00",
+      "recorded_context": {},
+      "compiler": "not_recorded; do not infer from the current compiler",
+      "embedded_regression_candidate_paths": [],
+      "references": [],
+      "decision": "retain original bytes in original repository; exclude from standalone runtime/public payload until rights/provenance review; metadata inventory remains in snapshot",
+      "retirement_authorized": false
+    },
+    {
+      "path": "rust/artifacts/primary-text-final-validation.json",
+      "sha256": "ab11ffc607ebdb7570e2971c68ad92dedd1ef301ec27bf3141551dd9c46e53e1",
+      "bytes": 1349,
+      "last_change_commit": "d4b430f214e12a5b6d6d7527594575372afe0bae",
+      "last_change_date": "2026-11-03T08:23:18+01:00",
+      "recorded_context": {},
+      "compiler": "not_recorded; do not infer from the current compiler",
+      "embedded_regression_candidate_paths": [],
+      "references": [],
+      "decision": "retain original bytes in original repository; exclude from standalone runtime/public payload until rights/provenance review; metadata inventory remains in snapshot",
+      "retirement_authorized": false
+    },
+    {
+      "path": "rust/artifacts/push-final-validation.json",
+      "sha256": "a8900f0892e00b85e286fd09936408f1e9cd135605655885e9ad955d084212f5",
+      "bytes": 1198,
+      "last_change_commit": "d4b430f214e12a5b6d6d7527594575372afe0bae",
+      "last_change_date": "2026-11-03T08:23:18+01:00",
+      "recorded_context": {},
+      "compiler": "not_recorded; do not infer from the current compiler",
+      "embedded_regression_candidate_paths": [],
+      "references": [],
+      "decision": "retain original bytes in original repository; exclude from standalone runtime/public payload until rights/provenance review; metadata inventory remains in snapshot",
+      "retirement_authorized": false
+    },
+    {
+      "path": "rust/artifacts/reaction-final-validation.json",
+      "sha256": "5a1c6a6c3f1c483a61b06992215c0f2e5cef7012fc4a09cfd48a278e2454d2c9",
+      "bytes": 642,
+      "last_change_commit": "d4b430f214e12a5b6d6d7527594575372afe0bae",
+      "last_change_date": "2026-11-03T08:23:18+01:00",
+      "recorded_context": {},
+      "compiler": "not_recorded; do not infer from the current compiler",
+      "embedded_regression_candidate_paths": [],
+      "references": [],
+      "decision": "retain original bytes in original repository; exclude from standalone runtime/public payload until rights/provenance review; metadata inventory remains in snapshot",
+      "retirement_authorized": false
+    },
+    {
+      "path": "rust/artifacts/remaining-primary-inventory.json",
+      "sha256": "9cb0f7460e0b93113adbb3614e4e62e5928379332e87cebc84d1967ab8b96b84",
+      "bytes": 83467,
+      "last_change_commit": "5b642383066e29bec2ff564f5fc9c1087e9a1e46",
+      "last_change_date": "2026-11-03T12:27:20+01:00",
+      "recorded_context": {
+        "$.scope": "Ordinary primary-body coverage only; defense/passive/world/search completeness remain separate gates. All 22 spell bodies are tracked separately."
+      },
+      "compiler": "not_recorded; do not infer from the current compiler",
+      "embedded_regression_candidate_paths": [],
+      "references": [
+        "docs/superpowers/plans/2026-10-23-rust-search-engine.md"
+      ],
+      "decision": "retain original bytes in original repository; exclude from standalone runtime/public payload until rights/provenance review; metadata inventory remains in snapshot",
+      "retirement_authorized": false
+    },
+    {
+      "path": "rust/artifacts/resource-final-validation.json",
+      "sha256": "38036f9ab92f4ab0ed70398ada353da917b404711b3ccc7ecfb612b4e0254c96",
+      "bytes": 1020,
+      "last_change_commit": "d4b430f214e12a5b6d6d7527594575372afe0bae",
+      "last_change_date": "2026-11-03T08:23:18+01:00",
+      "recorded_context": {},
+      "compiler": "not_recorded; do not infer from the current compiler",
+      "embedded_regression_candidate_paths": [],
+      "references": [],
+      "decision": "retain original bytes in original repository; exclude from standalone runtime/public payload until rights/provenance review; metadata inventory remains in snapshot",
+      "retirement_authorized": false
+    },
+    {
+      "path": "rust/artifacts/spell-bodies-final-validation.json",
+      "sha256": "ac9b58c4968dcb5881edf69f584af60fd2f89bdb59df4da311c29e1e6161e18e",
+      "bytes": 1348,
+      "last_change_commit": "d4b430f214e12a5b6d6d7527594575372afe0bae",
+      "last_change_date": "2026-11-03T08:23:18+01:00",
+      "recorded_context": {},
+      "compiler": "not_recorded; do not infer from the current compiler",
+      "embedded_regression_candidate_paths": [],
+      "references": [
+        "docs/superpowers/plans/2026-10-23-rust-search-engine.md",
+        "rust/docs/archive/development-history.md",
+        "rust/docs/archive/fixture-history.md"
+      ],
+      "decision": "retain original bytes in original repository; exclude from standalone runtime/public payload until rights/provenance review; metadata inventory remains in snapshot",
+      "retirement_authorized": false
+    },
+    {
+      "path": "rust/artifacts/spell-body-port-inventory.json",
+      "sha256": "3faa102b5547d946cf3fce2c9cc3967ee1d122e81262345b08ba412c35b2466b",
+      "bytes": 2177,
+      "last_change_commit": "d4b430f214e12a5b6d6d7527594575372afe0bae",
+      "last_change_date": "2026-11-03T08:23:18+01:00",
+      "recorded_context": {
+        "$.scope": "All 22 spell bodies implemented through native cast/copy paths; ordinary Gydion access cards and Archwizard passive remain separate work."
+      },
+      "compiler": "not_recorded; do not infer from the current compiler",
+      "embedded_regression_candidate_paths": [],
+      "references": [],
+      "decision": "retain original bytes in original repository; exclude from standalone runtime/public payload until rights/provenance review; metadata inventory remains in snapshot",
+      "retirement_authorized": false
+    },
+    {
+      "path": "rust/artifacts/spellbook-final-validation.json",
+      "sha256": "4c56aa1905bac0e63bda3c79a1f4cf20ffda498c532766ffe90a6895402c004e",
+      "bytes": 1225,
+      "last_change_commit": "d4b430f214e12a5b6d6d7527594575372afe0bae",
+      "last_change_date": "2026-11-03T08:23:18+01:00",
+      "recorded_context": {},
+      "compiler": "not_recorded; do not infer from the current compiler",
+      "embedded_regression_candidate_paths": [],
+      "references": [],
+      "decision": "retain original bytes in original repository; exclude from standalone runtime/public payload until rights/provenance review; metadata inventory remains in snapshot",
+      "retirement_authorized": false
+    },
+    {
+      "path": "rust/artifacts/tigerclaw-primary-final-validation.json",
+      "sha256": "a0350af9c45aba25b4e4bf8773f64a9edc82d531b28c5e4da0c423e9f7e07cbf",
+      "bytes": 1949,
+      "last_change_commit": "d4b430f214e12a5b6d6d7527594575372afe0bae",
+      "last_change_date": "2026-11-03T08:23:18+01:00",
+      "recorded_context": {},
+      "compiler": "not_recorded; do not infer from the current compiler",
+      "embedded_regression_candidate_paths": [],
+      "references": [],
+      "decision": "retain original bytes in original repository; exclude from standalone runtime/public payload until rights/provenance review; metadata inventory remains in snapshot",
+      "retirement_authorized": false
+    },
+    {
+      "path": "rust/artifacts/travel-final-validation.json",
+      "sha256": "bb9e923277dc2de250316500989dbd062031fb3a128e9db1e9824c32145ada39",
+      "bytes": 1060,
+      "last_change_commit": "d4b430f214e12a5b6d6d7527594575372afe0bae",
+      "last_change_date": "2026-11-03T08:23:18+01:00",
+      "recorded_context": {},
+      "compiler": "not_recorded; do not infer from the current compiler",
+      "embedded_regression_candidate_paths": [],
+      "references": [],
+      "decision": "retain original bytes in original repository; exclude from standalone runtime/public payload until rights/provenance review; metadata inventory remains in snapshot",
+      "retirement_authorized": false
+    },
+    {
+      "path": "rust/artifacts/utility-final-validation.json",
+      "sha256": "36cf362721a551bec45a9e4c869ae5e9cf7b24b60627baf4d599016219c67b81",
+      "bytes": 1128,
+      "last_change_commit": "d4b430f214e12a5b6d6d7527594575372afe0bae",
+      "last_change_date": "2026-11-03T08:23:18+01:00",
+      "recorded_context": {},
+      "compiler": "not_recorded; do not infer from the current compiler",
+      "embedded_regression_candidate_paths": [],
+      "references": [],
+      "decision": "retain original bytes in original repository; exclude from standalone runtime/public payload until rights/provenance review; metadata inventory remains in snapshot",
+      "retirement_authorized": false
+    },
+    {
+      "path": "rust/artifacts/wasp-primary-final-validation.json",
+      "sha256": "68749b086593dec6dc4c2590ef27cb0ef040413cc3e2d2747a6a90cc84f89058",
+      "bytes": 2143,
+      "last_change_commit": "d4b430f214e12a5b6d6d7527594575372afe0bae",
+      "last_change_date": "2026-11-03T08:23:18+01:00",
+      "recorded_context": {},
+      "compiler": "not_recorded; do not infer from the current compiler",
+      "embedded_regression_candidate_paths": [],
+      "references": [
+        "docs/superpowers/plans/2026-10-23-rust-search-engine.md",
+        "rust/docs/archive/development-history.md",
+        "rust/docs/archive/fixture-history.md"
+      ],
+      "decision": "retain original bytes in original repository; exclude from standalone runtime/public payload until rights/provenance review; metadata inventory remains in snapshot",
+      "retirement_authorized": false
+    }
+  ],
+  "reports": [
+    {
+      "path": "rust/artifacts/arena-battle-final-validation.json",
+      "tracked": true,
+      "bytes": 3204,
+      "sha256": "1d143cc8eb695092111a81fcc8638a78534a7471886a9602a0018d6b3348591f",
+      "decision": "retain; no deletion or deduplication authorized",
+      "inspection": "metadata only; ignored cache/private snapshot bodies are not decoded"
+    },
+    {
+      "path": "rust/artifacts/arena-cleanup-final-validation.json",
+      "tracked": true,
+      "bytes": 2441,
+      "sha256": "87efea74372cf8775a065de62c2545a0931361523821f4c55492041b50809183",
+      "decision": "retain; no deletion or deduplication authorized",
+      "inspection": "metadata only; ignored cache/private snapshot bodies are not decoded"
+    },
+    {
+      "path": "rust/artifacts/arien-primary-final-validation.json",
+      "tracked": true,
+      "bytes": 1501,
+      "sha256": "c8190fa2d9dc8ccf9c57d2750c570d311300d8851b883206f0fbbcb064abe86f",
+      "decision": "retain; no deletion or deduplication authorized",
+      "inspection": "metadata only; ignored cache/private snapshot bodies are not decoded"
+    },
+    {
+      "path": "rust/artifacts/attack-final-validation.json",
+      "tracked": true,
+      "bytes": 642,
+      "sha256": "a73038e0833b3952ad39230a272d15bb6fe55fb2e502c77e11b1f66db3e7f64a",
+      "decision": "retain; no deletion or deduplication authorized",
+      "inspection": "metadata only; ignored cache/private snapshot bodies are not decoded"
+    },
+    {
+      "path": "rust/artifacts/brogan-primary-final-validation.json",
+      "tracked": true,
+      "bytes": 2028,
+      "sha256": "058e570b8ce432f67ae4573e3479a7a645b519fddfb7e0be5425f32499b62ed3",
+      "decision": "retain; no deletion or deduplication authorized",
+      "inspection": "metadata only; ignored cache/private snapshot bodies are not decoded"
+    },
+    {
+      "path": "rust/artifacts/card-action-final-validation.json",
+      "tracked": true,
+      "bytes": 1058,
+      "sha256": "c6e8ba973e92fe8d505c2c79f7f5b1346f1393331368cad3d0b3f47c773523a4",
+      "decision": "retain; no deletion or deduplication authorized",
+      "inspection": "metadata only; ignored cache/private snapshot bodies are not decoded"
+    },
+    {
+      "path": "rust/artifacts/copied-action-final-validation.json",
+      "tracked": true,
+      "bytes": 1873,
+      "sha256": "6940966aae233ad28a60be0e0f790c653f1696b5aac6c72c4213fbde6add1d84",
+      "decision": "retain; no deletion or deduplication authorized",
+      "inspection": "metadata only; ignored cache/private snapshot bodies are not decoded"
+    },
+    {
+      "path": "rust/artifacts/defense-bodies-final-validation.json",
+      "tracked": true,
+      "bytes": 2043,
+      "sha256": "efbf40b26c5d3358c29915a7801502b8ef255bcb9c246868d93b279e054bc20d",
+      "decision": "retain; no deletion or deduplication authorized",
+      "inspection": "metadata only; ignored cache/private snapshot bodies are not decoded"
+    },
+    {
+      "path": "rust/artifacts/dynamic-passive-final-validation.json",
+      "tracked": true,
+      "bytes": 1887,
+      "sha256": "7967e0a96626ee6b411766008c4c09d4c96595b1e404f0c973774b2cd8aed75e",
+      "decision": "retain; no deletion or deduplication authorized",
+      "inspection": "metadata only; ignored cache/private snapshot bodies are not decoded"
+    },
+    {
+      "path": "rust/artifacts/effect-creation-final-validation.json",
+      "tracked": true,
+      "bytes": 1566,
+      "sha256": "81c20dd2f7d1d8e8f797cfae3debc1cf3d9b16a9cbb2bc5358844a02eb1136e7",
+      "decision": "retain; no deletion or deduplication authorized",
+      "inspection": "metadata only; ignored cache/private snapshot bodies are not decoded"
+    },
+    {
+      "path": "rust/artifacts/gydion-primary-final-validation.json",
+      "tracked": true,
+      "bytes": 2000,
+      "sha256": "5e9fa2ddbf70441cb2d1e1e62b1bf464370e616dd0412f503a892acbaf8ccfbf",
+      "decision": "retain; no deletion or deduplication authorized",
+      "inspection": "metadata only; ignored cache/private snapshot bodies are not decoded"
+    },
+    {
+      "path": "rust/artifacts/marker-swap-final-validation.json",
+      "tracked": true,
+      "bytes": 1558,
+      "sha256": "83f702fcaf3edb411b834799c6aed723900a47091ef8d032a13a02592864feee",
+      "decision": "retain; no deletion or deduplication authorized",
+      "inspection": "metadata only; ignored cache/private snapshot bodies are not decoded"
+    },
+    {
+      "path": "rust/artifacts/min-primary-final-validation.json",
+      "tracked": true,
+      "bytes": 2144,
+      "sha256": "48de87a1bccfe1e76e625496cda82de8e9b332a3d91f1b0fee9601f465e4ee09",
+      "decision": "retain; no deletion or deduplication authorized",
+      "inspection": "metadata only; ignored cache/private snapshot bodies are not decoded"
+    },
+    {
+      "path": "rust/artifacts/mind-grip-final-validation.json",
+      "tracked": true,
+      "bytes": 1519,
+      "sha256": "6635bc2f90179f0e06f934ee5b406eacce04e25ed590de6e99faa580f2e9abc3",
+      "decision": "retain; no deletion or deduplication authorized",
+      "inspection": "metadata only; ignored cache/private snapshot bodies are not decoded"
+    },
+    {
+      "path": "rust/artifacts/misa-primary-final-validation.json",
+      "tracked": true,
+      "bytes": 2317,
+      "sha256": "88ace6948bc46c90e0925f6f6c9f9d29ffb490ece9381349a085a8b119e66413",
+      "decision": "retain; no deletion or deduplication authorized",
+      "inspection": "metadata only; ignored cache/private snapshot bodies are not decoded"
+    },
+    {
+      "path": "rust/artifacts/perform-primary-final-validation.json",
+      "tracked": true,
+      "bytes": 1042,
+      "sha256": "367d6755b7c404965e56b0ccf001a0d21e7f00e653e9ddf0b65cad64b458064f",
+      "decision": "retain; no deletion or deduplication authorized",
+      "inspection": "metadata only; ignored cache/private snapshot bodies are not decoded"
+    },
+    {
+      "path": "rust/artifacts/pre-action-final-validation.json",
+      "tracked": true,
+      "bytes": 643,
+      "sha256": "30c4a6c91b6b7ef5903c88d5130edb40416fe138bafbe980535c6b1888f15fa1",
+      "decision": "retain; no deletion or deduplication authorized",
+      "inspection": "metadata only; ignored cache/private snapshot bodies are not decoded"
+    },
+    {
+      "path": "rust/artifacts/primary-text-final-validation.json",
+      "tracked": true,
+      "bytes": 1349,
+      "sha256": "ab11ffc607ebdb7570e2971c68ad92dedd1ef301ec27bf3141551dd9c46e53e1",
+      "decision": "retain; no deletion or deduplication authorized",
+      "inspection": "metadata only; ignored cache/private snapshot bodies are not decoded"
+    },
+    {
+      "path": "rust/artifacts/push-final-validation.json",
+      "tracked": true,
+      "bytes": 1198,
+      "sha256": "a8900f0892e00b85e286fd09936408f1e9cd135605655885e9ad955d084212f5",
+      "decision": "retain; no deletion or deduplication authorized",
+      "inspection": "metadata only; ignored cache/private snapshot bodies are not decoded"
+    },
+    {
+      "path": "rust/artifacts/reaction-final-validation.json",
+      "tracked": true,
+      "bytes": 642,
+      "sha256": "5a1c6a6c3f1c483a61b06992215c0f2e5cef7012fc4a09cfd48a278e2454d2c9",
+      "decision": "retain; no deletion or deduplication authorized",
+      "inspection": "metadata only; ignored cache/private snapshot bodies are not decoded"
+    },
+    {
+      "path": "rust/artifacts/remaining-primary-inventory.json",
+      "tracked": true,
+      "bytes": 83467,
+      "sha256": "9cb0f7460e0b93113adbb3614e4e62e5928379332e87cebc84d1967ab8b96b84",
+      "decision": "retain; no deletion or deduplication authorized",
+      "inspection": "metadata only; ignored cache/private snapshot bodies are not decoded"
+    },
+    {
+      "path": "rust/artifacts/resource-final-validation.json",
+      "tracked": true,
+      "bytes": 1020,
+      "sha256": "38036f9ab92f4ab0ed70398ada353da917b404711b3ccc7ecfb612b4e0254c96",
+      "decision": "retain; no deletion or deduplication authorized",
+      "inspection": "metadata only; ignored cache/private snapshot bodies are not decoded"
+    },
+    {
+      "path": "rust/artifacts/spell-bodies-final-validation.json",
+      "tracked": true,
+      "bytes": 1348,
+      "sha256": "ac9b58c4968dcb5881edf69f584af60fd2f89bdb59df4da311c29e1e6161e18e",
+      "decision": "retain; no deletion or deduplication authorized",
+      "inspection": "metadata only; ignored cache/private snapshot bodies are not decoded"
+    },
+    {
+      "path": "rust/artifacts/spell-body-port-inventory.json",
+      "tracked": true,
+      "bytes": 2177,
+      "sha256": "3faa102b5547d946cf3fce2c9cc3967ee1d122e81262345b08ba412c35b2466b",
+      "decision": "retain; no deletion or deduplication authorized",
+      "inspection": "metadata only; ignored cache/private snapshot bodies are not decoded"
+    },
+    {
+      "path": "rust/artifacts/spellbook-final-validation.json",
+      "tracked": true,
+      "bytes": 1225,
+      "sha256": "4c56aa1905bac0e63bda3c79a1f4cf20ffda498c532766ffe90a6895402c004e",
+      "decision": "retain; no deletion or deduplication authorized",
+      "inspection": "metadata only; ignored cache/private snapshot bodies are not decoded"
+    },
+    {
+      "path": "rust/artifacts/tigerclaw-primary-final-validation.json",
+      "tracked": true,
+      "bytes": 1949,
+      "sha256": "a0350af9c45aba25b4e4bf8773f64a9edc82d531b28c5e4da0c423e9f7e07cbf",
+      "decision": "retain; no deletion or deduplication authorized",
+      "inspection": "metadata only; ignored cache/private snapshot bodies are not decoded"
+    },
+    {
+      "path": "rust/artifacts/travel-final-validation.json",
+      "tracked": true,
+      "bytes": 1060,
+      "sha256": "bb9e923277dc2de250316500989dbd062031fb3a128e9db1e9824c32145ada39",
+      "decision": "retain; no deletion or deduplication authorized",
+      "inspection": "metadata only; ignored cache/private snapshot bodies are not decoded"
+    },
+    {
+      "path": "rust/artifacts/utility-final-validation.json",
+      "tracked": true,
+      "bytes": 1128,
+      "sha256": "36cf362721a551bec45a9e4c869ae5e9cf7b24b60627baf4d599016219c67b81",
+      "decision": "retain; no deletion or deduplication authorized",
+      "inspection": "metadata only; ignored cache/private snapshot bodies are not decoded"
+    },
+    {
+      "path": "rust/artifacts/wasp-primary-final-validation.json",
+      "tracked": true,
+      "bytes": 2143,
+      "sha256": "68749b086593dec6dc4c2590ef27cb0ef040413cc3e2d2747a6a90cc84f89058",
+      "decision": "retain; no deletion or deduplication authorized",
+      "inspection": "metadata only; ignored cache/private snapshot bodies are not decoded"
+    }
+  ],
+  "byte_duplicate_groups": [],
+  "deletions": [],
+  "uncommitted_work_modified": false,
+  "retention_policy": "All material retained. Different bytes or unknown provenance are not grounds for deletion. Unique regression candidates require promotion and coverage review before any future retirement."
+}

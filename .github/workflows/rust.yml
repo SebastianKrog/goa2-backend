@@ -1,0 +1,151 @@
+name: Rust
+on:
+  push:
+    branches: [main, bots-upstream]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      release_candidate:
+        description: Require the complete release-candidate matrix
+        type: boolean
+        default: false
+  schedule:
+    - cron: '23 5 * * 1'
+concurrency:
+  group: rust-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  scope:
+    runs-on: ubuntu-latest
+    outputs:
+      full: ${{ steps.paths.outputs.full }}
+      restore: ${{ steps.paths.outputs.restore }}
+      release: ${{ steps.paths.outputs.release }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - id: paths
+        name: Select required reference gates
+        run: python3 rust/tools/ci_scope.py
+  native:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned compiler and components
+        working-directory: rust
+        run: rustup show active-toolchain
+      - name: Build locked workspace
+        working-directory: rust
+        run: cargo build --locked --workspace
+      - name: Format, strict lint and documentation
+        working-directory: rust
+        run: python3 tools/check.py quality
+      - name: Verify bundled data and quick native tests
+        working-directory: rust
+        run: python3 tools/check.py quick
+      - name: Run embedding example
+        working-directory: rust
+        run: cargo run --locked -p goa2-core --example local_game
+  tooling-service:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11.17'
+      - name: Install independently locked reference tooling
+        run: python -m pip install --require-hashes -r rust/tools/requirements.lock
+      - name: Check Python tools, including scripts
+        run: |
+          python -m black --check rust/tools rust/tests/tooling scripts/rust_oracle/pinned_source.py scripts/rust_oracle/run_pinned.py scripts/rust_verification scripts/verify_rust_game_server.py
+          python -m ruff check --select E9,F63,F7,F82 scripts rust/tools
+          python -m ruff check --select E,F,I --ignore E501 rust/tools rust/tests/tooling scripts/rust_oracle/pinned_source.py scripts/rust_oracle/run_pinned.py scripts/rust_verification scripts/verify_rust_game_server.py
+      - name: Test fixture, archive and content acquisition
+        run: python -m pytest -q rust/tests/tooling tests/rust_oracle/test_fixture_cache.py
+      - name: Install pinned dependency scanner
+        working-directory: rust
+        run: cargo install cargo-deny --version 0.20.2 --locked --root "${{ runner.temp }}/cargo-deny"
+      - name: Check locked dependency advisories and licenses
+        run: python rust/tools/dependency_review.py --scanner "${{ runner.temp }}/cargo-deny/bin/cargo-deny" --output "${{ runner.temp }}/dependency-review.json"
+      - name: Build native service
+        working-directory: rust
+        run: cargo build --locked -p goa2-game-server
+      - name: Run all disposable service contracts
+        run: python scripts/verify_rust_game_server.py rust/target/debug/goa2-game-server rust/content/smoke-game.json
+      - name: Verify admitted historical reader matrix
+        run: python rust/tools/historical_compatibility.py verify --binary rust/target/debug/goa2-game-server --content rust/content/smoke-game.json
+  full-parity:
+    needs: [scope, native]
+    if: needs.scope.outputs.full == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require complete admitted artifacts and run full differential tier
+        working-directory: rust
+        run: python3 tools/check.py full
+      # This job deliberately fails with counted missing artifacts until a verified
+      # artifact distribution is configured. Never silently run only the smoke set.
+  restore:
+    needs: [scope, native]
+    if: needs.scope.outputs.restore == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require complete admitted artifacts and run exhaustive restoration
+        working-directory: rust
+        run: python3 tools/check.py restore
+  release-acceptance:
+    needs: [scope, native, tooling-service, full-parity, restore]
+    if: needs.scope.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    # Every input must be configured for this candidate. Missing inputs fail;
+    # this definition does not provide a distribution route or deploy anything.
+    env:
+      GOA2_GAME_CONTENT: ${{ vars.GOA2_GAME_CONTENT }}
+      GOA2_GAME_SETUP_CASES: ${{ vars.GOA2_GAME_SETUP_CASES }}
+      GOA2_GAME_VIEW_CASES: ${{ vars.GOA2_GAME_VIEW_CASES }}
+      GOA2_ORACLE_SOURCE: ${{ vars.GOA2_ORACLE_SOURCE }}
+      GOA2_FIXTURE_CACHE: ${{ vars.GOA2_FIXTURE_CACHE }}
+      GOA2_SEARCH_BINARY: ${{ github.workspace }}/rust/target/release/goa2-search-cli
+      GOA2_BENCHMARK_OUTPUT: ${{ github.workspace }}/benchmark.json
+      GOA2_SERVICE_PYTHON: ${{ vars.GOA2_SERVICE_PYTHON }}
+      GOA2_SERVICE_SOURCE: ${{ vars.GOA2_SERVICE_SOURCE }}
+      GOA2_GAME_BINARY: ${{ github.workspace }}/rust/target/release/goa2-game-server
+      GOA2_FRONTEND_ORIGIN: ${{ vars.GOA2_FRONTEND_ORIGIN }}
+      GOA2_RUST_ORIGIN: ${{ vars.GOA2_RUST_ORIGIN }}
+      GOA2_STAGING_GAME_ID: ${{ vars.GOA2_STAGING_GAME_ID }}
+      GOA2_RELEASE_MANIFEST: ${{ vars.GOA2_RELEASE_MANIFEST }}
+      GOA2_STAGING_SEAT_TOKEN: ${{ secrets.GOA2_STAGING_SEAT_TOKEN }}
+      GOA2_STAGING_ACCESS_CLIENT_ID: ${{ secrets.GOA2_STAGING_ACCESS_CLIENT_ID }}
+      GOA2_STAGING_ACCESS_CLIENT_SECRET: ${{ secrets.GOA2_STAGING_ACCESS_CLIENT_SECRET }}
+      GOA2_STAGING_ACCESS_COOKIE: ${{ secrets.GOA2_STAGING_ACCESS_COOKIE }}
+      GOA2_STAGING_SPECTATOR_TOKEN: ${{ secrets.GOA2_STAGING_SPECTATOR_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11.17'
+      - name: Install independently locked tooling
+        run: python -m pip install --require-hashes -r rust/tools/requirements.lock
+      - name: Build release binaries
+        working-directory: rust
+        run: cargo build --locked --release --workspace
+      - name: Require every remaining candidate gate
+        run: |
+          python rust/tools/gates.py validate
+          for gate in setup-parity view-parity timed-bot-native simulation-benchmark strength-baseline hosted-local-contract hosted-staging-readonly; do
+            python rust/tools/gates.py run "$gate" --report "${gate}-result.json"
+          done
+  cold-native:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the pinned compiler and components
+        working-directory: rust
+        run: rustup show active-toolchain
+      - name: Acquire dependencies and verify without warm project caches
+        run: python3 rust/tools/cold_build.py --work "${{ runner.temp }}/goa2-cold" --report "${{ runner.temp }}/goa2-cold-result.json"

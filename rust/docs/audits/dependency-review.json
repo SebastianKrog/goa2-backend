@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "scanner": "cargo-deny 0.20.2",
+  "scanner_sha256": "c8fe2ef7fc585fd17e99d7c0cbd32713160c8fd4f25f8b9bb7ccd226f3527467",
+  "cargo_lock_sha256": "8ad64f41089cbdeea24a8b7c197108eafdb164844a8eb259472d7c2fdc6564ee",
+  "policy_sha256": "a3acc8d3158ea1196592c1298ef785539aef6feaf2ea8b0f364519f1e2676a32",
+  "advisory_databases": [
+    {
+      "repository": "https://github.com/rustsec/advisory-db",
+      "commit": "8a4faeaaa8535304bc640bc34c8764d960b15850"
+    }
+  ],
+  "scope": "Locked all-feature/all-target Cargo graph; license text/policy and RustSec advisories. Not workspace/content rights approval.",
+  "package_count": 117,
+  "summaries": [
+    {
+      "advisories": {
+        "errors": 0,
+        "helps": 0,
+        "notes": 0,
+        "warnings": 0
+      },
+      "licenses": {
+        "errors": 0,
+        "helps": 107,
+        "notes": 0,
+        "warnings": 0
+      }
+    }
+  ],
+  "exit_code": 0,
+  "advisory_ignores": [],
+  "license_exceptions": [],
+  "remediation": {
+    "advisory": "RUSTSEC-2026-0459",
+    "cve": "CVE-2026-119375",
+    "before": {
+      "rusqlite": "0.37.0",
+      "libsqlite3-sys": "0.35.0"
+    },
+    "after": {
+      "rusqlite": "0.41.1",
+      "libsqlite3-sys": "0.39.1",
+      "bundled_sqlite": "3.54.1"
+    },
+    "regressions": "checked signed-SQLite unsigned adapter and SQLite >= 3.54.0 guard; full-width JSON seeds/timestamps unchanged"
+  }
+}

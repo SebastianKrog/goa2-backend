@@ -10,26 +10,19 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / "rust/tests/fixtures"
-# Small bootstrap examples and native runtime recipe catalogs stay reviewable.
+# Bootstrap examples and corpus indexes stay reviewable; production catalogs live in rust/content/catalogs/.
 COMMITTED = {
     "movement.json",
     "states.json",
-    "effect-defaults.json",
     "effect-errors.json",
     "mine-reference-errors.json",
-    "instruction-templates.json",
-    "loadout-provenance.json",
-    "primary-effects.json",
-    "primary-builders.json",
-    "spell-builders.json",
-    "action-builders.json",
-    "defense-builders.json",
     "stack-traces.json",
     "object-execution.json",
     "object-arena.json",
     "complete-games.json",
     "complete-games-hanu.json",
     "cache-identities.json",
+    "registry.json",
 }
 
 
@@ -51,19 +44,29 @@ def stored_path(path):
 
 def read_bytes(path):
     path = Path(path)
-    # Legacy/plain temporary snapshots remain readable during migration.
+    candidates = [path]
     try:
-        return path.read_bytes()
-    except FileNotFoundError:
+        relative = path.absolute().relative_to(FIXTURES)
+    except ValueError:
         pass
-    compressed = path.with_suffix(path.suffix + ".gz")
-    if not compressed.exists():
-        raise FileNotFoundError(
-            f"Missing fixture {path}. Regenerate with scripts/rust_oracle/ "
-            "using the pinned oracle, or restore its verified compressed cache."
-        )
-    with gzip.open(compressed, "rb") as source:
-        return source.read()
+    else:
+        if cache := os.environ.get("GOA2_FIXTURE_CACHE"):
+            candidates.append(Path(cache) / relative)
+        candidates.append(FIXTURES / "smoke" / relative)
+    for candidate in candidates:
+        try:
+            return candidate.read_bytes()
+        except FileNotFoundError:
+            pass
+        try:
+            with gzip.open(candidate.with_suffix(candidate.suffix + ".gz"), "rb") as source:
+                return source.read()
+        except FileNotFoundError:
+            pass
+    raise FileNotFoundError(
+        f"Missing fixture {path}. Regenerate with scripts/rust_oracle/ using the pinned oracle, "
+        "or set GOA2_FIXTURE_CACHE to a verified cache; see rust/docs/testing.md."
+    )
 
 
 def read_text(path, encoding="utf-8", errors=None):

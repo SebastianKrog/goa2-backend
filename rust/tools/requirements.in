@@ -1,0 +1,8 @@
+# Frozen oracle runtime; independent of the Python engine's training dependencies.
+pydantic==2.13.4
+pydantic_core==2.46.4
+jsonpatch==1.33
+websockets==16.0
+pytest==9.0.1
+ruff==0.14.6
+black==25.11.0

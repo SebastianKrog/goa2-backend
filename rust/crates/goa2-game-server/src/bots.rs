@@ -5,11 +5,8 @@ use crate::{
 };
 use axum::http::StatusCode;
 use goa2_core::{
+    api::{BotDecision, EngineError, ExecutionBudget, LiveGame},
     codec::Phase,
-    interpreter::{
-        EngineError, ExecutionBudget,
-        live_game::{BotDecision, LiveGame},
-    },
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -70,7 +67,7 @@ async fn run(
         if *retired.borrow() || *shutdown.borrow() {
             return Ok(());
         }
-        let snapshot = game.snapshot()?;
+        let snapshot = game.snapshot_async().await?;
         let position = snapshot.position();
         let revision = position.revision;
         if position.phase != Phase::Planning {
@@ -96,7 +93,7 @@ async fn run(
             permit = server.bot_workers.clone().acquire_owned() => permit.map_err(ApiError::internal)?,
             () = changed(&mut updates, &mut retired, &mut shutdown, revision) => continue,
         };
-        if game.snapshot()?.position().revision != revision {
+        if game.snapshot_async().await?.position().revision != revision {
             continue;
         }
 

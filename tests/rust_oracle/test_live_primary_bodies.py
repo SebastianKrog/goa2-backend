@@ -22,7 +22,7 @@ def run(primary_scenes, name):
 
 
 def test_primary_catalog_reproduces_source_and_keeps_spell_registry_separate():
-    expected = json.loads((ROOT / "rust/tests/fixtures/primary-builders.json").read_text())
+    expected = json.loads((ROOT / "rust/content/catalogs/primary-builders.json").read_text())
     assert catalog() == expected
     assert len(expected["recipes"]) == 447
     assert len(expected["stateful_recipes"]) == 101

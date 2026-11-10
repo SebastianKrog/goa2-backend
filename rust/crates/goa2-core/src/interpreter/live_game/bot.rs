@@ -440,7 +440,10 @@ mod tests {
         let mut game = live_planning_game();
         for quiet_turns in 0..=4 {
             assert_eq!(
-                matches!(game.bot_limits(2, 1024).evaluation, SearchEvaluation::StallLaneAdvance),
+                matches!(
+                    game.bot_limits(2, 1024).evaluation,
+                    SearchEvaluation::StallLaneAdvance
+                ),
                 quiet_turns == 4,
             );
             if quiet_turns < 4 {
@@ -457,7 +460,10 @@ mod tests {
         // A same-turn wave change resets the clock without counting that turn as quiet.
         game.session.world.waves[0].1 -= 1;
         game.lane_progress.observe(&game.session);
-        assert_eq!(game.lane_progress.quiet_since, game.session.search_turn_index() + 1);
+        assert_eq!(
+            game.lane_progress.quiet_since,
+            game.session.search_turn_index() + 1
+        );
         assert!(matches!(
             game.bot_limits(2, 1024).evaluation,
             SearchEvaluation::LanePressureV3AccumulatedGold,
@@ -469,7 +475,8 @@ mod tests {
         let game = live_planning_game();
         let budget = ExecutionBudget::default();
         let mut checkpoint = game.checkpoint().unwrap();
-        checkpoint.lane_progress.as_mut().unwrap().quiet_since = game.session.search_turn_index() - 4;
+        checkpoint.lane_progress.as_mut().unwrap().quiet_since =
+            game.session.search_turn_index() - 4;
         let bytes = serde_json::to_vec(&checkpoint).unwrap();
         let restored = LiveGame::restore(serde_json::from_slice(&bytes).unwrap(), &budget).unwrap();
         assert!(restored.lane_progress.needs_lane_advance());

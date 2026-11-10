@@ -1,0 +1,220 @@
+{
+  "schema_version": 1,
+  "baseline_backend_commit": "f0fb93e117f358266ef522e6d5f23d3452e83e97",
+  "plan_commit": "fc0ff7024238668d7c2a800845dffa89533b5b29",
+  "frontend_commit": "a3c5e0a46b35a42cd6e054512ce3dbc6a61a579c",
+  "layout": "Retain the rust/ workspace prefix during extraction so embedded relative paths and Python ROOT contracts stay unchanged. No sibling checkouts are included.",
+  "groups": [
+    {
+      "category": "runtime",
+      "paths": [
+        "rust/Cargo.toml",
+        "rust/Cargo.lock",
+        "rust/rust-toolchain.toml",
+        "rust/oracle-manifest.json",
+        "rust/crates/*/Cargo.toml",
+        "rust/crates/*/src/**/*.rs",
+        "rust/crates/*/src/**/*.json",
+        "rust/content/**/*.json",
+        "rust/crates/*/src/**/*.sql"
+      ],
+      "destination": "same path",
+      "consumer": "Cargo build; game service; JSON-lines worker",
+      "required_external_inputs": [
+        "pinned compiler and Rust registry dependencies from Cargo.lock",
+        "C compiler/linker for bundled SQLite",
+        "explicit admitted runtime content pack or private checkpoint/database for running games"
+      ],
+      "dependency_inventory": "rust/docs/audits/dependencies.json"
+    },
+    {
+      "category": "development",
+      "paths": [
+        "rust/.gitignore",
+        "rust/cargo-*.sh",
+        "rust/README.md",
+        "rust/AGENTS.md",
+        "rust/tools/**/*.py",
+        "rust/crates/*/examples/**/*.rs",
+        "rust/crates/*/tests/**/*.rs",
+        "rust/test-support/**/*.rs",
+        "rust/tests/fixtures/*.json",
+        "rust/tests/fixtures/smoke/**/*",
+        "rust/tests/fixtures/README.md",
+        "rust/docs/**/*",
+        "rust/extraction-manifest.json",
+        "rust/tools/*.in",
+        "rust/tools/*.lock",
+        "rust/tests/tooling/*.py",
+        "rust/test-tiers.json",
+        "rust/CONTRIBUTING.md",
+        "rust/CHANGELOG.md",
+        "rust/SECURITY.md",
+        "rust/CODE_OF_CONDUCT.md",
+        "rust/tools/requirements.in",
+        "rust/tools/requirements.lock",
+        "rust/tests/baselines/**/*",
+        "rust/benchmarks/*.json",
+        "rust/arena/**/*",
+        "rust/verification-gates.json",
+        "rust/tests/compatibility/**/*",
+        "rust/deny.toml"
+      ],
+      "destination": "same path",
+      "consumer": "native development, quick/contract suites, documentation",
+      "required_external_inputs": [
+        "Python 3.11+ standard library tooling and independent requirements.lock for tests",
+        "Rust test dependencies from Cargo.lock",
+        "optional full fixture cache only for selected full/restore gates"
+      ],
+      "dependency_inventory": "rust/docs/audits/dependencies.json"
+    },
+    {
+      "category": "reference-verification",
+      "paths": [
+        "scripts/rust_oracle/*.py",
+        "tests/rust_oracle/*.py",
+        "pyproject.toml",
+        "uv.lock",
+        ".python-version",
+        "scripts/rust_verification/*.py"
+      ],
+      "destination": "same path; oracle sources acquired independently",
+      "consumer": "optional Python exporters; source/runtime hashes must match oracle-manifest.json",
+      "required_external_inputs": [
+        "exact admitted oracle source artifact and frozen runtime",
+        "full parity/cache data for selected exporters/comparisons",
+        "explicit compatible Python service for hosted/replay-share tools",
+        "optional explicit Lab source/evaluator only for those selected workflows"
+      ],
+      "dependency_inventory": "rust/docs/audits/dependencies.json"
+    },
+    {
+      "category": "deployment",
+      "paths": [
+        "scripts/verify_rust*.py",
+        "scripts/package_rust_game_server.py",
+        "scripts/export_rust_hero_catalogue.py",
+        "scripts/export_override_schema.py",
+        "rust/deploy/*",
+        ".github/workflows/rust.yml",
+        ".github/ISSUE_TEMPLATE/rust-bug.yml",
+        ".github/pull_request_template.md"
+      ],
+      "destination": "same path",
+      "consumer": "Linux packaging; process/hosted verifiers",
+      "required_external_inputs": [
+        "built Linux game binary and admitted content",
+        "selected systemd host and explicit frontend/Rust origins for deployed checks",
+        "release identity manifest and caller-provided ingress credentials",
+        "compatible Python service only for hosted adapter verification"
+      ],
+      "dependency_inventory": "rust/docs/audits/dependencies.json"
+    },
+    {
+      "category": "historical",
+      "paths": [
+        "rust/docs/archive/**/*"
+      ],
+      "destination": "same path; archive only",
+      "consumer": "provenance and original milestone records, not active contributor instructions",
+      "required_external_inputs": [
+        "original repository Git provenance only when refreshing historical inventory; static records require none"
+      ],
+      "dependency_inventory": "rust/docs/audits/dependencies.json"
+    }
+  ],
+  "excluded": [
+    {
+      "paths": [
+        ".git",
+        "src",
+        "data",
+        "tests/domain",
+        "tests/engine",
+        "tests/server",
+        "node_modules",
+        "rust/target",
+        "rust/artifacts",
+        "*.sqlite*",
+        ".env*"
+      ],
+      "reason": "original history/Python engine/private or generated material; never copied by extraction"
+    },
+    {
+      "paths": [
+        "rust/tests/fixtures/*/*.json",
+        "rust/tests/fixtures/*/*.json.gz"
+      ],
+      "reason": "Full payloads acquired into configurable ignored cache; smoke is explicitly retained by its own group"
+    }
+  ],
+  "external_dependencies": [
+    {
+      "name": "compiler",
+      "contract": "Rust 1.99.1 with rustfmt/clippy; Linux validated; C compiler for bundled SQLite"
+    },
+    {
+      "name": "oracle",
+      "contract": "Exact files/runtime from rust/oracle-manifest.json; GOA2_ORACLE_SOURCE admits a source archive without original Git history"
+    },
+    {
+      "name": "full parity payloads",
+      "contract": "Canonical 6592/live 17347 plus full-game indexes; full preflight must fail on missing/changed data; artifact hosting unresolved"
+    },
+    {
+      "name": "runtime game pack",
+      "contract": "version 1 with exact oracle/source identity; externally acquired pack requires independent SHA256; public redistribution unresolved"
+    },
+    {
+      "name": "hosted draft verification",
+      "contract": "Python service and explicitly compatible frontend; optional external integration, unavailable in native-only extraction"
+    },
+    {
+      "name": "packaging",
+      "contract": "scripts/package_rust_game_server.py reads rust/deploy/goa2-rust.service"
+    },
+    {
+      "name": "compatible Python service",
+      "contract": "Optional hosted-draft/replay-share verifiers and override metadata exporter require the matching Python backend service sources and its uv.lock environment, including FastAPI/httpx. These are not native runtime dependencies and must not be silently replaced with an incompatible frozen oracle service.",
+      "consumers": [
+        "scripts/verify_rust_hosted_draft.py",
+        "scripts/verify_rust_replay_share.py",
+        "scripts/export_override_schema.py"
+      ]
+    },
+    {
+      "name": "optional Layout Lab import/evaluator",
+      "contract": "port_lab_situations.py --lab/--python-src and rollout_parity.py --lab-evaluator explicitly accept external tooling. The Lab backend/state_model modules and evaluator file are excluded, optional and never required or auto-discovered for ordinary native builds/tests. No Lab service is started.",
+      "consumers": [
+        "scripts/rust_oracle/port_lab_situations.py",
+        "scripts/rust_oracle/rollout_parity.py"
+      ]
+    },
+    {
+      "name": "benchmark/profile artifacts",
+      "contract": "Full complete-game inputs come from the admitted external fixture cache; arena profiles/starts and perf.data are explicit local inputs. They are separately owned in rust/benchmarks/inputs.json; absence must not become a reduced successful run.",
+      "consumers": [
+        "scripts/rust_oracle/simulation_bench.py",
+        "scripts/rust_oracle/arena_queue.py",
+        "scripts/rust_oracle/native_profile.py"
+      ]
+    }
+  ],
+  "release_blockers": [
+    "Confirm source/content redistribution rights and attribution.",
+    "Publish/acquire all indexed parity payloads and pass full/restore suites.",
+    "Select destination/maintainers/security reporting channel.",
+    "Run hosted integration with a matching frontend before deployment promotion."
+  ],
+  "audit_entrypoints": [
+    "cargo build/test/doc --locked in rust/",
+    "rust/tools/check.py",
+    "rust/tools/baseline_games.py",
+    "scripts/rust_oracle/run_pinned.py",
+    "scripts/package_rust_game_server.py",
+    "scripts/verify_rust_game_server.py",
+    "scripts/verify_rust_hosted_draft.py",
+    "scripts/verify_rust_staging.py"
+  ]
+}

@@ -1,11 +1,8 @@
 //! Versioned, private live-game replay archives. Tokens and retry receipts stay in SQLite.
 use crate::{ApiError, Result};
-use goa2_core::interpreter::{
-    ExecutionBudget,
-    live_game::{
-        GameCheckpoint, GameTransition, LiveGame, PatchCommand, PauseVoteChange, PlayerCommand,
-        UnstickCommand,
-    },
+use goa2_core::api::{
+    ExecutionBudget, GameCheckpoint, GameTransition, LiveGame, PatchCommand, PauseVoteChange,
+    PlayerCommand, UnstickCommand,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -13,7 +10,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 pub const MAX_ARCHIVE_BYTES: usize = 16 * 1024 * 1024;
 pub const MAX_STEPS: usize = 10_000;
-const SCHEMA: u32 = 1;
+use crate::versions::REPLAY_SCHEMA as SCHEMA;
 const KIND: &str = "rust-live-replay";
 
 pub fn prepare_command<'a>(
@@ -336,13 +333,19 @@ impl Archive {
                 checkpoint.omit_lane_progress();
                 bytes = serde_json::to_vec(&checkpoint).map_err(ApiError::internal)?;
                 if sha256(&bytes) != entry.checkpoint_sha256 {
-                    return Err(invalid_at(entry.revision, &"reconstructed checkpoint differs"));
+                    return Err(invalid_at(
+                        entry.revision,
+                        &"reconstructed checkpoint differs",
+                    ));
                 }
                 next.reset_legacy_lane_progress()
                     .map_err(|error| invalid_at(entry.revision, &error))?;
             }
             if next.position().revision != entry.revision {
-                return Err(invalid_at(entry.revision, &"reconstructed checkpoint differs"));
+                return Err(invalid_at(
+                    entry.revision,
+                    &"reconstructed checkpoint differs",
+                ));
             }
             if last_rewind_use.contains_key(&entry.revision) {
                 rewind_checkpoints.insert(entry.revision, bytes);
@@ -355,18 +358,97 @@ impl Archive {
 }
 
 #[cfg(test)]
-mod tests {
+mod compatibility_tests {
     use super::*;
-    use goa2_core::interpreter::live_game::{GameContent, GameMode, GameSetup};
-    use std::{env, fs::File, io::BufReader};
+    use serde_json::json;
 
     #[test]
-    #[ignore = "requires GOA2_GAME_CONTENT from live_game_content.py"]
-    fn replay_accepts_legacy_entries_followed_by_live_lane_progress() {
-        let content = GameContent::read(BufReader::new(
-            File::open(env::var("GOA2_GAME_CONTENT").unwrap()).unwrap(),
-        ))
+    fn decision_defaults_full_width_times_and_variant_field_policy() {
+        let value = json!({"at_ms":u64::MAX,"operation":{"kind":"pause_released"}});
+        let decision: Decision = serde_json::from_value(value.clone()).unwrap();
+        assert_eq!(decision.at_ms, u64::MAX);
+        assert!(decision.rebase_ms.is_none());
+        assert_eq!(serde_json::to_value(decision).unwrap(), value);
+        let mut invalid = value.clone();
+        invalid["typo"] = json!(true);
+        assert!(serde_json::from_value::<Decision>(invalid).is_err());
+        let mut invalid = value.clone();
+        invalid["operation"]["typo"] = json!(true);
+        // Serde's internally tagged unit variants tolerate extra fields even
+        // with deny_unknown_fields. Preserve this existing compatibility policy.
+        assert!(serde_json::from_value::<Decision>(invalid).is_ok());
+        let structured = json!({"at_ms":0,"operation":{"kind":"timeout","entropy":1,"typo":true}});
+        assert!(serde_json::from_value::<Decision>(structured).is_err());
+        let unknown = json!({"at_ms":0,"operation":{"kind":"future_operation"}});
+        assert!(serde_json::from_value::<Decision>(unknown).is_err());
+        let mut invalid = value;
+        invalid["at_ms"] = json!(-1);
+        assert!(serde_json::from_value::<Decision>(invalid).is_err());
+    }
+    #[test]
+    fn replay_archive_mutations_reject_ranges_hashes_versions_and_rewind_overflow() {
+        use goa2_core::api::{GameContent, GameMode, GameSetup};
+        let content =
+            GameContent::read(include_bytes!("../../../content/smoke-game.json").as_slice())
+                .unwrap();
+        let setup = GameSetup {
+            map: "forgotten_island".into(),
+            red_heroes: vec!["Arien".into()],
+            blue_heroes: vec!["Brogan".into()],
+            seed: 29,
+            mode: GameMode::Quick,
+            cheats_enabled: false,
+            tie_breaker: None,
+        };
+        let game = LiveGame::create(&content, &setup, &ExecutionBudget::default())
+            .unwrap()
+            .0;
+        let checkpoint = serde_json::to_vec(&game.checkpoint().unwrap()).unwrap();
+        let archive = Archive::new(
+            0,
+            0,
+            &checkpoint,
+            Vec::new(),
+            BTreeMap::new(),
+            BTreeSet::new(),
+        )
         .unwrap();
+        let original = serde_json::to_value(archive).unwrap();
+        for (key, value) in [
+            ("kind", json!("future")),
+            ("schema", json!(2)),
+            ("start_revision", json!(u64::MAX)),
+            ("revision", json!(u64::MAX)),
+            ("start_sha256", json!("0".repeat(64))),
+            ("bot_seats", json!(["unknown-seat"])),
+        ] {
+            let mut changed = original.clone();
+            changed[key] = value;
+            let archive: Archive = serde_json::from_value(changed).unwrap();
+            assert!(archive.restore(None).is_err(), "{key}");
+        }
+        for to in [0, 1, u64::MAX] {
+            let mut changed = original.clone();
+            changed["revision"] = json!(1);
+            changed["entries"] = json!([{"revision":1,"checkpoint_sha256":"0".repeat(64),"decision":{"at_ms":0,"operation":{"kind":"rewind","proposer":"hero_arien","to":to}}}]);
+            let archive: Archive = serde_json::from_value(changed).unwrap();
+            assert!(archive.restore(None).is_err());
+        }
+        let archive: Archive = serde_json::from_value(original).unwrap();
+        assert_eq!(archive.restore(None).unwrap().0.position().revision, 0);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use goa2_core::api::{GameContent, GameMode, GameSetup};
+
+    #[test]
+    fn replay_accepts_legacy_entries_followed_by_live_lane_progress() {
+        let content =
+            GameContent::read(include_bytes!("../../../content/smoke-game.json").as_slice())
+                .unwrap();
         let budget = ExecutionBudget::default();
         let (game, _) = LiveGame::create(
             &content,
@@ -417,12 +499,18 @@ mod tests {
             0,
             2,
             &start,
-            vec![patch(1, old_hash, wave), patch(2, sha256(&current_checkpoint), gold)],
+            vec![
+                patch(1, old_hash, wave),
+                patch(2, sha256(&current_checkpoint), gold),
+            ],
             BTreeMap::new(),
             BTreeSet::new(),
         )
         .unwrap();
         let (replayed, _) = archive.restore(None).unwrap();
-        assert_eq!(serde_json::to_vec(&replayed.checkpoint().unwrap()).unwrap(), current_checkpoint);
+        assert_eq!(
+            serde_json::to_vec(&replayed.checkpoint().unwrap()).unwrap(),
+            current_checkpoint
+        );
     }
 }

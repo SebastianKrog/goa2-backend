@@ -501,6 +501,10 @@ mod adjacent_tests {
         serde_json::to_value(session.export_envelope().unwrap()).unwrap()
     }
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: frozen late-generation payload is not bundled; see docs/testing.md"
+    )]
     fn adjacency_reads_live_operands_and_output_without_generation_or_shared_worker_mutation() {
         let root = session("ordinary");
         let before = snapshot(&root);
@@ -527,6 +531,10 @@ mod adjacent_tests {
         assert_eq!(snapshot(&root), before);
     }
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: frozen late-generation payload is not bundled; see docs/testing.md"
+    )]
     fn adjacency_overflow_rejects_before_pop_but_absent_actor_returns_zero_first() {
         for suffix in ["ordinary", "no-actor"] {
             let mut worker = session(suffix);

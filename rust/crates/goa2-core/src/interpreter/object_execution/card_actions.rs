@@ -33,7 +33,7 @@ impl ActionBindings {
         let data = DATA
             .get_or_init(|| {
                 let data: Value = serde_json::from_str(include_str!(
-                    "../../../../../tests/fixtures/action-builders.json"
+                    "../../../../../content/catalogs/action-builders.json"
                 ))
                 .map_err(|e| e.to_string())?;
                 if data["schema_version"] != 1
@@ -149,7 +149,9 @@ impl NativeSession {
             profile.action_rules_ns = Some(started.elapsed().as_nanos());
             profile.category = Some(match &resolution {
                 ActionResolution::Prompt(_) => "resolve_card.menu",
-                ActionResolution::Finished(children) if children.is_empty() => "resolve_card.no_action",
+                ActionResolution::Finished(children) if children.is_empty() => {
+                    "resolve_card.no_action"
+                }
                 ActionResolution::Finished(_) => "resolve_card.response",
             });
         }

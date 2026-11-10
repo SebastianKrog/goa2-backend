@@ -120,6 +120,10 @@ mod tests {
         native_hex(hex, worker.coordinates)
     }
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: frozen late-generation payload is not bundled; see docs/testing.md"
+    )]
     fn respawn_request_guard_keeps_stack_pending_and_locations_unchanged() {
         let mut worker = object_session("object-execution-hero-respawn-live-ordinary-first");
         worker.next_request = u64::MAX;
@@ -143,6 +147,10 @@ mod tests {
         );
     }
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: frozen late-generation payload is not bundled; see docs/testing.md"
+    )]
     fn pass_precedes_no_spawn_and_needs_no_generation_capacity() {
         let mut worker =
             object_session("object-execution-hero-respawn-live-pending-pass-no-spawns-first");
@@ -157,6 +165,10 @@ mod tests {
         assert_eq!(worker.next_request, u64::MAX);
     }
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: frozen late-generation payload is not bundled; see docs/testing.md"
+    )]
     fn respawn_reads_live_hero_operand_before_spawns_or_pending_selection() {
         let root = object_session("object-execution-hero-respawn-live-token-first");
         let before = root.export_envelope().unwrap();
@@ -193,6 +205,10 @@ mod tests {
         assert_eq!(root.export_envelope().unwrap().state, before.state);
     }
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: frozen late-generation payload is not bundled; see docs/testing.md"
+    )]
     fn token_respawn_preserves_maps_unlinks_effects_and_keeps_root_private() {
         let mut root = object_session("object-execution-hero-respawn-live-token-effects-first");
         let req = root.advance_prefix(1).unwrap().request.unwrap();
@@ -234,6 +250,10 @@ mod tests {
         assert_eq!(root.export_envelope().unwrap().state, before.state);
     }
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: frozen late-generation payload is not bundled; see docs/testing.md"
+    )]
     fn respawn_new_hex_and_shared_snapshot_remain_restorable() {
         let mut worker = object_session("object-execution-hero-respawn-live-shared-snapshot-first");
         let req = worker.advance_prefix(1).unwrap().request.unwrap();
@@ -281,6 +301,10 @@ mod tests {
         assert_eq!(before.object_bindings, restored.object_bindings);
     }
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: frozen late-generation payload is not bundled; see docs/testing.md"
+    )]
     fn multipiece_respawn_uses_supply_order_not_misc_registry_order() {
         let mut worker =
             object_session("object-execution-hero-respawn-live-piece-reversed-registry-first");

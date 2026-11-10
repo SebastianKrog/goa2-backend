@@ -10,7 +10,7 @@ from primary_templates import build_catalog
 
 def test_primary_catalog_is_exact_frozen_effect_api_output():
     root = Path(__file__).resolve().parents[2]
-    frozen = json.loads((root / "rust/tests/fixtures/primary-effects.json").read_text())
+    frozen = json.loads((root / "rust/content/catalogs/primary-effects.json").read_text())
     assert build_catalog() == frozen
 
 
@@ -59,7 +59,7 @@ def test_aura_capabilities_match_frozen_registry_method_implementations():
 
     register_all_effects()
     root = Path(__file__).resolve().parents[2]
-    frozen = json.loads((root / "rust/tests/fixtures/instruction-templates.json").read_text())
+    frozen = json.loads((root / "rust/content/catalogs/instruction-templates.json").read_text())
     hooks = ("get_stat_auras", "get_movement_aura", "get_action_prevention_reason")
     actual = sorted(
         key
@@ -83,7 +83,7 @@ def test_ultimate_unlock_catalog_matches_frozen_registered_hooks():
 
     register_all_effects()
     root = Path(__file__).resolve().parents[2]
-    frozen = json.loads((root / "rust/tests/fixtures/instruction-templates.json").read_text())
+    frozen = json.loads((root / "rust/content/catalogs/instruction-templates.json").read_text())
     actual = sorted(
         key
         for key, effect in CardEffectRegistry._effects.items()
@@ -141,7 +141,7 @@ def test_passive_config_catalog_matches_frozen_public_api():
 
     register_all_effects()
     root = Path(__file__).resolve().parents[2]
-    frozen = json.loads((root / "rust/tests/fixtures/instruction-templates.json").read_text())
+    frozen = json.loads((root / "rust/content/catalogs/instruction-templates.json").read_text())
     import os
     import subprocess
 
@@ -200,4 +200,4 @@ def test_effect_defaults_are_exact_frozen_model_output():
     from effect_step_traces import defaults
 
     root = Path(__file__).resolve().parents[2]
-    assert defaults() == json.loads((root / "rust/tests/fixtures/effect-defaults.json").read_text())
+    assert defaults() == json.loads((root / "rust/content/catalogs/effect-defaults.json").read_text())

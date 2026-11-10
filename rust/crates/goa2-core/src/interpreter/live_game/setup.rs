@@ -104,7 +104,7 @@ impl GameContent {
         let content: Self = serde_json::from_reader(reader)
             .map_err(|error| invalid(&format!("invalid setup content: {error}")))?;
         let manifest = oracle_manifest().map_err(super::super::unsupported)?;
-        if content.version != 1
+        if content.version != crate::versions::CONTENT
             || content.oracle_revision != ORACLE_REVISION
             || manifest["source_sha256"].as_str() != Some(&content.source_sha256)
         {

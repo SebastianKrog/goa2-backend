@@ -52,7 +52,7 @@ def export():
             )
             cases.append(dict(hero=name, level=level, items=items, reveals=reveals, extra=extra,
                               expected=[row.model_dump(mode="json") for row in result]))
-    out = ROOT / "rust/tests/fixtures/loadout-provenance.json"
+    out = ROOT / "rust/content/catalogs/loadout-provenance.json"
     out.write_text(json.dumps(dict(source_sha256=source["source_sha256"], heroes=heroes, cases=cases),
                               separators=(",", ":")) + "\n", encoding="utf-8")
 

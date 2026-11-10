@@ -1,0 +1,1438 @@
+{
+  "schema_version": 1,
+  "scope": "Inline Markdown links outside fenced code in the extraction selection; local file and Markdown heading targets. Remote URLs are not fetched. Code-path examples are audited separately by maintained command guides.",
+  "links": [
+    {
+      "consumer": "rust/CONTRIBUTING.md",
+      "link": "docs/contributing.md",
+      "target": "rust/docs/contributing.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/CONTRIBUTING.md",
+      "link": "docs/testing.md",
+      "target": "rust/docs/testing.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/CONTRIBUTING.md",
+      "link": "docs/compatibility.md",
+      "target": "rust/docs/compatibility.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/CONTRIBUTING.md",
+      "link": "docs/readiness.md",
+      "target": "rust/docs/readiness.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/README.md",
+      "link": "docs/readiness.md",
+      "target": "rust/docs/readiness.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/README.md",
+      "link": "docs/testing.md",
+      "target": "rust/docs/testing.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/README.md",
+      "link": "docs/content.md",
+      "target": "rust/docs/content.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/README.md",
+      "link": "docs/architecture.md",
+      "target": "rust/docs/architecture.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/README.md",
+      "link": "docs/compatibility.md",
+      "target": "rust/docs/compatibility.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/README.md",
+      "link": "docs/testing.md",
+      "target": "rust/docs/testing.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/README.md",
+      "link": "docs/content.md",
+      "target": "rust/docs/content.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/README.md",
+      "link": "docs/frontend-protocol.md",
+      "target": "rust/docs/frontend-protocol.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/README.md",
+      "link": "docs/operations.md",
+      "target": "rust/docs/operations.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/README.md",
+      "link": "docs/search.md",
+      "target": "rust/docs/search.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/README.md",
+      "link": "docs/contributing.md",
+      "target": "rust/docs/contributing.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/README.md",
+      "link": "extraction-manifest.json",
+      "target": "rust/extraction-manifest.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/README.md",
+      "link": "docs/readiness.md",
+      "target": "rust/docs/readiness.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/README.md",
+      "link": "docs/platform-and-packaging.md",
+      "target": "rust/docs/platform-and-packaging.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/README.md",
+      "link": "docs/verification-gates.md",
+      "target": "rust/docs/verification-gates.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/README.md",
+      "link": "docs/archive/development-history.md",
+      "target": "rust/docs/archive/development-history.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/README.md",
+      "link": "docs/archive/fixture-history.md",
+      "target": "rust/docs/archive/fixture-history.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/README.md",
+      "link": "docs/license-review.md",
+      "target": "rust/docs/license-review.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/SECURITY.md",
+      "link": "docs/readiness.md",
+      "target": "rust/docs/readiness.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/architecture.md",
+      "link": "../crates/goa2-core/examples/local_game.rs",
+      "target": "rust/crates/goa2-core/examples/local_game.rs",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/architecture.md",
+      "link": "search.md",
+      "target": "rust/docs/search.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/architecture.md",
+      "link": "compatibility.md",
+      "target": "rust/docs/compatibility.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/architecture.md",
+      "link": "audits/server-harness.md",
+      "target": "rust/docs/audits/server-harness.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/architecture.md",
+      "link": "audits/api-boundaries.md",
+      "target": "rust/docs/audits/api-boundaries.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/architecture.md",
+      "link": "audits/concurrency-and-panics.md",
+      "target": "rust/docs/audits/concurrency-and-panics.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/architecture.md",
+      "link": "audits/versions-and-robustness.md",
+      "target": "rust/docs/audits/versions-and-robustness.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/archive/development-history.md",
+      "link": "../../README.md",
+      "target": "rust/README.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/archive/development-history.md",
+      "link": "../audits/documentation.json",
+      "target": "rust/docs/audits/documentation.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/archive/development-history.md",
+      "link": "../audits/material-inventory.json",
+      "target": "rust/docs/audits/material-inventory.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/archive/development-history.md",
+      "link": "../audits/material-inventory.json",
+      "target": "rust/docs/audits/material-inventory.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/archive/development-history.md",
+      "link": "../audits/material-inventory.json",
+      "target": "rust/docs/audits/material-inventory.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/archive/development-history.md",
+      "link": "../audits/material-inventory.json",
+      "target": "rust/docs/audits/material-inventory.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/archive/development-history.md",
+      "link": "../audits/material-inventory.json",
+      "target": "rust/docs/audits/material-inventory.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/archive/development-history.md",
+      "link": "../audits/material-inventory.json",
+      "target": "rust/docs/audits/material-inventory.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/archive/development-history.md",
+      "link": "../audits/material-inventory.json",
+      "target": "rust/docs/audits/material-inventory.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/archive/development-history.md",
+      "link": "../audits/material-inventory.json",
+      "target": "rust/docs/audits/material-inventory.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/archive/development-history.md",
+      "link": "../audits/material-inventory.json",
+      "target": "rust/docs/audits/material-inventory.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/archive/development-history.md",
+      "link": "../audits/material-inventory.json",
+      "target": "rust/docs/audits/material-inventory.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/archive/development-history.md",
+      "link": "../audits/material-inventory.json",
+      "target": "rust/docs/audits/material-inventory.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/archive/development-history.md",
+      "link": "../audits/material-inventory.json",
+      "target": "rust/docs/audits/material-inventory.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/archive/development-history.md",
+      "link": "../audits/material-inventory.json",
+      "target": "rust/docs/audits/material-inventory.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/archive/development-history.md",
+      "link": "../audits/documentation.json",
+      "target": "rust/docs/audits/documentation.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/archive/development-history.md",
+      "link": "../audits/documentation.json",
+      "target": "rust/docs/audits/documentation.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/archive/development-history.md",
+      "link": "../audits/documentation.json",
+      "target": "rust/docs/audits/documentation.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/archive/development-history.md",
+      "link": "../audits/documentation.json",
+      "target": "rust/docs/audits/documentation.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/archive/development-history.md",
+      "link": "../audits/material-inventory.json",
+      "target": "rust/docs/audits/material-inventory.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/archive/fixture-history.md",
+      "link": "../../README.md",
+      "target": "rust/README.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/archive/fixture-history.md",
+      "link": "../../README.md#build-and-check",
+      "target": "rust/README.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/archive/fixture-history.md",
+      "link": "../audits/material-inventory.json",
+      "target": "rust/docs/audits/material-inventory.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/archive/fixture-history.md",
+      "link": "../audits/material-inventory.json",
+      "target": "rust/docs/audits/material-inventory.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/archive/fixture-history.md",
+      "link": "../audits/material-inventory.json",
+      "target": "rust/docs/audits/material-inventory.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/archive/fixture-history.md",
+      "link": "../audits/material-inventory.json",
+      "target": "rust/docs/audits/material-inventory.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/archive/fixture-history.md",
+      "link": "../audits/material-inventory.json",
+      "target": "rust/docs/audits/material-inventory.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/archive/fixture-history.md",
+      "link": "../audits/material-inventory.json",
+      "target": "rust/docs/audits/material-inventory.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/archive/fixture-history.md",
+      "link": "../audits/material-inventory.json",
+      "target": "rust/docs/audits/material-inventory.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/archive/fixture-history.md",
+      "link": "../audits/material-inventory.json",
+      "target": "rust/docs/audits/material-inventory.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/archive/fixture-history.md",
+      "link": "../audits/material-inventory.json",
+      "target": "rust/docs/audits/material-inventory.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/archive/fixture-history.md",
+      "link": "../audits/material-inventory.json",
+      "target": "rust/docs/audits/material-inventory.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/archive/fixture-history.md",
+      "link": "../audits/material-inventory.json",
+      "target": "rust/docs/audits/material-inventory.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/archive/fixture-history.md",
+      "link": "../audits/material-inventory.json",
+      "target": "rust/docs/audits/material-inventory.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/archive/fixture-history.md",
+      "link": "../audits/material-inventory.json",
+      "target": "rust/docs/audits/material-inventory.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/archive/fixture-history.md",
+      "link": "../audits/material-inventory.json",
+      "target": "rust/docs/audits/material-inventory.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/archive/fixture-history.md",
+      "link": "../audits/material-inventory.json",
+      "target": "rust/docs/audits/material-inventory.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/archive/fixture-history.md",
+      "link": "../audits/material-inventory.json",
+      "target": "rust/docs/audits/material-inventory.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/api-boundaries.md",
+      "link": "boundaries.json",
+      "target": "rust/docs/audits/boundaries.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/api-boundaries.md",
+      "link": "../worker-protocol-examples.json",
+      "target": "rust/docs/worker-protocol-examples.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/api-boundaries.md",
+      "link": "../worker-operations.json",
+      "target": "rust/docs/worker-operations.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/ci-gates.md",
+      "link": "../verification-gates.md",
+      "target": "rust/docs/verification-gates.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/concurrency-and-panics.md",
+      "link": "boundaries.json",
+      "target": "rust/docs/audits/boundaries.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/extraction-dependencies.md",
+      "link": "dependencies.json",
+      "target": "rust/docs/audits/dependencies.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/fourth-ten.md",
+      "link": "fourth-ten.json",
+      "target": "rust/docs/audits/fourth-ten.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/fourth-ten.md",
+      "link": "cold-native.json",
+      "target": "rust/docs/audits/cold-native.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/fourth-ten.md",
+      "link": "../../tests/compatibility/README.md",
+      "target": "rust/tests/compatibility/README.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/fourth-ten.md",
+      "link": "historical-matrix.json",
+      "target": "rust/docs/audits/historical-matrix.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/fourth-ten.md",
+      "link": "dependency-review.json",
+      "target": "rust/docs/audits/dependency-review.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/fourth-ten.md",
+      "link": "../release-notes.md",
+      "target": "rust/docs/release-notes.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/fourth-ten.md",
+      "link": "../release-provenance.json",
+      "target": "rust/docs/release-provenance.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/fourth-ten.md",
+      "link": "../../benchmarks/inputs.json",
+      "target": "rust/benchmarks/inputs.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/fourth-ten.md",
+      "link": "../../benchmarks/maintenance-v1-results.json",
+      "target": "rust/benchmarks/maintenance-v1-results.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/fourth-ten.md",
+      "link": "performance-baseline.md",
+      "target": "rust/docs/audits/performance-baseline.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/fourth-ten.md",
+      "link": "performance-baseline.md#catalog-and-footprint-decision",
+      "target": "rust/docs/audits/performance-baseline.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/material-ownership.md",
+      "link": "material-inventory.json",
+      "target": "rust/docs/audits/material-inventory.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/material-ownership.md",
+      "link": "error-guards.json",
+      "target": "rust/docs/audits/error-guards.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/next-ten.md",
+      "link": "next-ten.json",
+      "target": "rust/docs/audits/next-ten.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/next-ten.md",
+      "link": "second-ten.md",
+      "target": "rust/docs/audits/second-ten.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/next-ten.md",
+      "link": "extraction-dependencies.md",
+      "target": "rust/docs/audits/extraction-dependencies.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/next-ten.md",
+      "link": "dependencies.json",
+      "target": "rust/docs/audits/dependencies.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/next-ten.md",
+      "link": "../../tests/baselines/README.md",
+      "target": "rust/tests/baselines/README.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/next-ten.md",
+      "link": "../platform-and-packaging.md",
+      "target": "rust/docs/platform-and-packaging.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/next-ten.md",
+      "link": "../../benchmarks/inputs.json",
+      "target": "rust/benchmarks/inputs.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/next-ten.md",
+      "link": "error-guards.json",
+      "target": "rust/docs/audits/error-guards.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/next-ten.md",
+      "link": "material-inventory.json",
+      "target": "rust/docs/audits/material-inventory.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/next-ten.md",
+      "link": "material-ownership.md",
+      "target": "rust/docs/audits/material-ownership.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/next-ten.md",
+      "link": "cache-identity.md",
+      "target": "rust/docs/audits/cache-identity.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/next-ten.md",
+      "link": "../platform-and-packaging.md",
+      "target": "rust/docs/platform-and-packaging.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/next-ten.md",
+      "link": "../verification-gates.md",
+      "target": "rust/docs/verification-gates.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/performance-baseline.md",
+      "link": "../../benchmarks/maintenance-v1-results.json",
+      "target": "rust/benchmarks/maintenance-v1-results.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/performance-baseline.md",
+      "link": "performance-summary.json",
+      "target": "rust/docs/audits/performance-summary.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/second-ten.md",
+      "link": "second-ten.json",
+      "target": "rust/docs/audits/second-ten.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/second-ten.md",
+      "link": "third-ten.md",
+      "target": "rust/docs/audits/third-ten.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/second-ten.md",
+      "link": "ci-gates.md",
+      "target": "rust/docs/audits/ci-gates.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/second-ten.md",
+      "link": "compatibility-decisions.md#serialized-boundary-policy-c05-03",
+      "target": "rust/docs/audits/compatibility-decisions.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/second-ten.md",
+      "link": "compatibility-decisions.md#recipient-and-freshness-coverage-c05-04",
+      "target": "rust/docs/audits/compatibility-decisions.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/second-ten.md",
+      "link": "compatibility-decisions.md#shim-classification-and-removal-gates-c05-0506",
+      "target": "rust/docs/audits/compatibility-decisions.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/second-ten.md",
+      "link": "documentation.json",
+      "target": "rust/docs/audits/documentation.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/second-ten.md",
+      "link": "../platform-and-packaging.md#cratesio-retained-policy-c07-11",
+      "target": "rust/docs/platform-and-packaging.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/second-ten.md",
+      "link": "server-harness.md#online-backup-and-restoration-c08-02",
+      "target": "rust/docs/audits/server-harness.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/second-ten.md",
+      "link": "server-harness.md",
+      "target": "rust/docs/audits/server-harness.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/third-ten.md",
+      "link": "third-ten.json",
+      "target": "rust/docs/audits/third-ten.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/third-ten.md",
+      "link": "fourth-ten.md",
+      "target": "rust/docs/audits/fourth-ten.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/third-ten.md",
+      "link": "concurrency-and-panics.md",
+      "target": "rust/docs/audits/concurrency-and-panics.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/third-ten.md",
+      "link": "boundaries.json",
+      "target": "rust/docs/audits/boundaries.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/third-ten.md",
+      "link": "api-boundaries.md",
+      "target": "rust/docs/audits/api-boundaries.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/third-ten.md",
+      "link": "api-boundaries.md#dense-versus-object-aware-execution-c10-05",
+      "target": "rust/docs/audits/api-boundaries.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/third-ten.md",
+      "link": "versions-and-robustness.md",
+      "target": "rust/docs/audits/versions-and-robustness.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/third-ten.md",
+      "link": "concurrency-and-panics.md#panic-assumptions-and-trust-distinctions",
+      "target": "rust/docs/audits/concurrency-and-panics.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/third-ten.md",
+      "link": "versions-and-robustness.md#new-deterministic-mutationproperty-coverage",
+      "target": "rust/docs/audits/versions-and-robustness.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/cleanup-checklist.md",
+      "link": "readiness.md",
+      "target": "rust/docs/readiness.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/cleanup-checklist.md",
+      "link": "cleanup-evidence.json",
+      "target": "rust/docs/cleanup-evidence.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/cleanup-checklist.md",
+      "link": "audits/next-ten.md",
+      "target": "rust/docs/audits/next-ten.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/cleanup-checklist.md",
+      "link": "audits/second-ten.md",
+      "target": "rust/docs/audits/second-ten.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/cleanup-checklist.md",
+      "link": "audits/third-ten.md",
+      "target": "rust/docs/audits/third-ten.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/cleanup-checklist.md",
+      "link": "audits/fourth-ten.md",
+      "target": "rust/docs/audits/fourth-ten.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/compatibility.md",
+      "link": "worker-operations.json",
+      "target": "rust/docs/worker-operations.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/compatibility.md",
+      "link": "operations.md",
+      "target": "rust/docs/operations.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/compatibility.md",
+      "link": "audits/compatibility-decisions.md",
+      "target": "rust/docs/audits/compatibility-decisions.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/compatibility.md",
+      "link": "audits/api-boundaries.md",
+      "target": "rust/docs/audits/api-boundaries.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/compatibility.md",
+      "link": "audits/versions-and-robustness.md",
+      "target": "rust/docs/audits/versions-and-robustness.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/compatibility.md",
+      "link": "../tests/compatibility/README.md",
+      "target": "rust/tests/compatibility/README.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/compatibility.md",
+      "link": "audits/historical-matrix.json",
+      "target": "rust/docs/audits/historical-matrix.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/contributing.md",
+      "link": "../README.md",
+      "target": "rust/README.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/contributing.md",
+      "link": "architecture.md",
+      "target": "rust/docs/architecture.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/contributing.md",
+      "link": "readiness.md",
+      "target": "rust/docs/readiness.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/frontend-protocol.md",
+      "link": "compatibility.md",
+      "target": "rust/docs/compatibility.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/license-review.md",
+      "link": "audits/dependency-review.json",
+      "target": "rust/docs/audits/dependency-review.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/operations.md",
+      "link": "audits/server-harness.md#online-backup-and-restoration-c08-02",
+      "target": "rust/docs/audits/server-harness.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/operations.md",
+      "link": "../tests/compatibility/README.md",
+      "target": "rust/tests/compatibility/README.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/operations.md",
+      "link": "release-notes.md",
+      "target": "rust/docs/release-notes.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/operations.md",
+      "link": "release-provenance.json",
+      "target": "rust/docs/release-provenance.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/platform-and-packaging.md",
+      "link": "readiness.md",
+      "target": "rust/docs/readiness.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/readiness.md",
+      "link": "cleanup-checklist.md",
+      "target": "rust/docs/cleanup-checklist.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/readiness.md",
+      "link": "audits/next-ten.md",
+      "target": "rust/docs/audits/next-ten.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/readiness.md",
+      "link": "audits/second-ten.md",
+      "target": "rust/docs/audits/second-ten.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/readiness.md",
+      "link": "audits/third-ten.md",
+      "target": "rust/docs/audits/third-ten.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/readiness.md",
+      "link": "audits/fourth-ten.md",
+      "target": "rust/docs/audits/fourth-ten.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/release-notes.md",
+      "link": "release-provenance.json",
+      "target": "rust/docs/release-provenance.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/release-notes.md",
+      "link": "operations.md",
+      "target": "rust/docs/operations.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/release-notes.md",
+      "link": "readiness.md",
+      "target": "rust/docs/readiness.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/search.md",
+      "link": "readiness.md",
+      "target": "rust/docs/readiness.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/search.md",
+      "link": "../benchmarks/inputs.json",
+      "target": "rust/benchmarks/inputs.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/search.md",
+      "link": "verification-gates.md",
+      "target": "rust/docs/verification-gates.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/search.md",
+      "link": "audits/api-boundaries.md",
+      "target": "rust/docs/audits/api-boundaries.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/search.md",
+      "link": "worker-protocol-examples.json",
+      "target": "rust/docs/worker-protocol-examples.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/search.md",
+      "link": "audits/performance-baseline.md",
+      "target": "rust/docs/audits/performance-baseline.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/testing.md",
+      "link": "../test-tiers.json",
+      "target": "rust/test-tiers.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/testing.md",
+      "link": "verification-gates.md",
+      "target": "rust/docs/verification-gates.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/testing.md",
+      "link": "../tests/baselines/README.md",
+      "target": "rust/tests/baselines/README.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/testing.md",
+      "link": "audits/ci-gates.md",
+      "target": "rust/docs/audits/ci-gates.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/testing.md",
+      "link": "audits/compatibility-decisions.md",
+      "target": "rust/docs/audits/compatibility-decisions.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/testing.md",
+      "link": "audits/server-harness.md",
+      "target": "rust/docs/audits/server-harness.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/testing.md",
+      "link": "audits/versions-and-robustness.md",
+      "target": "rust/docs/audits/versions-and-robustness.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/testing.md",
+      "link": "audits/cold-native.json",
+      "target": "rust/docs/audits/cold-native.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/testing.md",
+      "link": "audits/historical-matrix.json",
+      "target": "rust/docs/audits/historical-matrix.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/testing.md",
+      "link": "../tests/compatibility/README.md",
+      "target": "rust/tests/compatibility/README.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/testing.md",
+      "link": "audits/dependency-review.json",
+      "target": "rust/docs/audits/dependency-review.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/verification-gates.md",
+      "link": "../verification-gates.json",
+      "target": "rust/verification-gates.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/tests/fixtures/README.md",
+      "link": "../../docs/testing.md",
+      "target": "rust/docs/testing.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/tests/fixtures/README.md",
+      "link": "../../docs/content.md",
+      "target": "rust/docs/content.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/tests/fixtures/README.md",
+      "link": "../../docs/archive/fixture-history.md",
+      "target": "rust/docs/archive/fixture-history.md",
+      "status": "included"
+    }
+  ],
+  "failures": [],
+  "historical_policy": "Archive remains dated provenance, never current acceptance/onboarding. Excluded raw reports are referenced through the retained material inventory; original bytes remain in the source repository.",
+  "excluded_original_documents": [
+    {
+      "path": "docs/AI_EXPERIMENT_JOURNAL.md",
+      "sha256": "5021b86913c4343d3362956ce4c4d03d2ddaeacae6168fd118c2e5843d806dca",
+      "last_change_commit": "feb77b5db5585b0adde6412575eb083a5bb98be5",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/AI_LEARNING_CONTRACT.md",
+      "sha256": "58c2bd9c759324713ace45aede0d7da6ef3c44ccf48c208300b9a1b546f1ab05",
+      "last_change_commit": "feb77b5db5585b0adde6412575eb083a5bb98be5",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/AI_PR_RESET_HANDOFF.md",
+      "sha256": "e686d9ffbc18bc2c9c8b8effa0967562b05c727b33371f81bed26bab1f29b395",
+      "last_change_commit": "feb77b5db5585b0adde6412575eb083a5bb98be5",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/AI_SEARCH_AND_LEARNED_RUNTIME.md",
+      "sha256": "643bb55fa50daa559bff36f727c96e30f373255f0ae0f35e0bc86590e440b6bb",
+      "last_change_commit": "8178fa61e90a0407d613292cd4745340d4e145f0",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/AI_STACK_CLEANUP.md",
+      "sha256": "f02c9e123526d965184dcafb934376ee6a25dc9f58e3d953991ad969601dbbcc",
+      "last_change_commit": "90a3e78cd36138cdf23bec547b5606a88b06aa74",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/BOT_SEARCH_STATE.md",
+      "sha256": "de679a3f616fa6dc9e64eee8c33232229720a72b20f7bd9b2ffb9da864793f5a",
+      "last_change_commit": "917b077ac5a4c909f3210036ed2eca6afcdced68",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/CLIENT_INTEGRATION_GUIDE.md",
+      "sha256": "e0400038869a04dad0fc6ee28a81994613c5a783f4e045fda59bb392e33d84fc",
+      "last_change_commit": "f0fb93e117f358266ef522e6d5f23d3452e83e97",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/CLIENT_READINESS_ROADMAP.md",
+      "sha256": "4e8aa945e0e8c2fd02df030d1fa1ee2ccf448f0cf49fb332c42fa50eb60ffc16",
+      "last_change_commit": "1b6c92760eb839aab8f2d1f1fb12ac40199b76f1",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/CODEBASE_MAP.md",
+      "sha256": "0dca6f48decf8d4ba787d44a3caa5159259993a7f69a3fbde1ec7c9333aac3e4",
+      "last_change_commit": "3daa91bb1e32616c6e860009f57a069ec187c08d",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/DOUBLE_LANE_PREP.md",
+      "sha256": "7e17961617c157adeeeaac2f67474f2026007066864c4cf9412e0a3a52debb76",
+      "last_change_commit": "a7c7c4526ed44752938cc26bc4d05ec1b16879f5",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/EFFECT_AUTHOR_REFERENCE.md",
+      "sha256": "e360a86eb34a063d9c563cd258cef2109629221bb75c5eb235ade7bf81a4d8bc",
+      "last_change_commit": "601df58bf5ed6765b0d5a092806df2b4a07184e8",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/LEARNED_MODEL_LINEAGE.md",
+      "sha256": "4f50dc6d7c4730e4f075afeb67c09379dfc7bf30470fd00a3134a1b7adb76a91",
+      "last_change_commit": "bc56595e7de74b371c667a971e0df3be16a370a0",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/LEARNED_TRAINING_OPERATIONS.md",
+      "sha256": "4c1d3175c4f6a75fb6159380b5bf6cf29dd556809b3ed9882732216d92a76189",
+      "last_change_commit": "feb77b5db5585b0adde6412575eb083a5bb98be5",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/LEGALITY_CHECKS.md",
+      "sha256": "0c4dfae183f296989c85da176d407b01ddcbb069a5183d1973573de5fa2a5e2f",
+      "last_change_commit": "00becf4a68615afa410f8eabe0c841809af0427b",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/MAINTAINABILIY_ROADMAP.md",
+      "sha256": "6002d3bbe3eaec5dbec54a4b029f5d790efe812117979c0f5f20fab56b4292f3",
+      "last_change_commit": "90a3e78cd36138cdf23bec547b5606a88b06aa74",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/RUST_ENGINE_CLEANUP_PLAN.md",
+      "sha256": "1ed7d8316b7e18f2fd9f553f7187a2f771ce0bb6dc83cfc63bb0b5ddf059807a",
+      "last_change_commit": "ea1e2b0a04ff43f6416ff3561b83a78a9b359fca",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/SHARED_DECISION_FACTS_COMPATIBILITY.md",
+      "sha256": "b20b7df2e0f58ee6e6249931c7d7ce3ce216b2205fc26ebee2980d90ab37c001",
+      "last_change_commit": "757bc27aaa271d711c2dc1273a6f7dc4c0b91ddf",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/TODO.md",
+      "sha256": "e46ef8a66152bbbc79c09b4187b6c95ea0d7a5ea1dfcfa9467c6b0679d71cf80",
+      "last_change_commit": "a59f853ad28323bc2643c64f955cc278c9201e33",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/TOPOLOGY_IMPLEMENTATION_PLAN.md",
+      "sha256": "37d05d0b98f01591d468fa1d97013c06d4cfbe64da304d540896889d7a24b499",
+      "last_change_commit": "af25788a567f85a3d13685e204c8d34bd754de07",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/WASP_IMPLEMENTATION_GUIDE.md",
+      "sha256": "4624dc476faea7b0085bec0694adcc361cbc12a7af73cf3d6033db603b207814",
+      "last_change_commit": "c7e083d031ab00853792af6327d63be7641c5111",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/architecture-effect-system-plan.md",
+      "sha256": "1d17b02ca541ad6bda937e9824bbdbd7d8b7fc79f14e2359e1fbe8710876a0e6",
+      "last_change_commit": "68429040f8344e4cf8089017eb85cd2c6b7dea58",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/audit_claims_tracker.md",
+      "sha256": "39115dad43246d7fbdb28058b9f0f0742f935b3258392f42609dbea0d7c068e7",
+      "last_change_commit": "a051b194c3d36753f054338cdc775e5f54a3f341",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/card_effects_guidelines.md",
+      "sha256": "360d938a80fe4341f42814795116e4f1b97d578f950d81faf1c4069548188f13",
+      "last_change_commit": "6b6841e20343fda7c9e2d18bcaba2eca0e4b1405",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/character_effect_testing_strategy_plan.md",
+      "sha256": "2f2820ee78f3a3ef2c5bfb3d680c6ff79a64bb566405db6c4d213267b253b007",
+      "last_change_commit": "6b6841e20343fda7c9e2d18bcaba2eca0e4b1405",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/cutter_test_spec.md",
+      "sha256": "620284ced71fe4c5f2dddb101bf577847188a9c96904c0122bc0515afed7d6f1",
+      "last_change_commit": "3c5c577b31fd94475e08d21da87eb518687984cc",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/effect-system-implementation-checklist.md",
+      "sha256": "dd14f03a05655c0803cf3e3d62c82f803148cef13df41552d16c22b95128bfa7",
+      "last_change_commit": "2f4cb07b42d2889e6b68445fc470bc35ae26ad1f",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/effect_authoring_improvements.md",
+      "sha256": "ee1c1c1005b56e212ec386ce2631ded5f81c22d2ea73cc215e8a9c1b605fcb7a",
+      "last_change_commit": "252f8e7fb09ed4a052442529b9c49e657fec6e38",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/heroes/garrus_hld.md",
+      "sha256": "4a8489b65744c09683cda764633490cca81ea9053298b9b215a1810be5d0b2f4",
+      "last_change_commit": "cfd986d3b3dec74919dc5f738c99a96bc85aab01",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/heroes/nebkher.md",
+      "sha256": "24b5bbaa77508055f7551c7cac67a00497913d84257618c1330b713315ae8863",
+      "last_change_commit": "2f4cb07b42d2889e6b68445fc470bc35ae26ad1f",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/heroes/silverarrow_hld.md",
+      "sha256": "f49fa4254ab2b9fbcb102bd36848b6ddc737da1cebb4c8f88b78967dc0b89520",
+      "last_change_commit": "608ae900f2b62ee64a41923ef100563a108020b4",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/heroes/trinkets_effect_reference.md",
+      "sha256": "bf75f14da8aa45d477326f222213f1abb67f912a7ce8d8f3e3068faa9b9e1e6c",
+      "last_change_commit": "252f8e7fb09ed4a052442529b9c49e657fec6e38",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/plan_active_effects_system.md",
+      "sha256": "ce81afb53372cffe31f8aa3efd9a4a7c0c69c6e8ae2009794d5e2f85fcb9b41c",
+      "last_change_commit": "db87259f29f65f4f6f0dad3d7ff5e102ad536fb4",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/plan_defense_effects.md",
+      "sha256": "b900ca1b4a3016782a1621a7dea0088370ad5d6b61d69791252aa28f48df7a0d",
+      "last_change_commit": "b13743504de971013a1f7387a65facdd807df44e",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/plan_modifier_to_activeeffect_migration.md",
+      "sha256": "c629f6b2001985824057ac69d2a5219970d981e681e9065c65442fb07a86f5a9",
+      "last_change_commit": "48926e7a5922d8f661cb9394abbc9a6638c3cdcb",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/plan_passive_abilities_system.md",
+      "sha256": "1c3fb3c25ac8c37a748fecb99d58a56b7191aef5892ad888d9fd4c09f7081bcc",
+      "last_change_commit": "01b8bad18a4b1effd534997c6a221cdcefa11ef9",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/plan_unique_id_system.md",
+      "sha256": "30892e916d8969f2b5f71a6032b6a389bfa8cc1681fc10bca265ff1351720437",
+      "last_change_commit": "db87259f29f65f4f6f0dad3d7ff5e102ad536fb4",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/refactor_plan_entity_manager.md",
+      "sha256": "24469eaa79b09268a91c93172ba6dc7d75d58c75d709171d1cb777745aee55f9",
+      "last_change_commit": "de6bb6a7c58993ad3d44a113fc3a6fee2ea1ebd7",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/state_synchronization_issue.md",
+      "sha256": "f40839ebf4af397b82456c7e0ea4e94426e2a74c3faef2c26c447d0300ef3859",
+      "last_change_commit": "de6bb6a7c58993ad3d44a113fc3a6fee2ea1ebd7",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/superpowers/plans/2026-06-25-character-draft-lobby.md",
+      "sha256": "3ea586898eaf0dc03e1a00ccd1750d10c1225397160cc539dae1daa9ad23b392",
+      "last_change_commit": "cd265969f6881687218fab56e174f2315fa018fa",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/superpowers/plans/2026-07-01-hanu-ultimate-trick.md",
+      "sha256": "22fb0ee6151c3f11d38950112db399f59cae7dea5c98aea5f0f38300ddef9fb9",
+      "last_change_commit": "9fce172849b4f771e040f1c6277830aaf05db0bd",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/superpowers/plans/2026-07-02-razzle-multipiece-hero.md",
+      "sha256": "e9c3e5ae48d0bd3e94da0fe4d8ffee42c2403165cfc981a2a02c8a321a98bb84",
+      "last_change_commit": "2cff9b9c37a4b121ffbc97599971377637d854b2",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/superpowers/plans/2026-07-03-razzle-follow-up-fixes.md",
+      "sha256": "7517e9e3e56c0793ac936d6855786c7703214b4da853ea217aecb04263cc8fb7",
+      "last_change_commit": "7c920b5dad1e628ad2d4659ce12b6144be1837e8",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/superpowers/plans/2026-07-04-map-editor.md",
+      "sha256": "a6b7425e4fc8f4286c2de2bd07ad736b4afe652f359ccaa47de0252b4cf9b75f",
+      "last_change_commit": "556c424e7696932a0041f35c984d09f63099f403",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/superpowers/plans/2026-07-05-double-lane-endgame.md",
+      "sha256": "002fdd07ba80d4701d056d9015aeb83e0e64d43148d7c66d92be8a9a4d8db6bd",
+      "last_change_commit": "032b1cb6cbc91ba69cac979681586aea037b1eab",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/superpowers/plans/2026-07-05-emmitt-tdd-paths.md",
+      "sha256": "f5a62827c79178eb2a0c6cc6608eeef914cdc9398956eba8936739b30f8976e0",
+      "last_change_commit": "ef891924c5f927cbcb08ee0a587cd880656ad73b",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/superpowers/plans/2026-07-07-nebkher-tdd-paths.md",
+      "sha256": "f1011f3e7bb23a2a33a01f6ae6a2f7779310e291d57fe26e3b43213fc592f6a0",
+      "last_change_commit": "a051b194c3d36753f054338cdc775e5f54a3f341",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/superpowers/plans/2026-07-10-snorri-implementation.md",
+      "sha256": "db54fb6dd080a8798ea5947d9ddc72df302b9eb2781bdfcbb89243681a9533ef",
+      "last_change_commit": "09f8ccb97e9314f6665f030cc2a67433dc0e73da",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/superpowers/plans/2026-07-10-snorri-tdd-paths.md",
+      "sha256": "20ca29b03dd49e3d781b785bdb9a0ea40c2c54fe7638e09013d8dcec44466a29",
+      "last_change_commit": "ea5940706a7e51c6320b4952f2fc5abd7b7020be",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/superpowers/plans/2026-07-11-takahide-implementation.md",
+      "sha256": "f89813e8d5545a0871378ba6575755aeec28037e3db6a46588419232791ce860",
+      "last_change_commit": "652417f8c697e3bb0759b859c1309d937ee863bc",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/superpowers/plans/2026-07-11-takahide-tdd-paths.md",
+      "sha256": "467014a7f32efe04abcdec1f3eb8077da530a4f1ef241bff48c22a050267d259",
+      "last_change_commit": "652417f8c697e3bb0759b859c1309d937ee863bc",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/superpowers/plans/2026-07-13-gydion-implementation.md",
+      "sha256": "62af82978a7b95bc41b9a95f97372cef8cf3daa022869599ecd1e85fcd5b5558",
+      "last_change_commit": "fe91925a54e418437e13917dcc18cdbd612d3ca1",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/superpowers/plans/2026-07-13-gydion-tdd-paths.md",
+      "sha256": "b4b36d848e020129b45256c9c8dc83adbe25d2fea8276b9af29871e2edfcf386",
+      "last_change_commit": "fe91925a54e418437e13917dcc18cdbd612d3ca1",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/superpowers/plans/2026-08-05-consensus-overrides.md",
+      "sha256": "7af7ce59696b1e721e3fd6b97af4a69c0b732f17155a317e06b3bf501bef66ed",
+      "last_change_commit": "5fd41e7e09438fe395e0079c7b6f6273fd1e638a",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-23-rust-search-engine.md",
+      "sha256": "f34b4a3be7bc56c9300d0d7d823e13f378f8f9d647b261b2ff44d3a0bcf4546f",
+      "last_change_commit": "f0fb93e117f358266ef522e6d5f23d3452e83e97",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/superpowers/specs/2026-06-25-character-draft-lobby-design.md",
+      "sha256": "6a9912815002658c21a33c2d6a804114f13242d2c49e0fb62bf0afe704f18fda",
+      "last_change_commit": "5644b4721763310a8490af05fa746202a06790a1",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/superpowers/specs/2026-06-27-wuk-hero-effects-design.md",
+      "sha256": "fbb7fc6b0fdf2325fccef1d4efeb08cd3143d6882888b69f64c481cd1de95d58",
+      "last_change_commit": "52c6c6d0bd38ccc19c842bf2106e5490b73fa313",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/superpowers/specs/2026-07-01-hanu-ultimate-trick-design.md",
+      "sha256": "93838f0edfdbf3e43bd2220ac4f86b28ba6093630148a2f036f135ce4f232e61",
+      "last_change_commit": "9fce172849b4f771e040f1c6277830aaf05db0bd",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/superpowers/specs/2026-07-02-razzle-multipiece-design.md",
+      "sha256": "d3cd59168a35c7d568001665bd28839b4d98fe30fab5f14f8424ce08b80b9aac",
+      "last_change_commit": "39b5b447ef212be4a67c2d98d697809a15ac6496",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/superpowers/specs/2026-07-04-map-editor-design.md",
+      "sha256": "8ca2d5f137ad7728dab132bccdafa598d00011b86c82380e983b4c2ca8316ce6",
+      "last_change_commit": "556c424e7696932a0041f35c984d09f63099f403",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/superpowers/specs/2026-07-05-double-lane-endgame-design.md",
+      "sha256": "e2168a348008ebbb3944da613131412e23531fc5449a8ec5ceb44fc64d031ec5",
+      "last_change_commit": "1513d5bfe2e02ce085b39ac093f492c9f1d82833",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/superpowers/specs/2026-08-03-effect-card-attribution-design.md",
+      "sha256": "d72717a825ef831f79d3f6d188caa78cbaec222db4022c2a58a5202d8f3da8eb",
+      "last_change_commit": "e79f7498c54ab7c3b838a2970c81c2a22e3edcfd",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    },
+    {
+      "path": "docs/superpowers/specs/2026-08-05-consensus-overrides-design.md",
+      "sha256": "8e3e858c0c0e927a1e9d4fde5067b139f1150b852911e62adc913e2361f50d2f",
+      "last_change_commit": "93db3eaedd1dbcc8da85f2e0b62d9532f0dcbd10",
+      "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
+    }
+  ],
+  "archive_origins": [
+    {
+      "archive": "rust/docs/archive/development-history.md",
+      "original_path": "rust/README.md",
+      "baseline_commit": "f0fb93e117f358266ef522e6d5f23d3452e83e97",
+      "original_sha256": "6911af654fd9f38af83d43b1625da61e17ef9e91191c8e1a44fcca31df378bac",
+      "original_last_change_commit_and_date": "f0fb93e117f358266ef522e6d5f23d3452e83e97 2026-11-08T08:51:40+01:00",
+      "edit_scope": "Historical body retained; stale link targets annotated/redirected to retained inventory or current build section. Original source remains in Git."
+    },
+    {
+      "archive": "rust/docs/archive/fixture-history.md",
+      "original_path": "rust/tests/fixtures/README.md",
+      "baseline_commit": "f0fb93e117f358266ef522e6d5f23d3452e83e97",
+      "original_sha256": "26718755132bd22b5f048b8ddd39d685127c5119a05bbc4129dc2bebc4aa9e2e",
+      "original_last_change_commit_and_date": "9f7d080fc74138c50f82eee34ca6d31ed0fdd55b 2026-11-04T19:16:08+01:00",
+      "edit_scope": "Historical body retained; stale link targets annotated/redirected to retained inventory or current build section. Original source remains in Git."
+    }
+  ]
+}

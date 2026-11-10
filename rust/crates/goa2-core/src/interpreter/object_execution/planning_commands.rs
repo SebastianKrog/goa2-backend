@@ -175,7 +175,9 @@ impl NativeSession {
             .zip(seeds)
             .map(|(hands, seed)| {
                 budget.check(0)?;
-                self.with_installed_resolution_samples(player, hands, Some(seed), |worker| Ok(worker.clone()))
+                self.with_installed_resolution_samples(player, hands, Some(seed), |worker| {
+                    Ok(worker.clone())
+                })
             })
             .collect()
     }
@@ -208,33 +210,42 @@ impl NativeSession {
         let instruction = &self.steps[instruction].instruction;
         let key_field = match instruction {
             Instruction::LiveReaction => Field::TargetPlayerKey,
-            Instruction::LiveForceDiscard | Instruction::LiveColorDiscard
+            Instruction::LiveForceDiscard
+            | Instruction::LiveColorDiscard
             | Instruction::LiveDiscardOrDefeat => Field::VictimKey,
             _ => return Ok(None),
         };
-        if objects.arena.field(step, objects.pending)
+        if objects
+            .arena
+            .field(step, objects.pending)
             .is_some_and(|input| objects.arena.truthy(&input))
         {
             return Ok(None);
         }
         let direct = if matches!(instruction, Instruction::LiveForceDiscard) {
-            self.truthy_symbol_bound(objects, objects.arena.field(step, objects.phases.k(Field::Victim)))?
+            self.truthy_symbol_bound(
+                objects,
+                objects.arena.field(step, objects.phases.k(Field::Victim)),
+            )?
         } else {
             None
         };
         let target = if direct.is_some() {
             direct
         } else if let Some(key) = self.truthy_symbol_bound(
-            objects, objects.arena.field(step, objects.phases.k(key_field)),
+            objects,
+            objects.arena.field(step, objects.phases.k(key_field)),
         )? {
             self.truthy_symbol_bound(objects, objects.arena.context_value(key))?
         } else {
             None
         };
         let viewer_team = self.world.hero(viewer).map(|row| row.team);
-        Ok(target.and_then(|id| self.world.hero(id))
-            .filter(|hero| hero.id != viewer
-                && !(Some(hero.team) == viewer_team && known.contains(&hero.id)))
+        Ok(target
+            .and_then(|id| self.world.hero(id))
+            .filter(|hero| {
+                hero.id != viewer && !(Some(hero.team) == viewer_team && known.contains(&hero.id))
+            })
             .map(|hero| hero.id))
     }
 
@@ -245,7 +256,10 @@ impl NativeSession {
         operation: impl FnOnce(&mut Self) -> Result<T>,
     ) -> Result<T> {
         self.with_rollback(|worker| {
-            let row = worker.world.hero(hero).ok_or_else(|| unsupported("hidden hand owner missing"))?;
+            let row = worker
+                .world
+                .hero(hero)
+                .ok_or_else(|| unsupported("hidden hand owner missing"))?;
             let protected = [row.current, row.extra];
             worker.with_live_objects(|session, objects| {
                 session.replace_sampled_hand(objects, hero, hand, protected)?;
@@ -275,7 +289,8 @@ impl NativeSession {
                 self.trigger_reads_concealed_mine_bound(objects, step, viewer)?
             }
             Instruction::LiveCardGuess { .. } => !step.is_some_and(|step| {
-                self.sampled_guess_steps.is_some_and(|steps| steps.contains(&step))
+                self.sampled_guess_steps
+                    .is_some_and(|steps| steps.contains(&step))
             }),
             Instruction::LiveCardSelect if self.has_concealed_card_in_public_zone() => {
                 use crate::card_selection::Container;
@@ -295,17 +310,19 @@ impl NativeSession {
                 !self.card_swap_is_current_to_hand_bound(objects, step)?
             }
             Instruction::LiveResolvedCardSwap
-            | Instruction::LiveDeckCardSwap | Instruction::LiveRetrieve
-            | Instruction::LiveColorDiscard => {
-                self.has_concealed_card_in_public_zone()
-            }
+            | Instruction::LiveDeckCardSwap
+            | Instruction::LiveRetrieve
+            | Instruction::LiveColorDiscard => self.has_concealed_card_in_public_zone(),
             _ => false,
         })
     }
 
     fn has_concealed_card_in_public_zone(&self) -> bool {
         self.world.heroes.iter().any(|hero| {
-            hero.played.iter().flatten().chain(&hero.discard)
+            hero.played
+                .iter()
+                .flatten()
+                .chain(&hero.discard)
                 .any(|id| self.world.card(*id).is_some_and(|card| card.facedown))
         })
     }
@@ -325,19 +342,30 @@ impl NativeSession {
                 )
             });
         if !(self.planning.phase == Phase::Resolution || cleanup_battle)
-            || self.last_request.as_ref().is_none_or(|request| {
-                !self.resolution_request_addresses(request, player)
-            })
+            || self
+                .last_request
+                .as_ref()
+                .is_none_or(|request| !self.resolution_request_addresses(request, player))
         {
-            return Err(unsupported("resolution sampling requires a live resolution prompt for the player"));
+            return Err(unsupported(
+                "resolution sampling requires a live resolution prompt for the player",
+            ));
         }
         if let (Some(objects), Some(frame)) = (&self.objects, self.stack.last())
-            && !matches!(self.steps[frame.instruction].instruction, Instruction::LiveCardGuess { reveal: false })
+            && !matches!(
+                self.steps[frame.instruction].instruction,
+                Instruction::LiveCardGuess { reveal: false }
+            )
             && self.search_step_reads_concealed_state(
-                objects, frame.instruction, frame.object, player,
+                objects,
+                frame.instruction,
+                frame.object,
+                player,
             )?
         {
-            return Err(unsupported("resolution sampling cannot reconstruct this concealed choice"));
+            return Err(unsupported(
+                "resolution sampling cannot reconstruct this concealed choice",
+            ));
         }
         let observation = self.player_observation(player)?;
         self.validate_sampled_resolution_effects()?;
@@ -360,7 +388,9 @@ impl NativeSession {
             let protected = [hero.current, hero.extra];
             // Prepared spells are tracked separately from ordinary cards and
             // are reconstructible from the roster and public casting history.
-            if protected.iter().flatten()
+            if protected
+                .iter()
+                .flatten()
                 .any(|id| self.world.card(*id).is_none_or(|card| card.facedown))
             {
                 return Err(unsupported(
@@ -376,9 +406,12 @@ impl NativeSession {
                         .and_then(|rows| rows.get(&observation.heroes[index].id))
                         .map_or(&[], Vec::as_slice),
                 )?
-                .ok_or_else(|| unsupported(format!(
-                    "no consistent ordinary resolution hand for {}", observation.heroes[index].name
-                )))?;
+                .ok_or_else(|| {
+                    unsupported(format!(
+                        "no consistent ordinary resolution hand for {}",
+                        observation.heroes[index].name
+                    ))
+                })?;
             for (world, hand) in samples.iter_mut().zip(hands) {
                 world.push(PlanningHandSample {
                     hero: hero.id,
@@ -398,7 +431,10 @@ impl NativeSession {
         let objects = self.objects.as_ref()?;
         let mut stack = self.stack.iter().rev();
         let selector = stack.next()?;
-        if !matches!(self.steps[selector.instruction].instruction, Instruction::LiveHexSelect) {
+        if !matches!(
+            self.steps[selector.instruction].instruction,
+            Instruction::LiveHexSelect
+        ) {
             return None;
         }
         let next = stack.next()?;
@@ -408,19 +444,31 @@ impl NativeSession {
             _ => return None,
         };
         let step = next.object?;
-        if self.passive_text_bound(objects, selector.object?, Field::Output).ok()?
-            != self.passive_text_bound(objects, step, Field::DestinationKey).ok()?
+        if self
+            .passive_text_bound(objects, selector.object?, Field::Output)
+            .ok()?
+            != self
+                .passive_text_bound(objects, step, Field::DestinationKey)
+                .ok()?
         {
             return None;
         }
-        let text = |field| self.passive_optional_text_bound(objects, step, field).ok().flatten();
-        let unit = text(Field::UnitId).filter(|id| !self.symbols.name(*id).is_empty())
+        let text = |field| {
+            self.passive_optional_text_bound(objects, step, field)
+                .ok()
+                .flatten()
+        };
+        let unit = text(Field::UnitId)
+            .filter(|id| !self.symbols.name(*id).is_empty())
             .or_else(|| {
                 if !movement {
                     return None;
                 }
                 let key = text(Field::UnitKey)?;
-                objects.symbol_from_context(key, &self.symbols).ok().flatten()
+                objects
+                    .symbol_from_context(key, &self.symbols)
+                    .ok()
+                    .flatten()
             })
             .or(self.planning.actor)?;
         Some(self.world.resolved_actor(unit))
@@ -435,13 +483,18 @@ impl NativeSession {
     ) -> Result<T> {
         self.with_rollback(|worker| {
             let root_choices = worker.resolution_choices(player)?;
-            let request = worker.last_request.clone()
+            let request = worker
+                .last_request
+                .clone()
                 .ok_or_else(|| unsupported("sampled resolution root request missing"))?;
             worker.with_live_objects(|session, objects| {
                 for sample in samples {
                     match sample.update {
                         SampledCards::Hand(hand) => session.replace_sampled_hand(
-                            objects, sample.hero, &hand, sample.fixed,
+                            objects,
+                            sample.hero,
+                            &hand,
+                            sample.fixed,
                         )?,
                         SampledCards::ConcealedGold(slot, gold) => {
                             session.bind_sampled_gold(objects, sample.hero, slot, &gold)?;
@@ -460,7 +513,9 @@ impl NativeSession {
             // validate the actual rules, including filters on public prompts.
             worker.with_rollback(|probe| {
                 probe.advance_objects(&ExecutionBudget::default(), Some(1), false)?;
-                let generated = probe.last_request.as_ref()
+                let generated = probe
+                    .last_request
+                    .as_ref()
                     .ok_or_else(|| unsupported("sampled resolution lost the root request"))?;
                 if generated.id != request.id
                     || generated.owner != request.owner
@@ -469,7 +524,9 @@ impl NativeSession {
                     || generated.can_skip != request.can_skip
                     || generated.discard != request.discard
                 {
-                    return Err(unsupported("sampled resolution changed the root request metadata"));
+                    return Err(unsupported(
+                        "sampled resolution changed the root request metadata",
+                    ));
                 }
                 if probe.resolution_choices(player)? != root_choices {
                     return Err(unsupported("sampled resolution changed the root choices"));
@@ -534,9 +591,12 @@ impl NativeSession {
                         .and_then(|rows| rows.get(&id))
                         .map_or(&[], Vec::as_slice),
                 )?
-                .ok_or_else(|| unsupported(format!(
-                    "no consistent ordinary planning hand for {}", self.symbols.name(hero.id)
-                )))?;
+                .ok_or_else(|| {
+                    unsupported(format!(
+                        "no consistent ordinary planning hand for {}",
+                        self.symbols.name(hero.id)
+                    ))
+                })?;
             samples.push(PlanningHandSample {
                 hero: hero.id,
                 update: SampledCards::Hand(hand),
@@ -570,9 +630,10 @@ impl NativeSession {
         if effects.is_empty() {
             return Ok(());
         }
-        let objects = self.objects.as_ref().ok_or_else(|| {
-            unsupported("sampled resolution requires live effect bindings")
-        })?;
+        let objects = self
+            .objects
+            .as_ref()
+            .ok_or_else(|| unsupported("sampled resolution requires live effect bindings"))?;
         let nodes = objects.effect_nodes()?;
         if nodes.len() != effects.len() {
             return Err(unsupported("effect collection binding drift"));
@@ -580,8 +641,8 @@ impl NativeSession {
         for (effect, node) in effects.iter().zip(nodes) {
             let behavior = &effect.definition.behavior;
             let kind = self.symbols.name(effect.definition.kind);
-            let action_restriction = kind == "target_prevention"
-                && !behavior.restrictions.is_empty();
+            let action_restriction =
+                kind == "target_prevention" && !behavior.restrictions.is_empty();
             // These round markers record performed cards. Source-card
             // visibility and live finishing steps are checked separately.
             let double_items = behavior.kind == Kind::DoubleItems
@@ -590,13 +651,16 @@ impl NativeSession {
                 });
             let basic_bonus = behavior.kind == Kind::BasicBonus
                 && effect.card.is_some_and(|card| {
-                    matches!(self.symbols.name(card),
-                        "broom_for_improvement" | "broomstick_beatdown" | "this_is_my_broomstick")
+                    matches!(
+                        self.symbols.name(card),
+                        "broom_for_improvement" | "broomstick_beatdown" | "this_is_my_broomstick"
+                    )
                 });
-            let round_marker = (matches!(kind, "enraged" | "equilibrium") || double_items || basic_bonus)
-                && effect.duration == crate::effects::Duration::ThisRound
-                && effect.token.is_none()
-                && effect.granted_passive.is_none();
+            let round_marker =
+                (matches!(kind, "enraged" | "equilibrium") || double_items || basic_bonus)
+                    && effect.duration == crate::effects::Duration::ThisRound
+                    && effect.token.is_none()
+                    && effect.granted_passive.is_none();
             // Wuk's Dominance uses public minion positions at battle time.
             let dominance = behavior.kind == Kind::BattleExclusion
                 && effect.duration == crate::effects::Duration::Passive
@@ -604,14 +668,19 @@ impl NativeSession {
                 && effect.granted_passive.is_none()
                 && effect.scope_origin == Some(effect.source)
                 && effect.card.is_some_and(|card| {
-                    matches!(self.symbols.name(card), "claim_dominance" | "assert_dominance")
+                    matches!(
+                        self.symbols.name(card),
+                        "claim_dominance" | "assert_dominance"
+                    )
                 });
             // Reverse Time changes public initiative ordering next turn.
             let reverse_time = kind == "reversed_initiative"
                 && effect.duration == crate::effects::Duration::NextTurn
                 && effect.token.is_none()
                 && effect.granted_passive.is_none()
-                && effect.card.is_some_and(|card| self.symbols.name(card) == "reverse_time");
+                && effect
+                    .card
+                    .is_some_and(|card| self.symbols.name(card) == "reverse_time");
             let public_color_trigger = kind == "after_cards_played_trigger"
                 && effect.duration == crate::effects::Duration::NextTurn
                 && effect.token.is_none()
@@ -627,22 +696,28 @@ impl NativeSession {
                 && effect.duration == crate::effects::Duration::ThisTurn
                 && effect.token.is_none()
                 && effect.granted_passive.is_none())
-                .then(|| effect.card.map(|card| self.symbols.name(card)))
-                .flatten()
-                .filter(|card| matches!(*card,
-                    "unexpected_journey" | "there_and_back_again" | "safe_travels"));
+            .then(|| effect.card.map(|card| self.symbols.name(card)))
+            .flatten()
+            .filter(|card| {
+                matches!(
+                    *card,
+                    "unexpected_journey" | "there_and_back_again" | "safe_travels"
+                )
+            });
             let another_one = kind == "delayed_trigger"
                 && effect.duration == crate::effects::Duration::ThisTurn
                 && effect.token.is_none()
                 && effect.granted_passive.is_none()
-                && effect.card.is_some_and(|card| self.symbols.name(card) == "another_one");
+                && effect
+                    .card
+                    .is_some_and(|card| self.symbols.name(card) == "another_one");
             let sentinel = (kind == "delayed_trigger"
                 && effect.duration == crate::effects::Duration::ThisTurn
                 && effect.token.is_none()
                 && effect.granted_passive.is_none())
-                .then(|| effect.card.map(|card| self.symbols.name(card)))
-                .flatten()
-                .filter(|card| matches!(*card, "warning_shot" | "treetop_sentinel"));
+            .then(|| effect.card.map(|card| self.symbols.name(card)))
+            .flatten()
+            .filter(|card| matches!(*card, "warning_shot" | "treetop_sentinel"));
             let glitch_cleanup = kind == "delayed_trigger"
                 && effect.duration == crate::effects::Duration::ThisTurn
                 && effect.token.is_none()
@@ -662,7 +737,10 @@ impl NativeSession {
                 && effect.token.is_none()
                 && effect.granted_passive.is_none()
                 && effect.card.is_some_and(|card| {
-                    matches!(self.symbols.name(card), "death_grenade" | "holy_death_grenade")
+                    matches!(
+                        self.symbols.name(card),
+                        "death_grenade" | "holy_death_grenade"
+                    )
                 });
             // Pre-discard triggers use the public board and hand count.
             // Any resulting discard choice runs against the sampled hand.
@@ -680,7 +758,17 @@ impl NativeSession {
                     | Kind::MovementAura
                     | Kind::StaticBarrier
                     | Kind::Petrify
-            ) || action_restriction || round_marker || dominance || reverse_time || public_color_trigger || sentinel.is_some() || journey.is_some() || another_one || glitch_cleanup || grenade || round_minion_defeat;
+            ) || action_restriction
+                || round_marker
+                || dominance
+                || reverse_time
+                || public_color_trigger
+                || sentinel.is_some()
+                || journey.is_some()
+                || another_one
+                || glitch_cleanup
+                || grenade
+                || round_minion_defeat;
             if !public {
                 let card = effect.card.map_or("cardless", |id| self.symbols.name(id));
                 return Err(unsupported(format!(
@@ -709,7 +797,10 @@ impl NativeSession {
             }
             if let Some(card) = journey {
                 self.validate_sampled_journey(
-                    objects, finishing, effect.source, card == "safe_travels",
+                    objects,
+                    finishing,
+                    effect.source,
+                    card == "safe_travels",
                 )?;
                 continue;
             }
@@ -722,28 +813,38 @@ impl NativeSession {
                 } else {
                     steps.len() == 2
                 };
-                if valid_count && steps.iter().enumerate().all(|(index, step)| {
-                    objects.program(*step).is_some_and(|instruction| {
-                        let instruction = &self.steps[instruction].instruction;
-                        if index % 2 == 0 {
-                            matches!(instruction, Instruction::LiveUnitSelect)
-                        } else {
-                            match sentinel {
-                                Some("warning_shot") => matches!(instruction, Instruction::LiveForceDiscard),
-                                Some("treetop_sentinel") => matches!(instruction, Instruction::LiveDiscardOrDefeat),
-                                _ => matches!(instruction, Instruction::LiveColorDiscard),
+                if valid_count
+                    && steps.iter().enumerate().all(|(index, step)| {
+                        objects.program(*step).is_some_and(|instruction| {
+                            let instruction = &self.steps[instruction].instruction;
+                            if index % 2 == 0 {
+                                matches!(instruction, Instruction::LiveUnitSelect)
+                            } else {
+                                match sentinel {
+                                    Some("warning_shot") => {
+                                        matches!(instruction, Instruction::LiveForceDiscard)
+                                    }
+                                    Some("treetop_sentinel") => {
+                                        matches!(instruction, Instruction::LiveDiscardOrDefeat)
+                                    }
+                                    _ => matches!(instruction, Instruction::LiveColorDiscard),
+                                }
                             }
-                        }
-                    }) && matches!(
-                        objects.arena.field_ref(*step, objects.pending),
-                        None | Some(ObjectValue::Atom(Datum::Null))
-                    )
-                }) {
+                        }) && matches!(
+                            objects.arena.field_ref(*step, objects.pending),
+                            None | Some(ObjectValue::Atom(Datum::Null))
+                        )
+                    })
+                {
                     continue;
                 }
                 return Err(unsupported("unexpected deferred discard program"));
             }
-            if objects.arena.sequence(finishing).is_some_and(|steps| !steps.is_empty()) {
+            if objects
+                .arena
+                .sequence(finishing)
+                .is_some_and(|steps| !steps.is_empty())
+            {
                 return Err(unsupported(format!(
                     "resolution sampling does not support finishing steps on {kind}",
                 )));
@@ -777,27 +878,43 @@ impl NativeSession {
             return Err(invalid());
         }
         for &step in &steps {
-            if objects.token(step)?.is_some() || !matches!(
-                objects.arena.field_ref(step, objects.pending),
-                None | Some(ObjectValue::Atom(Datum::Null))
-            ) {
+            if objects.token(step)?.is_some()
+                || !matches!(
+                    objects.arena.field_ref(step, objects.pending),
+                    None | Some(ObjectValue::Atom(Datum::Null))
+                )
+            {
                 return Err(invalid());
             }
         }
         let filters = self.unit_filter_list_bound(objects, *select, Field::Filters)?;
-        let [ObjectValue::Object(team), ObjectValue::Object(minions), ObjectValue::Object(range)] =
-            filters.as_slice()
+        let [
+            ObjectValue::Object(team),
+            ObjectValue::Object(minions),
+            ObjectValue::Object(range),
+        ] = filters.as_slice()
         else {
             return Err(invalid());
         };
         for (filter, expected) in [
-            (*team, "team_filter"), (*minions, "minion_type_filter"), (*range, "range_filter"),
+            (*team, "team_filter"),
+            (*minions, "minion_type_filter"),
+            (*range, "range_filter"),
         ] {
-            if self.symbols.name(self.passive_text_bound(objects, filter, Field::FilterType)?) != expected {
+            if self
+                .symbols
+                .name(self.passive_text_bound(objects, filter, Field::FilterType)?)
+                != expected
+            {
                 return Err(invalid());
             }
         }
-        for field in [Field::OriginKey, Field::OriginHexKey, Field::MinRangeKey, Field::MaxRangeKey] {
+        for field in [
+            Field::OriginKey,
+            Field::OriginHexKey,
+            Field::MinRangeKey,
+            Field::MaxRangeKey,
+        ] {
             if text(*range, field)?.is_some() {
                 return Err(invalid());
             }
@@ -813,13 +930,20 @@ impl NativeSession {
                 if self.symbols.name(*id) == expected)
         };
         let empty = |object, name| {
-            matches!(field(object, name), None | Some(ObjectValue::Atom(Datum::Null)))
+            matches!(
+                field(object, name),
+                None | Some(ObjectValue::Atom(Datum::Null))
+            )
         };
         let sequence = |object, name| match field(object, name) {
             Some(ObjectValue::Object(list)) => objects.arena.sequence(*list),
             _ => None,
         };
-        let program = |step| objects.program(step).map(|index| &self.steps[index].instruction);
+        let program = |step| {
+            objects
+                .program(step)
+                .map(|index| &self.steps[index].instruction)
+        };
         let steps = objects.steps_in_list(finishing)?;
         let [token, targets, repeat, remove] = steps.as_slice() else {
             return Err(invalid());
@@ -827,8 +951,13 @@ impl NativeSession {
         let Some([ObjectValue::Object(token_filter)]) = sequence(*token, "filters") else {
             return Err(invalid());
         };
-        let Some([ObjectValue::Object(adjacent), ObjectValue::Object(enemy), ObjectValue::Object(hero)]) =
-            sequence(*targets, "filters")
+        let Some(
+            [
+                ObjectValue::Object(adjacent),
+                ObjectValue::Object(enemy),
+                ObjectValue::Object(hero),
+            ],
+        ) = sequence(*targets, "filters")
         else {
             return Err(invalid());
         };
@@ -887,23 +1016,36 @@ impl NativeSession {
         finishing: ObjectId,
     ) -> Result<()> {
         let invalid = || unsupported("unexpected Glitch cleanup program");
-        let field = |object, name| {
-            objects.arena.field_ref(object, self.symbols.lookup(name)?)
-        };
+        let field = |object, name| objects.arena.field_ref(object, self.symbols.lookup(name)?);
         let text = |object, name, expected| {
             matches!(field(object, name), Some(ObjectValue::Atom(Datum::Text(id)))
                 if self.symbols.name(*id) == expected)
         };
         let empty = |object, name| {
-            matches!(field(object, name), None | Some(ObjectValue::Atom(Datum::Null)))
+            matches!(
+                field(object, name),
+                None | Some(ObjectValue::Atom(Datum::Null))
+            )
         };
         let fresh = |step| {
-            ["pending_input", "pending_request_id", "active_if_key", "skip_if_key"]
-                .into_iter().all(|name| empty(step, name))
+            [
+                "pending_input",
+                "pending_request_id",
+                "active_if_key",
+                "skip_if_key",
+            ]
+            .into_iter()
+            .all(|name| empty(step, name))
         };
-        let program = |step| objects.program(step).map(|index| &self.steps[index].instruction);
+        let program = |step| {
+            objects
+                .program(step)
+                .map(|index| &self.steps[index].instruction)
+        };
         let steps = objects.steps_in_list(finishing)?;
-        let [collect, repeat] = steps.as_slice() else { return Err(invalid()); };
+        let [collect, repeat] = steps.as_slice() else {
+            return Err(invalid());
+        };
         let Some(ObjectValue::Object(filters)) = field(*collect, "filters") else {
             return Err(invalid());
         };
@@ -916,14 +1058,22 @@ impl NativeSession {
             return Err(invalid());
         };
         let children = objects.steps_in_list(*templates)?;
-        let [remove] = children.as_slice() else { return Err(invalid()); };
-        if matches!(program(*collect), Some(Instruction::LiveQuery { collect: true }))
-            && matches!(program(*repeat), Some(Instruction::ForEach { .. }))
+        let [remove] = children.as_slice() else {
+            return Err(invalid());
+        };
+        if matches!(
+            program(*collect),
+            Some(Instruction::LiveQuery { collect: true })
+        ) && matches!(program(*repeat), Some(Instruction::ForEach { .. }))
             && matches!(program(*remove), Some(Instruction::LiveTokenRemove))
-            && fresh(*collect) && fresh(*repeat) && fresh(*remove)
+            && fresh(*collect)
+            && fresh(*repeat)
+            && fresh(*remove)
             && text(*collect, "target_type", "UNIT_OR_TOKEN")
-            && text(*unit, "type", "unit_type_filter") && text(*unit, "unit_type", "TOKEN")
-            && text(*token, "type", "token_type_filter") && text(*token, "token_type", "glitch")
+            && text(*unit, "type", "unit_type_filter")
+            && text(*unit, "unit_type", "TOKEN")
+            && text(*token, "type", "token_type_filter")
+            && text(*token, "token_type", "glitch")
             && text(*collect, "output_key", "_glitch_cleanup_ids")
             && text(*repeat, "list_key", "_glitch_cleanup_ids")
             && text(*repeat, "item_key", "_glitch_cleanup_id")
@@ -944,17 +1094,23 @@ impl NativeSession {
         use crate::card_selection::Container;
 
         let steps = objects.steps_in_list(finishing)?;
-        let program = |step| objects.program(step).map(|index| &self.steps[index].instruction);
+        let program = |step| {
+            objects
+                .program(step)
+                .map(|index| &self.steps[index].instruction)
+        };
         let [target, their_card, their_retrieve, own_card, own_retrieve] = steps.as_slice() else {
             return Err(unsupported("unexpected Another One retrieval program"));
         };
         if !matches!(program(*target), Some(Instruction::LiveUnitSelect))
             || !matches!(program(*their_retrieve), Some(Instruction::LiveRetrieve))
             || !matches!(program(*own_retrieve), Some(Instruction::LiveRetrieve))
-            || steps.iter().any(|step| !matches!(
-                objects.arena.field_ref(*step, objects.pending),
-                None | Some(ObjectValue::Atom(Datum::Null))
-            ))
+            || steps.iter().any(|step| {
+                !matches!(
+                    objects.arena.field_ref(*step, objects.pending),
+                    None | Some(ObjectValue::Atom(Datum::Null))
+                )
+            })
         {
             return Err(unsupported("unexpected Another One retrieval program"));
         }
@@ -964,7 +1120,9 @@ impl NativeSession {
             }
             let spec = self.card_spec_bound(objects, select)?;
             if !matches!(spec.containers.as_slice(), [Container::Discard]) || spec.facedown {
-                return Err(unsupported("Another One requires a public discard selector"));
+                return Err(unsupported(
+                    "Another One requires a public discard selector",
+                ));
             }
         }
         Ok(())
@@ -979,27 +1137,37 @@ impl NativeSession {
     ) -> Result<()> {
         let steps = objects.steps_in_list(finishing)?;
         let program = |step| {
-            objects.program(step).map(|index| &self.steps[index].instruction)
+            objects
+                .program(step)
+                .map(|index| &self.steps[index].instruction)
         };
         let swap = match steps.as_slice() {
             [swap] if !move_after => *swap,
-            [swap, select, movement] if move_after
-                && matches!(program(*select), Some(Instruction::LiveHexSelect))
-                && matches!(program(*movement), Some(Instruction::LiveMove))
-                && self.passive_optional_text_bound(objects, *movement, Field::UnitId)?
-                    == Some(source) => *swap,
+            [swap, select, movement]
+                if move_after
+                    && matches!(program(*select), Some(Instruction::LiveHexSelect))
+                    && matches!(program(*movement), Some(Instruction::LiveMove))
+                    && self.passive_optional_text_bound(objects, *movement, Field::UnitId)?
+                        == Some(source) =>
+            {
+                *swap
+            }
             _ => return Err(unsupported("unexpected Journey return program")),
         };
         let target = self.passive_optional_text_bound(objects, swap, Field::UnitBId)?;
         if !matches!(program(swap), Some(Instruction::LiveSwap))
             || self.passive_optional_text_bound(objects, swap, Field::UnitAId)? != Some(source)
             || target.is_none_or(|id| id == source || self.world.hero(id).is_none())
-            || steps.iter().any(|step| !matches!(
-                objects.arena.field_ref(*step, objects.pending),
-                None | Some(ObjectValue::Atom(Datum::Null))
-            ))
+            || steps.iter().any(|step| {
+                !matches!(
+                    objects.arena.field_ref(*step, objects.pending),
+                    None | Some(ObjectValue::Atom(Datum::Null))
+                )
+            })
         {
-            return Err(unsupported("Journey return requires public hero bindings and fresh steps"));
+            return Err(unsupported(
+                "Journey return requires public hero bindings and fresh steps",
+            ));
         }
         Ok(())
     }
@@ -1014,7 +1182,10 @@ impl NativeSession {
                 && effect.duration == crate::effects::Duration::Passive
                 && let Some(token) = effect.token
                 && effect.scope_origin == Some(token)
-                && let Some(kind) = self.world.entity(token).and_then(|entity| entity.token_type)
+                && let Some(kind) = self
+                    .world
+                    .entity(token)
+                    .and_then(|entity| entity.token_type)
                 && match (effect.definition.behavior.kind, self.symbols.name(kind)) {
                     (crate::effect_rules::Kind::LosBlocker, "smoke_bomb")
                     | (crate::effect_rules::Kind::AreaStat, "ice" | "barrier") => true,
@@ -1035,10 +1206,16 @@ impl NativeSession {
                     return Err(unsupported("effect collection binding drift"));
                 }
                 let finishing = objects.finishing_list(nodes[index])?;
-                if objects.arena.sequence(finishing).is_some_and(|steps| steps.is_empty()) {
+                if objects
+                    .arena
+                    .sequence(finishing)
+                    .is_some_and(|steps| steps.is_empty())
+                {
                     continue;
                 }
-                return Err(unsupported("sampled worlds cannot preserve token effect finishing steps"));
+                return Err(unsupported(
+                    "sampled worlds cannot preserve token effect finishing steps",
+                ));
             }
             let public = self.world.hero(effect.source).and_then(|hero| {
                 observation
@@ -1137,37 +1314,66 @@ impl NativeSession {
         printed: &str,
     ) -> Result<()> {
         use crate::world::CardLifecycle;
-        let row = self.world.hero(hero).ok_or_else(|| unsupported("sampled hero missing"))?;
+        let row = self
+            .world
+            .hero(hero)
+            .ok_or_else(|| unsupported("sampled hero missing"))?;
         let (field, index, lifecycle, old) = match slot {
             HiddenGoldSlot::Played(index) => (
-                Field::Played, index, CardLifecycle::Resolved, row.played.get(index).copied().flatten(),
+                Field::Played,
+                index,
+                CardLifecycle::Resolved,
+                row.played.get(index).copied().flatten(),
             ),
             HiddenGoldSlot::Discard(index) => (
-                Field::Discard, index, CardLifecycle::Discard, row.discard.get(index).copied(),
+                Field::Discard,
+                index,
+                CardLifecycle::Discard,
+                row.discard.get(index).copied(),
             ),
         };
         let old = old.ok_or_else(|| unsupported("sampled gold slot missing"))?;
-        let previous = self.world.card(old).ok_or_else(|| unsupported("sampled gold missing"))?;
-        if !previous.facedown || previous.lifecycle != lifecycle
-            || self.symbols.name(self.world.definitions.cards[previous.definition].color
-                .ok_or_else(|| unsupported("played card color missing"))?) != "GOLD"
+        let previous = self
+            .world
+            .card(old)
+            .ok_or_else(|| unsupported("sampled gold missing"))?;
+        if !previous.facedown
+            || previous.lifecycle != lifecycle
+            || self.symbols.name(
+                self.world.definitions.cards[previous.definition]
+                    .color
+                    .ok_or_else(|| unsupported("played card color missing"))?,
+            ) != "GOLD"
         {
-            return Err(unsupported("sampled slot is not a facedown gold in the expected lifecycle"));
+            return Err(unsupported(
+                "sampled slot is not a facedown gold in the expected lifecycle",
+            ));
         }
         let played = previous.played_this_round;
         let old_printed = self.world.definitions.cards[previous.definition].printed_id;
-        let chosen = row.deck.iter().copied().find(|id| {
-            self.world.card(*id).is_some_and(|card| {
-                self.symbols.name(self.world.definitions.cards[card.definition].printed_id) == printed
+        let chosen = row
+            .deck
+            .iter()
+            .copied()
+            .find(|id| {
+                self.world.card(*id).is_some_and(|card| {
+                    self.symbols
+                        .name(self.world.definitions.cards[card.definition].printed_id)
+                        == printed
+                })
             })
-        }).ok_or_else(|| unsupported("sampled gold absent from deck"))?;
+            .ok_or_else(|| unsupported("sampled gold absent from deck"))?;
         let chosen_card = self.world.card(chosen).unwrap();
         let chosen_printed = self.world.definitions.cards[chosen_card.definition].printed_id;
         if self.world.effects.instances.iter().any(|effect| {
-            [effect.card, effect.linked_card].into_iter().flatten()
+            [effect.card, effect.linked_card]
+                .into_iter()
+                .flatten()
                 .any(|card| card == old_printed || card == chosen_printed)
         }) {
-            return Err(unsupported("sampled facedown gold has a live effect reference"));
+            return Err(unsupported(
+                "sampled facedown gold has a live effect reference",
+            ));
         }
         if chosen == old {
             return Ok(());
@@ -1175,13 +1381,16 @@ impl NativeSession {
         if chosen_card.lifecycle != CardLifecycle::Deck {
             return Err(unsupported("sampled gold is not in the deck"));
         }
-        let model = self.hero_model_bound(objects, hero)
+        let model = self
+            .hero_model_bound(objects, hero)
             .ok_or_else(|| unsupported("sampled hero model missing"))?;
         let Some(ObjectValue::Object(list)) = objects.arena.field(model, objects.phases.k(field))
         else {
             return Err(unsupported("sampled gold collection missing"));
         };
-        objects.arena.set_index(list, index, ObjectValue::Atom(Datum::Instance(chosen.0)))
+        objects
+            .arena
+            .set_index(list, index, ObjectValue::Atom(Datum::Instance(chosen.0)))
             .map_err(unsupported)?;
         self.swap_card_flags_bound(objects, chosen, lifecycle, true, played)?;
         self.swap_card_flags_bound(objects, old, CardLifecycle::Deck, false, false)?;
@@ -1354,7 +1563,8 @@ impl NativeSession {
         model: ObjectId,
         field: Field,
     ) -> Result<&'a [ObjectValue]> {
-        let Some(ObjectValue::Object(list)) = objects.arena.field_ref(model, objects.phases.k(field))
+        let Some(ObjectValue::Object(list)) =
+            objects.arena.field_ref(model, objects.phases.k(field))
         else {
             return Err(unsupported("planning card collection missing"));
         };
@@ -1435,23 +1645,30 @@ impl NativeSession {
                     .sequence(*list)
                     .ok_or_else(|| unsupported("planning cards must be a list"))?;
             }
-            let [deck_values, hand_values, discard_values, spell_values, played_values] = values;
+            let [
+                deck_values,
+                hand_values,
+                discard_values,
+                spell_values,
+                played_values,
+            ] = values;
             let row = &self.world.heroes[index];
-            let update = |field, values: &[ObjectValue], old: &[CardId]| -> Result<Option<Vec<CardId>>> {
-                if values.len() == old.len()
+            let update =
+                |field, values: &[ObjectValue], old: &[CardId]| -> Result<Option<Vec<CardId>>> {
+                    if values.len() == old.len()
                     && values.iter().zip(old).all(|(value, card)| {
                         matches!(value, ObjectValue::Atom(Datum::Instance(id)) if *id == card.0)
                     })
                 {
                     return Ok(None);
                 }
-                Ok(Some(
-                    self.decode_hero_cards(values, field)?
-                        .into_iter()
-                        .flatten()
-                        .collect(),
-                ))
-            };
+                    Ok(Some(
+                        self.decode_hero_cards(values, field)?
+                            .into_iter()
+                            .flatten()
+                            .collect(),
+                    ))
+                };
             let deck = update(Field::Deck, deck_values, &row.deck)?;
             let hand = update(Field::Hand, hand_values, &row.hand)?;
             let discard = update(Field::Discard, discard_values, &row.discard)?;
@@ -1888,27 +2105,42 @@ mod tests {
             let fixture = fixture_case(&format!("object-execution-card-selector-{case}"));
             let mut root = NativeSession::compile(
                 serde_json::from_value(fixture["envelope"].clone()).unwrap(),
-            ).unwrap();
+            )
+            .unwrap();
             assert!(root.has_concealed_card_in_public_zone());
             let request = root.advance_prefix(1).unwrap().request.unwrap();
             let frame = root.stack.last().unwrap();
-            assert!(matches!(root.steps[frame.instruction].instruction, Instruction::LiveCardSelect));
+            assert!(matches!(
+                root.steps[frame.instruction].instruction,
+                Instruction::LiveCardSelect
+            ));
             assert_eq!(
                 root.search_step_reads_concealed_state(
-                    root.objects.as_ref().unwrap(), frame.instruction, frame.object, request.owner,
-                ).unwrap(),
+                    root.objects.as_ref().unwrap(),
+                    frame.instruction,
+                    frame.object,
+                    request.owner,
+                )
+                .unwrap(),
                 reads_concealed,
             );
         }
     }
 
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: frozen late-generation payload is not bundled; see docs/testing.md"
+    )]
     fn sampled_round_minion_defeat_requires_the_selector_binding() {
         for card in ["final_embrace", "constrict"] {
-            let fixture = fixture_case(&format!("object-execution-xargatha-primary-{card}-round-ordinary-first"));
+            let fixture = fixture_case(&format!(
+                "object-execution-xargatha-primary-{card}-round-ordinary-first"
+            ));
             let mut root = NativeSession::compile(
                 serde_json::from_value(fixture["envelope"].clone()).unwrap(),
-            ).unwrap();
+            )
+            .unwrap();
             root.advance_prefix(1).unwrap();
             root.advance_prefix(1).unwrap();
             assert_eq!(root.world.effects.instances.len(), 1);
@@ -1918,10 +2150,16 @@ mod tests {
                 let node = objects.effect_nodes()?[0];
                 let finishing = objects.finishing_list(node)?;
                 let defeat = objects.steps_in_list(finishing)?[1];
-                objects.arena.set_field(
-                    defeat, objects.phases.k(Field::VictimKey), ObjectValue::Atom(Datum::Null),
-                ).map_err(unsupported)
-            }).unwrap();
+                objects
+                    .arena
+                    .set_field(
+                        defeat,
+                        objects.phases.k(Field::VictimKey),
+                        ObjectValue::Atom(Datum::Null),
+                    )
+                    .map_err(unsupported)
+            })
+            .unwrap();
             assert!(matches!(root.validate_sampled_resolution_effects(),
                 Err(EngineError::Unsupported(reason))
                 if reason == "unexpected round-end minion defeat program"));
@@ -1931,13 +2169,17 @@ mod tests {
     #[test]
     fn sampled_resolution_allows_public_double_items() {
         let fixture = fixture_case("object-execution-min-primary-inner_strength-text-first");
-        let mut root = NativeSession::compile(
-            serde_json::from_value(fixture["envelope"].clone()).unwrap(),
-        ).unwrap();
+        let mut root =
+            NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
+                .unwrap();
         for _ in 0..8 {
-            if root.world.effects.instances.iter().any(|effect| {
-                root.symbols.name(effect.definition.kind) == "double_items"
-            }) {
+            if root
+                .world
+                .effects
+                .instances
+                .iter()
+                .any(|effect| root.symbols.name(effect.definition.kind) == "double_items")
+            {
                 root.validate_sampled_resolution_effects().unwrap();
                 return;
             }
@@ -1949,9 +2191,9 @@ mod tests {
     #[test]
     fn sampled_grenade_allows_its_issued_target_request() {
         let fixture = fixture_case("object-execution-min-primary-death_grenade-text-first");
-        let mut root = NativeSession::compile(
-            serde_json::from_value(fixture["envelope"].clone()).unwrap(),
-        ).unwrap();
+        let mut root =
+            NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
+                .unwrap();
         for operation in fixture["operations"].as_array().unwrap() {
             if operation["kind"] == "input" {
                 let request = root.last_request.as_ref().unwrap().id;
@@ -1981,22 +2223,29 @@ mod tests {
     #[test]
     fn sampled_grenade_rejects_a_rebound_public_target() {
         let fixture = fixture_case("object-execution-min-primary-death_grenade-text-first");
-        let mut root = NativeSession::compile(
-            serde_json::from_value(fixture["envelope"].clone()).unwrap(),
-        ).unwrap();
-        let index = fixture["operations"].as_array().unwrap().iter().find_map(|operation| {
-            if operation["kind"] == "input" {
-                let request = root.last_request.as_ref().unwrap().id;
-                let selection = root.import_selection(&operation["selection"]).unwrap();
-                root.submit(request, selection).unwrap();
-            } else {
-                root.advance_prefix(1).unwrap();
-            }
-            root.world.effects.instances.iter().position(|effect| {
-                root.symbols.name(effect.definition.kind) == "delayed_trigger"
-                    && effect.card.is_some_and(|id| root.symbols.name(id) == "death_grenade")
+        let mut root =
+            NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
+                .unwrap();
+        let index = fixture["operations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find_map(|operation| {
+                if operation["kind"] == "input" {
+                    let request = root.last_request.as_ref().unwrap().id;
+                    let selection = root.import_selection(&operation["selection"]).unwrap();
+                    root.submit(request, selection).unwrap();
+                } else {
+                    root.advance_prefix(1).unwrap();
+                }
+                root.world.effects.instances.iter().position(|effect| {
+                    root.symbols.name(effect.definition.kind) == "delayed_trigger"
+                        && effect
+                            .card
+                            .is_some_and(|id| root.symbols.name(id) == "death_grenade")
+                })
             })
-        }).expect("fixture must create the delayed grenade");
+            .expect("fixture must create the delayed grenade");
         root.validate_sampled_resolution_effects().unwrap();
 
         let symbols = &root.symbols;
@@ -2004,11 +2253,14 @@ mod tests {
         let node = objects.effect_nodes().unwrap()[index];
         let finishing = objects.finishing_list(node).unwrap();
         let targets = objects.steps_in_list(finishing).unwrap()[1];
-        objects.arena.set_field(
-            targets,
-            symbols.lookup("active_if_key").unwrap(),
-            ObjectValue::Atom(Datum::Text(symbols.lookup("grenade_victims").unwrap())),
-        ).unwrap();
+        objects
+            .arena
+            .set_field(
+                targets,
+                symbols.lookup("active_if_key").unwrap(),
+                ObjectValue::Atom(Datum::Text(symbols.lookup("grenade_victims").unwrap())),
+            )
+            .unwrap();
         assert!(matches!(
             root.validate_sampled_resolution_effects(),
             Err(EngineError::Unsupported(reason)) if reason == "unexpected grenade finishing program",
@@ -2018,22 +2270,29 @@ mod tests {
     #[test]
     fn sampled_glitch_cleanup_rejects_a_rebound_remove_token() {
         let fixture = fixture_case("object-execution-defense-body-unstable_timeline-text-first");
-        let mut root = NativeSession::compile(
-            serde_json::from_value(fixture["envelope"].clone()).unwrap(),
-        ).unwrap();
-        let index = fixture["operations"].as_array().unwrap().iter().find_map(|operation| {
-            if operation["kind"] == "input" {
-                let request = root.last_request.as_ref().unwrap().id;
-                let selection = root.import_selection(&operation["selection"]).unwrap();
-                root.submit(request, selection).unwrap();
-            } else {
-                root.advance_prefix(1).unwrap();
-            }
-            root.world.effects.instances.iter().position(|effect| {
-                root.symbols.name(effect.definition.kind) == "delayed_trigger"
-                    && effect.card.is_some_and(|id| root.symbols.name(id) == "unstable_timeline")
+        let mut root =
+            NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
+                .unwrap();
+        let index = fixture["operations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find_map(|operation| {
+                if operation["kind"] == "input" {
+                    let request = root.last_request.as_ref().unwrap().id;
+                    let selection = root.import_selection(&operation["selection"]).unwrap();
+                    root.submit(request, selection).unwrap();
+                } else {
+                    root.advance_prefix(1).unwrap();
+                }
+                root.world.effects.instances.iter().position(|effect| {
+                    root.symbols.name(effect.definition.kind) == "delayed_trigger"
+                        && effect
+                            .card
+                            .is_some_and(|id| root.symbols.name(id) == "unstable_timeline")
+                })
             })
-        }).expect("fixture must create the delayed Glitch cleanup");
+            .expect("fixture must create the delayed Glitch cleanup");
         root.validate_sampled_resolution_effects().unwrap();
 
         let symbols = &root.symbols;
@@ -2041,17 +2300,21 @@ mod tests {
         let node = objects.effect_nodes().unwrap()[index];
         let finishing = objects.finishing_list(node).unwrap();
         let repeat = objects.steps_in_list(finishing).unwrap()[1];
-        let Some(ObjectValue::Object(templates)) = objects.arena.field(
-            repeat, symbols.lookup("steps_template").unwrap(),
-        ) else {
+        let Some(ObjectValue::Object(templates)) = objects
+            .arena
+            .field(repeat, symbols.lookup("steps_template").unwrap())
+        else {
             panic!("cleanup loop must have a template");
         };
         let remove = objects.steps_in_list(templates).unwrap()[0];
-        objects.arena.set_field(
-            remove,
-            symbols.lookup("token_key").unwrap(),
-            ObjectValue::Atom(Datum::Text(symbols.lookup("_glitch_cleanup_ids").unwrap())),
-        ).unwrap();
+        objects
+            .arena
+            .set_field(
+                remove,
+                symbols.lookup("token_key").unwrap(),
+                ObjectValue::Atom(Datum::Text(symbols.lookup("_glitch_cleanup_ids").unwrap())),
+            )
+            .unwrap();
         assert!(matches!(
             root.validate_sampled_resolution_effects(),
             Err(EngineError::Unsupported(reason)) if reason == "unexpected Glitch cleanup program",
@@ -2085,47 +2348,69 @@ mod tests {
                 upgrade_checkpoints: None,
             };
             let legal = root.resolution_choices(request.owner).unwrap();
-            let searched = root.search_resolution_in_sampled_world(
-                request.owner,
-                sample,
-                super::super::SearchLimits {
-                    max_depth: 2,
-                    max_nodes: 64,
-                    opponent_policy: super::super::OpponentPolicy::Adversarial,
-                    evaluation: super::super::SearchEvaluation::MaterialPosition,
-                },
-                &ExecutionBudget::default(),
-            ).unwrap();
+            let searched = root
+                .search_resolution_in_sampled_world(
+                    request.owner,
+                    sample,
+                    super::super::SearchLimits {
+                        max_depth: 2,
+                        max_nodes: 64,
+                        opponent_policy: super::super::OpponentPolicy::Adversarial,
+                        evaluation: super::super::SearchEvaluation::MaterialPosition,
+                    },
+                    &ExecutionBudget::default(),
+                )
+                .unwrap();
             assert!(legal.contains(&searched.decision));
             assert!(searched.nodes > 0);
 
             // Level-one hands are uniquely determined. Perturb a different
             // hero's concealed hand explicitly to test the prompt dependency.
-            let mut samples = root.resolution_samples(request.owner, sample, &[39], &[])
-                .unwrap().remove(0);
-            let hidden = samples.iter_mut()
-                .find(|row| root.symbols.name(row.hero) == "hero_swift").unwrap();
+            let mut samples = root
+                .resolution_samples(request.owner, sample, &[39], &[])
+                .unwrap()
+                .remove(0);
+            let hidden = samples
+                .iter_mut()
+                .find(|row| root.symbols.name(row.hero) == "hero_swift")
+                .unwrap();
             let hero = hidden.hero;
             let old_hand = root.world.hero(hero).unwrap().hand.clone();
             let SampledCards::Hand(hand) = &mut hidden.update else {
                 panic!("expected a sampled hand");
             };
-            let replacement = root.with_live_objects(|session, objects| {
-                let model = session.hero_model_bound(objects, hero).unwrap();
-                let deck = session.hero_card_list_bound(objects, model, Field::Deck)?;
-                Ok(deck.into_iter().flatten().find_map(|card| {
-                    let id = session.printed_observation_card(card).unwrap();
-                    (!old_hand.contains(&card) && !hidden.fixed.contains(&Some(card))
-                        && !hand.cards.contains(&id)).then_some(id)
-                }).unwrap())
-            }).unwrap();
+            let replacement = root
+                .with_live_objects(|session, objects| {
+                    let model = session.hero_model_bound(objects, hero).unwrap();
+                    let deck = session.hero_card_list_bound(objects, model, Field::Deck)?;
+                    Ok(deck
+                        .into_iter()
+                        .flatten()
+                        .find_map(|card| {
+                            let id = session.printed_observation_card(card).unwrap();
+                            (!old_hand.contains(&card)
+                                && !hidden.fixed.contains(&Some(card))
+                                && !hand.cards.contains(&id))
+                            .then_some(id)
+                        })
+                        .unwrap())
+                })
+                .unwrap();
             hand.cards[0] = replacement;
             root.with_installed_resolution_samples(request.owner, samples, None, |worker| {
-                assert!(worker.world.hero(hero).unwrap().hand.iter()
-                    .any(|card| !old_hand.contains(card)));
+                assert!(
+                    worker
+                        .world
+                        .hero(hero)
+                        .unwrap()
+                        .hand
+                        .iter()
+                        .any(|card| !old_hand.contains(card))
+                );
                 assert_eq!(worker.player_observation(request.owner)?, view);
                 Ok(())
-            }).unwrap();
+            })
+            .unwrap();
             assert_eq!(root.semantic_state().unwrap(), before);
             checked += 1;
         }
@@ -2139,7 +2424,10 @@ mod tests {
         fn adjust_effect_copies(value: &mut serde_json::Value) {
             match value {
                 serde_json::Value::Object(fields) => {
-                    match fields.get("effect_type").and_then(serde_json::Value::as_str) {
+                    match fields
+                        .get("effect_type")
+                        .and_then(serde_json::Value::as_str)
+                    {
                         Some("minion_defeat_bounty") => {
                             fields.insert("source_card_id".into(), json!("fixture_known_card"));
                         }
@@ -2162,8 +2450,13 @@ mod tests {
         let viewer = root.world.heroes[0].id;
         let token = root.world.effects.instances[1].token.unwrap();
         let mut observation = root.player_observation(viewer).unwrap();
-        observation.heroes.iter_mut().find(|hero| hero.id == "hero_swift").unwrap()
-            .known_spells.push("fixture_known_card".into());
+        observation
+            .heroes
+            .iter_mut()
+            .find(|hero| hero.id == "hero_swift")
+            .unwrap()
+            .known_spells
+            .push("fixture_known_card".into());
 
         for phase in [Phase::Planning, Phase::Resolution] {
             observation.phase = phase;
@@ -2171,13 +2464,21 @@ mod tests {
         }
         root.with_live_objects(|_, objects| {
             let misc = objects.phases.root(&objects.arena, Field::MiscEntities)?;
-            let Some(ObjectValue::Atom(Datum::Instance(physical))) = objects.arena.field(misc, token) else {
+            let Some(ObjectValue::Atom(Datum::Instance(physical))) =
+                objects.arena.field(misc, token)
+            else {
                 panic!("placed Totem missing");
             };
-            objects.arena.set_physical_field(
-                physical, objects.phases.k(Field::Facedown), Datum::Bool(true),
-            ).map_err(unsupported)
-        }).unwrap();
+            objects
+                .arena
+                .set_physical_field(
+                    physical,
+                    objects.phases.k(Field::Facedown),
+                    Datum::Bool(true),
+                )
+                .map_err(unsupported)
+        })
+        .unwrap();
         for phase in [Phase::Planning, Phase::Resolution] {
             observation.phase = phase;
             assert!(matches!(root.validate_sampled_effect_cards(&observation),
@@ -2194,7 +2495,9 @@ mod tests {
                 .unwrap();
         root.advance_prefix(1).unwrap();
         let request = root.advance_prefix(1).unwrap().request.unwrap();
-        let selection = root.import_selection(&fixture["operations"][2]["selection"]).unwrap();
+        let selection = root
+            .import_selection(&fixture["operations"][2]["selection"])
+            .unwrap();
         root.submit(request.id, selection).unwrap();
         for _ in 0..4 {
             if !root.world.effects.instances.is_empty() {
@@ -2215,9 +2518,12 @@ mod tests {
             else {
                 panic!("placed token missing");
             };
-            objects.arena.set_physical_field(id, objects.phases.k(Field::Facedown), Datum::Bool(true))
+            objects
+                .arena
+                .set_physical_field(id, objects.phases.k(Field::Facedown), Datum::Bool(true))
                 .map_err(unsupported)
-        }).unwrap();
+        })
+        .unwrap();
         assert!(root.validate_sampled_effect_cards(&observation).is_err());
         observation.phase = Phase::Resolution;
         assert!(root.validate_sampled_effect_cards(&observation).is_err());
@@ -2242,9 +2548,15 @@ mod tests {
         assert!(root.validate_sampled_effect_cards(&observation).is_err());
         for effect in &root.world.effects.instances {
             let source = root.world.hero(effect.source).unwrap();
-            let hero = observation.heroes.iter_mut()
-                .find(|row| row.id == root.symbols.name(source.id)).unwrap();
-            for card in [Some(effect.card.unwrap()), effect.linked_card].into_iter().flatten() {
+            let hero = observation
+                .heroes
+                .iter_mut()
+                .find(|row| row.id == root.symbols.name(source.id))
+                .unwrap();
+            for card in [Some(effect.card.unwrap()), effect.linked_card]
+                .into_iter()
+                .flatten()
+            {
                 hero.revealed_current.push(root.symbols.name(card).into());
             }
         }
@@ -2253,13 +2565,21 @@ mod tests {
         assert!(root.validate_sampled_effect_cards(&observation).is_err());
 
         observation.phase = Phase::Resolution;
-        let private = observation.heroes.iter_mut()
-            .find(|hero| hero.id == observation.private.hero).unwrap();
+        let private = observation
+            .heroes
+            .iter_mut()
+            .find(|hero| hero.id == observation.private.hero)
+            .unwrap();
         observation.private.hand = std::mem::take(&mut private.revealed_current);
         root.validate_sampled_effect_cards(&observation).unwrap();
 
-        observation.private.hero = observation.heroes.iter()
-            .find(|hero| hero.id != observation.private.hero).unwrap().id.clone();
+        observation.private.hero = observation
+            .heroes
+            .iter()
+            .find(|hero| hero.id != observation.private.hero)
+            .unwrap()
+            .id
+            .clone();
         assert!(root.validate_sampled_effect_cards(&observation).is_err());
     }
 
@@ -2356,14 +2676,26 @@ mod tests {
             seed: 39,
             upgrade_checkpoints: None,
         };
-        let roster = root.world.heroes.iter().map(|hero| hero.id).collect::<Vec<_>>();
-        let scoped = root.resolution_samples(owner, sample, &[39], &roster).unwrap();
+        let roster = root
+            .world
+            .heroes
+            .iter()
+            .map(|hero| hero.id)
+            .collect::<Vec<_>>();
+        let scoped = root
+            .resolution_samples(owner, sample, &[39], &roster)
+            .unwrap();
         assert!(!scoped[0].iter().any(|row| row.hero == hero));
         for enemy in root.world.heroes.iter().filter(|hero| hero.team != team) {
             assert!(scoped[0].iter().any(|row| row.hero == enemy.id));
         }
-        let worlds = alternate.sampled_resolution_workers(owner, sample, 1, &roster, &budget).unwrap();
-        assert_eq!(worlds[0].world.hero(hero).unwrap().hand, alternate.world.hero(hero).unwrap().hand);
+        let worlds = alternate
+            .sampled_resolution_workers(owner, sample, 1, &roster, &budget)
+            .unwrap();
+        assert_eq!(
+            worlds[0].world.hero(hero).unwrap().hand,
+            alternate.world.hero(hero).unwrap().hand
+        );
 
         let run = |session: &mut NativeSession, worlds, workers| {
             let before = session.semantic_state().unwrap();
@@ -2410,13 +2742,17 @@ mod tests {
     #[test]
     fn probabilistic_search_pauses_before_hidden_defense_and_discard() {
         for (name, discard) in [
-            ("object-execution-live-reaction-Takahide-prompt-invalid-pass", false),
+            (
+                "object-execution-live-reaction-Takahide-prompt-invalid-pass",
+                false,
+            ),
             ("object-execution-forced-discard-plain", true),
         ] {
             let fixture = fixture_case(name);
             let mut root = NativeSession::compile(
-                serde_json::from_value(fixture["envelope"].clone()).unwrap()
-            ).unwrap();
+                serde_json::from_value(fixture["envelope"].clone()).unwrap(),
+            )
+            .unwrap();
             let budget = ExecutionBudget::default();
             let mut ordinary = root.clone();
             ordinary.advance_to_decision(&budget).unwrap();
@@ -2424,10 +2760,20 @@ mod tests {
             assert_eq!(request.discard, discard);
             let owner = request.owner;
             let team = root.world.hero(owner).unwrap().team;
-            let viewer = root.world.heroes.iter().find(|hero| hero.team != team).unwrap().id;
-            root.advance_search_objects_before_hand(&budget, viewer, &[viewer]).unwrap();
+            let viewer = root
+                .world
+                .heroes
+                .iter()
+                .find(|hero| hero.team != team)
+                .unwrap()
+                .id;
+            root.advance_search_objects_before_hand(&budget, viewer, &[viewer])
+                .unwrap();
             assert!(root.last_request.is_none());
-            assert_eq!(root.pending_hidden_hand_reader(viewer, &[viewer]).unwrap(), Some(owner));
+            assert_eq!(
+                root.pending_hidden_hand_reader(viewer, &[viewer]).unwrap(),
+                Some(owner)
+            );
             root.advance_search_objects(&budget, viewer).unwrap();
             assert_eq!(root.last_request.as_ref(), Some(request));
         }

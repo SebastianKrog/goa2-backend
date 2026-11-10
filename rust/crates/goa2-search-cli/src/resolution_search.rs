@@ -1,13 +1,17 @@
 use goa2_core::{
-    codec::StateEnvelope,
-    interpreter::{
+    api::experimental_search::{
         BotPlanningScope, DecisionMove, ExecutionBudget, NativeSession, PlanningRolloutSample,
         PlanningSearchOptions, SearchLimits, TeamKnowledgeMode,
     },
+    codec::StateEnvelope,
 };
 use serde_json::{Value, json};
 use std::time::{Duration, Instant};
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Keep JSON worker operands explicit until the worker API split"
+)]
 pub(super) fn search(
     envelope: StateEnvelope,
     player_id: String,
@@ -25,14 +29,25 @@ pub(super) fn search(
         .map_err(|error| error.to_string())?;
     let result = match (arena_bots, resolution_sample) {
         (Some(bots), Some((sample, worlds, 1))) => {
-            let bots = bots.into_iter().map(|id| super::sequence_legality::player(&mut session, id))
+            let bots = bots
+                .into_iter()
+                .map(|id| super::sequence_legality::player(&mut session, id))
                 .collect::<Result<Vec<_>, _>>()?;
             session.search_node_limited_resolution(
                 // This candidate enables the experiment for arena resolution only.
-                player, sample, worlds, &bots, true, limits, rollout_turns.unwrap_or(4), &budget,
+                player,
+                sample,
+                worlds,
+                &bots,
+                true,
+                limits,
+                rollout_turns.unwrap_or(4),
+                &budget,
             )
         }
-        (Some(_), _) => return Err("arena v2 requires a sampled resolution root and one worker".into()),
+        (Some(_), _) => {
+            return Err("arena v2 requires a sampled resolution root and one worker".into());
+        }
         (None, Some(sample)) => session.search_resolution_worlds(
             player,
             sample,
@@ -106,6 +121,8 @@ pub(super) fn compile_with_budget(
     Ok(session)
 }
 
+// Keep the existing JSON worker operands explicit until the versioned worker API is split (C09).
+#[allow(clippy::too_many_arguments)]
 pub(super) fn rollout(
     envelope: StateEnvelope,
     player_id: String,
@@ -162,6 +179,10 @@ pub(super) struct BotTeam {
     worlds: Option<usize>,
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Keep JSON worker operands explicit until the worker API split"
+)]
 pub(super) fn sampled_planning(
     envelope: StateEnvelope,
     player_id: String,
@@ -192,13 +213,20 @@ pub(super) fn sampled_planning(
         };
         let result = if arena_v2 {
             session.search_node_limited_planning(
-                player, scope, cap, limits,
-                PlanningSearchOptions { rollout_turns: Some(options.rollout_turns.unwrap_or(4)), ..options },
+                player,
+                scope,
+                cap,
+                limits,
+                PlanningSearchOptions {
+                    rollout_turns: Some(options.rollout_turns.unwrap_or(4)),
+                    ..options
+                },
                 &budget,
             )
         } else {
             session.search_bot_team_planning(player, scope, cap, limits, options, &budget)
-        }.map_err(|error| error.to_string())?;
+        }
+        .map_err(|error| error.to_string())?;
         let commitments = result
             .commitments
             .iter()

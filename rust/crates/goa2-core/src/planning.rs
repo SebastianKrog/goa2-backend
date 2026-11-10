@@ -591,9 +591,9 @@ impl Planning {
             .ok_or("requests missing")?;
         requests.retain(|k, _| self.requests.iter().any(|(key, _, _)| key == k));
         for (key, from, to) in &self.requests {
-            requests.entry(key.clone()).or_insert_with(|| {
-                json!({"from": symbols.name(*from), "to": symbols.name(*to)})
-            });
+            requests
+                .entry(key.clone())
+                .or_insert_with(|| json!({"from": symbols.name(*from), "to": symbols.name(*to)}));
         }
         state["current_actor_id"] = json!(self.actor.map(|h| symbols.name(h)));
         state["resolution_owner_id"] = json!(self.owner.map(|h| symbols.name(h)));

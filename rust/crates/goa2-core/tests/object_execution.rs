@@ -3936,8 +3936,13 @@ fn live_game_finishes_a_recorded_game_without_a_turn_cap() {
                 // foreign responses when there is no owner action to undo.
                 if [4595, 4642, 5091].contains(&index) {
                     assert_eq!(selection, "CONFIRM");
-                    assert!(!request["options"].as_array().unwrap().iter()
-                        .any(|option| option["id"] == "CONFIRM"));
+                    assert!(
+                        !request["options"]
+                            .as_array()
+                            .unwrap()
+                            .iter()
+                            .any(|option| option["id"] == "CONFIRM")
+                    );
                     continue;
                 }
                 let request_id = request["id"].as_str().unwrap().to_owned();
@@ -4002,13 +4007,27 @@ fn live_game_scopes_simultaneous_upgrade_prompts() {
     let request_id = arien["id"].as_str().unwrap();
     let cards = ["expert_duelist".to_owned()];
     let before = serde_json::to_value(game.checkpoint().unwrap()).unwrap();
-    let preview = game.preview_upgrades("hero_arien", request_id, &cards).unwrap();
+    let preview = game
+        .preview_upgrades("hero_arien", request_id, &cards)
+        .unwrap();
     assert_eq!(preview["remaining"], 0);
     assert_eq!(preview["options"], json!([]));
-    assert!(game.preview_upgrades("hero_hanu", request_id, &cards).is_err());
-    assert!(game.preview_upgrades("hero_arien", "stale", &cards).is_err());
-    assert!(game.preview_upgrades("hero_arien", request_id, &["unknown".into()]).is_err());
-    assert_eq!(serde_json::to_value(game.checkpoint().unwrap()).unwrap(), before);
+    assert!(
+        game.preview_upgrades("hero_hanu", request_id, &cards)
+            .is_err()
+    );
+    assert!(
+        game.preview_upgrades("hero_arien", "stale", &cards)
+            .is_err()
+    );
+    assert!(
+        game.preview_upgrades("hero_arien", request_id, &["unknown".into()])
+            .is_err()
+    );
+    assert_eq!(
+        serde_json::to_value(game.checkpoint().unwrap()).unwrap(),
+        before
+    );
     let upgrade = || PlayerCommand::Input {
         request_id: arien["id"].as_str().unwrap().to_owned(),
         selection: json!({"hero_id": "hero_arien", "card_id": "expert_duelist"}),
@@ -4018,7 +4037,10 @@ fn live_game_scopes_simultaneous_upgrade_prompts() {
         Err(EngineError::InvalidInput(_))
     ));
     game.submit("hero_arien", 0, upgrade(), &budget).unwrap();
-    assert_eq!(preview["view"], game.client_view(Some("hero_arien")).unwrap()["view"]);
+    assert_eq!(
+        preview["view"],
+        game.client_view(Some("hero_arien")).unwrap()["view"]
+    );
     assert!(game.request_for("hero_arien").is_none());
     assert!(game.request_for("hero_brogan").is_some());
 }

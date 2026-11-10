@@ -64,7 +64,11 @@ impl NativeSession {
             _ => Err(unsupported("card selector list binding invalid")),
         }
     }
-    pub(super) fn card_spec_bound(&self, objects: &BoundObjects, step: ObjectId) -> Result<CardSelectSpec> {
+    pub(super) fn card_spec_bound(
+        &self,
+        objects: &BoundObjects,
+        step: ObjectId,
+    ) -> Result<CardSelectSpec> {
         let Some(ObjectValue::Object(filters)) =
             self.card_field_bound(objects, step, Field::Filters)
         else {

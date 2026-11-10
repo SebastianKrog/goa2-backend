@@ -217,7 +217,7 @@ def catalog():
 
 if __name__ == "__main__":
     data = catalog()
-    path = ROOT / "rust/tests/fixtures/defense-builders.json"
+    path = ROOT / "rust/content/catalogs/defense-builders.json"
     write_text(path, json.dumps(data, indent=2) + "\n")
     print(
         {

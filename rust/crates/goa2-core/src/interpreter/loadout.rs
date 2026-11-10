@@ -151,7 +151,7 @@ fn catalog() -> Result<&'static Catalog> {
     CATALOG
         .get_or_init(|| {
             let catalog: Catalog = serde_json::from_str(include_str!(
-                "../../../../tests/fixtures/loadout-provenance.json"
+                "../../../../content/catalogs/loadout-provenance.json"
             ))
             .map_err(|error| error.to_string())?;
             if crate::codec::oracle_manifest()?["source_sha256"].as_str()
@@ -316,9 +316,11 @@ fn hidden_gold_slots(hero: &super::HeroObservation) -> impl Iterator<Item = Hidd
         cards: &[PublicCard],
         slot: fn(usize) -> HiddenGoldSlot,
     ) -> impl Iterator<Item = HiddenGoldSlot> + '_ {
-        cards.iter().enumerate().filter_map(move |(index, card)| {
-            matches!(card, PublicCard::Hidden).then(|| slot(index))
-        })
+        cards
+            .iter()
+            .enumerate()
+            .filter(|(_, card)| matches!(card, PublicCard::Hidden))
+            .map(move |(index, _)| slot(index))
     }
 
     slots(&hero.played, HiddenGoldSlot::Played)
@@ -445,9 +447,16 @@ impl PlayerObservation {
         hero_id: &str,
         checkpoints: &[UpgradeCheckpoint],
     ) -> Result<Option<impl Fn(u64) -> Option<SampledHand> + use<'a>>> {
-        Ok(self.ordinary_hand_hypotheses(hero_id, checkpoints)?.map(|(hands, golds, hand)| {
-            move |seed| hand(sample_index(seed, hands), sample_index(seed ^ 0x81f2b1aa727ea991, golds))
-        }))
+        Ok(self
+            .ordinary_hand_hypotheses(hero_id, checkpoints)?
+            .map(|(hands, golds, hand)| {
+                move |seed| {
+                    hand(
+                        sample_index(seed, hands),
+                        sample_index(seed ^ 0x81f2b1aa727ea991, golds),
+                    )
+                }
+            }))
     }
 
     pub(super) fn resolution_hand_hypotheses(
@@ -458,7 +467,8 @@ impl PlayerObservation {
         if self.phase != crate::codec::Phase::Resolution {
             return Ok(None);
         }
-        let Some((hands, golds, build)) = self.ordinary_hand_hypotheses(hero_id, checkpoints)? else {
+        let Some((hands, golds, build)) = self.ordinary_hand_hypotheses(hero_id, checkpoints)?
+        else {
             return Ok(None);
         };
         if hands.saturating_mul(golds) > 16 {
@@ -467,7 +477,9 @@ impl PlayerObservation {
         let mut weighted: Vec<(SampledHand, u32)> = Vec::new();
         for index in 0..hands {
             for gold in 0..golds {
-                let Some(hand) = build(index, gold) else { continue };
+                let Some(hand) = build(index, gold) else {
+                    continue;
+                };
                 if let Some((_, weight)) = weighted.iter_mut().find(|(row, _)| *row == hand) {
                     *weight += 1;
                 } else {
@@ -478,11 +490,21 @@ impl PlayerObservation {
         Ok((!weighted.is_empty()).then_some(weighted))
     }
 
+    #[expect(
+        clippy::type_complexity,
+        reason = "Return a lazily captured hand builder with its two index bounds"
+    )]
     fn ordinary_hand_hypotheses<'a>(
         &'a self,
         hero_id: &str,
         checkpoints: &[UpgradeCheckpoint],
-    ) -> Result<Option<(usize, usize, impl Fn(usize, usize) -> Option<SampledHand> + use<'a>)>> {
+    ) -> Result<
+        Option<(
+            usize,
+            usize,
+            impl Fn(usize, usize) -> Option<SampledHand> + use<'a>,
+        )>,
+    > {
         if hero_id == self.private.hero {
             return Ok(None);
         }
@@ -545,88 +567,93 @@ impl PlayerObservation {
             loadouts
         };
         let fixed_starting_gold = hidden_gold_slot.is_none()
-            && self.phase == crate::codec::Phase::Planning && self.round == 1 && self.turn == 1;
+            && self.phase == crate::codec::Phase::Planning
+            && self.round == 1
+            && self.turn == 1;
         let golds = if hero.level < 8 && public_golds == 0 && !fixed_starting_gold {
             definition.cyclic_golds.len().max(1)
         } else {
             1
         };
-        Ok(Some((loadouts.len(), golds, move |selected: usize, gold_index: usize| {
-            let loadout = &loadouts[selected];
-            let upgraded = definition
-                .cards
-                .iter()
-                .filter(|card| loadout.active_card_ids.contains(&card.id))
-                .map(|card| card.color.index())
-                .collect::<BTreeSet<_>>();
-            let mut cards = definition
-                .starting
-                .iter()
-                .filter(|id| {
-                    !definition.cyclic_golds.contains(id)
-                        && !(hero.level >= 8
-                            && !definition.cyclic_golds.is_empty()
-                            && id.as_str() == "bushido")
-                        && !definition
-                            .cards
+        Ok(Some((
+            loadouts.len(),
+            golds,
+            move |selected: usize, gold_index: usize| {
+                let loadout = &loadouts[selected];
+                let upgraded = definition
+                    .cards
+                    .iter()
+                    .filter(|card| loadout.active_card_ids.contains(&card.id))
+                    .map(|card| card.color.index())
+                    .collect::<BTreeSet<_>>();
+                let mut cards = definition
+                    .starting
+                    .iter()
+                    .filter(|id| {
+                        !definition.cyclic_golds.contains(id)
+                            && !(hero.level >= 8
+                                && !definition.cyclic_golds.is_empty()
+                                && id.as_str() == "bushido")
+                            && !definition.cards.iter().any(|card| {
+                                card.id == **id && upgraded.contains(&card.color.index())
+                            })
+                    })
+                    .chain(&loadout.active_card_ids)
+                    .filter(|id| !unavailable.contains(id))
+                    .cloned()
+                    .collect::<Vec<_>>();
+                let mut hidden_gold = None;
+                if hero.level >= 8 {
+                    cards.extend(
+                        definition
+                            .cyclic_golds
                             .iter()
-                            .any(|card| card.id == **id && upgraded.contains(&card.color.index()))
-                })
-                .chain(&loadout.active_card_ids)
-                .filter(|id| !unavailable.contains(id))
-                .cloned()
-                .collect::<Vec<_>>();
-            let mut hidden_gold = None;
-            if hero.level >= 8 {
-                cards.extend(
-                    definition
-                        .cyclic_golds
-                        .iter()
-                        .filter(|id| !unavailable.contains(id))
-                        .cloned(),
-                );
-            } else if public_golds == 0 && !definition.cyclic_golds.is_empty() {
-                let gold = if fixed_starting_gold {
-                    definition
-                        .starting
-                        .iter()
-                        .find(|id| definition.cyclic_golds.contains(id))?
-                } else {
-                    &definition.cyclic_golds[gold_index]
-                };
-                if let Some(slot) = hidden_gold_slot {
-                    hidden_gold = Some((slot, gold.clone()));
-                } else {
-                    cards.push(gold.clone());
+                            .filter(|id| !unavailable.contains(id))
+                            .cloned(),
+                    );
+                } else if public_golds == 0 && !definition.cyclic_golds.is_empty() {
+                    let gold = if fixed_starting_gold {
+                        definition
+                            .starting
+                            .iter()
+                            .find(|id| definition.cyclic_golds.contains(id))?
+                    } else {
+                        &definition.cyclic_golds[gold_index]
+                    };
+                    if let Some(slot) = hidden_gold_slot {
+                        hidden_gold = Some((slot, gold.clone()));
+                    } else {
+                        cards.push(gold.clone());
+                    }
                 }
-            }
-            // Unrevealed commitments still belong to the reconstructed
-            // pool. Their public slots account for the difference from hand size.
-            if cards.len() != hero.hand_size.checked_add(hero.hidden_commitments)? {
-                return None;
-            }
-            cards.sort();
-            let retired = definition
-                .cards
-                .iter()
-                .filter(|card| {
-                    !loadout.item_card_ids.contains(&card.id)
-                        && definition.cards.iter().any(|active| {
-                            loadout.active_card_ids.contains(&active.id)
-                                && active.color.index() == card.color.index()
-                                && active.tier > card.tier
-                        })
+                // Unrevealed commitments still belong to the reconstructed
+                // pool. Their public slots account for the difference from hand size.
+                if cards.len() != hero.hand_size.checked_add(hero.hidden_commitments)? {
+                    return None;
+                }
+                cards.sort();
+                let retired = definition
+                    .cards
+                    .iter()
+                    .filter(|card| {
+                        !loadout.item_card_ids.contains(&card.id)
+                            && definition.cards.iter().any(|active| {
+                                loadout.active_card_ids.contains(&active.id)
+                                    && active.color.index() == card.color.index()
+                                    && active.tier > card.tier
+                            })
+                    })
+                    .map(|card| card.id.clone())
+                    .collect();
+                Some(SampledHand {
+                    hero: hero.id.clone(),
+                    cards,
+                    loadout: loadout.clone(),
+                    retired,
+                    hidden_gold,
                 })
-                .map(|card| card.id.clone())
-                .collect();
-            Some(SampledHand {
-                hero: hero.id.clone(),
-                cards,
-                loadout: loadout.clone(),
-                retired,
-                hidden_gold,
-            })
-        })))
+            },
+        )))
     }
 
     /// Candidate upgrade paths for a publicly identified hero. Unsupported or
@@ -1038,7 +1065,13 @@ mod tests {
         let weighted = view.resolution_hand_hypotheses(&id, &[]).unwrap().unwrap();
         assert_eq!(weighted.len(), golds.len());
         assert!(weighted.iter().all(|(hand, weight)| {
-            *weight == 1 && hand.cards.iter().filter(|card| golds.contains(card)).count() == 1
+            *weight == 1
+                && hand
+                    .cards
+                    .iter()
+                    .filter(|card| golds.contains(card))
+                    .count()
+                    == 1
         }));
         let mut seen = BTreeSet::new();
         for seed in 0..32 {
@@ -1433,7 +1466,7 @@ mod tests {
     #[test]
     fn native_provenance_matches_frozen_python_hypotheses() {
         let raw: serde_json::Value = serde_json::from_str(include_str!(
-            "../../../../tests/fixtures/loadout-provenance.json"
+            "../../../../content/catalogs/loadout-provenance.json"
         ))
         .unwrap();
         let cases: Vec<Case> = serde_json::from_value(raw["cases"].clone()).unwrap();

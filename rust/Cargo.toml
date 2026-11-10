@@ -5,6 +5,8 @@ resolver = "3"
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
+# Only this compiler is supported until a lower MSRV is independently tested.
+rust-version = "1.99.1"
 license = "MIT"
 publish = false
 

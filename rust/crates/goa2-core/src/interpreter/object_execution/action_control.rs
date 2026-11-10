@@ -103,6 +103,10 @@ mod tests {
         serde_json::to_value(session.export_envelope().unwrap()).unwrap()
     }
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: frozen late-generation payload is not bundled; see docs/testing.md"
+    )]
     fn control_entity_counter_guard_precedes_effect_and_stack_mutation() {
         let mut worker = session("plain");
         worker.world.next_entity_id = i64::MAX;
@@ -117,6 +121,10 @@ mod tests {
         assert_eq!(snapshot(&worker), before);
     }
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: frozen late-generation payload is not bundled; see docs/testing.md"
+    )]
     fn control_reads_live_level_and_ultimate_without_needing_step_capacity() {
         let root = session("level-7");
         let before = snapshot(&root);
@@ -177,6 +185,10 @@ mod tests {
         assert_eq!(snapshot(&root), before);
     }
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: frozen late-generation payload is not bundled; see docs/testing.md"
+    )]
     fn manager_scopes_and_retained_effect_lists_are_private_between_workers() {
         let root = session("plain");
         let before = snapshot(&root);

@@ -326,9 +326,7 @@ impl NativeSession {
                     .take(limit)
                     .map(|n| Typed(Datum::Int(*n)))
                     .collect(),
-                RequestChoices::Mines(paths) => {
-                    (0..paths.len().min(limit)).map(MinePath).collect()
-                }
+                RequestChoices::Mines(paths) => (0..paths.len().min(limit)).map(MinePath).collect(),
                 RequestChoices::Laugh
                 | RequestChoices::YesNo
                 | RequestChoices::Repeat { .. }
@@ -734,17 +732,25 @@ fn visit(
         budget.check(0)?;
         let terminal = trie[*child].children.is_empty();
         if terminal
-            && let DecisionMove::Input { player, request, selection } = decision
-            && !worker.last_request.as_ref().is_some_and(|request| {
-                matches!(request.choices, RequestChoices::Upgrades(_))
-            })
+            && let DecisionMove::Input {
+                player,
+                request,
+                selection,
+            } = decision
+            && !worker
+                .last_request
+                .as_ref()
+                .is_some_and(|request| matches!(request.choices, RequestChoices::Upgrades(_)))
         {
             // Plain prompt membership is read-only and the leaf has no
             // transition to execute. The root rollback still owns the batch.
             let verdict = sequence_failure(
-                worker.validate_sequence_input(*player, *request, selection).map(|_| ()),
+                worker
+                    .validate_sequence_input(*player, *request, selection)
+                    .map(|_| ()),
                 depth,
-            )?.unwrap_or(SequenceVerdict::Legal { checked: depth + 1 });
+            )?
+            .unwrap_or(SequenceVerdict::Legal { checked: depth + 1 });
             assign(trie, *child, &verdict, false, batch);
             continue;
         }

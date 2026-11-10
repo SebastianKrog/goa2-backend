@@ -1,3 +1,7 @@
+mod migrations;
+mod unsigned;
+use unsigned::{SqlU64, unsigned};
+
 use crate::{
     ApiError, Result,
     bots::BotSpec,
@@ -5,7 +9,7 @@ use crate::{
     replay::{self, Archive, Decision, Entry},
     shares::{Metadata, Seek, Share},
 };
-use goa2_core::interpreter::live_game::GameCheckpoint;
+use goa2_core::api::GameCheckpoint;
 use rusqlite::{Connection, MAIN_DB, OpenFlags, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -49,6 +53,8 @@ pub struct AcceptedAction<'a> {
     pub reply: &'a Value,
 }
 
+type ReplayHistory = (u64, Vec<(Entry, Option<HistoryContext>)>);
+
 pub struct Store {
     connection: Mutex<Connection>,
     _ownership: File,
@@ -89,7 +95,7 @@ impl Store {
                 snapshot
                     .query_row("SELECT 1 FROM games LIMIT 1", [], |_| Ok(()))
                     .optional()?;
-                snapshot.backup(MAIN_DB, &staged, None)?;
+                snapshot.backup(MAIN_DB, &staged, None::<fn(rusqlite::backup::Progress)>)?;
             }
             {
                 let copy = Connection::open(&staged)?;
@@ -125,73 +131,8 @@ impl Store {
         let ownership = options.open(lock_path).map_err(ApiError::internal)?;
         ownership.try_lock().map_err(ApiError::internal)?;
         options.open(path).map_err(ApiError::internal)?;
-        let connection = Connection::open(path).map_err(ApiError::internal)?;
-        connection
-            .execute_batch(
-                "PRAGMA journal_mode = WAL;
-             PRAGMA synchronous = FULL;
-             PRAGMA foreign_keys = ON;
-             CREATE TABLE IF NOT EXISTS games (
-               id TEXT PRIMARY KEY, revision INTEGER NOT NULL,
-               credentials BLOB NOT NULL, checkpoint BLOB NOT NULL
-             );
-             CREATE TABLE IF NOT EXISTS accepted_actions (
-               game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
-               hero_id TEXT NOT NULL, action_id TEXT NOT NULL,
-               command BLOB NOT NULL, reply BLOB NOT NULL,
-               PRIMARY KEY (game_id, hero_id, action_id)
-             );
-             CREATE TABLE IF NOT EXISTS replay_starts (
-               game_id TEXT PRIMARY KEY REFERENCES games(id) ON DELETE CASCADE,
-               revision INTEGER NOT NULL, checkpoint BLOB NOT NULL
-             );
-             CREATE TABLE IF NOT EXISTS replay_entries (
-               game_id TEXT NOT NULL REFERENCES replay_starts(game_id) ON DELETE CASCADE,
-               revision INTEGER NOT NULL, entry BLOB NOT NULL, history BLOB,
-               PRIMARY KEY (game_id, revision)
-             );
-             CREATE TABLE IF NOT EXISTS reported_replays (
-               game_id TEXT PRIMARY KEY, revision INTEGER NOT NULL, archive BLOB NOT NULL
-             );
-             CREATE TABLE IF NOT EXISTS replay_shares (
-               token TEXT PRIMARY KEY, game_id TEXT NOT NULL UNIQUE,
-               total INTEGER NOT NULL, metadata BLOB NOT NULL, created_at INTEGER
-             );
-             CREATE TABLE IF NOT EXISTS replay_share_groups (
-               token TEXT NOT NULL REFERENCES replay_shares(token) ON DELETE CASCADE,
-               start INTEGER NOT NULL, gzip BLOB NOT NULL, PRIMARY KEY (token, start)
-             );
-             INSERT OR IGNORE INTO replay_starts (game_id, revision, checkpoint)
-               SELECT id, revision, checkpoint FROM games;",
-            )
-            .map_err(ApiError::internal)?;
-        let has_history = connection
-            .query_row(
-                "SELECT EXISTS(SELECT 1 FROM pragma_table_info('replay_entries') WHERE name='history')",
-                [],
-                |row| row.get::<_, bool>(0),
-            )
-            .map_err(ApiError::internal)?;
-        if !has_history {
-            connection
-                .execute("ALTER TABLE replay_entries ADD COLUMN history BLOB", [])
-                .map_err(ApiError::internal)?;
-        }
-        let has_share_date = connection
-            .query_row(
-                "SELECT EXISTS(SELECT 1 FROM pragma_table_info('replay_shares') WHERE name='created_at')",
-                [],
-                |row| row.get::<_, bool>(0),
-            )
-            .map_err(ApiError::internal)?;
-        if !has_share_date {
-            connection
-                .execute(
-                    "ALTER TABLE replay_shares ADD COLUMN created_at INTEGER",
-                    [],
-                )
-                .map_err(ApiError::internal)?;
-        }
+        let mut connection = Connection::open(path).map_err(ApiError::internal)?;
+        migrations::apply(&mut connection).map_err(ApiError::internal)?;
         Ok(Self {
             connection: Mutex::new(connection),
             _ownership: ownership,
@@ -207,7 +148,7 @@ impl Store {
             .query_map([], |row| {
                 Ok((
                     row.get(0)?,
-                    row.get(1)?,
+                    unsigned(row, 1)?,
                     row.get::<_, Vec<u8>>(2)?,
                     row.get::<_, Vec<u8>>(3)?,
                 ))
@@ -231,12 +172,17 @@ impl Store {
         let tx = db.transaction().map_err(ApiError::internal)?;
         tx.execute(
             "INSERT INTO games (id, revision, credentials, checkpoint) VALUES (?1, ?2, ?3, ?4)",
-            params![game.id, game.revision, encode(&game.credentials)?, snapshot],
+            params![
+                game.id,
+                SqlU64(game.revision),
+                encode(&game.credentials)?,
+                snapshot
+            ],
         )
         .map_err(ApiError::internal)?;
         tx.execute(
             "INSERT INTO replay_starts (game_id, revision, checkpoint) VALUES (?1, ?2, ?3)",
-            params![game.id, game.revision, snapshot],
+            params![game.id, SqlU64(game.revision), snapshot],
         )
         .map_err(ApiError::internal)?;
         tx.commit().map_err(ApiError::internal)
@@ -277,6 +223,8 @@ impl Store {
         ))
     }
 
+    // These arguments are one atomic journal/receipt transaction; keep the boundary explicit.
+    #[allow(clippy::too_many_arguments)]
     pub fn commit(
         &self,
         game: &str,
@@ -309,7 +257,7 @@ impl Store {
         let count = tx
             .execute(
                 "UPDATE games SET revision=?1, checkpoint=?2 WHERE id=?3 AND revision=?4",
-                params![revision, snapshot, game, previous],
+                params![SqlU64(revision), snapshot, game, SqlU64(previous)],
             )
             .map_err(ApiError::internal)?;
         if count != 1 {
@@ -323,7 +271,7 @@ impl Store {
         }
         tx.execute(
             "INSERT INTO replay_entries (game_id, revision, entry, history) VALUES (?1, ?2, ?3, ?4)",
-            params![game, revision, entry, history],
+            params![game, SqlU64(revision), entry, history],
         )
         .map_err(ApiError::internal)?;
         tx.commit().map_err(ApiError::internal)
@@ -343,7 +291,7 @@ impl Store {
                 "INSERT INTO reported_replays (game_id, revision, archive) VALUES (?1, ?2, ?3)
              ON CONFLICT(game_id) DO UPDATE SET revision=excluded.revision, archive=excluded.archive
              WHERE reported_replays.revision < excluded.revision",
-                params![game, archive.revision, encoded],
+                params![game, SqlU64(archive.revision), encoded],
             )
             .map_err(ApiError::internal)?;
         Ok(())
@@ -387,10 +335,10 @@ impl Store {
                 .query_map([], |row| {
                     Ok((
                         row.get::<_, String>(0)?,
-                        row.get::<_, u64>(1)?,
+                        unsigned(row, 1)?,
                         row.get::<_, String>(2)?,
                         row.get::<_, String>(3)?,
-                        row.get::<_, Option<u64>>(4)?,
+                        row.get::<_, Option<SqlU64>>(4)?.map(|value| value.0),
                     ))
                 })
                 .map_err(ApiError::internal)?
@@ -424,8 +372,8 @@ impl Store {
             .query_map([], |row| {
                 Ok(json!({
                     "token": row.get::<_, String>(0)?, "game_id": row.get::<_, String>(1)?,
-                    "total_decisions": row.get::<_, u64>(2)?, "created_at": row.get::<_, Option<u64>>(3)?,
-                    "size_bytes": row.get::<_, u64>(4)?, "engine": "rust",
+                    "total_decisions": unsigned(row,2)?, "created_at": row.get::<_,Option<SqlU64>>(3)?.map(|value|value.0),
+                    "size_bytes": unsigned(row,4)?, "engine": "rust",
                 }))
             })
             .map_err(ApiError::internal)?
@@ -466,13 +414,13 @@ impl Store {
         let tx = db.transaction().map_err(ApiError::internal)?;
         tx.execute(
             "INSERT INTO replay_shares (token, game_id, total, metadata, created_at) VALUES (?1, ?2, ?3, ?4, unixepoch())",
-            params![token, game, share.total, metadata],
+            params![token, game, SqlU64(share.total), metadata],
         )
         .map_err(ApiError::internal)?;
         for (start, gzip) in share.groups {
             tx.execute(
                 "INSERT INTO replay_share_groups (token, start, gzip) VALUES (?1, ?2, ?3)",
-                params![token, start, gzip],
+                params![token, SqlU64(start), gzip],
             )
             .map_err(ApiError::internal)?;
         }
@@ -506,7 +454,7 @@ impl Store {
             .query_row(
                 "SELECT total FROM replay_shares WHERE token=?1",
                 [token],
-                |row| row.get(0),
+                |row| unsigned(row, 0),
             )
             .optional()
             .map_err(ApiError::internal)?
@@ -514,7 +462,7 @@ impl Store {
         let start = seek.group_start(total, metadata.as_ref());
         db.query_row(
             "SELECT gzip FROM replay_share_groups WHERE token=?1 AND start=?2",
-            params![token, start],
+            params![token, SqlU64(start)],
             |row| row.get(0),
         )
         .map_err(ApiError::internal)
@@ -527,24 +475,20 @@ impl Store {
             .query_row(
                 "SELECT revision FROM replay_starts WHERE game_id=?1",
                 [game],
-                |row| row.get(0),
+                |row| unsigned(row, 0),
             )
             .optional()
             .map_err(ApiError::internal)?
             .ok_or_else(|| ApiError::not_found("Game replay not found"))
     }
 
-    pub fn history(
-        &self,
-        game: &str,
-        revision: u64,
-    ) -> Result<(u64, Vec<(Entry, Option<HistoryContext>)>)> {
+    pub fn history(&self, game: &str, revision: u64) -> Result<ReplayHistory> {
         let db = self.connection.lock().map_err(ApiError::internal)?;
         let start: u64 = db
             .query_row(
                 "SELECT revision FROM replay_starts WHERE game_id=?1",
                 [game],
-                |row| row.get(0),
+                |row| unsigned(row, 0),
             )
             .optional()
             .map_err(ApiError::internal)?
@@ -557,7 +501,7 @@ impl Store {
             .map_err(ApiError::internal)?;
         let first = start.max(revision.saturating_sub(replay::MAX_STEPS as u64));
         let rows = query
-            .query_map(params![game, first, revision], |row| {
+            .query_map(params![game, SqlU64(first), SqlU64(revision)], |row| {
                 Ok((row.get::<_, Vec<u8>>(0)?, row.get::<_, Option<Vec<u8>>>(1)?))
             })
             .map_err(ApiError::internal)?;
@@ -595,7 +539,7 @@ impl Store {
              FROM replay_starts JOIN games ON games.id = replay_starts.game_id
              WHERE game_id=?1",
                 [game],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                |row| Ok((unsigned(row, 0)?, unsigned(row, 1)?, row.get(2)?)),
             )
             .optional()
             .map_err(ApiError::internal)?
@@ -631,4 +575,23 @@ impl Store {
 
 fn encode(value: &impl Serialize) -> Result<Vec<u8>> {
     serde_json::to_vec(value).map_err(ApiError::internal)
+}
+
+#[cfg(test)]
+mod compatibility_tests {
+    use super::*;
+
+    #[test]
+    fn legacy_credentials_default_optional_metadata_without_discarding_auth() {
+        let value = json!({"player_tokens":[{"hero_id":"hero_arien","token":"synthetic-player"}],
+            "spectator_token":"synthetic-spectator","hero_names":{},"future_optional":true});
+        let credentials: Credentials = serde_json::from_value(value).unwrap();
+        assert!(credentials.bots.is_empty());
+        assert!(credentials.fixed_clock_ms.is_none() && credentials.provisioning_hash.is_none());
+        assert_eq!(credentials.player_tokens[0].token, "synthetic-player");
+        assert_eq!(credentials.spectator_token, "synthetic-spectator");
+        let encoded = serde_json::to_value(credentials).unwrap();
+        assert!(encoded.get("future_optional").is_none());
+        assert!(encoded.get("fixed_clock_ms").is_none());
+    }
 }

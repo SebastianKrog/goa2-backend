@@ -1,0 +1,902 @@
+{
+  "schema_version": 1,
+  "examples": [
+    {
+      "operation": "capabilities",
+      "request": {
+        "schema_version": 1,
+        "id": 1,
+        "operation": "capabilities"
+      },
+      "required_fields": [],
+      "scope": "Deserialize only; synthetic empty envelope is not native gameplay evidence."
+    },
+    {
+      "operation": "prepare_search",
+      "request": {
+        "schema_version": 1,
+        "id": 2,
+        "operation": "prepare_search"
+      },
+      "required_fields": [],
+      "scope": "Deserialize only; synthetic empty envelope is not native gameplay evidence."
+    },
+    {
+      "operation": "aggregate_trace",
+      "request": {
+        "schema_version": 1,
+        "id": 3,
+        "operation": "aggregate_trace",
+        "envelope": {
+          "schema_version": 1,
+          "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+          "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+          "rules_version": 9,
+          "definitions": [],
+          "instances": [],
+          "state": {}
+        },
+        "operations": []
+      },
+      "required_fields": [
+        "envelope",
+        "operations"
+      ],
+      "scope": "Deserialize only; synthetic empty envelope is not native gameplay evidence."
+    },
+    {
+      "operation": "mine_paths",
+      "request": {
+        "schema_version": 1,
+        "id": 4,
+        "operation": "mine_paths",
+        "envelope": {
+          "schema_version": 1,
+          "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+          "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+          "rules_version": 9,
+          "definitions": [],
+          "instances": [],
+          "state": {}
+        },
+        "queries": []
+      },
+      "required_fields": [
+        "envelope",
+        "queries"
+      ],
+      "scope": "Deserialize only; synthetic empty envelope is not native gameplay evidence."
+    },
+    {
+      "operation": "hex_filters",
+      "request": {
+        "schema_version": 1,
+        "id": 5,
+        "operation": "hex_filters",
+        "envelope": {
+          "schema_version": 1,
+          "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+          "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+          "rules_version": 9,
+          "definitions": [],
+          "instances": [],
+          "state": {}
+        },
+        "queries": []
+      },
+      "required_fields": [
+        "envelope",
+        "queries"
+      ],
+      "scope": "Deserialize only; synthetic empty envelope is not native gameplay evidence."
+    },
+    {
+      "operation": "terrain",
+      "request": {
+        "schema_version": 1,
+        "id": 6,
+        "operation": "terrain",
+        "envelope": {
+          "schema_version": 1,
+          "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+          "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+          "rules_version": 9,
+          "definitions": [],
+          "instances": [],
+          "state": {}
+        },
+        "queries": []
+      },
+      "required_fields": [
+        "envelope",
+        "queries"
+      ],
+      "scope": "Deserialize only; synthetic empty envelope is not native gameplay evidence."
+    },
+    {
+      "operation": "action_legality",
+      "request": {
+        "schema_version": 1,
+        "id": 7,
+        "operation": "action_legality",
+        "envelope": {
+          "schema_version": 1,
+          "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+          "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+          "rules_version": 9,
+          "definitions": [],
+          "instances": [],
+          "state": {}
+        },
+        "queries": []
+      },
+      "required_fields": [
+        "envelope",
+        "queries"
+      ],
+      "scope": "Deserialize only; synthetic empty envelope is not native gameplay evidence."
+    },
+    {
+      "operation": "targeting",
+      "request": {
+        "schema_version": 1,
+        "id": 8,
+        "operation": "targeting",
+        "envelope": {
+          "schema_version": 1,
+          "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+          "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+          "rules_version": 9,
+          "definitions": [],
+          "instances": [],
+          "state": {}
+        },
+        "queries": []
+      },
+      "required_fields": [
+        "envelope",
+        "queries"
+      ],
+      "scope": "Deserialize only; synthetic empty envelope is not native gameplay evidence."
+    },
+    {
+      "operation": "displacement_legality",
+      "request": {
+        "schema_version": 1,
+        "id": 9,
+        "operation": "displacement_legality",
+        "envelope": {
+          "schema_version": 1,
+          "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+          "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+          "rules_version": 9,
+          "definitions": [],
+          "instances": [],
+          "state": {}
+        },
+        "queries": []
+      },
+      "required_fields": [
+        "envelope",
+        "queries"
+      ],
+      "scope": "Deserialize only; synthetic empty envelope is not native gameplay evidence."
+    },
+    {
+      "operation": "stats",
+      "request": {
+        "schema_version": 1,
+        "id": 10,
+        "operation": "stats",
+        "envelope": {
+          "schema_version": 1,
+          "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+          "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+          "rules_version": 9,
+          "definitions": [],
+          "instances": [],
+          "state": {}
+        },
+        "queries": []
+      },
+      "required_fields": [
+        "envelope",
+        "queries"
+      ],
+      "scope": "Deserialize only; synthetic empty envelope is not native gameplay evidence."
+    },
+    {
+      "operation": "travel_zones",
+      "request": {
+        "schema_version": 1,
+        "id": 11,
+        "operation": "travel_zones",
+        "envelope": {
+          "schema_version": 1,
+          "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+          "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+          "rules_version": 9,
+          "definitions": [],
+          "instances": [],
+          "state": {}
+        },
+        "queries": []
+      },
+      "required_fields": [
+        "envelope",
+        "queries"
+      ],
+      "scope": "Deserialize only; synthetic empty envelope is not native gameplay evidence."
+    },
+    {
+      "operation": "action_trace",
+      "request": {
+        "schema_version": 1,
+        "id": 12,
+        "operation": "action_trace",
+        "envelope": {
+          "schema_version": 1,
+          "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+          "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+          "rules_version": 9,
+          "definitions": [],
+          "instances": [],
+          "state": {}
+        },
+        "operations": []
+      },
+      "required_fields": [
+        "envelope",
+        "operations"
+      ],
+      "scope": "Deserialize only; synthetic empty envelope is not native gameplay evidence."
+    },
+    {
+      "operation": "tie_trace",
+      "request": {
+        "schema_version": 1,
+        "id": 13,
+        "operation": "tie_trace",
+        "envelope": {
+          "schema_version": 1,
+          "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+          "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+          "rules_version": 9,
+          "definitions": [],
+          "instances": [],
+          "state": {}
+        },
+        "tied": [],
+        "operations": []
+      },
+      "required_fields": [
+        "envelope",
+        "tied",
+        "operations"
+      ],
+      "scope": "Deserialize only; synthetic empty envelope is not native gameplay evidence."
+    },
+    {
+      "operation": "planning_trace",
+      "request": {
+        "schema_version": 1,
+        "id": 14,
+        "operation": "planning_trace",
+        "envelope": {
+          "schema_version": 1,
+          "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+          "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+          "rules_version": 9,
+          "definitions": [],
+          "instances": [],
+          "state": {}
+        },
+        "operations": []
+      },
+      "required_fields": [
+        "envelope",
+        "operations"
+      ],
+      "scope": "Deserialize only; synthetic empty envelope is not native gameplay evidence."
+    },
+    {
+      "operation": "effect_trace",
+      "request": {
+        "schema_version": 1,
+        "id": 15,
+        "operation": "effect_trace",
+        "envelope": {
+          "schema_version": 1,
+          "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+          "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+          "rules_version": 9,
+          "definitions": [],
+          "instances": [],
+          "state": {}
+        },
+        "operations": []
+      },
+      "required_fields": [
+        "envelope",
+        "operations"
+      ],
+      "scope": "Deserialize only; synthetic empty envelope is not native gameplay evidence."
+    },
+    {
+      "operation": "card_equality",
+      "request": {
+        "schema_version": 1,
+        "id": 16,
+        "operation": "card_equality",
+        "envelope": {
+          "schema_version": 1,
+          "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+          "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+          "rules_version": 9,
+          "definitions": [],
+          "instances": [],
+          "state": {}
+        },
+        "queries": []
+      },
+      "required_fields": [
+        "envelope",
+        "queries"
+      ],
+      "scope": "Deserialize only; synthetic empty envelope is not native gameplay evidence."
+    },
+    {
+      "operation": "card_trace",
+      "request": {
+        "schema_version": 1,
+        "id": 17,
+        "operation": "card_trace",
+        "envelope": {
+          "schema_version": 1,
+          "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+          "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+          "rules_version": 9,
+          "definitions": [],
+          "instances": [],
+          "state": {}
+        },
+        "operations": []
+      },
+      "required_fields": [
+        "envelope",
+        "operations"
+      ],
+      "scope": "Deserialize only; synthetic empty envelope is not native gameplay evidence."
+    },
+    {
+      "operation": "heuristic_input",
+      "request": {
+        "schema_version": 1,
+        "id": 18,
+        "operation": "heuristic_input",
+        "envelope": {
+          "schema_version": 1,
+          "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+          "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+          "rules_version": 9,
+          "definitions": [],
+          "instances": [],
+          "state": {}
+        },
+        "player_id": "synthetic-player"
+      },
+      "required_fields": [
+        "envelope",
+        "player_id"
+      ],
+      "scope": "Deserialize only; synthetic empty envelope is not native gameplay evidence."
+    },
+    {
+      "operation": "evaluate_lab_attack_range",
+      "request": {
+        "schema_version": 1,
+        "id": 19,
+        "operation": "evaluate_lab_attack_range",
+        "envelope": {
+          "schema_version": 1,
+          "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+          "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+          "rules_version": 9,
+          "definitions": [],
+          "instances": [],
+          "state": {}
+        },
+        "player_id": "synthetic-player"
+      },
+      "required_fields": [
+        "envelope",
+        "player_id"
+      ],
+      "scope": "Deserialize only; synthetic empty envelope is not native gameplay evidence."
+    },
+    {
+      "operation": "search_greedy",
+      "request": {
+        "schema_version": 1,
+        "id": 20,
+        "operation": "search_greedy",
+        "envelope": {
+          "schema_version": 1,
+          "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+          "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+          "rules_version": 9,
+          "definitions": [],
+          "instances": [],
+          "state": {}
+        },
+        "player_id": "synthetic-player",
+        "turns": 1,
+        "max_nodes": 1,
+        "seed": 1,
+        "time_ms": 1
+      },
+      "required_fields": [
+        "envelope",
+        "player_id",
+        "turns",
+        "max_nodes",
+        "seed",
+        "time_ms"
+      ],
+      "scope": "Deserialize only; synthetic empty envelope is not native gameplay evidence."
+    },
+    {
+      "operation": "search_resolution",
+      "request": {
+        "schema_version": 1,
+        "id": 21,
+        "operation": "search_resolution",
+        "envelope": {
+          "schema_version": 1,
+          "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+          "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+          "rules_version": 9,
+          "definitions": [],
+          "instances": [],
+          "state": {}
+        },
+        "player_id": "synthetic-player",
+        "max_depth": 1,
+        "max_nodes": 1
+      },
+      "required_fields": [
+        "envelope",
+        "player_id",
+        "max_depth",
+        "max_nodes"
+      ],
+      "scope": "Deserialize only; synthetic empty envelope is not native gameplay evidence."
+    },
+    {
+      "operation": "search_sampled_planning",
+      "request": {
+        "schema_version": 1,
+        "id": 22,
+        "operation": "search_sampled_planning",
+        "envelope": {
+          "schema_version": 1,
+          "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+          "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+          "rules_version": 9,
+          "definitions": [],
+          "instances": [],
+          "state": {}
+        },
+        "player_id": "synthetic-player",
+        "seed": 1,
+        "cap": 1,
+        "max_depth": 1,
+        "max_nodes": 1
+      },
+      "required_fields": [
+        "envelope",
+        "player_id",
+        "seed",
+        "cap",
+        "max_depth",
+        "max_nodes"
+      ],
+      "scope": "Deserialize only; synthetic empty envelope is not native gameplay evidence."
+    },
+    {
+      "operation": "show_bot_commitments",
+      "request": {
+        "schema_version": 1,
+        "id": 23,
+        "operation": "show_bot_commitments",
+        "envelope": {
+          "schema_version": 1,
+          "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+          "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+          "rules_version": 9,
+          "definitions": [],
+          "instances": [],
+          "state": {}
+        },
+        "viewer_id": "synthetic-player",
+        "bot_ids": [],
+        "mode": "true_rules"
+      },
+      "required_fields": [
+        "envelope",
+        "viewer_id",
+        "bot_ids",
+        "mode"
+      ],
+      "scope": "Deserialize only; synthetic empty envelope is not native gameplay evidence."
+    },
+    {
+      "operation": "rollout_game_turns",
+      "request": {
+        "schema_version": 1,
+        "id": 24,
+        "operation": "rollout_game_turns",
+        "envelope": {
+          "schema_version": 1,
+          "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+          "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+          "rules_version": 9,
+          "definitions": [],
+          "instances": [],
+          "state": {}
+        },
+        "player_id": "synthetic-player",
+        "turns": 1,
+        "max_nodes": 1,
+        "time_ms": 1
+      },
+      "required_fields": [
+        "envelope",
+        "player_id",
+        "turns",
+        "max_nodes",
+        "time_ms"
+      ],
+      "scope": "Deserialize only; synthetic empty envelope is not native gameplay evidence."
+    },
+    {
+      "operation": "check_sequences",
+      "request": {
+        "schema_version": 1,
+        "id": 25,
+        "operation": "check_sequences",
+        "envelope": {
+          "schema_version": 1,
+          "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+          "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+          "rules_version": 9,
+          "definitions": [],
+          "instances": [],
+          "state": {}
+        },
+        "sequences": []
+      },
+      "required_fields": [
+        "envelope",
+        "sequences"
+      ],
+      "scope": "Deserialize only; synthetic empty envelope is not native gameplay evidence."
+    },
+    {
+      "operation": "arena_start",
+      "request": {
+        "schema_version": 1,
+        "id": 26,
+        "operation": "arena_start",
+        "envelope": {
+          "schema_version": 1,
+          "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+          "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+          "rules_version": 9,
+          "definitions": [],
+          "instances": [],
+          "state": {}
+        },
+        "turns": 1
+      },
+      "required_fields": [
+        "envelope",
+        "turns"
+      ],
+      "scope": "Deserialize only; synthetic empty envelope is not native gameplay evidence."
+    },
+    {
+      "operation": "arena_submit",
+      "request": {
+        "schema_version": 1,
+        "id": 27,
+        "operation": "arena_submit",
+        "revision": 1,
+        "choice": {
+          "kind": "planning",
+          "commitments": []
+        }
+      },
+      "required_fields": [
+        "revision",
+        "choice"
+      ],
+      "scope": "Deserialize only; synthetic empty envelope is not native gameplay evidence."
+    },
+    {
+      "operation": "arena_replay",
+      "request": {
+        "schema_version": 1,
+        "id": 28,
+        "operation": "arena_replay",
+        "envelope": {
+          "schema_version": 1,
+          "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+          "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+          "rules_version": 9,
+          "definitions": [],
+          "instances": [],
+          "state": {}
+        },
+        "turns": 1,
+        "choices": []
+      },
+      "required_fields": [
+        "envelope",
+        "turns",
+        "choices"
+      ],
+      "scope": "Deserialize only; synthetic empty envelope is not native gameplay evidence."
+    },
+    {
+      "operation": "offline_match",
+      "request": {
+        "schema_version": 1,
+        "id": 29,
+        "operation": "offline_match",
+        "envelope": {
+          "schema_version": 1,
+          "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+          "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+          "rules_version": 9,
+          "definitions": [],
+          "instances": [],
+          "state": {}
+        },
+        "turns": 1,
+        "seed": 1,
+        "policies": [
+          {
+            "depth": 1,
+            "max_nodes": 8,
+            "work_budget": "nodes_v1"
+          },
+          {
+            "depth": 1,
+            "max_nodes": 8,
+            "work_budget": "nodes_v1"
+          }
+        ]
+      },
+      "required_fields": [
+        "envelope",
+        "turns",
+        "seed",
+        "policies"
+      ],
+      "scope": "Deserialize only; synthetic empty envelope is not native gameplay evidence."
+    },
+    {
+      "operation": "rollout_bench",
+      "request": {
+        "schema_version": 1,
+        "id": 30,
+        "operation": "rollout_bench",
+        "envelope": {
+          "schema_version": 1,
+          "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+          "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+          "rules_version": 9,
+          "definitions": [],
+          "instances": [],
+          "state": {}
+        },
+        "player_id": "synthetic-player",
+        "iterations": 1
+      },
+      "required_fields": [
+        "envelope",
+        "player_id",
+        "iterations"
+      ],
+      "scope": "Deserialize only; synthetic empty envelope is not native gameplay evidence."
+    },
+    {
+      "operation": "resolution_reuse_census",
+      "request": {
+        "schema_version": 1,
+        "id": 31,
+        "operation": "resolution_reuse_census",
+        "envelope": {
+          "schema_version": 1,
+          "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+          "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+          "rules_version": 9,
+          "definitions": [],
+          "instances": [],
+          "state": {}
+        },
+        "depth": 1,
+        "max_nodes": 1
+      },
+      "required_fields": [
+        "envelope",
+        "depth",
+        "max_nodes"
+      ],
+      "scope": "Deserialize only; synthetic empty envelope is not native gameplay evidence."
+    },
+    {
+      "operation": "fingerprint_bench",
+      "request": {
+        "schema_version": 1,
+        "id": 32,
+        "operation": "fingerprint_bench",
+        "envelope": {
+          "schema_version": 1,
+          "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+          "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+          "rules_version": 9,
+          "definitions": [],
+          "instances": [],
+          "state": {}
+        },
+        "iterations": 1
+      },
+      "required_fields": [
+        "envelope",
+        "iterations"
+      ],
+      "scope": "Deserialize only; synthetic empty envelope is not native gameplay evidence."
+    },
+    {
+      "operation": "simulation_bench",
+      "request": {
+        "schema_version": 1,
+        "id": 33,
+        "operation": "simulation_bench",
+        "envelope": {
+          "schema_version": 1,
+          "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+          "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+          "rules_version": 9,
+          "definitions": [],
+          "instances": [],
+          "state": {}
+        },
+        "operations": [],
+        "iterations": 1
+      },
+      "required_fields": [
+        "envelope",
+        "operations",
+        "iterations"
+      ],
+      "scope": "Deserialize only; synthetic empty envelope is not native gameplay evidence."
+    },
+    {
+      "operation": "stack_trace_stream",
+      "request": {
+        "schema_version": 1,
+        "id": 34,
+        "operation": "stack_trace_stream",
+        "envelope": {
+          "schema_version": 1,
+          "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+          "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+          "rules_version": 9,
+          "definitions": [],
+          "instances": [],
+          "state": {}
+        },
+        "operations": []
+      },
+      "required_fields": [
+        "envelope",
+        "operations"
+      ],
+      "scope": "Deserialize only; synthetic empty envelope is not native gameplay evidence."
+    },
+    {
+      "operation": "stack_trace",
+      "request": {
+        "schema_version": 1,
+        "id": 35,
+        "operation": "stack_trace",
+        "envelope": {
+          "schema_version": 1,
+          "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+          "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+          "rules_version": 9,
+          "definitions": [],
+          "instances": [],
+          "state": {}
+        },
+        "operations": []
+      },
+      "required_fields": [
+        "envelope",
+        "operations"
+      ],
+      "scope": "Deserialize only; synthetic empty envelope is not native gameplay evidence."
+    },
+    {
+      "operation": "roundtrip_state",
+      "request": {
+        "schema_version": 1,
+        "id": 36,
+        "operation": "roundtrip_state",
+        "envelope": {
+          "schema_version": 1,
+          "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+          "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+          "rules_version": 9,
+          "definitions": [],
+          "instances": [],
+          "state": {}
+        }
+      },
+      "required_fields": [
+        "envelope"
+      ],
+      "scope": "Deserialize only; synthetic empty envelope is not native gameplay evidence."
+    },
+    {
+      "operation": "validate_execution",
+      "request": {
+        "schema_version": 1,
+        "id": 37,
+        "operation": "validate_execution",
+        "envelope": {
+          "schema_version": 1,
+          "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+          "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+          "rules_version": 9,
+          "definitions": [],
+          "instances": [],
+          "state": {}
+        }
+      },
+      "required_fields": [
+        "envelope"
+      ],
+      "scope": "Deserialize only; synthetic empty envelope is not native gameplay evidence."
+    },
+    {
+      "operation": "load_board",
+      "request": {
+        "schema_version": 1,
+        "id": 38,
+        "operation": "load_board",
+        "tiles": []
+      },
+      "required_fields": [
+        "tiles"
+      ],
+      "scope": "Deserialize only; synthetic empty envelope is not native gameplay evidence."
+    },
+    {
+      "operation": "movement",
+      "request": {
+        "schema_version": 1,
+        "id": 39,
+        "operation": "movement",
+        "queries": []
+      },
+      "required_fields": [
+        "queries"
+      ],
+      "scope": "Deserialize only; synthetic empty envelope is not native gameplay evidence."
+    }
+  ]
+}

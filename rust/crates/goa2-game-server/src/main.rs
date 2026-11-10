@@ -8,6 +8,7 @@ mod presence;
 mod replay;
 mod shares;
 mod store;
+mod versions;
 
 use axum::{
     Json,
@@ -15,7 +16,8 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use game::Server;
-use goa2_core::interpreter::{EngineError, live_game::GameContent};
+use goa2_core::api::{EngineError, GameContent};
+use goa2_core::diagnostic::{Boundary, Category, Diagnostic};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
@@ -30,7 +32,7 @@ use std::{
 };
 use store::Store;
 
-const RULES_VERSION: u32 = 9;
+use goa2_core::versions::RULES as RULES_VERSION;
 
 type Result<T> = std::result::Result<T, ApiError>;
 
@@ -38,6 +40,7 @@ type Result<T> = std::result::Result<T, ApiError>;
 struct ApiError {
     status: StatusCode,
     detail: String,
+    diagnostic: Diagnostic,
 }
 
 impl ApiError {
@@ -45,6 +48,14 @@ impl ApiError {
         Self {
             status,
             detail: detail.into(),
+            diagnostic: Diagnostic {
+                category: if status.is_server_error() {
+                    Category::Internal
+                } else {
+                    Category::InvalidInput
+                },
+                boundary: Boundary::Command,
+            },
         }
     }
 
@@ -70,7 +81,9 @@ impl ApiError {
 
     fn internal(error: impl Display) -> Self {
         eprintln!("goa2-game-server: {error}");
-        Self::new(StatusCode::INTERNAL_SERVER_ERROR, "Game service error")
+        let mut result = Self::new(StatusCode::INTERNAL_SERVER_ERROR, "Game service error");
+        result.diagnostic.boundary = Boundary::Storage;
+        result
     }
 }
 
@@ -84,13 +97,23 @@ impl std::error::Error for ApiError {}
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
+        if self.status.is_server_error() || self.diagnostic.category != Category::InvalidInput {
+            eprintln!(
+                "goa2-game-server diagnostic {:?}/{}",
+                self.diagnostic.boundary,
+                self.diagnostic.category.code()
+            );
+        }
         (self.status, Json(json!({"detail": self.detail}))).into_response()
     }
 }
 
 impl From<EngineError> for ApiError {
     fn from(error: EngineError) -> Self {
-        Self::invalid(error.to_string())
+        let diagnostic = error.diagnostic(Boundary::Command);
+        let mut result = Self::invalid(error.to_string());
+        result.diagnostic = diagnostic;
+        result
     }
 }
 
@@ -217,4 +240,32 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod diagnostic_tests {
+    use super::*;
+    #[tokio::test]
+    async fn internal_categories_add_context_without_changing_http_packets() {
+        let error = EngineError::Cancelled;
+        let expected = error.to_string();
+        let api = ApiError::from(error);
+        assert_eq!(api.diagnostic.category, Category::Cancelled);
+        let response = api.into_response();
+        assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        let body = axum::body::to_bytes(response.into_body(), 1024)
+            .await
+            .unwrap();
+        let value: Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(value, json!({"detail":expected}));
+        let internal = ApiError::internal("synthetic-private-storage-detail");
+        assert_eq!(
+            internal.diagnostic,
+            Diagnostic {
+                category: Category::Internal,
+                boundary: Boundary::Storage
+            }
+        );
+        assert_eq!(internal.detail, "Game service error");
+    }
 }

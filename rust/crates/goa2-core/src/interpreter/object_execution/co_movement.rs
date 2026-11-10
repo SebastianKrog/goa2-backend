@@ -300,6 +300,10 @@ mod tests {
         serde_json::to_value(session.export_envelope().unwrap()).unwrap()
     }
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: frozen late-generation payload is not bundled; see docs/testing.md"
+    )]
     fn drag_generation_guard_precedes_partner_hex_and_stack_mutation() {
         for token in [false, true] {
             let mut worker = root(token);
@@ -316,6 +320,10 @@ mod tests {
         }
     }
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: frozen late-generation payload is not bundled; see docs/testing.md"
+    )]
     fn drag_reads_live_destinations_without_mutating_the_root_or_retained_hex() {
         let original = root(false);
         let before = snapshot(&original);
@@ -344,6 +352,10 @@ mod tests {
         assert_eq!(snapshot(&original), before);
     }
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: frozen late-generation payload is not bundled; see docs/testing.md"
+    )]
     fn nonstraight_raw_drag_is_explicitly_guarded_before_consumption() {
         let mut worker = root(false);
         let key = worker.symbols.lookup("anchor_dest").unwrap();
@@ -364,6 +376,10 @@ mod tests {
         assert_eq!(snapshot(&worker), before);
     }
     #[test]
+    #[cfg_attr(
+        not(feature = "full-parity"),
+        ignore = "full-parity: frozen late-generation payload is not bundled; see docs/testing.md"
+    )]
     fn co_mover_filter_reads_private_live_partner_keys() {
         let case = fixture_case("object-execution-co-movement-filter-False-False-plain");
         let original =

@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "purpose": "Synthetic content definitions for native example and disposable service contracts. Contains no player credentials, saves or replay data. Not a full-roster content release.",
+  "source_full_pack_sha256": "4b7520f058d68dda93efb15837d0b657332a1a3132d37148c14a9bb2968ff651",
+  "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+  "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+  "path": "smoke-game.json",
+  "sha256": "69ce2e47927eab8427fa8c2932f369044a30297716f1a4402a1ba6e1673c3ee2",
+  "selection": {
+    "heroes": [
+      "Arien",
+      "Brogan",
+      "Tigerclaw",
+      "Sabina",
+      "Hanu",
+      "Razzle",
+      "Emmitt"
+    ],
+    "maps": [
+      "forgotten_island"
+    ]
+  },
+  "licensing": "Redistribution review pending, same as embedded catalogs. No public release authorized."
+}

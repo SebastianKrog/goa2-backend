@@ -1,13 +1,14 @@
-//! JSON-lines diagnostic worker. Native search is not yet advertised.
+//! JSON-lines rules and search worker. Diagnostic operations are experimental;
+//! see docs/compatibility.md for the retained wire contract.
 #![forbid(unsafe_code)]
 mod resolution_search;
 mod sequence_legality;
 mod simulation_bench;
-use goa2_core::codec::StateEnvelope;
-use goa2_core::geometry::{BoardGeometry, MovementQuery, TileSpec};
-use goa2_core::interpreter::{
+use goa2_core::api::experimental_search::{
     ArenaChoice, ArenaMatch, EngineError, ExecutionBudget, NativeSession, RecordedArenaChoice,
 };
+use goa2_core::codec::StateEnvelope;
+use goa2_core::geometry::{BoardGeometry, MovementQuery, TileSpec};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::io::{self, BufRead, Write};
@@ -117,7 +118,7 @@ enum Operation {
         #[serde(default)]
         profile: bool,
         #[serde(default)]
-        evaluation: goa2_core::interpreter::SearchEvaluation,
+        evaluation: goa2_core::api::experimental_search::SearchEvaluation,
     },
     SearchResolution {
         envelope: StateEnvelope,
@@ -125,19 +126,20 @@ enum Operation {
         max_depth: u8,
         max_nodes: usize,
         #[serde(default)]
-        evaluation: goa2_core::interpreter::SearchEvaluation,
+        evaluation: goa2_core::api::experimental_search::SearchEvaluation,
         time_ms: Option<u64>,
-        work_budget: Option<goa2_core::interpreter::WorkBudget>,
+        work_budget: Option<goa2_core::api::experimental_search::WorkBudget>,
         rollout_turns: Option<u8>,
         planning_sample_seed: Option<u64>,
         resolution_sample_seed: Option<u64>,
         resolution_sample_worlds: Option<usize>,
         resolution_sample_workers: Option<usize>,
         arena_bot_ids: Option<Vec<String>>,
-        public_upgrade_batches: Option<Vec<goa2_core::interpreter::PublicUpgradeBatch>>,
+        public_upgrade_batches:
+            Option<Vec<goa2_core::api::experimental_search::PublicUpgradeBatch>>,
         upgrade_checkpoints: Option<UpgradeCheckpoints>,
         #[serde(default)]
-        opponent_policy: goa2_core::interpreter::OpponentPolicy,
+        opponent_policy: goa2_core::api::experimental_search::OpponentPolicy,
     },
     SearchSampledPlanning {
         envelope: StateEnvelope,
@@ -149,7 +151,7 @@ enum Operation {
         #[serde(default)]
         greedy_card_order: bool,
         #[serde(default)]
-        forecast_node_share: goa2_core::interpreter::ForecastNodeShare,
+        forecast_node_share: goa2_core::api::experimental_search::ForecastNodeShare,
         #[serde(default)]
         legacy_fixed_followup: bool,
         #[serde(default)]
@@ -159,20 +161,21 @@ enum Operation {
         max_depth: u8,
         max_nodes: usize,
         #[serde(default)]
-        evaluation: goa2_core::interpreter::SearchEvaluation,
+        evaluation: goa2_core::api::experimental_search::SearchEvaluation,
         time_ms: Option<u64>,
-        work_budget: Option<goa2_core::interpreter::WorkBudget>,
+        work_budget: Option<goa2_core::api::experimental_search::WorkBudget>,
         rollout_turns: Option<u8>,
         workers: Option<usize>,
         bot_team: Option<resolution_search::BotTeam>,
-        public_upgrade_batches: Option<Vec<goa2_core::interpreter::PublicUpgradeBatch>>,
+        public_upgrade_batches:
+            Option<Vec<goa2_core::api::experimental_search::PublicUpgradeBatch>>,
         upgrade_checkpoints: Option<UpgradeCheckpoints>,
     },
     ShowBotCommitments {
         envelope: StateEnvelope,
         viewer_id: String,
         bot_ids: Vec<String>,
-        mode: goa2_core::interpreter::TeamKnowledgeMode,
+        mode: goa2_core::api::experimental_search::TeamKnowledgeMode,
     },
     RolloutGameTurns {
         envelope: StateEnvelope,
@@ -209,7 +212,7 @@ enum Operation {
         seed: u64,
         #[serde(default)]
         capture_trace: bool,
-        policies: [goa2_core::interpreter::OfflinePolicy; 2],
+        policies: [goa2_core::api::experimental_search::OfflinePolicy; 2],
     },
     RolloutBench {
         envelope: StateEnvelope,
@@ -263,17 +266,19 @@ enum Operation {
     },
 }
 type UpgradeCheckpoints =
-    std::collections::BTreeMap<String, Vec<goa2_core::interpreter::UpgradeCheckpoint>>;
+    std::collections::BTreeMap<String, Vec<goa2_core::api::experimental_search::UpgradeCheckpoint>>;
 
 fn resolve_upgrade_evidence(
     checkpoints: Option<UpgradeCheckpoints>,
-    batches: Option<Vec<goa2_core::interpreter::PublicUpgradeBatch>>,
+    batches: Option<Vec<goa2_core::api::experimental_search::PublicUpgradeBatch>>,
 ) -> Result<Option<UpgradeCheckpoints>, String> {
     match (checkpoints, batches) {
         (Some(_), Some(_)) => Err("provide checkpoints or public upgrade batches".into()),
-        (None, Some(batches)) => goa2_core::interpreter::replay_public_upgrade_batches(&batches)
-            .map(Some)
-            .map_err(|error| error.to_string()),
+        (None, Some(batches)) => {
+            goa2_core::api::experimental_search::replay_public_upgrade_batches(&batches)
+                .map(Some)
+                .map_err(|error| error.to_string())
+        }
         (checkpoints, None) => Ok(checkpoints),
     }
 }
@@ -284,7 +289,7 @@ fn execute(
     board: &mut Option<(BoardGeometry, goa2_core::geometry::Occupancy)>,
     arena: &mut Option<ArenaMatch>,
 ) -> Result<Value, String> {
-    if request.schema_version != 1 {
+    if request.schema_version != goa2_core::versions::WORKER_SCHEMA {
         return Err("unsupported protocol schema".into());
     }
     match request.operation {
@@ -309,9 +314,10 @@ fn execute(
                 .heuristic_input_choice(player)
                 .map_err(|error| error.to_string())?;
             let selection = match choice {
-                Some(goa2_core::interpreter::DecisionMove::Input { selection, .. }) => {
-                    session.selection_json(&selection)
-                }
+                Some(goa2_core::api::experimental_search::DecisionMove::Input {
+                    selection,
+                    ..
+                }) => session.selection_json(&selection),
                 _ => Value::Null,
             };
             Ok(json!({"selection": selection}))
@@ -355,7 +361,7 @@ fn execute(
                     .collect::<Result<Vec<_>, _>>()?,
                 None => vec![player],
             };
-            let options = goa2_core::interpreter::GreedySearchOptions {
+            let options = goa2_core::api::experimental_search::GreedySearchOptions {
                 controlled: &controlled,
                 turns,
                 max_nodes,
@@ -416,7 +422,7 @@ fn execute(
             upgrade_checkpoints,
             opponent_policy,
         } => {
-            let budget = goa2_core::interpreter::ExecutionBudget::for_search(
+            let budget = goa2_core::api::experimental_search::ExecutionBudget::for_search(
                 started,
                 time_ms,
                 work_budget,
@@ -443,7 +449,8 @@ fn execute(
             if !arena_v2 && arena_bot_ids.is_some() {
                 return Err("arena_bot_ids requires work_budget nodes_v2".into());
             }
-            let arena_bots = arena_v2.then(|| arena_bot_ids.unwrap_or_else(|| vec![player_id.clone()]));
+            let arena_bots =
+                arena_v2.then(|| arena_bot_ids.unwrap_or_else(|| vec![player_id.clone()]));
             resolution_search::search(
                 envelope,
                 player_id,
@@ -452,7 +459,7 @@ fn execute(
                 rollout_turns,
                 resolution_sample_seed.map(|seed| {
                     (
-                        goa2_core::interpreter::PlanningRolloutSample {
+                        goa2_core::api::experimental_search::PlanningRolloutSample {
                             seed,
                             upgrade_checkpoints: checkpoints.as_ref(),
                         },
@@ -460,11 +467,13 @@ fn execute(
                         resolution_sample_workers.unwrap_or(1),
                     )
                 }),
-                planning_sample_seed.map(|seed| goa2_core::interpreter::PlanningRolloutSample {
-                    seed,
-                    upgrade_checkpoints: checkpoints.as_ref(),
+                planning_sample_seed.map(|seed| {
+                    goa2_core::api::experimental_search::PlanningRolloutSample {
+                        seed,
+                        upgrade_checkpoints: checkpoints.as_ref(),
+                    }
                 }),
-                goa2_core::interpreter::SearchLimits {
+                goa2_core::api::experimental_search::SearchLimits {
                     max_depth,
                     max_nodes,
                     opponent_policy,
@@ -498,7 +507,7 @@ fn execute(
             if reply_probe_cap.is_some() && bot_team.is_none() {
                 return Err("reply_probe_cap requires scoped bot planning".into());
             }
-            let budget = goa2_core::interpreter::ExecutionBudget::for_search(
+            let budget = goa2_core::api::experimental_search::ExecutionBudget::for_search(
                 started,
                 time_ms,
                 work_budget,
@@ -513,8 +522,8 @@ fn execute(
                 bot_team,
                 (seed, cap),
                 budget,
-                work_budget == Some(goa2_core::interpreter::WorkBudget::NodesV2),
-                goa2_core::interpreter::PlanningSearchOptions {
+                work_budget == Some(goa2_core::api::experimental_search::WorkBudget::NodesV2),
+                goa2_core::api::experimental_search::PlanningSearchOptions {
                     rollout_turns,
                     workers: workers.unwrap_or(1),
                     upgrade_checkpoints: upgrade_checkpoints.as_ref(),
@@ -527,10 +536,11 @@ fn execute(
                     fixed_future_planning,
                     branch_future_planning,
                 },
-                goa2_core::interpreter::SearchLimits {
+                goa2_core::api::experimental_search::SearchLimits {
                     max_depth,
                     max_nodes,
-                    opponent_policy: goa2_core::interpreter::OpponentPolicy::Adversarial,
+                    opponent_policy:
+                        goa2_core::api::experimental_search::OpponentPolicy::Adversarial,
                     evaluation,
                 },
             )
@@ -943,15 +953,17 @@ fn stream_records(
 ) -> io::Result<()> {
     let mut count = 0;
     let result = produce(&mut |record| {
-        write_packet(out,&json!({"schema_version":1,"id":id,"ok":true,"result":{"sequence":count,"record":record}})).map_err(|e|e.to_string())?;
+        write_packet(out,&json!({"schema_version":goa2_core::versions::WORKER_SCHEMA,"id":id,"ok":true,"result":{"sequence":count,"record":record}})).map_err(|e|e.to_string())?;
         count += 1;
         Ok(())
     });
     let response = match result {
         Ok(()) => {
-            json!({"schema_version":1,"id":id,"ok":true,"result":{"complete":true,"records":count}})
+            json!({"schema_version":goa2_core::versions::WORKER_SCHEMA,"id":id,"ok":true,"result":{"complete":true,"records":count}})
         }
-        Err(error) => json!({"schema_version":1,"id":id,"ok":false,"error":error,"records":count}),
+        Err(error) => {
+            json!({"schema_version":goa2_core::versions::WORKER_SCHEMA,"id":id,"ok":false,"error":error,"records":count})
+        }
     };
     write_packet(out, &response)
 }
@@ -964,7 +976,7 @@ fn main() -> io::Result<()> {
         let started = Instant::now();
         let response = match serde_json::from_str::<Request>(&line) {
             Ok(Request {
-                schema_version: 1,
+                schema_version: goa2_core::versions::WORKER_SCHEMA,
                 id,
                 operation:
                     Operation::StackTraceStream {
@@ -976,7 +988,7 @@ fn main() -> io::Result<()> {
                 continue;
             }
             Ok(Request {
-                schema_version: 1,
+                schema_version: goa2_core::versions::WORKER_SCHEMA,
                 id,
                 operation:
                     Operation::ArenaReplay {
@@ -993,12 +1005,16 @@ fn main() -> io::Result<()> {
             Ok(request) => {
                 let id = request.id.clone();
                 match execute(request, started, &mut board, &mut arena) {
-                    Ok(result) => json!({"schema_version":1,"id":id,"ok":true,"result":result}),
-                    Err(error) => json!({"schema_version":1,"id":id,"ok":false,"error":error}),
+                    Ok(result) => {
+                        json!({"schema_version":goa2_core::versions::WORKER_SCHEMA,"id":id,"ok":true,"result":result})
+                    }
+                    Err(error) => {
+                        json!({"schema_version":goa2_core::versions::WORKER_SCHEMA,"id":id,"ok":false,"error":error})
+                    }
                 }
             }
             Err(error) => {
-                json!({"schema_version":1,"id":null,"ok":false,"error":error.to_string()})
+                json!({"schema_version":goa2_core::versions::WORKER_SCHEMA,"id":null,"ok":false,"error":error.to_string()})
             }
         };
         serde_json::to_writer(&mut out, &response)?;
@@ -1029,6 +1045,7 @@ mod tests {
                 resolution_sample_seed: None,
                 resolution_sample_worlds: None,
                 resolution_sample_workers: None,
+                arena_bot_ids: None,
                 public_upgrade_batches: None,
                 upgrade_checkpoints: None,
                 opponent_policy: Default::default(),
@@ -1132,13 +1149,13 @@ mod tests {
     fn protocol_rejects_unknown_fields_and_preserves_prior_board_on_error() {
         assert!(
             serde_json::from_value::<Request>(
-                json!({"schema_version":1,"id":1,"operation":"load_board","tiles":[],"typo":true})
+                json!({"schema_version":goa2_core::versions::WORKER_SCHEMA,"id":1,"operation":"load_board","tiles":[],"typo":true})
             )
             .is_err()
         );
         let mut board = None;
         let request = serde_json::from_value(
-            json!({"schema_version":1,"id":1,"operation":"load_board","tiles":[]}),
+            json!({"schema_version":goa2_core::versions::WORKER_SCHEMA,"id":1,"operation":"load_board","tiles":[]}),
         )
         .unwrap();
         execute(request, Instant::now(), &mut board, &mut None).unwrap();
@@ -1553,3 +1570,63 @@ mod trace_tests {
 #[cfg(test)]
 #[path = "../../../test-support/fixture_cache.rs"]
 mod fixture_cache;
+
+#[cfg(test)]
+mod protocol_examples_tests {
+    use super::*;
+    #[test]
+    fn worker_examples_cover_every_operation_schema_and_future_rejection() {
+        let examples: Value =
+            serde_json::from_str(include_str!("../../../docs/worker-protocol-examples.json"))
+                .unwrap();
+        let rows = examples["examples"].as_array().unwrap();
+        assert_eq!(rows.len(), 39);
+        let mut names = std::collections::BTreeSet::new();
+        for row in rows {
+            assert!(names.insert(row["operation"].as_str().unwrap()));
+            let value = row["request"].clone();
+            let _: Request = serde_json::from_value(value.clone())
+                .unwrap_or_else(|e| panic!("{}: {e}", row["operation"]));
+            for field in row["required_fields"].as_array().unwrap() {
+                let mut invalid = value.clone();
+                invalid
+                    .as_object_mut()
+                    .unwrap()
+                    .remove(field.as_str().unwrap());
+                assert!(
+                    serde_json::from_value::<Request>(invalid).is_err(),
+                    "{} missing {field}",
+                    row["operation"]
+                );
+            }
+            let mut future = value;
+            future["schema_version"] = json!(2);
+            let request: Request = serde_json::from_value(future).unwrap();
+            assert!(execute(request, Instant::now(), &mut None, &mut None).is_err());
+        }
+    }
+    #[test]
+    fn invalid_json_lines_are_rejected_without_poisoning_persistent_board() {
+        let mut board = None;
+        let mut arena = None;
+        let valid = |id| {
+            serde_json::from_value(
+                json!({"schema_version":1,"id":id,"operation":"load_board","tiles":[]}),
+            )
+            .unwrap()
+        };
+        execute(valid(0), Instant::now(), &mut board, &mut arena).unwrap();
+        for id in 1..=128 {
+            let value = json!({"schema_version":1,"id":id,"operation":format!("unknown_{id}"),"queries":[null,{},[],true]});
+            assert!(serde_json::from_value::<Request>(value).is_err());
+            let future: Request = serde_json::from_value(
+                json!({"schema_version":id+1,"id":id,"operation":"load_board","tiles":[]}),
+            )
+            .unwrap();
+            assert!(execute(future, Instant::now(), &mut board, &mut arena).is_err());
+            assert!(board.is_some());
+            assert!(arena.is_none());
+        }
+        execute(valid(129), Instant::now(), &mut board, &mut arena).unwrap();
+    }
+}

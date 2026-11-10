@@ -29,7 +29,7 @@ pub use patch::{CardPatchZone, PatchCommand};
 pub use setup::{GameContent, GameMode, GameSetup, SetupTeam};
 pub use unstick::UnstickCommand;
 
-const CHECKPOINT_VERSION: u32 = 1;
+use crate::versions::CHECKPOINT as CHECKPOINT_VERSION;
 
 /// The transport authenticates the actor separately from this payload.
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -163,7 +163,10 @@ impl LiveGame {
             checkpoint.envelope,
             checkpoint.revision,
             checkpoint.upgrade_history,
-            checkpoint.lane_progress.as_ref().map(|lane| lane.quiet_since),
+            checkpoint
+                .lane_progress
+                .as_ref()
+                .map(|lane| lane.quiet_since),
             budget,
         )?;
         if !transition.events.is_empty() {
@@ -171,7 +174,9 @@ impl LiveGame {
         }
         game.restore_rollback(
             checkpoint.rollback,
-            checkpoint.lane_progress.and_then(|lane| lane.rollback_quiet_since),
+            checkpoint
+                .lane_progress
+                .and_then(|lane| lane.rollback_quiet_since),
             budget,
         )?;
         Ok(game)
@@ -227,7 +232,9 @@ impl LiveGame {
                 .transpose()?,
             lane_progress: Some(lane_progress::LaneProgressCheckpoint {
                 quiet_since: self.lane_progress.quiet_since,
-                rollback_quiet_since: self.rollback.as_ref()
+                rollback_quiet_since: self
+                    .rollback
+                    .as_ref()
                     .map(|anchor| anchor.lane_progress.quiet_since),
             }),
         })

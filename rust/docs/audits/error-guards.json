@@ -1,0 +1,127 @@
+{
+  "schema_version": 1,
+  "scope": "All retained error metadata families and the guard constructor categories they exercise; test names are consumers, not claims that missing full-feature suites were executed.",
+  "guards": [
+    {
+      "id": "codec-only-transition",
+      "classification": "intentional rejection contract",
+      "guard": "StateEnvelope::require_native_execution always rejects codec-only execution; native coverage is established by NativeSession compilation",
+      "sources": [
+        "rust/crates/goa2-core/src/codec.rs",
+        "rust/crates/goa2-search-cli/src/main.rs"
+      ],
+      "tests": [
+        "goa2-core codec::tests::mid_action_state_is_lossless_but_explicitly_not_executable",
+        "goa2-core tests/oracle.rs full_states_aliases_tokens_overrides_and_continuations_roundtrip"
+      ],
+      "retain_until": "An explicitly versioned diagnostic migration; codec decoding alone never implies executable rules",
+      "owner": "engine maintainers",
+      "retirement_authorized": false
+    },
+    {
+      "id": "invalid-envelope-and-command",
+      "classification": "intentional rejection contract",
+      "guard": "Invalid physical references, future versions, unknown fields and stale revisions must reject without committed mutation",
+      "sources": [
+        "rust/crates/goa2-core/src/codec.rs",
+        "rust/crates/goa2-core/src/interpreter/live_game.rs"
+      ],
+      "tests": [
+        "goa2-core codec::tests::rejects_bad_references_conflicts_content_and_future_rules",
+        "goa2-core tests/contracts.rs command_unknown_fields_and_stale_revisions_do_not_mutate_game",
+        "goa2-core tests/contracts.rs checkpoint_v1_defaults_restore_and_future_versions_reject"
+      ],
+      "retain_until": "Permanent supported-boundary invariants; change only through an explicit version/migration decision",
+      "owner": "engine maintainers",
+      "retirement_authorized": false
+    },
+    {
+      "id": "native-coverage-preconditions",
+      "classification": "historical porting/representation limitation, not a new gameplay rule",
+      "guard": "Unsupported nested programs, unbound selectors and reached dense-path queries reject before consuming/mutating the root. Inert unsupported templates may be importable.",
+      "sources": [
+        "rust/crates/goa2-core/src/interpreter.rs",
+        "rust/crates/goa2-core/src/interpreter/object_execution.rs"
+      ],
+      "tests": [
+        "goa2-core interpreter::tests::unsupported_nested_instruction_rejects_whole_root",
+        "goa2-core interpreter::tests::inert_spell_rule_primitives_import_but_reached_dense_queries_and_respawns_are_guarded_before_pop"
+      ],
+      "retain_until": "Port the exact consumer with full differential/restore regressions; never relax a guard merely because an import succeeds",
+      "owner": "engine maintainers",
+      "retirement_authorized": false
+    },
+    {
+      "id": "execution-and-generation-limits",
+      "classification": "intentional resource/identity rejection contract",
+      "guard": "Cancellation, deadlines, step limits and exhausted request/step/entity generations preserve real boundaries and reject fake progress",
+      "sources": [
+        "rust/crates/goa2-core/src/interpreter.rs",
+        "rust/crates/goa2-core/tests/object_execution.rs"
+      ],
+      "tests": [
+        "goa2-core interpreter::tests::automatic_step_limit_is_real_and_does_not_count_fake_progress",
+        "goa2-core interpreter::tests::resume_rejects_regressing_and_exhausted_identity_history",
+        "goa2-core tests/object_execution.rs cancelled_expired_and_zero_prefix_leave_live_object_state_untouched"
+      ],
+      "retain_until": "Retain limits and identity invariants through any implementation change",
+      "owner": "engine maintainers",
+      "retirement_authorized": false
+    },
+    {
+      "id": "recursive-reference-effect",
+      "classification": "frozen Python reference defect with explicit native coverage guard",
+      "fixture": {
+        "path": "rust/tests/fixtures/effect-errors.json",
+        "sha256": "65cf7f235539fbce24fc79cf37a9511f27f408ca6b5983aba8add6c6ccd0a37d"
+      },
+      "cases": [
+        {
+          "name": "effect-adjacency-shield-radius",
+          "reference_error": "RecursionError"
+        }
+      ],
+      "sources": [
+        "scripts/rust_oracle/effect_traces.py",
+        "rust/crates/goa2-core/src/interpreter.rs"
+      ],
+      "tests": [
+        "goa2-core interpreter::tests::recursive_reference_immunity_topology_is_explicitly_unsupported"
+      ],
+      "retain_until": "Separate reviewed reference/native semantics decision; do not silently normalize the RecursionError into an accepted gameplay result",
+      "owner": "engine maintainers",
+      "retirement_authorized": false
+    },
+    {
+      "id": "mine-reference-defects",
+      "classification": "frozen Python reference defects and documented order/coercion boundary",
+      "fixture": {
+        "path": "rust/tests/fixtures/mine-reference-errors.json",
+        "sha256": "f812fe99bbdae685875a66b187db9fb7c49acde90c7b8226ea35254c10244f4d"
+      },
+      "cases": [
+        {
+          "kind": "literal-destination-lost-in-mine-choice"
+        },
+        {
+          "kind": "hash-dependent-mine-order"
+        },
+        {
+          "kind": "mine-option-helper-coercion"
+        }
+      ],
+      "native_policy": "mine path identity is an unordered set with stable native order; explicit trigger/event order is preserved; literal-destination loss remains a documented source compatibility defect",
+      "sources": [
+        "scripts/rust_oracle/mine_traces.py",
+        "rust/crates/goa2-core/src/interpreter/object_execution/mines.rs"
+      ],
+      "tests": [
+        "tests/rust_oracle/test_mine_traces.py",
+        "goa2-core interpreter::tests::ordered_mine_trigger_chains_restore_tokens_discards_and_rollback_flags"
+      ],
+      "retain_until": "Preserve explicit event/trigger order and the admitted source/native policy; any correction needs its own review",
+      "owner": "engine maintainers",
+      "retirement_authorized": false
+    }
+  ]
+}

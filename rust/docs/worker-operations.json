@@ -1,0 +1,1059 @@
+{
+  "schema_version": 1,
+  "wire_schema": 1,
+  "operations": [
+    {
+      "operation": "capabilities",
+      "status": "supported automation",
+      "callers": [
+        "scripts/rust_oracle/oracle.py",
+        "scripts/rust_oracle/arena_queue.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup",
+      "protocol_examples": "rust/docs/worker-protocol-examples.json#capabilities",
+      "schema_tests": "worker_examples_cover_every_operation_schema_and_future_rejection",
+      "error_tests": "protocol_rejects_unknown_fields_and_preserves_prior_board_on_error",
+      "owner": "engine/search maintainers",
+      "uncalled_policy": "No caller match is not removal evidence; keep diagnostics until dynamic/manual callers and unique coverage are migrated.",
+      "static_request_sites": [
+        {
+          "consumer": "scripts/rust_oracle/arena_queue.py",
+          "line": 391,
+          "expression": "worker.request"
+        },
+        {
+          "consumer": "scripts/rust_oracle/oracle.py",
+          "line": 330,
+          "expression": "worker.request"
+        }
+      ],
+      "direct_call_status": "literal request/stream sites recorded",
+      "boundary_inventory": "rust/docs/audits/boundaries.json"
+    },
+    {
+      "operation": "prepare_search",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/rollout_parity.py",
+        "scripts/rust_oracle/arena_calibrate.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup",
+      "protocol_examples": "rust/docs/worker-protocol-examples.json#prepare_search",
+      "schema_tests": "worker_examples_cover_every_operation_schema_and_future_rejection",
+      "error_tests": "protocol_rejects_unknown_fields_and_preserves_prior_board_on_error",
+      "owner": "engine/search maintainers",
+      "uncalled_policy": "No caller match is not removal evidence; keep diagnostics until dynamic/manual callers and unique coverage are migrated.",
+      "static_request_sites": [
+        {
+          "consumer": "scripts/rust_oracle/arena_calibrate.py",
+          "line": 173,
+          "expression": "policy.request"
+        },
+        {
+          "consumer": "scripts/rust_oracle/rollout_parity.py",
+          "line": 2099,
+          "expression": "worker.request"
+        },
+        {
+          "consumer": "scripts/rust_oracle/rollout_parity.py",
+          "line": 2378,
+          "expression": "worker.request"
+        }
+      ],
+      "direct_call_status": "literal request/stream sites recorded",
+      "boundary_inventory": "rust/docs/audits/boundaries.json"
+    },
+    {
+      "operation": "aggregate_trace",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/object_arena_traces.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup",
+      "protocol_examples": "rust/docs/worker-protocol-examples.json#aggregate_trace",
+      "schema_tests": "worker_examples_cover_every_operation_schema_and_future_rejection",
+      "error_tests": "protocol_rejects_unknown_fields_and_preserves_prior_board_on_error",
+      "owner": "engine/search maintainers",
+      "uncalled_policy": "No caller match is not removal evidence; keep diagnostics until dynamic/manual callers and unique coverage are migrated.",
+      "static_request_sites": [
+        {
+          "consumer": "scripts/rust_oracle/object_arena_traces.py",
+          "line": 284,
+          "expression": "worker.request"
+        }
+      ],
+      "direct_call_status": "literal request/stream sites recorded",
+      "boundary_inventory": "rust/docs/audits/boundaries.json"
+    },
+    {
+      "operation": "mine_paths",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/mine_traces.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup",
+      "protocol_examples": "rust/docs/worker-protocol-examples.json#mine_paths",
+      "schema_tests": "worker_examples_cover_every_operation_schema_and_future_rejection",
+      "error_tests": "protocol_rejects_unknown_fields_and_preserves_prior_board_on_error",
+      "owner": "engine/search maintainers",
+      "uncalled_policy": "No caller match is not removal evidence; keep diagnostics until dynamic/manual callers and unique coverage are migrated.",
+      "static_request_sites": [
+        {
+          "consumer": "scripts/rust_oracle/mine_traces.py",
+          "line": 589,
+          "expression": "worker.request"
+        }
+      ],
+      "direct_call_status": "literal request/stream sites recorded",
+      "boundary_inventory": "rust/docs/audits/boundaries.json"
+    },
+    {
+      "operation": "hex_filters",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/movement_sequence_traces.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup",
+      "protocol_examples": "rust/docs/worker-protocol-examples.json#hex_filters",
+      "schema_tests": "worker_examples_cover_every_operation_schema_and_future_rejection",
+      "error_tests": "protocol_rejects_unknown_fields_and_preserves_prior_board_on_error",
+      "owner": "engine/search maintainers",
+      "uncalled_policy": "No caller match is not removal evidence; keep diagnostics until dynamic/manual callers and unique coverage are migrated.",
+      "static_request_sites": [
+        {
+          "consumer": "scripts/rust_oracle/movement_sequence_traces.py",
+          "line": 494,
+          "expression": "worker.request"
+        }
+      ],
+      "direct_call_status": "literal request/stream sites recorded",
+      "boundary_inventory": "rust/docs/audits/boundaries.json"
+    },
+    {
+      "operation": "terrain",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/oracle.py",
+        "scripts/rust_oracle/sequence_legality.py",
+        "scripts/rust_oracle/primary_traces.py",
+        "scripts/rust_oracle/live_turret_traces.py",
+        "scripts/rust_oracle/live_token_path_traces.py",
+        "scripts/rust_oracle/live_spell_primitive_traces.py",
+        "scripts/rust_oracle/object_execution_traces.py",
+        "scripts/rust_oracle/line_of_sight_traces.py",
+        "scripts/rust_oracle/push_traces.py",
+        "scripts/rust_oracle/terrain_traces.py",
+        "scripts/rust_oracle/stack_traces.py",
+        "tests/rust_oracle/test_live_push.py",
+        "tests/rust_oracle/test_live_token_paths.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup",
+      "protocol_examples": "rust/docs/worker-protocol-examples.json#terrain",
+      "schema_tests": "worker_examples_cover_every_operation_schema_and_future_rejection",
+      "error_tests": "protocol_rejects_unknown_fields_and_preserves_prior_board_on_error",
+      "owner": "engine/search maintainers",
+      "uncalled_policy": "No caller match is not removal evidence; keep diagnostics until dynamic/manual callers and unique coverage are migrated.",
+      "static_request_sites": [
+        {
+          "consumer": "scripts/rust_oracle/terrain_traces.py",
+          "line": 346,
+          "expression": "worker.request"
+        }
+      ],
+      "direct_call_status": "literal request/stream sites recorded",
+      "boundary_inventory": "rust/docs/audits/boundaries.json"
+    },
+    {
+      "operation": "action_legality",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/action_rule_traces.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup",
+      "protocol_examples": "rust/docs/worker-protocol-examples.json#action_legality",
+      "schema_tests": "worker_examples_cover_every_operation_schema_and_future_rejection",
+      "error_tests": "protocol_rejects_unknown_fields_and_preserves_prior_board_on_error",
+      "owner": "engine/search maintainers",
+      "uncalled_policy": "No caller match is not removal evidence; keep diagnostics until dynamic/manual callers and unique coverage are migrated.",
+      "static_request_sites": [
+        {
+          "consumer": "scripts/rust_oracle/action_rule_traces.py",
+          "line": 533,
+          "expression": "worker.request"
+        }
+      ],
+      "direct_call_status": "literal request/stream sites recorded",
+      "boundary_inventory": "rust/docs/audits/boundaries.json"
+    },
+    {
+      "operation": "targeting",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/targeting_rules.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup",
+      "protocol_examples": "rust/docs/worker-protocol-examples.json#targeting",
+      "schema_tests": "worker_examples_cover_every_operation_schema_and_future_rejection",
+      "error_tests": "protocol_rejects_unknown_fields_and_preserves_prior_board_on_error",
+      "owner": "engine/search maintainers",
+      "uncalled_policy": "No caller match is not removal evidence; keep diagnostics until dynamic/manual callers and unique coverage are migrated.",
+      "static_request_sites": [
+        {
+          "consumer": "scripts/rust_oracle/targeting_rules.py",
+          "line": 397,
+          "expression": "worker.request"
+        }
+      ],
+      "direct_call_status": "literal request/stream sites recorded",
+      "boundary_inventory": "rust/docs/audits/boundaries.json"
+    },
+    {
+      "operation": "displacement_legality",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/displacement_effect_traces.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup",
+      "protocol_examples": "rust/docs/worker-protocol-examples.json#displacement_legality",
+      "schema_tests": "worker_examples_cover_every_operation_schema_and_future_rejection",
+      "error_tests": "protocol_rejects_unknown_fields_and_preserves_prior_board_on_error",
+      "owner": "engine/search maintainers",
+      "uncalled_policy": "No caller match is not removal evidence; keep diagnostics until dynamic/manual callers and unique coverage are migrated.",
+      "static_request_sites": [
+        {
+          "consumer": "scripts/rust_oracle/displacement_effect_traces.py",
+          "line": 470,
+          "expression": "worker.request"
+        }
+      ],
+      "direct_call_status": "literal request/stream sites recorded",
+      "boundary_inventory": "rust/docs/audits/boundaries.json"
+    },
+    {
+      "operation": "stats",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/effect_stat_traces.py",
+        "scripts/rust_oracle/model_traces.py",
+        "scripts/rust_oracle/live_attack_sequence_traces.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup",
+      "protocol_examples": "rust/docs/worker-protocol-examples.json#stats",
+      "schema_tests": "worker_examples_cover_every_operation_schema_and_future_rejection",
+      "error_tests": "protocol_rejects_unknown_fields_and_preserves_prior_board_on_error",
+      "owner": "engine/search maintainers",
+      "uncalled_policy": "No caller match is not removal evidence; keep diagnostics until dynamic/manual callers and unique coverage are migrated.",
+      "static_request_sites": [
+        {
+          "consumer": "scripts/rust_oracle/effect_stat_traces.py",
+          "line": 403,
+          "expression": "worker.request"
+        },
+        {
+          "consumer": "scripts/rust_oracle/model_traces.py",
+          "line": 252,
+          "expression": "worker.request"
+        }
+      ],
+      "direct_call_status": "literal request/stream sites recorded",
+      "boundary_inventory": "rust/docs/audits/boundaries.json"
+    },
+    {
+      "operation": "travel_zones",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/action_traces.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup",
+      "protocol_examples": "rust/docs/worker-protocol-examples.json#travel_zones",
+      "schema_tests": "worker_examples_cover_every_operation_schema_and_future_rejection",
+      "error_tests": "protocol_rejects_unknown_fields_and_preserves_prior_board_on_error",
+      "owner": "engine/search maintainers",
+      "uncalled_policy": "No caller match is not removal evidence; keep diagnostics until dynamic/manual callers and unique coverage are migrated.",
+      "static_request_sites": [
+        {
+          "consumer": "scripts/rust_oracle/action_traces.py",
+          "line": 229,
+          "expression": "worker.request"
+        }
+      ],
+      "direct_call_status": "literal request/stream sites recorded",
+      "boundary_inventory": "rust/docs/audits/boundaries.json"
+    },
+    {
+      "operation": "action_trace",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/action_traces.py",
+        "scripts/rust_oracle/action_rule_traces.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup",
+      "protocol_examples": "rust/docs/worker-protocol-examples.json#action_trace",
+      "schema_tests": "worker_examples_cover_every_operation_schema_and_future_rejection",
+      "error_tests": "protocol_rejects_unknown_fields_and_preserves_prior_board_on_error",
+      "owner": "engine/search maintainers",
+      "uncalled_policy": "No caller match is not removal evidence; keep diagnostics until dynamic/manual callers and unique coverage are migrated.",
+      "static_request_sites": [
+        {
+          "consumer": "scripts/rust_oracle/action_rule_traces.py",
+          "line": 542,
+          "expression": "worker.request"
+        },
+        {
+          "consumer": "scripts/rust_oracle/action_traces.py",
+          "line": 219,
+          "expression": "worker.request"
+        }
+      ],
+      "direct_call_status": "literal request/stream sites recorded",
+      "boundary_inventory": "rust/docs/audits/boundaries.json"
+    },
+    {
+      "operation": "tie_trace",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/planning_traces.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup",
+      "protocol_examples": "rust/docs/worker-protocol-examples.json#tie_trace",
+      "schema_tests": "worker_examples_cover_every_operation_schema_and_future_rejection",
+      "error_tests": "protocol_rejects_unknown_fields_and_preserves_prior_board_on_error",
+      "owner": "engine/search maintainers",
+      "uncalled_policy": "No caller match is not removal evidence; keep diagnostics until dynamic/manual callers and unique coverage are migrated.",
+      "static_request_sites": [
+        {
+          "consumer": "scripts/rust_oracle/planning_traces.py",
+          "line": 330,
+          "expression": "worker.request"
+        }
+      ],
+      "direct_call_status": "literal request/stream sites recorded",
+      "boundary_inventory": "rust/docs/audits/boundaries.json"
+    },
+    {
+      "operation": "planning_trace",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/planning_traces.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup",
+      "protocol_examples": "rust/docs/worker-protocol-examples.json#planning_trace",
+      "schema_tests": "worker_examples_cover_every_operation_schema_and_future_rejection",
+      "error_tests": "protocol_rejects_unknown_fields_and_preserves_prior_board_on_error",
+      "owner": "engine/search maintainers",
+      "uncalled_policy": "No caller match is not removal evidence; keep diagnostics until dynamic/manual callers and unique coverage are migrated.",
+      "static_request_sites": [
+        {
+          "consumer": "scripts/rust_oracle/planning_traces.py",
+          "line": 317,
+          "expression": "worker.request"
+        }
+      ],
+      "direct_call_status": "literal request/stream sites recorded",
+      "boundary_inventory": "rust/docs/audits/boundaries.json"
+    },
+    {
+      "operation": "effect_trace",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/effect_traces.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup",
+      "protocol_examples": "rust/docs/worker-protocol-examples.json#effect_trace",
+      "schema_tests": "worker_examples_cover_every_operation_schema_and_future_rejection",
+      "error_tests": "protocol_rejects_unknown_fields_and_preserves_prior_board_on_error",
+      "owner": "engine/search maintainers",
+      "uncalled_policy": "No caller match is not removal evidence; keep diagnostics until dynamic/manual callers and unique coverage are migrated.",
+      "static_request_sites": [
+        {
+          "consumer": "scripts/rust_oracle/effect_traces.py",
+          "line": 293,
+          "expression": "worker.request"
+        }
+      ],
+      "direct_call_status": "literal request/stream sites recorded",
+      "boundary_inventory": "rust/docs/audits/boundaries.json"
+    },
+    {
+      "operation": "card_equality",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/card_equality_traces.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup",
+      "protocol_examples": "rust/docs/worker-protocol-examples.json#card_equality",
+      "schema_tests": "worker_examples_cover_every_operation_schema_and_future_rejection",
+      "error_tests": "protocol_rejects_unknown_fields_and_preserves_prior_board_on_error",
+      "owner": "engine/search maintainers",
+      "uncalled_policy": "No caller match is not removal evidence; keep diagnostics until dynamic/manual callers and unique coverage are migrated.",
+      "static_request_sites": [
+        {
+          "consumer": "scripts/rust_oracle/card_equality_traces.py",
+          "line": 148,
+          "expression": "worker.request"
+        }
+      ],
+      "direct_call_status": "literal request/stream sites recorded",
+      "boundary_inventory": "rust/docs/audits/boundaries.json"
+    },
+    {
+      "operation": "card_trace",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/model_traces.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup",
+      "protocol_examples": "rust/docs/worker-protocol-examples.json#card_trace",
+      "schema_tests": "worker_examples_cover_every_operation_schema_and_future_rejection",
+      "error_tests": "protocol_rejects_unknown_fields_and_preserves_prior_board_on_error",
+      "owner": "engine/search maintainers",
+      "uncalled_policy": "No caller match is not removal evidence; keep diagnostics until dynamic/manual callers and unique coverage are migrated.",
+      "static_request_sites": [
+        {
+          "consumer": "scripts/rust_oracle/model_traces.py",
+          "line": 263,
+          "expression": "worker.request"
+        }
+      ],
+      "direct_call_status": "literal request/stream sites recorded",
+      "boundary_inventory": "rust/docs/audits/boundaries.json"
+    },
+    {
+      "operation": "heuristic_input",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup",
+      "protocol_examples": "rust/docs/worker-protocol-examples.json#heuristic_input",
+      "schema_tests": "worker_examples_cover_every_operation_schema_and_future_rejection",
+      "error_tests": "protocol_rejects_unknown_fields_and_preserves_prior_board_on_error",
+      "owner": "engine/search maintainers",
+      "uncalled_policy": "No caller match is not removal evidence; keep diagnostics until dynamic/manual callers and unique coverage are migrated.",
+      "static_request_sites": [],
+      "direct_call_status": "no direct literal request; manual/indirect diagnostic remains retained",
+      "boundary_inventory": "rust/docs/audits/boundaries.json"
+    },
+    {
+      "operation": "evaluate_lab_attack_range",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup",
+      "protocol_examples": "rust/docs/worker-protocol-examples.json#evaluate_lab_attack_range",
+      "schema_tests": "worker_examples_cover_every_operation_schema_and_future_rejection",
+      "error_tests": "protocol_rejects_unknown_fields_and_preserves_prior_board_on_error",
+      "owner": "engine/search maintainers",
+      "uncalled_policy": "No caller match is not removal evidence; keep diagnostics until dynamic/manual callers and unique coverage are migrated.",
+      "static_request_sites": [],
+      "direct_call_status": "no direct literal request; manual/indirect diagnostic remains retained",
+      "boundary_inventory": "rust/docs/audits/boundaries.json"
+    },
+    {
+      "operation": "search_greedy",
+      "status": "supported automation",
+      "callers": [
+        "scripts/rust_oracle/rollout_parity.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup",
+      "protocol_examples": "rust/docs/worker-protocol-examples.json#search_greedy",
+      "schema_tests": "worker_examples_cover_every_operation_schema_and_future_rejection",
+      "error_tests": "protocol_rejects_unknown_fields_and_preserves_prior_board_on_error",
+      "owner": "engine/search maintainers",
+      "uncalled_policy": "No caller match is not removal evidence; keep diagnostics until dynamic/manual callers and unique coverage are migrated.",
+      "static_request_sites": [
+        {
+          "consumer": "scripts/rust_oracle/rollout_parity.py",
+          "line": 1055,
+          "expression": "worker.request"
+        },
+        {
+          "consumer": "scripts/rust_oracle/rollout_parity.py",
+          "line": 955,
+          "expression": "worker.request"
+        },
+        {
+          "consumer": "scripts/rust_oracle/rollout_parity.py",
+          "line": 1110,
+          "expression": "worker.request"
+        }
+      ],
+      "direct_call_status": "literal request/stream sites recorded",
+      "boundary_inventory": "rust/docs/audits/boundaries.json"
+    },
+    {
+      "operation": "search_resolution",
+      "status": "supported automation",
+      "callers": [
+        "scripts/rust_oracle/rollout_parity.py",
+        "scripts/rust_oracle/sequence_legality.py",
+        "scripts/rust_oracle/arena_match.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup",
+      "protocol_examples": "rust/docs/worker-protocol-examples.json#search_resolution",
+      "schema_tests": "worker_examples_cover_every_operation_schema_and_future_rejection",
+      "error_tests": "protocol_rejects_unknown_fields_and_preserves_prior_board_on_error",
+      "owner": "engine/search maintainers",
+      "uncalled_policy": "No caller match is not removal evidence; keep diagnostics until dynamic/manual callers and unique coverage are migrated.",
+      "static_request_sites": [
+        {
+          "consumer": "scripts/rust_oracle/rollout_parity.py",
+          "line": 1782,
+          "expression": "worker.request"
+        },
+        {
+          "consumer": "scripts/rust_oracle/rollout_parity.py",
+          "line": 1783,
+          "expression": "worker.request"
+        },
+        {
+          "consumer": "scripts/rust_oracle/rollout_parity.py",
+          "line": 1729,
+          "expression": "worker.request"
+        },
+        {
+          "consumer": "scripts/rust_oracle/rollout_parity.py",
+          "line": 142,
+          "expression": "worker.request"
+        },
+        {
+          "consumer": "scripts/rust_oracle/rollout_parity.py",
+          "line": 1874,
+          "expression": "worker.request"
+        },
+        {
+          "consumer": "scripts/rust_oracle/sequence_legality.py",
+          "line": 8094,
+          "expression": "worker.request"
+        },
+        {
+          "consumer": "scripts/rust_oracle/sequence_legality.py",
+          "line": 8149,
+          "expression": "worker.request"
+        },
+        {
+          "consumer": "scripts/rust_oracle/sequence_legality.py",
+          "line": 8150,
+          "expression": "worker.request"
+        },
+        {
+          "consumer": "scripts/rust_oracle/sequence_legality.py",
+          "line": 8216,
+          "expression": "worker.request"
+        },
+        {
+          "consumer": "scripts/rust_oracle/sequence_legality.py",
+          "line": 8222,
+          "expression": "worker.request"
+        }
+      ],
+      "direct_call_status": "literal request/stream sites recorded",
+      "boundary_inventory": "rust/docs/audits/boundaries.json"
+    },
+    {
+      "operation": "search_sampled_planning",
+      "status": "supported automation",
+      "callers": [
+        "scripts/rust_oracle/rollout_parity.py",
+        "scripts/rust_oracle/arena_match.py",
+        "tests/rust_oracle/test_arena_calibrate.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup",
+      "protocol_examples": "rust/docs/worker-protocol-examples.json#search_sampled_planning",
+      "schema_tests": "worker_examples_cover_every_operation_schema_and_future_rejection",
+      "error_tests": "protocol_rejects_unknown_fields_and_preserves_prior_board_on_error",
+      "owner": "engine/search maintainers",
+      "uncalled_policy": "No caller match is not removal evidence; keep diagnostics until dynamic/manual callers and unique coverage are migrated.",
+      "static_request_sites": [
+        {
+          "consumer": "scripts/rust_oracle/rollout_parity.py",
+          "line": 1184,
+          "expression": "worker.request"
+        },
+        {
+          "consumer": "scripts/rust_oracle/rollout_parity.py",
+          "line": 1185,
+          "expression": "worker.request"
+        },
+        {
+          "consumer": "scripts/rust_oracle/rollout_parity.py",
+          "line": 1412,
+          "expression": "worker.request"
+        },
+        {
+          "consumer": "scripts/rust_oracle/rollout_parity.py",
+          "line": 1292,
+          "expression": "worker.request"
+        },
+        {
+          "consumer": "scripts/rust_oracle/rollout_parity.py",
+          "line": 1352,
+          "expression": "worker.request"
+        },
+        {
+          "consumer": "scripts/rust_oracle/rollout_parity.py",
+          "line": 1455,
+          "expression": "worker.request"
+        },
+        {
+          "consumer": "scripts/rust_oracle/rollout_parity.py",
+          "line": 1533,
+          "expression": "worker.request"
+        },
+        {
+          "consumer": "scripts/rust_oracle/rollout_parity.py",
+          "line": 1537,
+          "expression": "worker.request"
+        },
+        {
+          "consumer": "scripts/rust_oracle/rollout_parity.py",
+          "line": 1622,
+          "expression": "worker.request"
+        },
+        {
+          "consumer": "scripts/rust_oracle/rollout_parity.py",
+          "line": 1626,
+          "expression": "worker.request"
+        },
+        {
+          "consumer": "scripts/rust_oracle/rollout_parity.py",
+          "line": 1384,
+          "expression": "worker.request"
+        },
+        {
+          "consumer": "scripts/rust_oracle/rollout_parity.py",
+          "line": 1424,
+          "expression": "worker.request"
+        },
+        {
+          "consumer": "scripts/rust_oracle/rollout_parity.py",
+          "line": 1519,
+          "expression": "worker.request"
+        },
+        {
+          "consumer": "scripts/rust_oracle/rollout_parity.py",
+          "line": 134,
+          "expression": "worker.request"
+        },
+        {
+          "consumer": "scripts/rust_oracle/rollout_parity.py",
+          "line": 1242,
+          "expression": "worker.request"
+        }
+      ],
+      "direct_call_status": "literal request/stream sites recorded",
+      "boundary_inventory": "rust/docs/audits/boundaries.json"
+    },
+    {
+      "operation": "show_bot_commitments",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/rollout_parity.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup",
+      "protocol_examples": "rust/docs/worker-protocol-examples.json#show_bot_commitments",
+      "schema_tests": "worker_examples_cover_every_operation_schema_and_future_rejection",
+      "error_tests": "protocol_rejects_unknown_fields_and_preserves_prior_board_on_error",
+      "owner": "engine/search maintainers",
+      "uncalled_policy": "No caller match is not removal evidence; keep diagnostics until dynamic/manual callers and unique coverage are migrated.",
+      "static_request_sites": [
+        {
+          "consumer": "scripts/rust_oracle/rollout_parity.py",
+          "line": 1489,
+          "expression": "worker.request"
+        }
+      ],
+      "direct_call_status": "literal request/stream sites recorded",
+      "boundary_inventory": "rust/docs/audits/boundaries.json"
+    },
+    {
+      "operation": "rollout_game_turns",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/rollout_parity.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup",
+      "protocol_examples": "rust/docs/worker-protocol-examples.json#rollout_game_turns",
+      "schema_tests": "worker_examples_cover_every_operation_schema_and_future_rejection",
+      "error_tests": "protocol_rejects_unknown_fields_and_preserves_prior_board_on_error",
+      "owner": "engine/search maintainers",
+      "uncalled_policy": "No caller match is not removal evidence; keep diagnostics until dynamic/manual callers and unique coverage are migrated.",
+      "static_request_sites": [
+        {
+          "consumer": "scripts/rust_oracle/rollout_parity.py",
+          "line": 1987,
+          "expression": "worker.request"
+        },
+        {
+          "consumer": "scripts/rust_oracle/rollout_parity.py",
+          "line": 2566,
+          "expression": "worker.request"
+        }
+      ],
+      "direct_call_status": "literal request/stream sites recorded",
+      "boundary_inventory": "rust/docs/audits/boundaries.json"
+    },
+    {
+      "operation": "check_sequences",
+      "status": "supported automation",
+      "callers": [
+        "scripts/rust_oracle/sequence_legality.py",
+        "scripts/rust_oracle/arena_queue.py",
+        "tests/rust_oracle/test_recommendation_validation.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup",
+      "protocol_examples": "rust/docs/worker-protocol-examples.json#check_sequences",
+      "schema_tests": "worker_examples_cover_every_operation_schema_and_future_rejection",
+      "error_tests": "protocol_rejects_unknown_fields_and_preserves_prior_board_on_error",
+      "owner": "engine/search maintainers",
+      "uncalled_policy": "No caller match is not removal evidence; keep diagnostics until dynamic/manual callers and unique coverage are migrated.",
+      "static_request_sites": [
+        {
+          "consumer": "scripts/rust_oracle/arena_queue.py",
+          "line": 400,
+          "expression": "worker.request"
+        },
+        {
+          "consumer": "scripts/rust_oracle/sequence_legality.py",
+          "line": 8181,
+          "expression": "worker.request"
+        },
+        {
+          "consumer": "scripts/rust_oracle/sequence_legality.py",
+          "line": 8191,
+          "expression": "worker.request"
+        },
+        {
+          "consumer": "scripts/rust_oracle/sequence_legality.py",
+          "line": 8201,
+          "expression": "worker.request"
+        },
+        {
+          "consumer": "scripts/rust_oracle/sequence_legality.py",
+          "line": 8230,
+          "expression": "worker.request"
+        }
+      ],
+      "direct_call_status": "literal request/stream sites recorded",
+      "boundary_inventory": "rust/docs/audits/boundaries.json"
+    },
+    {
+      "operation": "arena_start",
+      "status": "supported automation",
+      "callers": [
+        "scripts/rust_oracle/arena_match.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup",
+      "protocol_examples": "rust/docs/worker-protocol-examples.json#arena_start",
+      "schema_tests": "worker_examples_cover_every_operation_schema_and_future_rejection",
+      "error_tests": "protocol_rejects_unknown_fields_and_preserves_prior_board_on_error",
+      "owner": "engine/search maintainers",
+      "uncalled_policy": "No caller match is not removal evidence; keep diagnostics until dynamic/manual callers and unique coverage are migrated.",
+      "static_request_sites": [
+        {
+          "consumer": "scripts/rust_oracle/arena_match.py",
+          "line": 32,
+          "expression": "referee.request"
+        }
+      ],
+      "direct_call_status": "literal request/stream sites recorded",
+      "boundary_inventory": "rust/docs/audits/boundaries.json"
+    },
+    {
+      "operation": "arena_submit",
+      "status": "supported automation",
+      "callers": [
+        "scripts/rust_oracle/arena_match.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup",
+      "protocol_examples": "rust/docs/worker-protocol-examples.json#arena_submit",
+      "schema_tests": "worker_examples_cover_every_operation_schema_and_future_rejection",
+      "error_tests": "protocol_rejects_unknown_fields_and_preserves_prior_board_on_error",
+      "owner": "engine/search maintainers",
+      "uncalled_policy": "No caller match is not removal evidence; keep diagnostics until dynamic/manual callers and unique coverage are migrated.",
+      "static_request_sites": [
+        {
+          "consumer": "scripts/rust_oracle/arena_match.py",
+          "line": 113,
+          "expression": "referee.request"
+        }
+      ],
+      "direct_call_status": "literal request/stream sites recorded",
+      "boundary_inventory": "rust/docs/audits/boundaries.json"
+    },
+    {
+      "operation": "arena_replay",
+      "status": "supported automation",
+      "callers": [
+        "scripts/rust_oracle/arena_verify.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup",
+      "protocol_examples": "rust/docs/worker-protocol-examples.json#arena_replay",
+      "schema_tests": "worker_examples_cover_every_operation_schema_and_future_rejection",
+      "error_tests": "protocol_rejects_unknown_fields_and_preserves_prior_board_on_error",
+      "owner": "engine/search maintainers",
+      "uncalled_policy": "No caller match is not removal evidence; keep diagnostics until dynamic/manual callers and unique coverage are migrated.",
+      "static_request_sites": [
+        {
+          "consumer": "scripts/rust_oracle/arena_verify.py",
+          "line": 274,
+          "expression": "worker.operation_records"
+        }
+      ],
+      "direct_call_status": "literal request/stream sites recorded",
+      "boundary_inventory": "rust/docs/audits/boundaries.json"
+    },
+    {
+      "operation": "offline_match",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/rollout_parity.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup",
+      "protocol_examples": "rust/docs/worker-protocol-examples.json#offline_match",
+      "schema_tests": "worker_examples_cover_every_operation_schema_and_future_rejection",
+      "error_tests": "protocol_rejects_unknown_fields_and_preserves_prior_board_on_error",
+      "owner": "engine/search maintainers",
+      "uncalled_policy": "No caller match is not removal evidence; keep diagnostics until dynamic/manual callers and unique coverage are migrated.",
+      "static_request_sites": [
+        {
+          "consumer": "scripts/rust_oracle/rollout_parity.py",
+          "line": 313,
+          "expression": "worker.request"
+        }
+      ],
+      "direct_call_status": "literal request/stream sites recorded",
+      "boundary_inventory": "rust/docs/audits/boundaries.json"
+    },
+    {
+      "operation": "rollout_bench",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/rollout_parity.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup",
+      "protocol_examples": "rust/docs/worker-protocol-examples.json#rollout_bench",
+      "schema_tests": "worker_examples_cover_every_operation_schema_and_future_rejection",
+      "error_tests": "protocol_rejects_unknown_fields_and_preserves_prior_board_on_error",
+      "owner": "engine/search maintainers",
+      "uncalled_policy": "No caller match is not removal evidence; keep diagnostics until dynamic/manual callers and unique coverage are migrated.",
+      "static_request_sites": [
+        {
+          "consumer": "scripts/rust_oracle/rollout_parity.py",
+          "line": 2004,
+          "expression": "worker.request"
+        },
+        {
+          "consumer": "scripts/rust_oracle/rollout_parity.py",
+          "line": 2583,
+          "expression": "worker.request"
+        }
+      ],
+      "direct_call_status": "literal request/stream sites recorded",
+      "boundary_inventory": "rust/docs/audits/boundaries.json"
+    },
+    {
+      "operation": "resolution_reuse_census",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup",
+      "protocol_examples": "rust/docs/worker-protocol-examples.json#resolution_reuse_census",
+      "schema_tests": "worker_examples_cover_every_operation_schema_and_future_rejection",
+      "error_tests": "protocol_rejects_unknown_fields_and_preserves_prior_board_on_error",
+      "owner": "engine/search maintainers",
+      "uncalled_policy": "No caller match is not removal evidence; keep diagnostics until dynamic/manual callers and unique coverage are migrated.",
+      "static_request_sites": [],
+      "direct_call_status": "no direct literal request; manual/indirect diagnostic remains retained",
+      "boundary_inventory": "rust/docs/audits/boundaries.json"
+    },
+    {
+      "operation": "fingerprint_bench",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup",
+      "protocol_examples": "rust/docs/worker-protocol-examples.json#fingerprint_bench",
+      "schema_tests": "worker_examples_cover_every_operation_schema_and_future_rejection",
+      "error_tests": "protocol_rejects_unknown_fields_and_preserves_prior_board_on_error",
+      "owner": "engine/search maintainers",
+      "uncalled_policy": "No caller match is not removal evidence; keep diagnostics until dynamic/manual callers and unique coverage are migrated.",
+      "static_request_sites": [],
+      "direct_call_status": "no direct literal request; manual/indirect diagnostic remains retained",
+      "boundary_inventory": "rust/docs/audits/boundaries.json"
+    },
+    {
+      "operation": "simulation_bench",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/simulation_bench.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup",
+      "protocol_examples": "rust/docs/worker-protocol-examples.json#simulation_bench",
+      "schema_tests": "worker_examples_cover_every_operation_schema_and_future_rejection",
+      "error_tests": "protocol_rejects_unknown_fields_and_preserves_prior_board_on_error",
+      "owner": "engine/search maintainers",
+      "uncalled_policy": "No caller match is not removal evidence; keep diagnostics until dynamic/manual callers and unique coverage are migrated.",
+      "static_request_sites": [
+        {
+          "consumer": "scripts/rust_oracle/simulation_bench.py",
+          "line": 307,
+          "expression": "target.request"
+        }
+      ],
+      "direct_call_status": "literal request/stream sites recorded",
+      "boundary_inventory": "rust/docs/audits/boundaries.json"
+    },
+    {
+      "operation": "stack_trace_stream",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/streamed_games.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup",
+      "protocol_examples": "rust/docs/worker-protocol-examples.json#stack_trace_stream",
+      "schema_tests": "worker_examples_cover_every_operation_schema_and_future_rejection",
+      "error_tests": "protocol_rejects_unknown_fields_and_preserves_prior_board_on_error",
+      "owner": "engine/search maintainers",
+      "uncalled_policy": "No caller match is not removal evidence; keep diagnostics until dynamic/manual callers and unique coverage are migrated.",
+      "static_request_sites": [
+        {
+          "consumer": "scripts/rust_oracle/streamed_games.py",
+          "line": 102,
+          "expression": "self.operation_records"
+        }
+      ],
+      "direct_call_status": "literal request/stream sites recorded",
+      "boundary_inventory": "rust/docs/audits/boundaries.json"
+    },
+    {
+      "operation": "stack_trace",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/object_execution_traces.py",
+        "scripts/rust_oracle/stack_traces.py",
+        "tests/rust_oracle/test_stack_traces.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup",
+      "protocol_examples": "rust/docs/worker-protocol-examples.json#stack_trace",
+      "schema_tests": "worker_examples_cover_every_operation_schema_and_future_rejection",
+      "error_tests": "protocol_rejects_unknown_fields_and_preserves_prior_board_on_error",
+      "owner": "engine/search maintainers",
+      "uncalled_policy": "No caller match is not removal evidence; keep diagnostics until dynamic/manual callers and unique coverage are migrated.",
+      "static_request_sites": [
+        {
+          "consumer": "scripts/rust_oracle/object_execution_traces.py",
+          "line": 3929,
+          "expression": "worker.request"
+        },
+        {
+          "consumer": "scripts/rust_oracle/stack_traces.py",
+          "line": 1293,
+          "expression": "worker.request"
+        },
+        {
+          "consumer": "tests/rust_oracle/test_stack_traces.py",
+          "line": 75,
+          "expression": "worker.request"
+        }
+      ],
+      "direct_call_status": "literal request/stream sites recorded",
+      "boundary_inventory": "rust/docs/audits/boundaries.json"
+    },
+    {
+      "operation": "roundtrip_state",
+      "status": "supported automation",
+      "callers": [
+        "scripts/rust_oracle/state_codec.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup",
+      "protocol_examples": "rust/docs/worker-protocol-examples.json#roundtrip_state",
+      "schema_tests": "worker_examples_cover_every_operation_schema_and_future_rejection",
+      "error_tests": "protocol_rejects_unknown_fields_and_preserves_prior_board_on_error",
+      "owner": "engine/search maintainers",
+      "uncalled_policy": "No caller match is not removal evidence; keep diagnostics until dynamic/manual callers and unique coverage are migrated.",
+      "static_request_sites": [
+        {
+          "consumer": "scripts/rust_oracle/state_codec.py",
+          "line": 310,
+          "expression": "worker.request"
+        }
+      ],
+      "direct_call_status": "literal request/stream sites recorded",
+      "boundary_inventory": "rust/docs/audits/boundaries.json"
+    },
+    {
+      "operation": "validate_execution",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/state_codec.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup",
+      "protocol_examples": "rust/docs/worker-protocol-examples.json#validate_execution",
+      "schema_tests": "worker_examples_cover_every_operation_schema_and_future_rejection",
+      "error_tests": "protocol_rejects_unknown_fields_and_preserves_prior_board_on_error",
+      "owner": "engine/search maintainers",
+      "uncalled_policy": "No caller match is not removal evidence; keep diagnostics until dynamic/manual callers and unique coverage are migrated.",
+      "static_request_sites": [
+        {
+          "consumer": "scripts/rust_oracle/state_codec.py",
+          "line": 316,
+          "expression": "worker.request"
+        }
+      ],
+      "direct_call_status": "literal request/stream sites recorded",
+      "boundary_inventory": "rust/docs/audits/boundaries.json"
+    },
+    {
+      "operation": "load_board",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/oracle.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup",
+      "protocol_examples": "rust/docs/worker-protocol-examples.json#load_board",
+      "schema_tests": "worker_examples_cover_every_operation_schema_and_future_rejection",
+      "error_tests": "protocol_rejects_unknown_fields_and_preserves_prior_board_on_error",
+      "owner": "engine/search maintainers",
+      "uncalled_policy": "No caller match is not removal evidence; keep diagnostics until dynamic/manual callers and unique coverage are migrated.",
+      "static_request_sites": [
+        {
+          "consumer": "scripts/rust_oracle/oracle.py",
+          "line": 333,
+          "expression": "worker.request"
+        }
+      ],
+      "direct_call_status": "literal request/stream sites recorded",
+      "boundary_inventory": "rust/docs/audits/boundaries.json"
+    },
+    {
+      "operation": "movement",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/rollout_parity.py",
+        "scripts/rust_oracle/oracle.py",
+        "scripts/rust_oracle/action_builders.py",
+        "scripts/rust_oracle/sequence_legality.py",
+        "scripts/rust_oracle/turn_traces.py",
+        "scripts/rust_oracle/live_primary_body_traces.py",
+        "scripts/rust_oracle/live_passive_body_traces.py",
+        "scripts/rust_oracle/primary_builders.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup",
+      "protocol_examples": "rust/docs/worker-protocol-examples.json#movement",
+      "schema_tests": "worker_examples_cover_every_operation_schema_and_future_rejection",
+      "error_tests": "protocol_rejects_unknown_fields_and_preserves_prior_board_on_error",
+      "owner": "engine/search maintainers",
+      "uncalled_policy": "No caller match is not removal evidence; keep diagnostics until dynamic/manual callers and unique coverage are migrated.",
+      "static_request_sites": [
+        {
+          "consumer": "scripts/rust_oracle/oracle.py",
+          "line": 334,
+          "expression": "worker.request"
+        },
+        {
+          "consumer": "scripts/rust_oracle/oracle.py",
+          "line": 350,
+          "expression": "worker.request"
+        }
+      ],
+      "direct_call_status": "literal request/stream sites recorded",
+      "boundary_inventory": "rust/docs/audits/boundaries.json"
+    }
+  ]
+}

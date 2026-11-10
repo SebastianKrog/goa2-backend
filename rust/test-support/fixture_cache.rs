@@ -1,27 +1,51 @@
-//! Test-only lossless fixture reader; no full-corpus extraction or retention.
+//! Test-only, case-at-a-time reader. Plain files remain useful for authoring.
 use std::{
     fs::File,
     io::{self, Read},
-    path::Path,
+    path::{Path, PathBuf},
 };
 
-pub fn open(path: impl AsRef<Path>) -> io::Result<Box<dyn Read>> {
-    let path = path.as_ref();
+fn local(path: &Path) -> io::Result<Box<dyn Read>> {
     match File::open(path) {
         Ok(file) => Ok(Box::new(file)),
         Err(error) if error.kind() == io::ErrorKind::NotFound => {
-            let mut name = path.as_os_str().to_owned();
-            name.push(".gz");
-            let file = File::open(&name).map_err(|error| io::Error::new(error.kind(), format!(
-                "Missing fixture {} (or .gz cache). Regenerate with scripts/rust_oracle/ using the pinned oracle: {error}", path.display()
-            )))?;
-            Ok(Box::new(flate2::read::GzDecoder::new(file)))
+            let mut compressed = path.as_os_str().to_owned();
+            compressed.push(".gz");
+            Ok(Box::new(flate2::read::GzDecoder::new(File::open(
+                compressed,
+            )?)))
         }
         Err(error) => Err(error),
     }
 }
 
-#[allow(dead_code)] // Integration targets share this module but may need only open().
+pub fn open(path: impl AsRef<Path>) -> io::Result<Box<dyn Read>> {
+    let path = path.as_ref();
+    let base = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures");
+    let mut candidates = vec![path.to_path_buf()];
+    if let Ok(relative) = path.strip_prefix(&base) {
+        if let Some(cache) = std::env::var_os("GOA2_FIXTURE_CACHE") {
+            candidates.push(PathBuf::from(cache).join(relative));
+        }
+        candidates.push(base.join("smoke").join(relative));
+    }
+    for candidate in candidates {
+        match local(&candidate) {
+            Ok(reader) => return Ok(reader),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error),
+        }
+    }
+    Err(io::Error::new(
+        io::ErrorKind::NotFound,
+        format!(
+            "Missing fixture {} (plain or .gz). Quick inputs ship in fixtures/smoke; for full parity set GOA2_FIXTURE_CACHE and run tools/fixtures.py verify --full. See docs/testing.md. Regenerate only with the pinned oracle.",
+            path.display()
+        ),
+    ))
+}
+
+#[allow(dead_code)] // Shared by integration targets needing only open().
 pub fn text(path: impl AsRef<Path>) -> String {
     let mut text = String::new();
     open(path)

@@ -62,11 +62,13 @@ impl NativeSession {
         let hero = self.discard_operand_bound(objects, step, Field::HeroId, Field::HeroKey)?;
         let printed = self.discard_operand_bound(objects, step, Field::CardId, Field::CardKey)?;
         Ok(hero.and_then(|id| self.world.hero(id)).is_some_and(|hero| {
-            printed.is_some_and(|printed| hero.hand.iter().any(|id| {
-                self.world.card(*id).is_some_and(|card| {
-                    self.world.definitions.cards[card.definition].printed_id == printed
+            printed.is_some_and(|printed| {
+                hero.hand.iter().any(|id| {
+                    self.world.card(*id).is_some_and(|card| {
+                        self.world.definitions.cards[card.definition].printed_id == printed
+                    })
                 })
-            }))
+            })
         }))
     }
 

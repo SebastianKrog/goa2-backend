@@ -135,7 +135,12 @@ impl NativeSession {
         let source_is_keyed = self
             .truthy_symbol_bound(objects, text("source_card_key"))?
             .is_some();
-        Ok(Some(CardSwapOperands { model, target, source, source_is_keyed }))
+        Ok(Some(CardSwapOperands {
+            model,
+            target,
+            source,
+            source_is_keyed,
+        }))
     }
 
     pub(super) fn card_swap_is_current_to_hand_bound(
@@ -148,15 +153,19 @@ impl NativeSession {
         };
         let current = self.model_card_bound(objects, operands.model, Field::Current)?;
         if operands.source_is_keyed
-            || current.and_then(|id| self.world.card(id)).is_none_or(|card| card.facedown)
+            || current
+                .and_then(|id| self.world.card(id))
+                .is_none_or(|card| card.facedown)
         {
             return Ok(false);
         }
         let hand = self.hero_card_list_bound(objects, operands.model, Field::Hand)?;
-        Ok(hand.into_iter().flatten().any(|id| self.world.card(id).is_some_and(|card| {
-            !card.facedown
-                && self.world.definitions.cards[card.definition].printed_id == operands.target
-        })))
+        Ok(hand.into_iter().flatten().any(|id| {
+            self.world.card(id).is_some_and(|card| {
+                !card.facedown
+                    && self.world.definitions.cards[card.definition].printed_id == operands.target
+            })
+        }))
     }
 
     pub(super) fn swap_cards_bound(
@@ -165,8 +174,12 @@ impl NativeSession {
         step: ObjectId,
     ) -> Result<()> {
         let p = &objects.phases;
-        let Some(CardSwapOperands { model, target, source, source_is_keyed }) =
-            self.card_swap_operands_bound(objects, step)?
+        let Some(CardSwapOperands {
+            model,
+            target,
+            source,
+            source_is_keyed,
+        }) = self.card_swap_operands_bound(objects, step)?
         else {
             return Ok(());
         };

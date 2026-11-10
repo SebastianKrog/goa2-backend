@@ -217,14 +217,19 @@ impl NativeSession {
                 let mut preview = self.world.clone();
                 preview.battle_zones = zones.clone();
                 preview.waves = waves.clone();
-                rules.resolve_traced(&mut preview, &self.symbols, live, selected.as_ref(), favored)
+                rules.resolve_traced(
+                    &mut preview,
+                    &self.symbols,
+                    live,
+                    selected.as_ref(),
+                    favored,
+                )
             }
         };
-        let (result, writes) = result
-            .map_err(|error| match error {
-                crate::battle::BattleError::Rule(text) => EngineError::Rule(text),
-                crate::battle::BattleError::Unsupported(text) => unsupported(text),
-            })?;
+        let (result, writes) = result.map_err(|error| match error {
+            crate::battle::BattleError::Rule(text) => EngineError::Rule(text),
+            crate::battle::BattleError::Unsupported(text) => unsupported(text),
+        })?;
         let clear_pending = pending.is_some()
             && writes
                 .iter()

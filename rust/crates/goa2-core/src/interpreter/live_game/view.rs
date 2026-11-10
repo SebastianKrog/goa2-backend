@@ -475,9 +475,7 @@ fn battle_zone_minion_counts(state: &Value) -> Map<String, Value> {
     fields(&state["battle_zones"])
         .filter_map(|(lane, zone)| {
             let zone = zone.as_str()?;
-            if board["zones"].get(zone).is_none() {
-                return None;
-            }
+            board["zones"].get(zone)?;
             let counts = ["RED", "BLUE"].map(|team| {
                 let mut seen = HashSet::new();
                 rows(&state["teams"][team]["minions"])

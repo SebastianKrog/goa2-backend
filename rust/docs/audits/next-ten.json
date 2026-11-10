@@ -1,0 +1,236 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-10",
+  "branch": "bots-upstream",
+  "parent_commit": "ea1e2b0a",
+  "completed_tasks": [
+    "C01-01",
+    "C01-02",
+    "C02-05",
+    "C03-06",
+    "C03-07",
+    "C03-08",
+    "C03-09",
+    "C03-10",
+    "C03-11",
+    "C04-06"
+  ],
+  "scope": "Local implementation, audit and retained-policy decisions; no publication, deployment, oracle repin or full-parity claim.",
+  "tooling": {
+    "expected": 18,
+    "executed": 18,
+    "failed": 0,
+    "extracted_expected": 18,
+    "extracted_executed": 18,
+    "extracted_failed": 0
+  },
+  "portable_baselines": {
+    "expected": 4,
+    "executed": 4,
+    "failed": 0,
+    "recorded_observations": 473,
+    "extracted_expected": 4,
+    "extracted_executed": 4,
+    "extracted_failed": 0,
+    "extracted_observations": 474,
+    "observation_count_is_golden": false,
+    "manifest": "../../tests/baselines/manifest.json"
+  },
+  "setup_parity": {
+    "expected_tests": 1,
+    "executed_tests": 1,
+    "failed": 0,
+    "compared_opening_states": 28,
+    "identity_graphs_compared": true
+  },
+  "quick_data": {
+    "expected": 572,
+    "executed": 572,
+    "missing": 0,
+    "failed": 0,
+    "extracted_same_result": true
+  },
+  "gate_catalog": {
+    "expected": 9,
+    "validated": 9,
+    "extracted_validated": 9,
+    "execution_claim": "setup-parity only"
+  },
+  "material_inventory": {
+    "tracked_milestones": 29,
+    "repository_reports": 29,
+    "identical_groups": 0,
+    "deleted": 0,
+    "original_bytes_unchanged": true
+  },
+  "full_preflight": {
+    "exit_code": 1,
+    "results": [
+      {
+        "family": "complete-games-hanu",
+        "expected": 2,
+        "executed": 0,
+        "missing": 2,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "complete-games",
+        "expected": 2,
+        "executed": 0,
+        "missing": 2,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "object-arena",
+        "expected": 12,
+        "executed": 0,
+        "missing": 12,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "object-execution",
+        "expected": 17347,
+        "executed": 0,
+        "missing": 17347,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "stack-traces",
+        "expected": 6592,
+        "executed": 0,
+        "missing": 6592,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "action-validation",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "actions",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "card-equality",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "displacement-validation",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "effect-stats",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "effects",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "hex-filters",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "mine-paths",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "models",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "planning",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "targeting",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "terrain-validation",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      }
+    ],
+    "meaning": "Missing admitted payloads; no mismatched payload admitted or smoke fallback."
+  },
+  "not_repeated": "Prior 382 native and 14 service results remain historical evidence. No Rust gameplay/production code changed in this batch.",
+  "remote_ci_claimed": false,
+  "publication_performed": false,
+  "commands": [
+    "python -m pytest -q rust/tests/tooling tests/rust_oracle/test_fixture_cache.py",
+    "python -m black --check rust/tools rust/tests/tooling scripts/rust_verification/baselines.py scripts/rust_oracle/run_pinned.py",
+    "python -m ruff check --select E,F,I --ignore E501 rust/tools rust/tests/tooling scripts/rust_verification/baselines.py scripts/rust_oracle/run_pinned.py",
+    "python rust/tools/dependency_audit.py --output rust/docs/audits/dependencies.json",
+    "python rust/tools/material_inventory.py --output rust/docs/audits/material-inventory.json",
+    "python rust/tools/fixtures.py verify",
+    "python rust/tools/fixtures.py verify --full",
+    "python rust/tools/gates.py validate",
+    "python rust/tools/gates.py run setup-parity --report /absolute/path/setup-result.json",
+    "python rust/tools/baseline_games.py --binary /absolute/path/goa2-game-server --output /absolute/path/baselines.json",
+    "python rust/tools/extract.py /absolute/path/new-extracted-directory"
+  ]
+}

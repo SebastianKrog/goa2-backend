@@ -21,3 +21,9 @@ Historical measurements remain in the archived development log with their
 original scope. They are not fresh acceptance. Full parity/restore artifacts
 must be available before the planned interpreter/search split or dense-path
 retirement. C10/C11 follow-ups are tracked in [readiness](readiness.md).
+
+Benchmark input ownership, identities, generators and consumers are recorded in
+[`benchmarks/inputs.json`](../benchmarks/inputs.json). Test-only smoke seeds are
+explicitly distinguished from full replay inputs and strength/profile recipes.
+The [gate catalog](verification-gates.md) pins runnable simulation/strength
+commands to reviewed bridge source; catalog validation is not a benchmark run.

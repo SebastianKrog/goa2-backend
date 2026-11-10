@@ -1,7 +1,8 @@
 # Test tiers and fixture ownership
 
 The [tier registry](../test-tiers.json) lists commands, scope, owners and when
-checks are required. Run commands from the Rust workspace unless stated otherwise.
+checks are required. The [expensive gate catalog](verification-gates.md) gives
+exact argv, required inputs and nonzero-test checks for the named gates. Run commands from the Rust workspace unless stated otherwise.
 
 ## Quick native
 
@@ -84,3 +85,11 @@ for oracle generation; exact Pydantic/core/jsonpatch versions are mandatory.
 Run `python -m pytest rust/tests/tooling tests/rust_oracle/test_fixture_cache.py`.
 The full original Python engine suite remains separate; this cleanup does not
 replace it or claim it ran when only native/tooling checks ran.
+
+## Portable synthetic baselines
+
+The [baseline set](../tests/baselines/README.md) records four disposable drivers
+and their admitted inputs/observations. Run `python3 tools/baseline_games.py`
+with an explicit `--binary` and `--output`. It covers manual 2D protocol, bots,
+clocks, rollback, upgrades, restart and replay, and never records credentials or
+private checkpoints. It is separate from full frozen parity coverage.

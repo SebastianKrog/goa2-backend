@@ -1,11 +1,14 @@
-# Rust engine cleanup — remaining checklist
+# Rust engine cleanup — task checklist
 
 Reconciled on 10 November 2026 against implementation `27dda4db` on
 `bots-upstream`, the [original plan](../../docs/RUST_ENGINE_CLEANUP_PLAN.md),
 [readiness record](readiness.md), and [verification evidence](cleanup-evidence.json).
-This lists remaining work across **all C01–C12 packages**, including release gates
+This tracks work across **all C01–C12 packages**, including release gates
 and later P1/P2 work. An unchecked item is open; a documented policy or local
 smoke pass does not establish its wider acceptance criterion.
+
+The [ten-task follow-up](audits/next-ten.md) closes the ten checked items below.
+**10 completed; 74 remain open.** All other acceptance gates retain their scope.
 
 The implemented baseline already includes catalog relocation, bundled smoke
 inputs/content, native CI definitions, SQLite migrations, service suites,
@@ -24,8 +27,8 @@ retain/defer decision when no change is justified.
 
 Owner: engine and release maintainers. No prerequisite package.
 
-- [ ] **C01-01** Finish the bidirectional dependency audit of the extraction manifest: embedded files, generated server metadata, Python imports/root resolution, test support, packaging/service files and hosted-draft dependencies. Record required external inputs and consumers for every retained group.
-- [ ] **C01-02** Complete the portable synthetic baseline set for manual 2D play, bots, timed play, rollback, upgrades, restart and replay. Add any scenarios not already covered, and record expected commands, scoped views, ordered events, revisions, content identity and provenance.
+- [x] **C01-01** Finish the bidirectional dependency audit of the extraction manifest: embedded files, generated server metadata, Python imports/root resolution, test support, packaging/service files and hosted-draft dependencies. Record required external inputs and consumers for every retained group.
+- [x] **C01-02** Complete the portable synthetic baseline set for manual 2D play, bots, timed play, rollback, upgrades, restart and replay. Add any scenarios not already covered, and record expected commands, scoped views, ordered events, revisions, content identity and provenance.
 - [ ] **C01-03** Confirm the baseline inputs are redistributable and contain no real credentials/private matches; record the rights decision with C07 before calling them public fixtures.
 - [ ] **C01-04** Approve the final extraction manifest and exact retained payload after the remaining data/rights decisions. Retain original-to-extracted source mapping and record clean source/build status for that candidate.
 
@@ -39,7 +42,7 @@ installer, small test pack and verified source-archive support already exist.
 - [ ] **C02-02** Make the exact admitted oracle source artifact available independently of the original Git database, subject to rights clearance. Publish or document its pinned acquisition location, archive checksum and locked Python/runtime requirements.
 - [ ] **C02-03** Update acquisition instructions to use the actual distribution locations, then exercise download, verification, installation and actionable failure paths from a fresh checkout without original history or sibling repositories.
 - [ ] **C02-04** Verify full-content server startup through that documented acquisition route with empty project caches and without Python gameplay installed. Record pack/binary identities; the bundled seven-hero test pack does not close this gate.
-- [ ] **C02-05** Keep Linux as the supported baseline. If macOS, Windows or a lower compiler minimum is proposed, test and document it before making that support claim; otherwise explicitly retain the present policy.
+- [x] **C02-05** Keep Linux as the supported baseline. If macOS, Windows or a lower compiler minimum is proposed, test and document it before making that support claim; otherwise explicitly retain the present policy.
 
 ## C03 — Runtime, fixture and legacy-material ownership (P0)
 
@@ -51,12 +54,12 @@ are already byte-verified; no fixture family has been retired.
 - [ ] **C03-03** Resolve the newer missing case whose targeted regeneration changed its frozen hash. Obtain the original admitted payload or separately review generator/provenance differences; do not substitute a changed case or silently repin the oracle/index.
 - [ ] **C03-04** Provide verified acquisition for all retained corpora and document where ignored cache payloads live. Preserve deterministic gzip, atomic publication, logical paths and one-case-at-a-time reads; do not extract/cache the full corpus in memory.
 - [ ] **C03-05** Finish registry detail for each family: specific generator command, schema/rules version, oracle/runtime identity, expected counts/hashes, actual consumers, acquisition location, rights and owner. Replace generic generator/consumer descriptions where they leave reproduction ambiguous.
-- [ ] **C03-06** Classify benchmark inputs separately from runtime catalogs, smoke examples and full parity data; record their location, identity, generator and consumers.
-- [ ] **C03-07** Classify error fixtures and guards as intentional rejection contracts or historical porting limitations, and identify the tests/consumers that justify retaining each category.
-- [ ] **C03-08** Audit tracked milestone validation JSON (29 artifacts at the plan baseline), references and unique regression inputs. Record archive/exclusion decisions with original commit, compiler and scope metadata before retiring anything.
-- [ ] **C03-09** Inventory duplicated/scratch reports before any deletion. Preserve unique source, scenarios and provenance, and document coverage replacement or a justified retention decision for each proposed removal.
-- [ ] **C03-10** Audit cache identity/invalidation across schema, rules, oracle, generator and runtime dependencies. Verify physical-instance aliases, dictionary/list order, null semantics and semantic hashes survive acquisition or representation changes.
-- [ ] **C03-11** Decide final catalog/package placement for the standalone layout. If crates.io publication is later enabled, redesign external-crate data paths as needed and verify packaged-crate contents; keep publication disabled meanwhile.
+- [x] **C03-06** Classify benchmark inputs separately from runtime catalogs, smoke examples and full parity data; record their location, identity, generator and consumers.
+- [x] **C03-07** Classify error fixtures and guards as intentional rejection contracts or historical porting limitations, and identify the tests/consumers that justify retaining each category.
+- [x] **C03-08** Audit tracked milestone validation JSON (29 artifacts at the plan baseline), references and unique regression inputs. Record archive/exclusion decisions with original commit, compiler and scope metadata before retiring anything.
+- [x] **C03-09** Inventory duplicated/scratch reports before any deletion. Preserve unique source, scenarios and provenance, and document coverage replacement or a justified retention decision for each proposed removal.
+- [x] **C03-10** Audit cache identity/invalidation across schema, rules, oracle, generator and runtime dependencies. Verify physical-instance aliases, dictionary/list order, null semantics and semantic hashes survive acquisition or representation changes.
+- [x] **C03-11** Decide final catalog/package placement for the standalone layout. If crates.io publication is later enabled, redesign external-crate data paths as needed and verify packaged-crate contents; keep publication disabled meanwhile.
 
 ## C04 — Test tiers and Rust CI (P0)
 
@@ -68,7 +71,7 @@ acceptance. Native/Python CI definitions and local quick/quality checks exist.
 - [ ] **C04-03** Run `python3 tools/check.py full` and retain canonical/live/full-game state, request, event-order and identity comparison results with explicit counts.
 - [ ] **C04-04** Run `python3 tools/check.py restore` with the required complete data and retain exhaustive boundary/restoration and worker-isolation evidence.
 - [ ] **C04-05** Acquire the admitted setup/view inputs and explicitly run their ignored gates. Record variables, selected names and nonzero expected/executed counts; an ignored gate is not a pass.
-- [ ] **C04-06** Replace remaining generic expensive-tier command descriptions with executable, pinned workload commands and required inputs. Cover setup/view, restore, performance/strength and hosted integration, with accountable owners and event/schedule triggers.
+- [x] **C04-06** Replace remaining generic expensive-tier command descriptions with executable, pinned workload commands and required inputs. Cover setup/view, restore, performance/strength and hosted integration, with accountable owners and event/schedule triggers.
 - [ ] **C04-07** Verify CI change selection enforces the appropriate reference/restore gates for engine, worker, codec/arena and fixture changes; releases must run the full required matrix regardless of a narrow file diff.
 - [ ] **C04-08** Establish periodic cold-acquisition/build verification. If CI caches are introduced, use them only as accelerators and test a path that does not depend on warm caches.
 - [ ] **C04-09** Run the workflow remotely and record actual job results, including separate Python tooling/script checks. Local successes alone do not establish a successful remote CI run.

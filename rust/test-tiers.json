@@ -34,22 +34,53 @@
       "name": "restore-exhaustive",
       "owner": "engine maintainers",
       "when": "restore/codec/arena changes and releases",
-      "command": "python3 tools/check.py restore; plus explicit setup/view environment gates in docs/testing.md",
-      "requires": "verified complete data and setup/view sources; not established by quick-native"
+      "command": "python3 tools/gates.py run restore-exhaustive",
+      "requires": "verified complete data and setup/view sources; not established by quick-native",
+      "additional_commands": [
+        "python3 tools/gates.py run setup-parity",
+        "python3 tools/gates.py run view-parity"
+      ]
     },
     {
       "name": "performance-strength",
       "owner": "search maintainers",
       "when": "search/hot-path changes and releases",
-      "command": "existing scripts/rust_oracle benchmark/arena commands; record exact workload per docs/search.md",
-      "requires": "frozen content/source, fixed work and paired runs; expensive opt-in"
+      "command": "python3 tools/gates.py run simulation-benchmark",
+      "requires": "frozen content/source, fixed work and paired runs; expensive opt-in",
+      "additional_commands": [
+        "python3 tools/gates.py run strength-baseline"
+      ]
     },
     {
       "name": "hosted-integration",
       "owner": "release maintainers",
       "when": "integration changes and deployment promotion",
-      "command": "scripts/verify_rust_hosted_draft.py and verify_rust_staging.py with explicit deployment arguments",
-      "requires": "explicit compatible frontend/deployment; never an implicit external mutation"
+      "command": "python3 tools/gates.py run hosted-local-contract",
+      "requires": "explicit compatible frontend/deployment; never an implicit external mutation",
+      "additional_commands": [
+        "python3 tools/gates.py run hosted-staging-readonly"
+      ]
+    },
+    {
+      "name": "setup-parity",
+      "owner": "engine maintainers",
+      "when": "setup/content changes, weekly reference backstop and release",
+      "command": "python3 tools/gates.py run setup-parity",
+      "requires": "Explicit admitted inputs and nonzero test selection; see verification-gates.json"
+    },
+    {
+      "name": "view-parity",
+      "owner": "engine/service maintainers",
+      "when": "view/privacy changes, weekly reference backstop and release",
+      "command": "python3 tools/gates.py run view-parity",
+      "requires": "Explicit admitted inputs and nonzero test selection; see verification-gates.json"
+    },
+    {
+      "name": "timed-bot-native",
+      "owner": "service/search maintainers",
+      "when": "clock/bot/budget changes and release",
+      "command": "python3 tools/gates.py run timed-bot-native",
+      "requires": "Explicit admitted inputs and nonzero test selection; see verification-gates.json"
     }
   ]
 }

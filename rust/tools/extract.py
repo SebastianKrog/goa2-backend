@@ -7,6 +7,8 @@ import json
 import shutil
 from pathlib import Path
 
+from dependency_audit import selected_paths
+
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST = ROOT / "rust/extraction-manifest.json"
 
@@ -15,17 +17,9 @@ def extract(destination):
     manifest = json.loads(MANIFEST.read_text())
     if destination.exists():
         raise FileExistsError(f"Extraction destination already exists: {destination}")
-    paths = {}
-    for group in manifest["groups"]:
-        for pattern in group["paths"]:
-            for path in sorted(ROOT.glob(pattern)):
-                if not path.is_file() or "__pycache__" in path.parts:
-                    continue
-                if path.is_symlink():
-                    raise ValueError(f"Symlink not admitted to extraction: {path}")
-                paths[path.relative_to(ROOT).as_posix()] = group["category"]
-    if not paths:
-        raise ValueError("Extraction manifest selected no files")
+    if destination.resolve().is_relative_to(ROOT.resolve()):
+        raise ValueError("Extraction destination must be outside the source repository")
+    paths = selected_paths(ROOT, manifest)
     destination.mkdir(parents=True)
     rows = []
     for relative, category in sorted(paths.items()):

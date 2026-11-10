@@ -59,6 +59,7 @@ oracle regeneration are in [content](docs/content.md).
 - [Frontend protocol](docs/frontend-protocol.md), [operations and persistence](docs/operations.md)
 - [Search and benchmarking](docs/search.md), [contribution workflow](docs/contributing.md)
 - [Extraction manifest](extraction-manifest.json), [release readiness](docs/readiness.md)
+- [Platform/package policy](docs/platform-and-packaging.md), [explicit verification gates](docs/verification-gates.md)
 
 Historical implementation and benchmark narratives are preserved in
 [development history](docs/archive/development-history.md) and

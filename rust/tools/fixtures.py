@@ -38,6 +38,14 @@ def raw(path):
             return stream.read()
 
 
+def reference_identity(value, oracle, description):
+    for key in ("oracle_revision", "source_sha256"):
+        if value.get(key) != oracle.get(key):
+            raise ValueError(f"{description} {key} mismatch")
+    if "rules_version" in value and value["rules_version"] != oracle.get("rules_version"):
+        raise ValueError(f"{description} rules_version mismatch")
+
+
 def quick(workspace=WORKSPACE):
     count = 0
     content = workspace / "content"
@@ -58,11 +66,15 @@ def quick(workspace=WORKSPACE):
             raise ValueError(f"Catalog schema changed: {row['path']}")
         count += 1
     sample = json.loads((content / "smoke-manifest.json").read_text())
+    reference_identity(sample, oracle, "Smoke content manifest")
     if hashlib.sha256((content / sample["path"]).read_bytes()).hexdigest() != sample["sha256"]:
         raise ValueError("Smoke content checksum changed")
     count += 1
     smoke = workspace / "tests/fixtures/smoke"
     manifest = json.loads((smoke / "manifest.json").read_text())
+    if manifest.get("schema_version") != 1:
+        raise ValueError("Unsupported smoke manifest schema")
+    reference_identity(manifest, oracle, "Smoke manifest")
     expected = {row["path"] + ".gz" for row in manifest["files"]}
     actual = {p.relative_to(smoke).as_posix() for p in smoke.rglob("*.gz")}
     if actual != expected or not expected:
@@ -117,7 +129,11 @@ def full(families, cache=None):
             )
             continue
         index_path = FIXTURES / (family + ".json")
-        index = json.loads(raw(index_path))
+        encoded_index = raw(index_path)
+        if record.get("sha256") and hashlib.sha256(encoded_index).hexdigest() != record["sha256"]:
+            raise ValueError(f"Registry index byte identity mismatch: {family}")
+        index = json.loads(encoded_index)
+        reference_identity(index, oracle, f"Index {family}")
         identity = index.pop("corpus_sha256")
         if index.get("schema_version") != 2 or digest(index) != identity:
             raise ValueError(f"Index identity mismatch: {family}")
@@ -126,6 +142,8 @@ def full(families, cache=None):
         expected = len(index["cases"])
         if not expected:
             raise ValueError(f"Zero selected cases: {family}")
+        if record.get("case_count") is not None and expected != record["case_count"]:
+            raise ValueError(f"Registry case count mismatch: {family}")
         seen = set()
         executed = missing = failed = 0
         for row in index["cases"]:

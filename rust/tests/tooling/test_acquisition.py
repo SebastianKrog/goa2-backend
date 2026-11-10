@@ -81,13 +81,16 @@ def test_full_parity_never_substitutes_a_bundled_smoke_case(tmp_path, monkeypatc
     fixtures = load("fixtures")
     base = tmp_path / "tests/fixtures"
     base.mkdir(parents=True)
-    (tmp_path / "oracle-manifest.json").write_text('{"source_sha256":"oracle"}')
+    (tmp_path / "oracle-manifest.json").write_text(
+        '{"source_sha256":"oracle","oracle_revision":"reference"}'
+    )
     (base / "registry.json").write_text('{"families":[{"family":"full"}]}')
     case = {"name": "kept", "expected": [1]}
     identity = fixtures.digest(case)
     relative = f"full/{identity}.json"
     index = {
         "schema_version": 2,
+        "oracle_revision": "reference",
         "source_sha256": "oracle",
         "cases": [{"name": "kept", "path": relative, "case_sha256": identity}],
     }

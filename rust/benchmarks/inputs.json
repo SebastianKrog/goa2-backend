@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "scope": "Ownership/identity inventory, not fresh benchmark results. Runtime catalogs remain in content/catalogs; parity indices and smoke data retain their existing roles.",
+  "inputs": [
+    {
+      "id": "matched-simulation-replays",
+      "class": "full-parity-derived benchmark input",
+      "location": "GOA2_FIXTURE_CACHE/complete-games-hanu/*.json[.gz]",
+      "index": {
+        "path": "rust/tests/fixtures/complete-games-hanu.json",
+        "sha256": "98629b81fbfee0723a1f13bb33997a6118f5d997284e1510b978d4b7cc4e8d9b"
+      },
+      "corpus_sha256": "6f9743e3a6c1b14f8cadeb527e8ca130f9770feea51c91ad6d05afddc4c9c56a",
+      "case_count": 2,
+      "generator": {
+        "path": "scripts/rust_oracle/streamed_games.py",
+        "sha256": "ab4b0d5cf61706ec8ac3025c33df02614538109c5f06bcf3e227a38bb90db9f2"
+      },
+      "generator_arguments": [
+        "--roster",
+        "hanu",
+        "--worker",
+        "ABSOLUTE_RELEASE_WORKER",
+        "--output",
+        "EXPLICIT_CORPUS_PATH"
+      ],
+      "consumers": [
+        "scripts/rust_oracle/simulation_bench.py",
+        "scripts/rust_oracle/rollout_parity.py --recorded-rollouts"
+      ],
+      "availability": "indexed payloads missing; do not replace with smoke or regenerate changed hashes",
+      "owner": "search maintainers",
+      "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+      "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+      "retention": "Retain identity and consumers; no corpus retirement or performance claim.",
+      "generator_note": "The recorded hash identifies the maintained generator/tool. Admitted case identities and original provenance remain in their corpus/smoke manifests; no regeneration is asserted by this inventory."
+    },
+    {
+      "id": "synthetic-resolution-and-planning",
+      "class": "generated benchmark/strength recipes",
+      "location": "Generated per invocation by frozen source plus admitted bridge scripts; reports in an explicit ignored output directory",
+      "generator": {
+        "path": "scripts/rust_oracle/rollout_parity.py",
+        "sha256": "ab82909a6cd0bf5b69bc6135d806ddb5eae2c13ab55b0b6bae80380804952888"
+      },
+      "identity": "Map, roster, seed, node/turn/sample parameters and oracle identity; exact command is recorded by verification-gates.json",
+      "consumers": [
+        "goa2-search-cli rollout_bench",
+        "search_resolution",
+        "search_sampled_planning",
+        "offline_match"
+      ],
+      "availability": "requires GOA2_ORACLE_SOURCE and locked runtime; no Lab evaluator unless explicitly requested",
+      "owner": "search maintainers",
+      "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+      "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+      "retention": "Retain identity and consumers; no corpus retirement or performance claim.",
+      "generator_note": "The recorded hash identifies the maintained generator/tool. Admitted case identities and original provenance remain in their corpus/smoke manifests; no regeneration is asserted by this inventory."
+    },
+    {
+      "id": "arena-profile-starts",
+      "class": "versioned strength-evaluation profile and private generated starts",
+      "location": "Explicit arena store/profile.json plus starts/<semantic-sha256>.json[.gz]",
+      "generator": {
+        "path": "scripts/rust_oracle/arena_profiles.py",
+        "sha256": "f219564f4fd805198bfec0d99fee85e80c58168df28303e638cd4afa41696ae1"
+      },
+      "identity": "arena_starts_v1 recipe, tuning/holdout seeds, acceptance parameters, profile digest and envelope hashes",
+      "consumers": [
+        "scripts/rust_oracle/arena_queue.py",
+        "scripts/rust_oracle/arena_verify.py"
+      ],
+      "availability": "explicit template/store/referee required; no profile or training run is authorized by classification",
+      "owner": "search maintainers",
+      "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+      "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+      "retention": "Retain identity and consumers; no corpus retirement or performance claim.",
+      "generator_note": "The recorded hash identifies the maintained generator/tool. Admitted case identities and original provenance remain in their corpus/smoke manifests; no regeneration is asserted by this inventory."
+    },
+    {
+      "id": "native-perf-samples",
+      "class": "external machine/profile capture",
+      "location": "Explicit local perf.data and matching binary, outside committed fixtures",
+      "generator": {
+        "path": "scripts/rust_oracle/native_profile.py",
+        "sha256": "0e719981342db23b7a96bda6948d284740490e66561336ac0719185ff742b99b"
+      },
+      "identity": "binary build ID and SHA256, perf.data SHA256, compiler/profile, hardware and capture command",
+      "consumers": [
+        "scripts/rust_oracle/native_profile.py"
+      ],
+      "availability": "optional Linux perf/readelf/nm; no samples are presumed available",
+      "owner": "search maintainers",
+      "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+      "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+      "retention": "Retain identity and consumers; no corpus retirement or performance claim.",
+      "generator_note": "The recorded hash identifies the maintained generator/tool. Admitted case identities and original provenance remain in their corpus/smoke manifests; no regeneration is asserted by this inventory."
+    },
+    {
+      "id": "benchmark-contract-test-seed",
+      "class": "test-only smoke input; not performance evidence",
+      "location": "rust/tests/fixtures/smoke/object-execution/<case-sha>.json.gz",
+      "index": {
+        "path": "rust/tests/fixtures/object-execution.json",
+        "sha256": "c7596d5d31cd15b0970d512d2128bab0601c0bdcaf78765a99076663050026f5"
+      },
+      "case": {
+        "name": "object-execution-card-planning-cycle",
+        "path": "object-execution/44d2b409cd8e145de3b1efb4999134a4ff8c91ec99b5de2869cc9a7c2cca20da.json",
+        "case_sha256": "44d2b409cd8e145de3b1efb4999134a4ff8c91ec99b5de2869cc9a7c2cca20da"
+      },
+      "generator": {
+        "path": "scripts/rust_oracle/object_execution_traces.py",
+        "sha256": "3f623c5079a8c45c5cc2c17b10d63d24f2f6ce16a43986d886ff0147d21412f2"
+      },
+      "consumers": [
+        "goa2-search-cli simulation_bench::tests"
+      ],
+      "availability": "bundled; used to verify measurement correctness, not to claim full-game throughput",
+      "owner": "search maintainers",
+      "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+      "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+      "retention": "Retain identity and consumers; no corpus retirement or performance claim.",
+      "generator_note": "The recorded hash identifies the maintained generator/tool. Admitted case identities and original provenance remain in their corpus/smoke manifests; no regeneration is asserted by this inventory.",
+      "original_source_commit": "dcd00e0cf609dc84eb879394398aec80b1d1de4a",
+      "provenance_manifest": "rust/tests/fixtures/smoke/manifest.json"
+    }
+  ]
+}

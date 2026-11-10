@@ -292,5 +292,25 @@
     "binary_and_content_identity_validated": true,
     "all_embedded_checksums_verified": true,
     "publication_performed": false
-  }
+  },
+  "follow_up_batches": [
+    {
+      "date": "2026-11-10",
+      "completed_tasks": [
+        "C01-01",
+        "C01-02",
+        "C02-05",
+        "C03-06",
+        "C03-07",
+        "C03-08",
+        "C03-09",
+        "C03-10",
+        "C03-11",
+        "C04-06"
+      ],
+      "evidence": "audits/next-ten.json",
+      "summary": "audits/next-ten.md",
+      "remaining_checklist_tasks": 74
+    }
+  ]
 }

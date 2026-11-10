@@ -190,7 +190,7 @@
     },
     {
       "name": "benchmark/profile artifacts",
-      "contract": "Full complete-game inputs come from the admitted external fixture cache; arena profiles/starts and perf.data are explicit local inputs. They are separately owned in docs/audits/benchmark-inputs.json; absence must not become a reduced successful run.",
+      "contract": "Full complete-game inputs come from the admitted external fixture cache; arena profiles/starts and perf.data are explicit local inputs. They are separately owned in rust/benchmarks/inputs.json; absence must not become a reduced successful run.",
       "consumers": [
         "scripts/rust_oracle/simulation_bench.py",
         "scripts/rust_oracle/arena_queue.py",

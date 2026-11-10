@@ -206,6 +206,13 @@ def unstick_vote_smoke(binary, pack, database):
             with sockets(server, game, arien) as first, sockets(server, game, brogan) as second:
                 for socket in (first, second):
                     packet(socket, "STATE_UPDATE", before["revision"])
+                    # Initial STATE_UPDATE precedes the server's pending-vote
+                    # synchronization. A request/response barrier lets both
+                    # sockets finish startup before broadcasting a new vote.
+                    # Keep exact notice ordering checks below; do not skip or
+                    # discard duplicate/stale proposal packets.
+                    socket.send(json.dumps({"type": "GET_VIEW"}))
+                    packet(socket, "STATE_UPDATE", before["revision"])
 
                 def vote(command, arguments, outcome):
                     first.send(

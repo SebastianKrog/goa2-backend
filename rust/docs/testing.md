@@ -72,7 +72,7 @@ python3 -m venv .venv-oracle
 ```
 
 `--suite auth`, `--suite bots`, `--suite clocks`, `--suite votes` and
-`--suite shutdown` select independently runnable suites; repeat the option to
+`--suite shutdown` and `--suite backup` select independently runnable suites; repeat the option to
 combine suites. Default runs all. Each suite reports expected/executed counts.
 Helpers in `scripts/rust_verification/` preserve real processes, temporary
 SQLite databases, concurrent requests, restart, backup, WebSockets and replay.
@@ -93,3 +93,9 @@ and their admitted inputs/observations. Run `python3 tools/baseline_games.py`
 with an explicit `--binary` and `--output`. It covers manual 2D protocol, bots,
 clocks, rollback, upgrades, restart and replay, and never records credentials or
 private checkpoints. It is separate from full frozen parity coverage.
+
+The [CI selection audit](audits/ci-gates.md) records conservative full/restore
+selection and a complete release-candidate matrix on version tags or an explicit
+manual candidate run. Input acquisition and remote execution results remain gates.
+[Boundary/audience contracts](audits/compatibility-decisions.md) and the
+[backup rehearsal](audits/server-harness.md) describe the small local regressions.

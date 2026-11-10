@@ -5,7 +5,7 @@ import json
 import tempfile
 from pathlib import Path
 
-from rust_verification import auth, bots, clocks, shutdown, votes
+from rust_verification import auth, backup, bots, clocks, shutdown, votes
 
 # Compatibility exports used by the hosted/replay-share verifiers.
 from rust_verification.process import (
@@ -50,6 +50,7 @@ SUITES = {
         votes.effect_patch_vote_smoke,
     ),
     "shutdown": (shutdown.shutdown_smoke,),
+    "backup": (backup.backup_restore_smoke,),
 }
 
 

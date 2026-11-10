@@ -34,3 +34,7 @@ identity validation. Rehearse rollback on disposable data before promotion.
 Release provenance must name source commit, toolchain, architecture, content hash,
 database version, test tier/counts and backup. A checksum is not a signature.
 Hosted ingress/Worker and backup verification remain a separate release gate.
+
+The [online WAL rehearsal](audits/server-harness.md#online-backup-and-restoration-c08-02)
+provides a reproducible `--suite backup` command and its exact retained-data checks.
+Historical binary rollback and hosted promotion remain separate acceptance gates.

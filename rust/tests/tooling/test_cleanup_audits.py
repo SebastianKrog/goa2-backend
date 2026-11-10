@@ -238,3 +238,15 @@ def test_pinned_wrapper_copies_only_admitted_metadata_not_full_payloads(tmp_path
     copied = run_pinned.copy_fixture_metadata(source, destination)
     assert copied == ["stack-traces.json"]
     assert sorted(p.name for p in (destination / "rust/tests/fixtures").iterdir()) == copied
+
+
+def test_crates_io_remains_disabled_for_every_workspace_crate():
+    import tomllib
+
+    workspace = tomllib.loads((ROOT / "rust/Cargo.toml").read_text())
+    assert workspace["workspace"]["package"]["publish"] is False
+    crates = list((ROOT / "rust/crates").glob("*/Cargo.toml"))
+    assert len(crates) == 3
+    for path in crates:
+        package = tomllib.loads(path.read_text())["package"]
+        assert package["publish"] == {"workspace": True}, path

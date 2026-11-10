@@ -2,8 +2,14 @@ name: Rust
 on:
   push:
     branches: [main, bots-upstream]
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
+    inputs:
+      release_candidate:
+        description: Require the complete release-candidate matrix
+        type: boolean
+        default: false
   schedule:
     - cron: '23 5 * * 1'
 concurrency:
@@ -15,29 +21,14 @@ jobs:
     outputs:
       full: ${{ steps.paths.outputs.full }}
       restore: ${{ steps.paths.outputs.restore }}
+      release: ${{ steps.paths.outputs.release }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
       - id: paths
         name: Select required reference gates
-        run: |
-          python3 - <<'PYTHON'
-          import json, os, subprocess
-          event = json.load(open(os.environ["GITHUB_EVENT_PATH"]))
-          base = event.get("pull_request", {}).get("base", {}).get("sha") or event.get("before")
-          explicit = os.environ["GITHUB_EVENT_NAME"] in {"schedule", "workflow_dispatch"}
-          diff = subprocess.run(["git", "diff", "--name-only", base or "", "HEAD"], text=True, capture_output=True)
-          # Missing merge/base history selects the full gates rather than skipping.
-          unknown = diff.returncode != 0
-          paths = diff.stdout.splitlines()
-          engine = ("rust/crates/goa2-core/", "rust/crates/goa2-search-cli/", "rust/tests/fixtures/", "rust/test-support/", "rust/content/catalogs/", "rust/oracle-manifest.json", "scripts/rust_oracle/", "rust/Cargo.", "rust/rust-toolchain.toml")
-          restore_paths = ("rust/crates/goa2-core/src/codec", "rust/crates/goa2-core/src/objects", "rust/crates/goa2-core/src/interpreter/object_execution", "rust/test-support/")
-          full = explicit or unknown or any(path.startswith(engine) for path in paths)
-          restore = explicit or unknown or any(path.startswith(restore_paths) for path in paths)
-          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
-              out.write(f"full={str(full).lower()}\nrestore={str(restore).lower()}\n")
-          PYTHON
+        run: python3 rust/tools/ci_scope.py
   native:
     runs-on: ubuntu-latest
     steps:
@@ -98,3 +89,45 @@ jobs:
       - name: Require complete admitted artifacts and run exhaustive restoration
         working-directory: rust
         run: python3 tools/check.py restore
+  release-acceptance:
+    needs: [scope, native, tooling-service, full-parity, restore]
+    if: needs.scope.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    # Every input must be configured for this candidate. Missing inputs fail;
+    # this definition does not provide a distribution route or deploy anything.
+    env:
+      GOA2_GAME_CONTENT: ${{ vars.GOA2_GAME_CONTENT }}
+      GOA2_GAME_SETUP_CASES: ${{ vars.GOA2_GAME_SETUP_CASES }}
+      GOA2_GAME_VIEW_CASES: ${{ vars.GOA2_GAME_VIEW_CASES }}
+      GOA2_ORACLE_SOURCE: ${{ vars.GOA2_ORACLE_SOURCE }}
+      GOA2_FIXTURE_CACHE: ${{ vars.GOA2_FIXTURE_CACHE }}
+      GOA2_SEARCH_BINARY: ${{ github.workspace }}/rust/target/release/goa2-search-cli
+      GOA2_BENCHMARK_OUTPUT: ${{ github.workspace }}/benchmark.json
+      GOA2_SERVICE_PYTHON: ${{ vars.GOA2_SERVICE_PYTHON }}
+      GOA2_SERVICE_SOURCE: ${{ vars.GOA2_SERVICE_SOURCE }}
+      GOA2_GAME_BINARY: ${{ github.workspace }}/rust/target/release/goa2-game-server
+      GOA2_FRONTEND_ORIGIN: ${{ vars.GOA2_FRONTEND_ORIGIN }}
+      GOA2_RUST_ORIGIN: ${{ vars.GOA2_RUST_ORIGIN }}
+      GOA2_STAGING_GAME_ID: ${{ vars.GOA2_STAGING_GAME_ID }}
+      GOA2_RELEASE_MANIFEST: ${{ vars.GOA2_RELEASE_MANIFEST }}
+      GOA2_STAGING_SEAT_TOKEN: ${{ secrets.GOA2_STAGING_SEAT_TOKEN }}
+      GOA2_STAGING_ACCESS_CLIENT_ID: ${{ secrets.GOA2_STAGING_ACCESS_CLIENT_ID }}
+      GOA2_STAGING_ACCESS_CLIENT_SECRET: ${{ secrets.GOA2_STAGING_ACCESS_CLIENT_SECRET }}
+      GOA2_STAGING_ACCESS_COOKIE: ${{ secrets.GOA2_STAGING_ACCESS_COOKIE }}
+      GOA2_STAGING_SPECTATOR_TOKEN: ${{ secrets.GOA2_STAGING_SPECTATOR_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11.17'
+      - name: Install independently locked tooling
+        run: python -m pip install --require-hashes -r rust/tools/requirements.lock
+      - name: Build release binaries
+        working-directory: rust
+        run: cargo build --locked --release --workspace
+      - name: Require every remaining candidate gate
+        run: |
+          python rust/tools/gates.py validate
+          for gate in setup-parity view-parity timed-bot-native simulation-benchmark strength-baseline hosted-local-contract hosted-staging-readonly; do
+            python rust/tools/gates.py run "$gate" --report "${gate}-result.json"
+          done

@@ -569,3 +569,22 @@ impl Store {
 fn encode(value: &impl Serialize) -> Result<Vec<u8>> {
     serde_json::to_vec(value).map_err(ApiError::internal)
 }
+
+#[cfg(test)]
+mod compatibility_tests {
+    use super::*;
+
+    #[test]
+    fn legacy_credentials_default_optional_metadata_without_discarding_auth() {
+        let value = json!({"player_tokens":[{"hero_id":"hero_arien","token":"synthetic-player"}],
+            "spectator_token":"synthetic-spectator","hero_names":{},"future_optional":true});
+        let credentials: Credentials = serde_json::from_value(value).unwrap();
+        assert!(credentials.bots.is_empty());
+        assert!(credentials.fixed_clock_ms.is_none() && credentials.provisioning_hash.is_none());
+        assert_eq!(credentials.player_tokens[0].token, "synthetic-player");
+        assert_eq!(credentials.spectator_token, "synthetic-spectator");
+        let encoded = serde_json::to_value(credentials).unwrap();
+        assert!(encoded.get("future_optional").is_none());
+        assert!(encoded.get("fixed_clock_ms").is_none());
+    }
+}

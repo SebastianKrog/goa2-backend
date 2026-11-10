@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "manifest": "rust/extraction-manifest.json",
-  "selected_files": 1094,
+  "selected_files": 1105,
   "group_counts": {
     "deployment": 11,
-    "development": 650,
+    "development": 660,
     "historical": 2,
-    "reference-verification": 247,
+    "reference-verification": 248,
     "runtime": 184
   },
   "embedded_inputs": [
@@ -118,6 +118,20 @@
     {
       "consumer": "rust/crates/goa2-core/tests/contracts.rs",
       "line": 7,
+      "input": "rust/content/smoke-game.json",
+      "kind": "rust-embed",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/crates/goa2-core/tests/contracts.rs",
+      "line": 121,
+      "input": "rust/content/smoke-game.json",
+      "kind": "rust-embed",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/crates/goa2-core/tests/contracts.rs",
+      "line": 209,
       "input": "rust/content/smoke-game.json",
       "kind": "rust-embed",
       "status": "included"
@@ -293,11 +307,11 @@
   ],
   "python_import_counts": {
     "compatible-python-service": 5,
-    "included-module": 1381,
+    "included-module": 1383,
     "optional-layout-lab": 4,
     "pinned-oracle-source": 1405,
-    "python-stdlib": 687,
-    "third-party-runtime": 72
+    "python-stdlib": 715,
+    "third-party-runtime": 73
   },
   "python_imports": [
     {
@@ -317,6 +331,12 @@
       "line": 117,
       "input": "scripts/rust_oracle/fixture_cache.py",
       "category": "included-module"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_ci_scope.py",
+      "line": 6,
+      "input": "pytest",
+      "category": "third-party-runtime"
     },
     {
       "consumer": "rust/tests/tooling/test_cleanup_audits.py",
@@ -346,6 +366,12 @@
       "consumer": "rust/tools/baseline_games.py",
       "line": 14,
       "input": "scripts/rust_verification/baselines.py",
+      "category": "included-module"
+    },
+    {
+      "consumer": "rust/tools/documentation_audit.py",
+      "line": 12,
+      "input": "rust/tools/dependency_audit.py",
       "category": "included-module"
     },
     {
@@ -14263,6 +14289,12 @@
       "category": "included-module"
     },
     {
+      "consumer": "scripts/rust_verification/backup.py",
+      "line": 10,
+      "input": "scripts/rust_verification/process.py",
+      "category": "included-module"
+    },
+    {
       "consumer": "scripts/rust_verification/baselines.py",
       "line": 12,
       "input": "scripts/rust_verification/__init__.py",
@@ -17511,9 +17543,21 @@
       "disposition": "Resolve literal/local modules using included scripts; variable imports are caller-controlled or pinned source discovery. No ambient source checkout is admitted for native execution."
     },
     {
+      "consumer": "rust/tests/tooling/test_ci_scope.py",
+      "line": 8,
+      "expression": "importlib.util.spec_from_file_location('ci_scope', Path(__file__).resolve().parents[2] / 'tools/ci_scope.py')",
+      "disposition": "Resolve literal/local modules using included scripts; variable imports are caller-controlled or pinned source discovery. No ambient source checkout is admitted for native execution."
+    },
+    {
       "consumer": "rust/tests/tooling/test_cleanup_audits.py",
       "line": 19,
       "expression": "importlib.util.spec_from_file_location(name, ROOT / 'rust/tools' / (name + '.py'))",
+      "disposition": "Resolve literal/local modules using included scripts; variable imports are caller-controlled or pinned source discovery. No ambient source checkout is admitted for native execution."
+    },
+    {
+      "consumer": "rust/tests/tooling/test_documentation_audit.py",
+      "line": 10,
+      "expression": "importlib.util.spec_from_file_location('documentation_audit', TOOLS / 'documentation_audit.py')",
       "disposition": "Resolve literal/local modules using included scripts; variable imports are caller-controlled or pinned source discovery. No ambient source checkout is admitted for native execution."
     },
     {
@@ -17536,9 +17580,24 @@
       "expression": "Path(__file__).resolve().parents[3]"
     },
     {
+      "consumer": "rust/tests/tooling/test_ci_scope.py",
+      "line": 8,
+      "expression": "importlib.util.spec_from_file_location('ci_scope', Path(__file__).resolve().parents[2] / 'tools/ci_scope.py')"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_ci_scope.py",
+      "line": 69,
+      "expression": "subprocess.run([sys.executable, ci_scope.__file__], env={**os.environ, 'GITHUB_EVENT_PATH': str(event), 'GITHUB_OUTPUT': str(output), 'GITHUB_EVENT_NAME': 'push'}, check=True, capture_output=True, text=True)"
+    },
+    {
       "consumer": "rust/tests/tooling/test_cleanup_audits.py",
       "line": 13,
       "expression": "Path(__file__).resolve().parents[3]"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_documentation_audit.py",
+      "line": 8,
+      "expression": "Path(__file__).resolve().parents[2] / 'tools'"
     },
     {
       "consumer": "rust/tools/baseline_games.py",
@@ -17558,6 +17617,11 @@
     {
       "consumer": "rust/tools/dependency_audit.py",
       "line": 15,
+      "expression": "Path(__file__).resolve().parents[2]"
+    },
+    {
+      "consumer": "rust/tools/documentation_audit.py",
+      "line": 14,
       "expression": "Path(__file__).resolve().parents[2]"
     },
     {
@@ -17686,6 +17750,66 @@
       "disposition": "included"
     },
     {
+      "consumer": "rust/tests/tooling/test_ci_scope.py",
+      "line": 18,
+      "input": "rust/crates/goa2-core/src/interpreter.rs",
+      "disposition": "included"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_ci_scope.py",
+      "line": 19,
+      "input": "rust/crates/goa2-core/src/codec.rs",
+      "disposition": "included"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_ci_scope.py",
+      "line": 20,
+      "input": "rust/crates/goa2-core/src/arena.rs",
+      "disposition": "review"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_ci_scope.py",
+      "line": 21,
+      "input": "rust/crates/goa2-search-cli/src/main.rs",
+      "disposition": "included"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_ci_scope.py",
+      "line": 22,
+      "input": "rust/crates/goa2-game-server/src/store.rs",
+      "disposition": "included"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_ci_scope.py",
+      "line": 23,
+      "input": "rust/tests/fixtures/object-execution.json",
+      "disposition": "included"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_ci_scope.py",
+      "line": 24,
+      "input": "rust/content/catalogs/actions.json",
+      "disposition": "review"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_ci_scope.py",
+      "line": 25,
+      "input": "scripts/rust_oracle/fixture_cache.py",
+      "disposition": "included"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_ci_scope.py",
+      "line": 46,
+      "input": "rust/README.md",
+      "disposition": "included"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_ci_scope.py",
+      "line": 54,
+      "input": "rust/README.md",
+      "disposition": "included"
+    },
+    {
       "consumer": "rust/tests/tooling/test_cleanup_audits.py",
       "line": 28,
       "input": "docs/guide.md",
@@ -17777,9 +17901,27 @@
     },
     {
       "consumer": "rust/tests/tooling/test_cleanup_audits.py",
+      "line": 246,
+      "input": "rust/Cargo.toml",
+      "disposition": "included"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_cleanup_audits.py",
+      "line": 248,
+      "input": "rust/crates",
+      "disposition": "directory resolved by included tool"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_cleanup_audits.py",
       "line": 240,
       "input": "rust/tests/fixtures",
       "disposition": "registered optional parity/cache input or generator destination"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_documentation_audit.py",
+      "line": 21,
+      "input": "rust/*.md",
+      "disposition": "review"
     },
     {
       "consumer": "rust/tools/baseline_games.py",
@@ -17792,6 +17934,90 @@
       "line": 20,
       "input": "rust/tests/baselines/manifest.json",
       "disposition": "included"
+    },
+    {
+      "consumer": "rust/tools/ci_scope.py",
+      "line": 12,
+      "input": "rust/crates/",
+      "disposition": "directory resolved by included tool"
+    },
+    {
+      "consumer": "rust/tools/ci_scope.py",
+      "line": 13,
+      "input": "rust/test-support/",
+      "disposition": "directory resolved by included tool"
+    },
+    {
+      "consumer": "rust/tools/ci_scope.py",
+      "line": 14,
+      "input": "rust/tests/fixtures/",
+      "disposition": "registered optional parity/cache input or generator destination"
+    },
+    {
+      "consumer": "rust/tools/ci_scope.py",
+      "line": 15,
+      "input": "rust/tests/baselines/",
+      "disposition": "directory resolved by included tool"
+    },
+    {
+      "consumer": "rust/tools/ci_scope.py",
+      "line": 16,
+      "input": "rust/content/",
+      "disposition": "directory resolved by included tool"
+    },
+    {
+      "consumer": "rust/tools/ci_scope.py",
+      "line": 17,
+      "input": "rust/oracle-manifest.json",
+      "disposition": "included"
+    },
+    {
+      "consumer": "rust/tools/ci_scope.py",
+      "line": 18,
+      "input": "rust/Cargo.",
+      "disposition": "review"
+    },
+    {
+      "consumer": "rust/tools/ci_scope.py",
+      "line": 19,
+      "input": "rust/rust-toolchain.toml",
+      "disposition": "included"
+    },
+    {
+      "consumer": "rust/tools/ci_scope.py",
+      "line": 20,
+      "input": "rust/tools/",
+      "disposition": "directory resolved by included tool"
+    },
+    {
+      "consumer": "rust/tools/ci_scope.py",
+      "line": 21,
+      "input": "rust/test-tiers.json",
+      "disposition": "included"
+    },
+    {
+      "consumer": "rust/tools/ci_scope.py",
+      "line": 22,
+      "input": "rust/verification-gates.json",
+      "disposition": "included"
+    },
+    {
+      "consumer": "rust/tools/ci_scope.py",
+      "line": 23,
+      "input": "scripts/rust_oracle/",
+      "disposition": "directory resolved by included tool"
+    },
+    {
+      "consumer": "rust/tools/ci_scope.py",
+      "line": 24,
+      "input": "scripts/rust_verification/",
+      "disposition": "directory resolved by included tool"
+    },
+    {
+      "consumer": "rust/tools/ci_scope.py",
+      "line": 25,
+      "input": "scripts/verify_rust",
+      "disposition": "review"
     },
     {
       "consumer": "rust/tools/dependency_audit.py",
@@ -17870,6 +18096,30 @@
       "line": 177,
       "input": "docs/",
       "disposition": "original Python/history documentation; not an ordinary native build dependency"
+    },
+    {
+      "consumer": "rust/tools/documentation_audit.py",
+      "line": 116,
+      "input": "rust/README.md",
+      "disposition": "included"
+    },
+    {
+      "consumer": "rust/tools/documentation_audit.py",
+      "line": 117,
+      "input": "rust/tests/fixtures/README.md",
+      "disposition": "included"
+    },
+    {
+      "consumer": "rust/tools/documentation_audit.py",
+      "line": 38,
+      "input": "rust/extraction-manifest.json",
+      "disposition": "included"
+    },
+    {
+      "consumer": "rust/tools/documentation_audit.py",
+      "line": 127,
+      "input": "rust/docs/archive/",
+      "disposition": "directory resolved by included tool"
     },
     {
       "consumer": "rust/tools/extract.py",
@@ -18817,6 +19067,7 @@
       "rust/crates/goa2-core/tests/oracle.rs"
     ],
     "rust/tools/dependency_audit.py": [
+      "rust/tools/documentation_audit.py",
       "rust/tools/extract.py"
     ],
     "scripts/rust_oracle/action_builders.py": [
@@ -20041,6 +20292,7 @@
     ],
     "scripts/rust_verification/process.py": [
       "scripts/rust_verification/auth.py",
+      "scripts/rust_verification/backup.py",
       "scripts/rust_verification/bots.py",
       "scripts/rust_verification/clocks.py",
       "scripts/rust_verification/shutdown.py",
@@ -20097,7 +20349,7 @@
     },
     {
       "name": "benchmark/profile artifacts",
-      "contract": "Full complete-game inputs come from the admitted external fixture cache; arena profiles/starts and perf.data are explicit local inputs. They are separately owned in docs/audits/benchmark-inputs.json; absence must not become a reduced successful run.",
+      "contract": "Full complete-game inputs come from the admitted external fixture cache; arena profiles/starts and perf.data are explicit local inputs. They are separately owned in rust/benchmarks/inputs.json; absence must not become a reduced successful run.",
       "consumers": [
         "scripts/rust_oracle/simulation_bench.py",
         "scripts/rust_oracle/arena_queue.py",

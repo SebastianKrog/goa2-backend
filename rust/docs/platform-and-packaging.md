@@ -26,3 +26,13 @@ attribution and release-owner decisions in [readiness](readiness.md).
 
 This closes the platform/placement decisions only. It grants no redistribution
 rights and does not select a public repository, maintainer identity or host.
+
+## crates.io retained policy (C07-11)
+
+Reviewed again for the second ten-task batch: public source hosting remains the
+only packaging target under preparation. Retain workspace `publish = false` and
+inheritance in all three crates. A tooling regression now rejects enabling any
+crate independently. No crate names, public registry grant or publishing token
+is assumed. Enabling crates.io needs a separately reviewed API/naming/data-path
+and metadata design, `cargo package` contents verification, rights clearance and
+a deliberate release decision; it is not part of source extraction acceptance.

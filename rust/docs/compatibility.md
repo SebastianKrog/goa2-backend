@@ -36,3 +36,8 @@ must survive process restart; a reused ID with different content is a conflict.
 Database v3 makes previously implicit alterations explicit. Binary rollback to
 a pre-versioning build requires the matching backup policy in [operations](operations.md),
 even though the retained table/column layout is unchanged.
+
+The [serialization/audience/shim audit](audits/compatibility-decisions.md) records
+per-boundary defaults, strict versus additive field handling, recipient regressions
+and explicit retention/migration conditions. No breaking cleanup or rules change
+was approved by retaining those policies.

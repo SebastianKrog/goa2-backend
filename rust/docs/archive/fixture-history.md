@@ -12,7 +12,7 @@ Verification uses bounded case workers (default 4, CPU-capped) and two test
 threads in the WSL wrapper. `GOA2_ORACLE_WORKERS=1 RUST_TEST_THREADS=1` selects
 serial debugging. Full cases stream; named rule/fork tests retain only selected
 inputs. Full oracle scans keep every expected snapshot and exact case counts.
-See [build/test commands](../../README.md#build-and-test-in-wsl) for the fast
+See [build/test commands](../../README.md#build-and-check) for the fast
 `iterate` profile and measured resource results. The frozen files, hashes and
 comparison coverage are unchanged by these test-loader optimizations.
 
@@ -2589,7 +2589,7 @@ gate filtered. After expanding the generic matrix, all three affected restore
 tests and full CLI replay pass again.
 
 Full live corpus: 12,539 scenes / 90,556 operations; canonical: 6,592 / 27,145.
-Strict lint/format and frozen-source/lock checks pass. [Validation record](../../artifacts/gydion-primary-final-validation.json).
+Strict lint/format and frozen-source/lock checks pass. Validation record (`rust/artifacts/gydion-primary-final-validation.json`; [retained provenance inventory](../audits/material-inventory.json)).
 
 Index SHA-256 `5be7dd86817d87bed50e4db06d31403eb7b771fa6606d76643e551e267f989d7`; semantic SHA-256 `1f12e3cac1595a164f50ace447a03ef169e55a2a69268203b22dcaa4de73bfb3`.
 
@@ -2615,7 +2615,7 @@ semantic SHA-256 `0269233bd91b47209e37521a1d8cf8f602066820f6105c2fed9ae59fe4afab
 Validation: 409 Rust workspace tests and 71 Python source contracts pass; the
 older all-corpus exhaustive restoration gate was excluded. Final release parity,
 strict Clippy, Rustfmt, Black/Ruff and frozen-source checks pass.
-[Validation record](../../artifacts/misa-primary-final-validation.json).
+Validation record (`rust/artifacts/misa-primary-final-validation.json`; [retained provenance inventory](../audits/material-inventory.json)).
 
 
 ### Wasp primary bodies and conditional queries (2026-11-03)
@@ -2642,7 +2642,7 @@ semantic SHA-256 `9ad15df4039d57f730afbb8997d43cbfd622dab0bb87ec96f6b14ef4569106
 Validation: 416 Rust workspace tests and 84 Python source contracts pass. One
 older all-corpus exhaustive restoration gate was excluded. Final release parity,
 strict Clippy, Rustfmt, Black/Ruff and frozen-source/lock checks pass.
-[Validation record](../../artifacts/wasp-primary-final-validation.json).
+Validation record (`rust/artifacts/wasp-primary-final-validation.json`; [retained provenance inventory](../audits/material-inventory.json)).
 
 
 ### Min primary bodies, permanent items and deferred text (2026-11-03)
@@ -2671,7 +2671,7 @@ Validation: 425 Rust workspace tests and 103 Python source contracts pass. One
 older all-corpus exhaustive restoration gate was excluded. Both complete CLI
 corpora and independent release parity pass, as do strict Clippy, Rustfmt,
 Black/Ruff and frozen-source/lock checks.
-[Validation record](../../artifacts/min-primary-final-validation.json).
+Validation record (`rust/artifacts/min-primary-final-validation.json`; [retained provenance inventory](../audits/material-inventory.json)).
 
 
 ### Dynamic Flurry/Cloak rebuilding (2026-11-03)
@@ -2704,7 +2704,7 @@ operations and the unchanged canonical corpus. The 60 affected Python source
 contracts and independent release parity pass. Other existing integration suites
 were not rerun in this increment. Strict Clippy, Rustfmt, Black/Ruff, reproducible
 catalog and frozen-source/lock checks pass.
-[Validation record](../../artifacts/dynamic-passive-final-validation.json).
+Validation record (`rust/artifacts/dynamic-passive-final-validation.json`; [retained provenance inventory](../audits/material-inventory.json)).
 Live index SHA-256 `005b80784c98a531af05a13a30c9b78fb1ce3873fb50548ddee57d352960f5c3`;
 semantic SHA-256 `20b85b2049bf4b616b43169025db77c556e18eb31e92eb3f6c30864b7592ac2e`.
 
@@ -2738,7 +2738,7 @@ Validation: all 281 core unit tests, the new 267-case restoration gate and all
 three full CLI replay tests pass. Eighteen affected Python source contracts and
 independent release parity pass. Other existing integration suites were not
 rerun for this increment. Strict Clippy, Rustfmt, Black/Ruff and frozen-source/
-lock checks pass. [Validation record](../../artifacts/arena-battle-final-validation.json).
+lock checks pass. Validation record (`rust/artifacts/arena-battle-final-validation.json`; [retained provenance inventory](../audits/material-inventory.json)).
 Live index SHA-256 `67e5c56ba993774183710efb259d874bb029b48676909b923cc11b3267d01162`;
 semantic SHA-256 `8f1fc9f63a99f760661b5a294a147d7a77ef17360a1be297011d051724c585cb`.
 
@@ -2778,7 +2778,7 @@ gate and three full CLI replay tests pass. Independent release parity and all 27
 affected Python source contracts pass. Strict Clippy, Rustfmt, Black/Ruff,
 whitespace and frozen-source/lock checks pass. Other existing integration suites
 were not rerun for this increment.
-[Validation record](../../artifacts/arena-cleanup-final-validation.json).
+Validation record (`rust/artifacts/arena-cleanup-final-validation.json`; [retained provenance inventory](../audits/material-inventory.json)).
 Live corpus SHA-256 `ca313f63072c7b2b5b72ce7fa65dc806e3ad9eabd56bb36e1ce98156cfe9be7a`;
 semantic SHA-256 `7a09d90d00100ba88888f4b9cff4962bfa0639a2245147bb23070c00ee78af20`.
 
@@ -2830,7 +2830,7 @@ All 36 affected source contracts and 28 existing Python upgrade-rule tests pass.
 Strict Clippy, Rustfmt, Black/Ruff, whitespace and frozen-source/lock checks pass.
 Other existing integration suites and the older exhaustive all-corpus restoration
 gate were not rerun for this increment.
-[Validation record](../../artifacts/arena-upgrades-final-validation.json).
+Validation record (`rust/artifacts/arena-upgrades-final-validation.json`; [retained provenance inventory](../audits/material-inventory.json)).
 Live corpus SHA-256 `58760a3b5acac23466ba868a14d63a75d6f87c0d2c3ed2ddc46b654521ce429f`;
 semantic SHA-256 `482dc08a9adb3bffbf71ac97d86258f7996e919e2c25f2cb2a7f3c0bef61adef`.
 
@@ -2890,7 +2890,7 @@ parity matches every new case. All 61 affected Python source-contract and existi
 hero/piece/round-rule tests pass. Strict Clippy, Rustfmt, Black/Ruff, whitespace,
 frozen-source and lock checks pass. Other existing integration suites and the
 older exhaustive all-corpus restoration gate were not rerun for this increment.
-[Validation record](../../artifacts/hero-respawn-final-validation.json).
+Validation record (`rust/artifacts/hero-respawn-final-validation.json`; [retained provenance inventory](../audits/material-inventory.json)).
 Live corpus SHA-256 `7e2054129c6e309e96e8220a9a541239a9fd0766747187936b081c677da8437e`;
 semantic SHA-256 `437956329fb22f3040a10b667e304dcda24ccfa294c2794d200c39fd2f1821a0`.
 
@@ -2973,7 +2973,7 @@ artifact; maintained tools generate/read the current v3 compact format.
 
 Work remains uncommitted. Primary/spell coverage remains 172/596 and 22/22;
 engine/search completion remains false.
-[Validation record](../../artifacts/phase-closure-and-stream-final-validation.json).
+Validation record (`rust/artifacts/phase-closure-and-stream-final-validation.json`; [retained provenance inventory](../audits/material-inventory.json)).
 Main corpus SHA-256 `00a95d0083e43e976f959558678f37554abccf773a78cefd96bc71b2ab7307b0`;
 complete-game corpus SHA-256 `52ac6e55f4bf9b8facae59a84b9b60e168599875a70a984c5bf68758ea6bf399`.
 
@@ -3032,7 +3032,7 @@ primary/spell coverage stays 172/596 and 22/22. Search completion remains open.
 Final validation after recovery: 302 core unit tests, the 280-case restoration
 gate, 29 affected Python tests, strict Clippy and format checks pass. Independent
 release replay matches all 1,020 movement operations. See
-[validation record](../../artifacts/co-movement-final-validation.json).
+validation record (`rust/artifacts/co-movement-final-validation.json`; [retained provenance inventory](../audits/material-inventory.json)).
 
 
 ### Initiative overrides
@@ -3056,7 +3056,7 @@ Validation: 305 core unit tests, the new initiative restoration gate, 38 affecte
 Python tests and independent release parity pass. Strict Clippy, Rustfmt, Black,
 Ruff, whitespace and frozen-source/lock checks pass. The final development
 footprint was 4.33 GiB, within the 12 GiB planning budget. See
-[validation record](../../artifacts/initiative-final-validation.json). Full
+validation record (`rust/artifacts/initiative-final-validation.json`; [retained provenance inventory](../audits/material-inventory.json)). Full
 workspace integrations and full-corpus/whole-game replays were not rerun.
 
 
@@ -3085,7 +3085,7 @@ Validation: 308 core unit tests, the mixed 125-case / 560-operation restore gate
 52 affected Python contracts, and both iterate/release differential corpora pass.
 Strict Clippy, Rustfmt, Black, Ruff and frozen-source/lock checks pass. The final
 development footprint was 4.40 GiB. See
-[validation record](../../artifacts/action-control-final-validation.json). Other
+validation record (`rust/artifacts/action-control-final-validation.json`; [retained provenance inventory](../audits/material-inventory.json)). Other
 workspace integrations and full-corpus/whole-game replays were not rerun.
 
 
@@ -3115,7 +3115,7 @@ engine closure or search throughput.
 Validation: 312 core unit tests, both restore gates, 60 affected Python contracts
 and strict Clippy pass. Both iterate and release parity pass for Journey and
 the 125 affected manager/generic cases. See the scoped
-[validation record](../../artifacts/journey-final-validation.json) for final
+validation record (`rust/artifacts/journey-final-validation.json`; [retained provenance inventory](../audits/material-inventory.json)) for final
 release replay and storage measurements. Full workspace integration suites and
 whole-corpus/whole-game replays were not rerun for this primitive.
 
@@ -3150,7 +3150,7 @@ The focused Hanu corpus SHA-256 is
 316 core tests and 99 affected Python contracts pass. All four restoration gates
 (1,485 cases / 13,334 operations), development/release Hanu parity and strict
 lint/format checks pass. Final evidence and exact verification scope are recorded in
-[the Hanu validation record](../../artifacts/hanu-primary-final-validation.json).
+the Hanu validation record (`rust/artifacts/hanu-primary-final-validation.json`; [retained provenance inventory](../audits/material-inventory.json)).
 Full roster/world/defense/passive/filter closure, raw exception fidelity and the
 original optimized search/performance requirements remain open.
 
@@ -3172,7 +3172,7 @@ The two native full-game tests also pass for all four saved games; 16 affected
 Python contracts and strict lint/format checks pass. The baseline two-game corpus
 is unchanged (7,059 operations). The combined scope
 is four particular games / 14,624 operations, not arbitrary roster or search
-closure. See [final evidence](../../artifacts/hanu-complete-games-final-validation.json).
+closure. See final evidence (`rust/artifacts/hanu-complete-games-final-validation.json`; [retained provenance inventory](../audits/material-inventory.json)).
 
 
 ### Xargatha primary bodies and cached adjacency

@@ -1,14 +1,15 @@
 # Rust engine cleanup — task checklist
 
 Reconciled on 10 November 2026 against implementation `27dda4db` on
-`bots-upstream`, the [original plan](../../docs/RUST_ENGINE_CLEANUP_PLAN.md),
+`bots-upstream`, the original plan (`docs/RUST_ENGINE_CLEANUP_PLAN.md` in the source repository),
 [readiness record](readiness.md), and [verification evidence](cleanup-evidence.json).
 This tracks work across **all C01–C12 packages**, including release gates
 and later P1/P2 work. An unchecked item is open; a documented policy or local
 smoke pass does not establish its wider acceptance criterion.
 
 The [ten-task follow-up](audits/next-ten.md) closes the ten checked items below.
-**10 completed; 74 remain open.** All other acceptance gates retain their scope.
+The [second ten-task follow-up](audits/second-ten.md) closes ten further items.
+**20 completed; 64 remain open.** All other acceptance gates retain their scope.
 
 The implemented baseline already includes catalog relocation, bundled smoke
 inputs/content, native CI definitions, SQLite migrations, service suites,
@@ -72,7 +73,7 @@ acceptance. Native/Python CI definitions and local quick/quality checks exist.
 - [ ] **C04-04** Run `python3 tools/check.py restore` with the required complete data and retain exhaustive boundary/restoration and worker-isolation evidence.
 - [ ] **C04-05** Acquire the admitted setup/view inputs and explicitly run their ignored gates. Record variables, selected names and nonzero expected/executed counts; an ignored gate is not a pass.
 - [x] **C04-06** Replace remaining generic expensive-tier command descriptions with executable, pinned workload commands and required inputs. Cover setup/view, restore, performance/strength and hosted integration, with accountable owners and event/schedule triggers.
-- [ ] **C04-07** Verify CI change selection enforces the appropriate reference/restore gates for engine, worker, codec/arena and fixture changes; releases must run the full required matrix regardless of a narrow file diff.
+- [x] **C04-07** Verify CI change selection enforces the appropriate reference/restore gates for engine, worker, codec/arena and fixture changes; releases must run the full required matrix regardless of a narrow file diff.
 - [ ] **C04-08** Establish periodic cold-acquisition/build verification. If CI caches are introduced, use them only as accelerators and test a path that does not depend on warm caches.
 - [ ] **C04-09** Run the workflow remotely and record actual job results, including separate Python tooling/script checks. Local successes alone do not establish a successful remote CI run.
 
@@ -83,10 +84,10 @@ The compatibility matrix and small checkpoint/privacy/rejection tests exist.
 
 - [ ] **C05-01** Assemble admitted historical checkpoint, replay/share and SQLite examples for every version claimed as supported; record producer, consumer, schema, expected behavior and migration path.
 - [ ] **C05-02** Complete and run that historical compatibility matrix through load, commands, restart, retry and rollback. Retain ordered-event, digest and physical-object/alias evidence from the full suites.
-- [ ] **C05-03** Audit absent optional fields, unknown-field rejection and unsupported future versions across supported serialized boundaries. Add missing regressions without duplicating already passing contracts or weakening deliberate oracle/rules rejection.
-- [ ] **C05-04** Finish audience/contract coverage for actor, teammate/team decisions, spectator, private replay and public shares. Fill gaps for simultaneous metadata, hidden decisions, generic prompts, request freshness, full-width seeds/times and stale-command protection.
-- [ ] **C05-05** Classify retained compatibility shims as required, temporary or obsolete, each with named consumer, test, removal condition and migration note. Keep dense execution, codec-only diagnostics, baseline policy controls and plain/gzip readers while their consumers remain.
-- [ ] **C05-06** For any proposed breaking cleanup, prove there is no supported consumer or supply a concrete migration/deprecation path. Keep rules corrections and rules/content-version decisions separate from mechanical cleanup.
+- [x] **C05-03** Audit absent optional fields, unknown-field rejection and unsupported future versions across supported serialized boundaries. Add missing regressions without duplicating already passing contracts or weakening deliberate oracle/rules rejection.
+- [x] **C05-04** Finish audience/contract coverage for actor, teammate/team decisions, spectator, private replay and public shares. Fill gaps for simultaneous metadata, hidden decisions, generic prompts, request freshness, full-width seeds/times and stale-command protection.
+- [x] **C05-05** Classify retained compatibility shims as required, temporary or obsolete, each with named consumer, test, removal condition and migration note. Keep dense execution, codec-only diagnostics, baseline policy controls and plain/gzip readers while their consumers remain.
+- [x] **C05-06** For any proposed breaking cleanup, prove there is no supported consumer or supply a concrete migration/deprecation path. Keep rules corrections and rules/content-version decisions separate from mechanical cleanup.
 
 ## C06 — Contributor documentation (P0)
 
@@ -94,8 +95,8 @@ Owner: engine and release maintainers. Final acceptance depends on C01–C05.
 The task-based guides, archive, example and native agent guidance exist.
 
 - [ ] **C06-01** Reconcile guides with the final standalone layout, artifact URLs, supported versions, complete test commands and actual destination metadata after the preceding decisions land.
-- [ ] **C06-02** Audit carried-forward historical/status references and links, including any remaining Python-era plans. Keep archived records identifiable by original date/commit and prevent them from becoming active Rust onboarding instructions.
-- [ ] **C06-03** Verify the intended facade's rustdoc covers failure conditions, determinism, trusted inputs, private state, budgets and cancellation; fill API-specific gaps while retaining the existing documentation/missing-doc gates.
+- [x] **C06-02** Audit carried-forward historical/status references and links, including any remaining Python-era plans. Keep archived records identifiable by original date/commit and prevent them from becoming active Rust onboarding instructions.
+- [x] **C06-03** Verify the intended facade's rustdoc covers failure conditions, determinism, trusted inputs, private state, budgets and cancellation; fill API-specific gaps while retaining the existing documentation/missing-doc gates.
 - [ ] **C06-04** Recheck current links and compiled examples against the final payload and perform a fresh contributor walkthrough: build, quick test, full-content startup, locating a rule and understanding compatibility without private history.
 
 ## C07 — Public repository and release hygiene (P0)
@@ -113,7 +114,7 @@ contribution/security/conduct materials are preparation drafts, not rights appro
 - [ ] **C07-08** Add accurate repository/description/readme metadata once the destination is known; finalize contribution, changelog and community materials against the actual public payload.
 - [ ] **C07-09** Prepare release notes/provenance naming source commit, compiler/profile, supported architecture, content hash, schemas/migration requirements, verification counts and backup/rollback instructions.
 - [ ] **C07-10** Decide the authenticity mechanism for public binary/content distribution and document how consumers verify it; checksums alone do not identify the publisher.
-- [ ] **C07-11** Keep crates.io disabled unless naming, API stability, data packaging, metadata and package verification are deliberately completed. Record this as a retained policy if public source hosting is the only intended release.
+- [x] **C07-11** Keep crates.io disabled unless naming, API stability, data packaging, metadata and package verification are deliberately completed. Record this as a retained policy if public source hosting is the only intended release.
 
 ## C08 — Server verification and persistence (P1)
 
@@ -121,11 +122,11 @@ Owner: service maintainers. Depends on C04/C05. Split process suites and atomic,
 idempotent schema v1–v3 migration tests already pass locally.
 
 - [ ] **C08-01** Extend the migration archive matrix to retained historical databases and realistic combinations of replay journals, credentials, accepted-action receipts and share metadata. Preserve actual process restart/failure behavior alongside unit tests.
-- [ ] **C08-02** Rehearse consistent WAL backup and restoration on disposable data, then verify links, revisions, receipts, replay reconstruction and share metadata after reopening the restored database.
+- [x] **C08-02** Rehearse consistent WAL backup and restoration on disposable data, then verify links, revisions, receipts, replay reconstruction and share metadata after reopening the restored database.
 - [ ] **C08-03** Rehearse binary rollback with the matching database backup across supported migration boundaries; record when a newer schema prevents direct rollback.
 - [ ] **C08-04** Run the extended replay/share service verifier for the final candidate and close any coverage gaps across auth/views, retries/concurrency, clocks/votes, persistence and bots.
 - [ ] **C08-05** Audit blocking work, lock scope, bot cancellation, deadline recovery and shutdown across transport, orchestration, persistence and replay boundaries; address concrete problems with their own regressions.
-- [ ] **C08-06** Evaluate whether a server library/test harness would materially improve testing and boundaries. Record retain/defer or implement the justified change; preserve real cross-process checks either way.
+- [x] **C08-06** Evaluate whether a server library/test harness would materially improve testing and boundaries. Record retain/defer or implement the justified change; preserve real cross-process checks either way.
 
 ## C09 — Library and worker API boundaries (P1)
 

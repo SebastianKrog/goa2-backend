@@ -2,7 +2,8 @@
 
 Completed on `bots-upstream`, 10 November 2026, after checklist commit `ea1e2b0a`.
 The [structured results](next-ten.json) preserve commands, counts and limits.
-The checklist now has **10 completed and 74 open tasks**.
+At the end of this batch the checklist had **10 completed and 74 open tasks**.
+See the current checklist and [second batch](second-ten.md) for later progress.
 
 | Task | Result and maintained evidence |
 | --- | --- |

@@ -311,6 +311,25 @@
       "evidence": "audits/next-ten.json",
       "summary": "audits/next-ten.md",
       "remaining_checklist_tasks": 74
+    },
+    {
+      "date": "2026-11-10",
+      "completed_tasks": [
+        "C04-07",
+        "C05-03",
+        "C05-04",
+        "C05-05",
+        "C05-06",
+        "C06-02",
+        "C06-03",
+        "C07-11",
+        "C08-02",
+        "C08-06"
+      ],
+      "evidence": "audits/second-ten.json",
+      "summary": "audits/second-ten.md",
+      "remaining_checklist_tasks": 64
     }
-  ]
+  ],
+  "latest_verification": "audits/second-ten.json"
 }

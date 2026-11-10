@@ -36,3 +36,9 @@ persistence (`store.rs` and numbered migrations), replay, shares, clocks and
 bots. Accepted commands, state and retry receipts commit transactionally.
 [Compatibility](compatibility.md) defines external promises; broad public modules
 remain available until their consumers have migrated.
+
+The [server harness decision](audits/server-harness.md) retains the existing private
+modules and real-process suites; a new server library is deferred until a concrete
+consumer or measured test limitation justifies the boundary. The `api` module's
+rustdoc now spells out trust, atomic candidate publication, error categories,
+determinism, explicit time, budgets/cancellation and recipient privacy.

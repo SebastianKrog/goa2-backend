@@ -11,7 +11,7 @@ The two-turn reference policy, serial throughput and decision latency
 are accepted for integration. The next milestone is a Rust backend
 that owns Layout Lab games, followed by web integration on the same
 game runtime. See the
-[implementation plan](../docs/superpowers/plans/2026-10-23-rust-search-engine.md)
+implementation plan (original repository `docs/superpowers/plans/2026-10-23-rust-search-engine.md`; [historical document inventory](../audits/documentation.json))
 for the runtime boundary, rollout stages and benchmark results.
 
 ### Native game setup
@@ -727,33 +727,33 @@ and restoration when no legal destination exists.
 Snorri’s focused oracle traces include Rune Mastery feeding into Deep Passage
 and copied Deep Passage using the original card owner’s rune slots.
 Misa’s 18 primary bodies also pass independent Python parity across 691 scenes /
-8,598 operations; see the [validation record](artifacts/misa-primary-final-validation.json).
+8,598 operations; see the validation record (`rust/artifacts/misa-primary-final-validation.json`; [retained provenance inventory](../audits/material-inventory.json)).
 Wasp adds 14 primary bodies and two conditional query steps, verified across
-572 scenes / 8,455 operations; see the [Wasp validation record](artifacts/wasp-primary-final-validation.json).
+572 scenes / 8,455 operations; see the Wasp validation record (`rust/artifacts/wasp-primary-final-validation.json`; [retained provenance inventory](../audits/material-inventory.json)).
 Min adds 14 primary bodies, permanent item conversion and deferred red-card text,
 verified across 507 scenes / 8,357 operations. That milestone passed
 425 Rust tests and 103 Python source contracts, with one older all-corpus
 exhaustive restoration gate excluded. Both full CLI corpora passed.
-See the [Min validation record](artifacts/min-primary-final-validation.json).
+See the Min validation record (`rust/artifacts/min-primary-final-validation.json`; [retained provenance inventory](../audits/material-inventory.json)).
 Flurry of Blows and Cloak and Daggers now rebuild reviewed ordinary bodies using
 source-specific raw/attributed APIs, explicit registry overrides and root-only
 target restrictions. Differential coverage includes 176 cases / 652 operations,
 including actual repeated attacks, negative damage and live collection lookup.
 Unsupported card bodies remain explicit guards.
-See the [dynamic passive validation record](artifacts/dynamic-passive-final-validation.json).
+See the dynamic passive validation record (`rust/artifacts/dynamic-passive-final-validation.json`; [retained provenance inventory](../audits/material-inventory.json)).
 The authoritative arena now executes lane checks/pushes, minion battle,
 casualty choices and spawn displacement through typed ordered mutations.
 Coverage includes 267 source cases / 1,446 operations across all supplied maps,
 preserving mapping aliases, spawn Hex identity and pending-input behavior.
 General game/search closure remains unfinished.
-See the [arena battle validation record](artifacts/arena-battle-final-validation.json).
+See the arena battle validation record (`rust/artifacts/arena-battle-final-validation.json`; [retained provenance inventory](../audits/material-inventory.json)).
 Round cleanup now stages an identity-preserving arena transaction: duration and
 card expiry, retrieval, markers, token persistence, mandatory leveling and both
 ultimate unlock hooks. Coverage includes 95 cases / 192 operations and a new
 round's commit/uncommit. Transaction and search performance gates remain open.
 All 285 core tests, the cleanup restoration gate and three full CLI replay tests pass;
 27 affected Python source contracts and independent release parity also pass.
-See the [cleanup validation record](artifacts/arena-cleanup-final-validation.json).
+See the cleanup validation record (`rust/artifacts/arena-cleanup-final-validation.json`; [retained provenance inventory](../audits/material-inventory.json)).
 
 Upgrade choices and round reset now execute in the authoritative arena. Ordered
 single/all-remaining batches are validated before mutation; physical hand/deck,
@@ -767,7 +767,7 @@ completion remain open.
 Validation passes 291 core tests, both affected restoration gates, three full CLI
 replay tests, 36 source contracts and 28 existing upgrade-rule tests. Full replay
 covers 14,900 live cases / 118,301 operations and the unchanged canonical corpus.
-See the [upgrade/reset validation record](artifacts/arena-upgrades-final-validation.json).
+See the upgrade/reset validation record (`rust/artifacts/arena-upgrades-final-validation.json`; [retained provenance inventory](../audits/material-inventory.json)).
 
 Hero respawn now executes through live operands and retained arena maps. It
 preserves PASS-before-spawn ordering, token unlinking, fresh selected Hex identity,
@@ -780,7 +780,7 @@ coverage remain open.
 All 297 core tests, the respawn restoration gate and three full CLI replays pass,
 along with 61 affected Python tests and independent release parity. Full replay
 covers 15,023 live cases / 118,718 operations and the unchanged canonical corpus.
-See the [hero respawn validation record](artifacts/hero-respawn-final-validation.json).
+See the hero respawn validation record (`rust/artifacts/hero-respawn-final-validation.json`; [retained provenance inventory](../audits/material-inventory.json)).
 
 The phase audit confirms that every supported source-pinned instruction prototype
 reaches its live adapter; ResolveCard was already implemented. Its dense-only
@@ -798,7 +798,7 @@ Two complete games pass all 7,059 operation comparisons through game over, with
 an independent release replay. The source verifier peaked at about 210 MiB;
 lossless compaction reduced its golden deltas from 673 MiB to 20.5 MiB. All 298
 core tests, the 191-flow restoration gate, eight CLI tests and 98 affected Python
-tests pass. See the [validation record](artifacts/phase-closure-and-stream-final-validation.json).
+tests pass. See the validation record (`rust/artifacts/phase-closure-and-stream-final-validation.json`; [retained provenance inventory](../audits/material-inventory.json)).
 
 To regenerate full-game goldens using the pinned oracle environment:
 
@@ -822,7 +822,7 @@ PYTHONHASHSEED=0 PYTHONPATH=scripts/rust_oracle:src \
   --roster hanu --worker "$HOME/.cache/goa2-rust/target/release/goa2-search-cli"
 ```
 
-See the [Hanu whole-game validation record](artifacts/hanu-complete-games-final-validation.json).
+See the Hanu whole-game validation record (`rust/artifacts/hanu-complete-games-final-validation.json`; [retained provenance inventory](../audits/material-inventory.json)).
 
 Garrus and Gydion versus Razzle and Mortimer matched the frozen Python engine
 across all 4,699 operations through game over in round 11 on Forgotten Island.
@@ -913,7 +913,7 @@ further profiling and optimization remain necessary for the original
 1,000 simulations/s gate. These timings do not establish whole-engine memory use.
 The original baseline remains in `artifacts/simulation-benchmark.json`; current
 measurements are in `artifacts/simulation-benchmark-dense-protection.json`.
-See the [regression record](artifacts/dense-protection-final-validation.json) for
+See the regression record (`rust/artifacts/dense-protection-final-validation.json`; [retained provenance inventory](../audits/material-inventory.json)) for
 its completed core, identity, restoration and full-corpus replay checks.
 
 For a recorded Linux perf profile, resolve raw file offsets before interpreting
@@ -940,8 +940,8 @@ PYTHONHASHSEED=0 PYTHONPATH=scripts/rust_oracle:src \
 ```
 
 The current runner writes to `artifacts/simulation-benchmark-rust-only.json` by
-default. [Original raw samples](artifacts/simulation-benchmark.json).
-Scoped verification: [validation record](artifacts/simulation-benchmark-final-validation.json).
+default. Original raw samples (`rust/artifacts/simulation-benchmark.json`; [retained provenance inventory](../audits/material-inventory.json)).
+Scoped verification: validation record (`rust/artifacts/simulation-benchmark-final-validation.json`; [retained provenance inventory](../audits/material-inventory.json)).
 
 ## Build and test in WSL
 
@@ -1127,12 +1127,12 @@ Movement disagreements are saved under ignored `rust/artifacts/` for diagnosis.
 
 The worker advertises the individual verified operations. The general game
 transition and search capability flags remain off pending the acceptance
-gates in [the implementation plan](../docs/superpowers/plans/2026-10-23-rust-search-engine.md#12-completion-checklist).
+gates in the implementation plan (original repository `docs/superpowers/plans/2026-10-23-rust-search-engine.md`; [historical document inventory](../audits/documentation.json)).
 Four serial positions remain below 1,000 rollouts/s. The current
 playing-strength reference is Lane Pressure V3 with depth two and a
 two-turn horizon. Evaluate strength on paired offline matches with
 swapped sides and a 64-turn safety limit. The
-[playing-strength plan](../docs/superpowers/plans/2026-10-23-rust-search-engine.md#playing-strength-evaluation-and-tuning)
+playing-strength plan (original repository `docs/superpowers/plans/2026-10-23-rust-search-engine.md`; [historical document inventory](../audits/documentation.json))
 defines the relative target, held-out promotion criteria, and parameter
 sweeps. Layout Lab and server integration are deferred.
 
@@ -2882,7 +2882,7 @@ Automatic arena turn/round/revelation orchestration, the remaining world and
 rule bindings, make/unmake, hashing, evaluation, search, integration/strength gates
 and 1,000 complete two-game-turn simulations/sec remain unfinished. Full
 transition/search capabilities remain false. Negative attacks remain legal.
-See the [implementation plan](../docs/superpowers/plans/2026-10-23-rust-search-engine.md#live-effect-lifecycle-and-after-reveal-scheduling)
+See the implementation plan (original repository `docs/superpowers/plans/2026-10-23-rust-search-engine.md`; [historical document inventory](../audits/documentation.json))
 for removal-order details and remaining requirements. No NN work, live services,
 commits or pushes are changed.
 
@@ -5230,9 +5230,9 @@ Gydion/catalog/ordinary-body source contracts pass; only the older exhaustive al
 is filtered. The dedicated and expanded generic restore tests check every Gydion boundary.
 The three affected restorations and full CLI replay pass after the generic
 matrix update. Full replay covers 12,539 live scenes / 90,556 operations and the unchanged canonical corpus.
-Strict lint, formatting and frozen-source checks pass. See the [implementation
-plan](../docs/superpowers/plans/2026-10-23-rust-search-engine.md) and
-[validation record](artifacts/gydion-primary-final-validation.json) for details.
+Strict lint, formatting and frozen-source checks pass. See the implementation
+plan (original repository `docs/superpowers/plans/2026-10-23-rust-search-engine.md`; [historical document inventory](../audits/documentation.json)) and
+validation record (`rust/artifacts/gydion-primary-final-validation.json`; [retained provenance inventory](../audits/material-inventory.json)) for details.
 
 
 ## Development footprint and fixture storage

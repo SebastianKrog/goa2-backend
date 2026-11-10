@@ -349,3 +349,33 @@ impl Archive {
         Ok((engine, self.hero_names))
     }
 }
+
+#[cfg(test)]
+mod compatibility_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn decision_defaults_full_width_times_and_variant_field_policy() {
+        let value = json!({"at_ms":u64::MAX,"operation":{"kind":"pause_released"}});
+        let decision: Decision = serde_json::from_value(value.clone()).unwrap();
+        assert_eq!(decision.at_ms, u64::MAX);
+        assert!(decision.rebase_ms.is_none());
+        assert_eq!(serde_json::to_value(decision).unwrap(), value);
+        let mut invalid = value.clone();
+        invalid["typo"] = json!(true);
+        assert!(serde_json::from_value::<Decision>(invalid).is_err());
+        let mut invalid = value.clone();
+        invalid["operation"]["typo"] = json!(true);
+        // Serde's internally tagged unit variants tolerate extra fields even
+        // with deny_unknown_fields. Preserve this existing compatibility policy.
+        assert!(serde_json::from_value::<Decision>(invalid).is_ok());
+        let structured = json!({"at_ms":0,"operation":{"kind":"timeout","entropy":1,"typo":true}});
+        assert!(serde_json::from_value::<Decision>(structured).is_err());
+        let unknown = json!({"at_ms":0,"operation":{"kind":"future_operation"}});
+        assert!(serde_json::from_value::<Decision>(unknown).is_err());
+        let mut invalid = value;
+        invalid["at_ms"] = json!(-1);
+        assert!(serde_json::from_value::<Decision>(invalid).is_err());
+    }
+}

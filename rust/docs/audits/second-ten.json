@@ -1,0 +1,307 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-10",
+  "branch": "bots-upstream",
+  "parent_commit": "a4023b72",
+  "completed_tasks": [
+    "C04-07",
+    "C05-03",
+    "C05-04",
+    "C05-05",
+    "C05-06",
+    "C06-02",
+    "C06-03",
+    "C07-11",
+    "C08-02",
+    "C08-06"
+  ],
+  "native": {
+    "profile": "iterate",
+    "compiler": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+    "executed": 389,
+    "failed": 0,
+    "ignored": 64,
+    "new_tests": 7,
+    "full_parity": false
+  },
+  "tooling": {
+    "expected": 35,
+    "executed": 35,
+    "failed": 0,
+    "extracted_expected": 35,
+    "extracted_executed": 35,
+    "extracted_failed": 0
+  },
+  "service": {
+    "expected_suites": 6,
+    "expected_scenarios": 15,
+    "executed_scenarios": 15,
+    "failed": 0,
+    "new_scenario": "backup_restore_smoke",
+    "extracted_backup_expected": 1,
+    "extracted_backup_executed": 1,
+    "extracted_backup_failed": 0,
+    "suites": [
+      {
+        "suite": "auth",
+        "expected": 2,
+        "executed": 2,
+        "failed": 0,
+        "missing": 0
+      },
+      {
+        "suite": "bots",
+        "expected": 3,
+        "executed": 3,
+        "failed": 0,
+        "missing": 0
+      },
+      {
+        "suite": "clocks",
+        "expected": 2,
+        "executed": 2,
+        "failed": 0,
+        "missing": 0
+      },
+      {
+        "suite": "votes",
+        "expected": 6,
+        "executed": 6,
+        "failed": 0,
+        "missing": 0
+      },
+      {
+        "suite": "shutdown",
+        "expected": 1,
+        "executed": 1,
+        "failed": 0,
+        "missing": 0
+      },
+      {
+        "suite": "backup",
+        "expected": 1,
+        "executed": 1,
+        "failed": 0,
+        "missing": 0
+      }
+    ],
+    "startup_barrier": {
+      "consumer": "scripts/rust_verification/votes.py::unstick_vote_smoke",
+      "contract": "GET_VIEW request/response after each initial state ensures both sockets finish pending-vote synchronization before a new proposal. Exact notice-order assertions remain."
+    },
+    "binary_sha256": "18e42bfe3f62741b1efa8fd470271d23ca3d8b6a43a0cbe38014db2d4226422a",
+    "content_sha256": "69ce2e47927eab8427fa8c2932f369044a30297716f1a4402a1ba6e1673c3ee2"
+  },
+  "quick_data": {
+    "expected": 572,
+    "executed": 572,
+    "missing": 0,
+    "failed": 0,
+    "extracted_same_result": true
+  },
+  "quality": {
+    "rustfmt": true,
+    "clippy_all_targets_all_features_warnings_denied": true,
+    "rustdoc_warnings_denied": true,
+    "compiled_embedding_example": true,
+    "python_black_and_strict_ruff": true,
+    "diff_check": true
+  },
+  "documentation": {
+    "initial_retained_link_failures": 36,
+    "final_retained_link_failures": 0,
+    "excluded_original_documents": 62,
+    "archive_original_provenance_recorded": true,
+    "remote_urls_fetched": false,
+    "final_retained_links": 120
+  },
+  "ci": {
+    "selector_behavior_tests": 14,
+    "all_gate_definitions_validated": 9,
+    "release_candidate_requires_full_matrix": true,
+    "remote_success_claimed": false,
+    "artifact_distribution_still_blocked": true,
+    "local_workflow_yaml_parsed": true
+  },
+  "full_preflight": {
+    "exit_code": 1,
+    "results": [
+      {
+        "family": "complete-games-hanu",
+        "expected": 2,
+        "executed": 0,
+        "missing": 2,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "complete-games",
+        "expected": 2,
+        "executed": 0,
+        "missing": 2,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "object-arena",
+        "expected": 12,
+        "executed": 0,
+        "missing": 12,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "object-execution",
+        "expected": 17347,
+        "executed": 0,
+        "missing": 17347,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "stack-traces",
+        "expected": 6592,
+        "executed": 0,
+        "missing": 6592,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "action-validation",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "actions",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "card-equality",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "displacement-validation",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "effect-stats",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "effects",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "hex-filters",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "mine-paths",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "models",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "planning",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "targeting",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "terrain-validation",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      }
+    ],
+    "meaning": "Missing admitted payloads; no mismatch admitted and no smoke substitution."
+  },
+  "production_scope": "No Rust runtime behavior or Python gameplay changes; Rust edits are API documentation and cfg(test)/integration contracts. New Python CI/docs/backup verification tooling and workflow enforcement only.",
+  "publication_performed": false,
+  "deployment_performed": false,
+  "original_history_rewritten": false,
+  "commands": [
+    "python tools/check.py quick --profile iterate (cwd rust)",
+    "python tools/check.py quality --profile iterate (cwd rust)",
+    "cargo run --locked --profile iterate -p goa2-core --example local_game (cwd rust)",
+    "python -m pytest -q rust/tests/tooling tests/rust_oracle/test_fixture_cache.py",
+    "python scripts/verify_rust_game_server.py /absolute/path/goa2-game-server rust/content/smoke-game.json",
+    "python scripts/verify_rust_game_server.py /absolute/path/goa2-game-server rust/content/smoke-game.json --suite backup",
+    "python rust/tools/documentation_audit.py --inventory-excluded --output rust/docs/audits/documentation.json",
+    "python rust/tools/dependency_audit.py --output rust/docs/audits/dependencies.json",
+    "python rust/tools/gates.py validate",
+    "python rust/tools/fixtures.py verify --full",
+    "python rust/tools/extract.py /absolute/path/new-extracted-directory"
+  ],
+  "extraction": {
+    "selected_files": 1105,
+    "original_git_history_used_by_extracted_checks": false,
+    "tooling_tests": 35,
+    "quick_data_checks": 572,
+    "gate_definitions": 9,
+    "documentation_link_failures": 0,
+    "backup_scenarios": 1,
+    "binary_scope": "Extracted process tooling against the same built native binary; native production behavior unchanged."
+  }
+}

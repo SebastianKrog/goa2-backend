@@ -65,6 +65,8 @@ impl AttackRules {
             empty: s.intern(""),
         }
     }
+    // These operands mirror AttackSequenceStep; grouping them would obscure the frozen instruction contract.
+    #[allow(clippy::too_many_arguments)]
     pub fn prepare(
         &self,
         world: &NativeWorld,

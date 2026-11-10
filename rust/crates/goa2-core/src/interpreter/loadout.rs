@@ -316,9 +316,11 @@ fn hidden_gold_slots(hero: &super::HeroObservation) -> impl Iterator<Item = Hidd
         cards: &[PublicCard],
         slot: fn(usize) -> HiddenGoldSlot,
     ) -> impl Iterator<Item = HiddenGoldSlot> + '_ {
-        cards.iter().enumerate().filter_map(move |(index, card)| {
-            matches!(card, PublicCard::Hidden).then(|| slot(index))
-        })
+        cards
+            .iter()
+            .enumerate()
+            .filter(|(_, card)| matches!(card, PublicCard::Hidden))
+            .map(move |(index, _)| slot(index))
     }
 
     slots(&hero.played, HiddenGoldSlot::Played)

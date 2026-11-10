@@ -253,15 +253,12 @@ impl LiveGame {
             | PatchCommand::SetItem { hero_id, .. } => {
                 self.hero(hero_id)?;
             }
-            PatchCommand::SetWaveCounter { lane_id, .. } => {
-                if !self
-                    .session
-                    .symbols
-                    .lookup(lane_id)
-                    .is_some_and(|lane| self.session.world.waves.iter().any(|(id, _)| *id == lane))
-                {
-                    return Err(invalid("Unknown lane"));
-                }
+            PatchCommand::SetWaveCounter { lane_id, .. }
+                if !self.session.symbols.lookup(lane_id).is_some_and(|lane| {
+                    self.session.world.waves.iter().any(|(id, _)| *id == lane)
+                }) =>
+            {
+                return Err(invalid("Unknown lane"));
             }
             _ => {}
         }

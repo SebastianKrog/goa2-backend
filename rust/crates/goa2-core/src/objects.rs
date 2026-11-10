@@ -243,7 +243,7 @@ impl ObjectPages {
     }
 
     fn push(&mut self, object: Arc<Object>) {
-        if self.len % Self::PAGE_LEN == 0 {
+        if self.len.is_multiple_of(Self::PAGE_LEN) {
             self.pages.push(Arc::new(ObjectPage {
                 objects: Vec::with_capacity(Self::PAGE_LEN),
                 fingerprint: OnceLock::new(),

@@ -49,6 +49,8 @@ pub struct AcceptedAction<'a> {
     pub reply: &'a Value,
 }
 
+type ReplayHistory = (u64, Vec<(Entry, Option<HistoryContext>)>);
+
 pub struct Store {
     connection: Mutex<Connection>,
     _ownership: File,
@@ -277,6 +279,8 @@ impl Store {
         ))
     }
 
+    // These arguments are one atomic journal/receipt transaction; keep the boundary explicit.
+    #[allow(clippy::too_many_arguments)]
     pub fn commit(
         &self,
         game: &str,
@@ -534,11 +538,7 @@ impl Store {
             .ok_or_else(|| ApiError::not_found("Game replay not found"))
     }
 
-    pub fn history(
-        &self,
-        game: &str,
-        revision: u64,
-    ) -> Result<(u64, Vec<(Entry, Option<HistoryContext>)>)> {
+    pub fn history(&self, game: &str, revision: u64) -> Result<ReplayHistory> {
         let db = self.connection.lock().map_err(ApiError::internal)?;
         let start: u64 = db
             .query_row(

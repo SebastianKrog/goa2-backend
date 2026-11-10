@@ -154,7 +154,7 @@ impl Share {
             }
 
             let frame = replay_frame(engine, first, total)?;
-            if index % GROUP_SIZE == 0 {
+            if index.is_multiple_of(GROUP_SIZE) {
                 if let Some(done) = group.take() {
                     append(done)?;
                 }

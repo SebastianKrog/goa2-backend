@@ -96,6 +96,8 @@ pub(super) fn compile_with_budget(
     Ok(session)
 }
 
+// Keep the existing JSON worker operands explicit until the versioned worker API is split (C09).
+#[allow(clippy::too_many_arguments)]
 pub(super) fn rollout(
     envelope: StateEnvelope,
     player_id: String,

@@ -217,11 +217,11 @@ impl ArenaMatch {
                             card.map(|id| session.printed_observation_card(id))
                                 .transpose()
                         };
-                        if printed(plan.first)? == row.first && printed(plan.second)? == row.second
+                        if printed(plan.first)? == row.first
+                            && printed(plan.second)? == row.second
+                            && matching.replace(plan).is_some()
                         {
-                            if matching.replace(plan).is_some() {
-                                return Err(invalid("ambiguous arena replay commitment"));
-                            }
+                            return Err(invalid("ambiguous arena replay commitment"));
                         }
                     }
                     let plan =

@@ -1,4 +1,7 @@
 //! Bounded alpha-beta over live resolution decisions.
+type PlanningRows = Vec<Vec<PlanningCommitment>>;
+type NarrowedPlanningRows = (PlanningRows, Option<(usize, PlanningCommitment)>);
+
 use super::{
     DecisionMove, EngineError, ExecutionBudget, NativeSession, PlanningCommitment, RequestChoices,
     Result,
@@ -1117,6 +1120,8 @@ impl NativeSession {
         )
     }
 
+    // Keep explicit budget, scope and deterministic sampling inputs until the search API split (C09/C10).
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn search_bot_team_planning_with_seed_pass(
         &self,
         player: Symbol,
@@ -1512,6 +1517,8 @@ impl NativeSession {
         })
     }
 
+    // Keep explicit budget, scope and deterministic sampling inputs until the search API split (C09/C10).
+    #[allow(clippy::too_many_arguments)]
     fn screen_planning_replies(
         &mut self,
         player: Symbol,
@@ -1629,6 +1636,8 @@ impl NativeSession {
         )
     }
 
+    // Keep explicit budget, scope and deterministic sampling inputs until the search API split (C09/C10).
+    #[allow(clippy::too_many_arguments)]
     fn search_planning_matrix_parallel_partition(
         &self,
         player: Symbol,
@@ -3633,10 +3642,7 @@ impl Search<'_, '_> {
         history: &[Vec<PlanningCommitment>],
         preferred: Vec<PlanningCommitment>,
         fixed_opponents: bool,
-    ) -> Result<(
-        Vec<Vec<PlanningCommitment>>,
-        Option<(usize, PlanningCommitment)>,
-    )> {
+    ) -> Result<NarrowedPlanningRows> {
         let mut row_alternative = None;
         let mut reply_alternative = None;
         for (index, choice) in preferred.iter().enumerate() {

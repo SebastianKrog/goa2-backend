@@ -4,6 +4,9 @@ Plan baseline: backend `f0fb93e117f358266ef522e6d5f23d3452e83e97`;
 plan `fc0ff702`; reference frontend `a3c5e0a`. Implementation remains on
 `bots-upstream`. No repository has been published and original history is intact.
 
+The [remaining-task checklist](cleanup-checklist.md) expands every open C01–C12
+item, including implementation gaps, decisions and acceptance gates.
+
 | Package | Implemented work | Remaining acceptance / owner |
 | --- | --- | --- |
 | C01 | Versioned extraction groups and dependency/consumer inventory; source-map exporter; synthetic service and compatibility baselines | Final public payload approval: release maintainers |

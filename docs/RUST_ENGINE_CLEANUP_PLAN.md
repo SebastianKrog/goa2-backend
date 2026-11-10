@@ -3,6 +3,7 @@
 > Implementation: native safeguards, tooling and extraction work are tracked in
 > [Rust readiness](../rust/docs/readiness.md). That record distinguishes verified
 > work from remaining artifact, licensing and later-refactor gates.
+> Track all outstanding work in the [remaining-task checklist](../rust/docs/cleanup-checklist.md).
 
 Prepare the existing GoA2 Rust engine for a standalone public repository where contributors can build, test, understand, and change it without access to the original developer’s machine or private development history.
 

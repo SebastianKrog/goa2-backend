@@ -284,5 +284,13 @@
     "Dependency advisory scan and publication metadata.",
     "Hosted draft/Worker and deployment/backup promotion gates.",
     "C10 interpreter/search restructuring and remaining C11 fuzz/performance work."
-  ]
+  ],
+  "linux_package": {
+    "binary_profile": "dev",
+    "target_arch": "x86_64",
+    "deterministic_two_runs": true,
+    "binary_and_content_identity_validated": true,
+    "all_embedded_checksums_verified": true,
+    "publication_performed": false
+  }
 }

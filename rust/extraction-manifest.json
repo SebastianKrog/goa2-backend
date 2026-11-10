@@ -78,6 +78,14 @@
       ],
       "destination": "same path",
       "consumer": "Linux packaging; process/hosted verifiers"
+    },
+    {
+      "category": "historical",
+      "paths": [
+        "rust/docs/archive/**/*"
+      ],
+      "destination": "same path; archive only",
+      "consumer": "provenance and original milestone records, not active contributor instructions"
     }
   ],
   "excluded": [

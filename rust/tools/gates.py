@@ -82,7 +82,7 @@ def execute(gate, variables):
             environment[name] = re.sub(r"\$\{([A-Z_]+)\}", lambda match: variables[match[1]], value)
         result = subprocess.run(
             command,
-            cwd=ROOT,
+            cwd=CATALOG.parent if command[0] == "cargo" else ROOT,
             env=environment,
             text=True,
             stdout=subprocess.PIPE,
@@ -138,4 +138,4 @@ if __name__ == "__main__":
     try:
         main()
     except (ValueError, OSError) as error:
-        raise SystemExit(str(error))
+        raise SystemExit(str(error)) from None

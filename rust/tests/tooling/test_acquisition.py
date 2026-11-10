@@ -42,7 +42,7 @@ def test_source_archive_rejects_extra_missing_corrupt_and_duplicate_members():
     for rows in [
         [],
         admitted + admitted,
-        admitted + [("../escape", b"x")],
+        [*admitted, ("../escape", b"x")],
         [("src/goa2/example.py", b"bad")],
     ]:
         with pytest.raises(ValueError):
@@ -113,14 +113,66 @@ def test_full_parity_never_substitutes_a_bundled_smoke_case(tmp_path, monkeypatc
     assert fixtures.full(["full"], cache)[0]["failed"] == 1
 
 
+@pytest.mark.parametrize("payload", [None, b"[]\n", b"[[1]]\n"])
+def test_full_preflight_checks_complete_game_snapshot_chunks(tmp_path, monkeypatch, payload):
+    fixtures = load("fixtures")
+    base = tmp_path / "tests/fixtures"
+    base.mkdir(parents=True)
+    oracle = {"source_sha256": "oracle", "oracle_revision": "reference"}
+    (tmp_path / "oracle-manifest.json").write_text(json.dumps(oracle))
+    (base / "registry.json").write_text('{"families":[{"family":"game"}]}')
+    encoded = b"[[1]]"
+    chunk_identity = hashlib.sha256(encoded).hexdigest()
+    relative = f"game/chunks-v3/{chunk_identity}.json"
+    case = {
+        "name": "whole-game",
+        "operations": [{"op": "advance"}],
+        "expected_delta_chunks": [{"path": relative, "sha256": chunk_identity, "records": 1}],
+    }
+    identity = fixtures.digest(case)
+    case_path = f"game/{identity}.json"
+    index = {
+        "schema_version": 2,
+        **oracle,
+        "cases": [{"name": case["name"], "path": case_path, "case_sha256": identity}],
+    }
+    index["corpus_sha256"] = fixtures.digest(index)
+    (base / "game.json").write_text(json.dumps(index))
+    cached_case = tmp_path / "cache" / case_path
+    cached_case.parent.mkdir(parents=True)
+    cached_case.write_text(json.dumps(case))
+    if payload is not None:
+        cached_chunk = tmp_path / "cache" / relative
+        cached_chunk.parent.mkdir(parents=True)
+        Path(str(cached_chunk) + ".gz").write_bytes(gzip.compress(payload, mtime=0))
+    monkeypatch.setattr(fixtures, "WORKSPACE", tmp_path)
+    monkeypatch.setattr(fixtures, "FIXTURES", base)
+    reports = fixtures.full(["game"], tmp_path / "cache")
+    chunks = next(row for row in reports if row.get("unit") == "snapshot-chunk")
+    assert chunks["expected"] == 1
+    assert chunks["executed"] == int(payload == encoded + b"\n")
+    assert chunks["missing"] == int(payload is None)
+    assert chunks["failed"] == int(payload is not None and payload != encoded + b"\n")
+    assert next(row for row in reports if row.get("unit") != "snapshot-chunk")["executed"] == 1
+
+
 def test_fixture_registry_allowlist_and_ignore_rules_agree():
     import fixture_cache
 
     registry = json.loads((ROOT / "rust/tests/fixtures/registry.json").read_text())
+    oracle = json.loads((ROOT / "rust/oracle-manifest.json").read_text())
+    for family in registry["families"]:
+        assert family["rules_version"] == oracle["rules_version"]
+        if "generator_argv" in family:
+            generator = ROOT / family["generator"]
+            assert hashlib.sha256(generator.read_bytes()).hexdigest() == family["generator_sha256"]
+            assert family["generator_argv"][:2] == ["python", "scripts/rust_oracle/run_pinned.py"]
+            for consumer in family["consumers"]:
+                assert (ROOT / consumer).is_file(), consumer
     expected = {
         row["path"] for row in registry["families"] if row["category"] != "external-parity"
     } | {"registry.json"}
-    assert fixture_cache.COMMITTED == expected
+    assert expected == fixture_cache.COMMITTED
     exceptions = {
         line.removeprefix("!/tests/fixtures/")
         for line in (ROOT / "rust/.gitignore").read_text().splitlines()

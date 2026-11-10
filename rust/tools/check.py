@@ -14,19 +14,25 @@ WORKSPACE = Path(__file__).resolve().parents[1]
 
 def run(command, *, tests=False, full=False, minimum=350):
     print("+ " + " ".join(command), flush=True)
-    result = subprocess.run(
+    executed = ignored = 0
+    with subprocess.Popen(
         command, cwd=WORKSPACE, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
-    )
-    print(result.stdout, end="", flush=True)
-    if result.returncode:
-        raise SystemExit(result.returncode)
+    ) as process:
+        assert process.stdout is not None
+        for line in process.stdout:
+            print(line, end="", flush=True)
+            if tests:
+                match = re.search(
+                    r"test result: ok\. (\d+) passed; (\d+) failed; (\d+) ignored; .*? (\d+) filtered out",
+                    line,
+                )
+                if match:
+                    executed += int(match[1])
+                    ignored += int(match[3])
+        result = process.wait()
+    if result:
+        raise SystemExit(result)
     if tests:
-        rows = re.findall(
-            r"test result: ok\. (\d+) passed; (\d+) failed; (\d+) ignored; .*? (\d+) filtered out",
-            result.stdout,
-        )
-        executed = sum(int(row[0]) for row in rows)
-        ignored = sum(int(row[2]) for row in rows)
         if executed < minimum:
             raise SystemExit(f"Unexpected reduced suite: {executed} passed (minimum {minimum})")
         print(

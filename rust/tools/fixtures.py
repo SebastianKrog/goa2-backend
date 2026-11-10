@@ -38,6 +38,15 @@ def raw(path):
             return stream.read()
 
 
+def read_fixture(relative, cache):
+    for base in [FIXTURES, *([cache] if cache else [])]:
+        try:
+            return raw(checked_path(base, relative))
+        except FileNotFoundError:
+            continue
+    return None
+
+
 def reference_identity(value, oracle, description):
     for key in ("oracle_revision", "source_sha256"):
         if value.get(key) != oracle.get(key):
@@ -105,16 +114,7 @@ def full(families, cache=None):
             if row["family"] == family
         )
         if record.get("category") == "external-parity":
-            candidates = [FIXTURES / record["path"]]
-            if cache:
-                candidates.append(checked_path(cache, record["path"]))
-            data = None
-            for candidate in candidates:
-                try:
-                    data = raw(candidate)
-                    break
-                except FileNotFoundError:
-                    continue
+            data = read_fixture(record["path"], cache)
             valid = data is not None and hashlib.sha256(data).hexdigest() == record["raw_sha256"]
             result.append(
                 dict(
@@ -146,22 +146,22 @@ def full(families, cache=None):
             raise ValueError(f"Registry case count mismatch: {family}")
         seen = set()
         executed = missing = failed = 0
+        chunks = dict(
+            family=family,
+            unit="snapshot-chunk",
+            expected=0,
+            executed=0,
+            missing=0,
+            failed=0,
+            skipped=0,
+        )
         for row in index["cases"]:
             if row["name"] in seen:
                 raise ValueError(f"Duplicate case: {row['name']}")
             seen.add(row["name"])
             if row["path"] != f"{family}/{row['case_sha256']}.json":
                 raise ValueError(f"Case path mismatch: {row['path']}")
-            candidates = [checked_path(FIXTURES, row["path"])]
-            if cache:
-                candidates.append(checked_path(cache, row["path"]))
-            data = None
-            for candidate in candidates:
-                try:
-                    data = raw(candidate)
-                    break
-                except FileNotFoundError:
-                    continue
+            data = read_fixture(row["path"], cache)
             if data is None:
                 missing += 1
                 continue
@@ -170,6 +170,29 @@ def full(families, cache=None):
                 failed += 1
             else:
                 executed += 1
+                if "expected_delta_chunks" in case:
+                    references = case["expected_delta_chunks"]
+                    if not references or sum(chunk["records"] for chunk in references) != len(
+                        case["operations"]
+                    ):
+                        executed -= 1
+                        failed += 1
+                        continue
+                    for chunk in references:
+                        chunks["expected"] += 1
+                        payload = read_fixture(chunk["path"], cache)
+                        if payload is None:
+                            chunks["missing"] += 1
+                        elif (
+                            hashlib.sha256(payload.removesuffix(b"\n")).hexdigest()
+                            != chunk["sha256"]
+                            or len(json.loads(payload)) != chunk["records"]
+                        ):
+                            chunks["failed"] += 1
+                        else:
+                            chunks["executed"] += 1
+        if chunks["expected"]:
+            result.append(chunks)
         result.append(
             dict(
                 family=family,

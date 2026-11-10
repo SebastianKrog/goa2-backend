@@ -10,16 +10,17 @@
       "case_count": 0,
       "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
       "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
-      "generator": "See docs/archive/fixture-history.md and scripts/rust_oracle/",
+      "generator": "scripts/rust_oracle/fixture_cache.py compress --workers 1",
       "consumers": [
-        "goa2-core/tests",
-        "goa2-core inline tests",
-        "goa2-search-cli inline tests"
+        "scripts/rust_oracle/fixture_cache.py",
+        "rust/tools/fixtures.py"
       ],
       "acquisition": "pinned export or separately verified cache; no public artifact URL established",
       "licensing": "requires upstream/content rights review before public distribution",
       "owner": "engine maintainers",
-      "retention": "retain unique coverage; no retirement authorized"
+      "retention": "retain unique coverage; no retirement authorized",
+      "rules_version": 9,
+      "runtime_manifest": "rust/oracle-manifest.json#runtime"
     },
     {
       "family": "complete-games-hanu",
@@ -30,16 +31,28 @@
       "case_count": 2,
       "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
       "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
-      "generator": "hanu_complete_games.py",
+      "generator": "scripts/rust_oracle/streamed_games.py",
       "consumers": [
-        "goa2-core/tests",
-        "goa2-core inline tests",
-        "goa2-search-cli inline tests"
+        "rust/crates/goa2-search-cli/src/main.rs"
       ],
       "acquisition": "pinned export or separately verified cache; no public artifact URL established",
       "licensing": "requires upstream/content rights review before public distribution",
       "owner": "engine maintainers",
-      "retention": "retain unique coverage; no retirement authorized"
+      "retention": "retain unique coverage; no retirement authorized",
+      "rules_version": 9,
+      "runtime_manifest": "rust/oracle-manifest.json#runtime",
+      "generator_sha256": "ab4b0d5cf61706ec8ac3025c33df02614538109c5f06bcf3e227a38bb90db9f2",
+      "generator_argv": [
+        "python",
+        "scripts/rust_oracle/run_pinned.py",
+        "streamed_games",
+        "--roster",
+        "hanu",
+        "--worker",
+        "WORKER",
+        "--output",
+        "OUTPUT"
+      ]
     },
     {
       "family": "complete-games",
@@ -50,16 +63,29 @@
       "case_count": 2,
       "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
       "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
-      "generator": "complete_games.py",
+      "generator": "scripts/rust_oracle/streamed_games.py",
       "consumers": [
-        "goa2-core/tests",
-        "goa2-core inline tests",
-        "goa2-search-cli inline tests"
+        "rust/crates/goa2-core/tests/object_execution.rs",
+        "rust/crates/goa2-search-cli/src/main.rs"
       ],
       "acquisition": "pinned export or separately verified cache; no public artifact URL established",
       "licensing": "requires upstream/content rights review before public distribution",
       "owner": "engine maintainers",
-      "retention": "retain unique coverage; no retirement authorized"
+      "retention": "retain unique coverage; no retirement authorized",
+      "rules_version": 9,
+      "runtime_manifest": "rust/oracle-manifest.json#runtime",
+      "generator_sha256": "ab4b0d5cf61706ec8ac3025c33df02614538109c5f06bcf3e227a38bb90db9f2",
+      "generator_argv": [
+        "python",
+        "scripts/rust_oracle/run_pinned.py",
+        "streamed_games",
+        "--roster",
+        "baseline",
+        "--worker",
+        "WORKER",
+        "--output",
+        "OUTPUT"
+      ]
     },
     {
       "family": "effect-errors",
@@ -70,16 +96,16 @@
       "case_count": 1,
       "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
       "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
-      "generator": "See docs/archive/fixture-history.md and scripts/rust_oracle/",
+      "generator": "Historical isolated Python failure capture; no current standalone exporter. Preserve admitted bytes and original source provenance in rust/docs/audits/error-guards.json.",
       "consumers": [
-        "goa2-core/tests",
-        "goa2-core inline tests",
-        "goa2-search-cli inline tests"
+        "rust/crates/goa2-core/src/interpreter.rs"
       ],
       "acquisition": "pinned export or separately verified cache; no public artifact URL established",
       "licensing": "requires upstream/content rights review before public distribution",
       "owner": "engine maintainers",
-      "retention": "retain unique coverage; no retirement authorized"
+      "retention": "retain unique coverage; no retirement authorized",
+      "rules_version": 9,
+      "runtime_manifest": "rust/oracle-manifest.json#runtime"
     },
     {
       "family": "mine-reference-errors",
@@ -90,16 +116,26 @@
       "case_count": 0,
       "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
       "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
-      "generator": "See docs/archive/fixture-history.md and scripts/rust_oracle/",
+      "generator": "scripts/rust_oracle/mine_traces.py",
       "consumers": [
-        "goa2-core/tests",
-        "goa2-core inline tests",
-        "goa2-search-cli inline tests"
+        "scripts/rust_oracle/mine_traces.py",
+        "tests/rust_oracle/test_mine_traces.py"
       ],
       "acquisition": "pinned export or separately verified cache; no public artifact URL established",
       "licensing": "requires upstream/content rights review before public distribution",
       "owner": "engine maintainers",
-      "retention": "retain unique coverage; no retirement authorized"
+      "retention": "retain unique coverage; no retirement authorized",
+      "rules_version": 9,
+      "runtime_manifest": "rust/oracle-manifest.json#runtime",
+      "generator_sha256": "862827405b818cf62de6f78ec71efd78d5a0d134633808d546630d785925e786",
+      "generator_argv": [
+        "python",
+        "scripts/rust_oracle/run_pinned.py",
+        "mine_traces",
+        "--corpus",
+        "OUTPUT",
+        "export-errors"
+      ]
     },
     {
       "family": "movement",
@@ -110,16 +146,25 @@
       "case_count": 9,
       "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
       "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
-      "generator": "See docs/archive/fixture-history.md and scripts/rust_oracle/",
+      "generator": "scripts/rust_oracle/oracle.py",
       "consumers": [
-        "goa2-core/tests",
-        "goa2-core inline tests",
-        "goa2-search-cli inline tests"
+        "rust/crates/goa2-core/tests/oracle.rs"
       ],
       "acquisition": "pinned export or separately verified cache; no public artifact URL established",
       "licensing": "requires upstream/content rights review before public distribution",
       "owner": "engine maintainers",
-      "retention": "retain unique coverage; no retirement authorized"
+      "retention": "retain unique coverage; no retirement authorized",
+      "rules_version": 9,
+      "runtime_manifest": "rust/oracle-manifest.json#runtime",
+      "generator_sha256": "915ff20df14fde661723518e4806c6ce49064da42a2dc1bc4df684d90a047c84",
+      "generator_argv": [
+        "python",
+        "scripts/rust_oracle/run_pinned.py",
+        "oracle",
+        "export-movement",
+        "--output",
+        "OUTPUT"
+      ]
     },
     {
       "family": "object-arena",
@@ -130,16 +175,25 @@
       "case_count": 12,
       "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
       "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
-      "generator": "shared_objects.py",
+      "generator": "scripts/rust_oracle/object_arena_traces.py",
       "consumers": [
-        "goa2-core/tests",
-        "goa2-core inline tests",
-        "goa2-search-cli inline tests"
+        "rust/crates/goa2-core/tests/objects.rs"
       ],
       "acquisition": "pinned export or separately verified cache; no public artifact URL established",
       "licensing": "requires upstream/content rights review before public distribution",
       "owner": "engine maintainers",
-      "retention": "retain unique coverage; no retirement authorized"
+      "retention": "retain unique coverage; no retirement authorized",
+      "rules_version": 9,
+      "runtime_manifest": "rust/oracle-manifest.json#runtime",
+      "generator_sha256": "b1fdebc859583c7dd34c9a5701272964a78be8275741889199447014fe7d161a",
+      "generator_argv": [
+        "python",
+        "scripts/rust_oracle/run_pinned.py",
+        "object_arena_traces",
+        "--corpus",
+        "OUTPUT",
+        "export"
+      ]
     },
     {
       "family": "object-execution",
@@ -150,16 +204,35 @@
       "case_count": 17347,
       "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
       "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
-      "generator": "object_execution_traces.py export",
+      "generator": "scripts/rust_oracle/object_execution_traces.py",
       "consumers": [
-        "goa2-core/tests",
-        "goa2-core inline tests",
-        "goa2-search-cli inline tests"
+        "rust/crates/goa2-core/src/interpreter/object_execution.rs",
+        "rust/crates/goa2-core/src/interpreter/object_execution/discard.rs",
+        "rust/crates/goa2-core/src/interpreter/object_execution/passive_bodies.rs",
+        "rust/crates/goa2-core/src/interpreter/object_execution/passives.rs",
+        "rust/crates/goa2-core/src/interpreter/object_execution/primary_bodies.rs",
+        "rust/crates/goa2-core/src/interpreter/object_execution/resources.rs",
+        "rust/crates/goa2-core/src/interpreter/object_execution/test_support.rs",
+        "rust/crates/goa2-core/src/interpreter/object_execution/utility_tests.rs",
+        "rust/crates/goa2-core/tests/object_execution.rs",
+        "rust/crates/goa2-search-cli/src/main.rs",
+        "rust/crates/goa2-search-cli/src/simulation_bench.rs"
       ],
       "acquisition": "pinned export or separately verified cache; no public artifact URL established",
       "licensing": "requires upstream/content rights review before public distribution",
       "owner": "engine maintainers",
-      "retention": "retain unique coverage; no retirement authorized"
+      "retention": "retain unique coverage; no retirement authorized",
+      "rules_version": 9,
+      "runtime_manifest": "rust/oracle-manifest.json#runtime",
+      "generator_sha256": "3f623c5079a8c45c5cc2c17b10d63d24f2f6ce16a43986d886ff0147d21412f2",
+      "generator_argv": [
+        "python",
+        "scripts/rust_oracle/run_pinned.py",
+        "object_execution_traces",
+        "--corpus",
+        "OUTPUT",
+        "export"
+      ]
     },
     {
       "family": "stack-traces",
@@ -170,16 +243,26 @@
       "case_count": 6592,
       "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
       "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
-      "generator": "stack_traces.py export",
+      "generator": "scripts/rust_oracle/stack_traces.py",
       "consumers": [
-        "goa2-core/tests",
-        "goa2-core inline tests",
-        "goa2-search-cli inline tests"
+        "rust/crates/goa2-core/src/interpreter.rs",
+        "rust/crates/goa2-search-cli/src/main.rs"
       ],
       "acquisition": "pinned export or separately verified cache; no public artifact URL established",
       "licensing": "requires upstream/content rights review before public distribution",
       "owner": "engine maintainers",
-      "retention": "retain unique coverage; no retirement authorized"
+      "retention": "retain unique coverage; no retirement authorized",
+      "rules_version": 9,
+      "runtime_manifest": "rust/oracle-manifest.json#runtime",
+      "generator_sha256": "c4989e8632d59a3d9b8f46a28329f52ac98d1d50629c40dd987faa62156e48fa",
+      "generator_argv": [
+        "python",
+        "scripts/rust_oracle/run_pinned.py",
+        "stack_traces",
+        "--corpus",
+        "OUTPUT",
+        "export"
+      ]
     },
     {
       "family": "states",
@@ -190,16 +273,26 @@
       "case_count": 3,
       "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
       "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
-      "generator": "See docs/archive/fixture-history.md and scripts/rust_oracle/",
+      "generator": "scripts/rust_oracle/state_codec.py",
       "consumers": [
-        "goa2-core/tests",
-        "goa2-core inline tests",
-        "goa2-search-cli inline tests"
+        "rust/crates/goa2-core/src/world.rs",
+        "rust/crates/goa2-core/tests/oracle.rs"
       ],
       "acquisition": "pinned export or separately verified cache; no public artifact URL established",
       "licensing": "requires upstream/content rights review before public distribution",
       "owner": "engine maintainers",
-      "retention": "retain unique coverage; no retirement authorized"
+      "retention": "retain unique coverage; no retirement authorized",
+      "rules_version": 9,
+      "runtime_manifest": "rust/oracle-manifest.json#runtime",
+      "generator_sha256": "c168dba9e24c17cfb98097791609635864372b0be231802dc885e01693162e1f",
+      "generator_argv": [
+        "python",
+        "scripts/rust_oracle/run_pinned.py",
+        "state_codec",
+        "--corpus",
+        "OUTPUT",
+        "export"
+      ]
     },
     {
       "family": "action-validation",
@@ -210,14 +303,25 @@
       "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
       "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
       "purpose": "Retained monolithic reference family consumed by full-feature integration tests; no replacement or retirement authorized.",
-      "generator": "scripts/rust_oracle/; see archived fixture history",
+      "generator": "scripts/rust_oracle/action_rule_traces.py",
       "consumers": [
-        "goa2-core integration tests",
-        "reference tooling"
+        "rust/crates/goa2-core/tests/actions.rs",
+        "rust/crates/goa2-core/tests/validation.rs"
       ],
       "licensing": "public redistribution review pending",
       "owner": "engine maintainers",
-      "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE"
+      "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE",
+      "rules_version": 9,
+      "runtime_manifest": "rust/oracle-manifest.json#runtime",
+      "generator_sha256": "b73a605cc9c8720b89fc7ba32e81ca924c6f0ed070049588740891bbb254b024",
+      "generator_argv": [
+        "python",
+        "scripts/rust_oracle/run_pinned.py",
+        "action_rule_traces",
+        "--corpus",
+        "OUTPUT",
+        "export"
+      ]
     },
     {
       "family": "actions",
@@ -228,14 +332,24 @@
       "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
       "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
       "purpose": "Retained monolithic reference family consumed by full-feature integration tests; no replacement or retirement authorized.",
-      "generator": "scripts/rust_oracle/; see archived fixture history",
+      "generator": "scripts/rust_oracle/action_traces.py",
       "consumers": [
-        "goa2-core integration tests",
-        "reference tooling"
+        "rust/crates/goa2-core/tests/actions.rs"
       ],
       "licensing": "public redistribution review pending",
       "owner": "engine maintainers",
-      "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE"
+      "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE",
+      "rules_version": 9,
+      "runtime_manifest": "rust/oracle-manifest.json#runtime",
+      "generator_sha256": "7767930c115f8a8ddb351b99ea798999b1762e6e9d2ba784831f68f5adda3dbe",
+      "generator_argv": [
+        "python",
+        "scripts/rust_oracle/run_pinned.py",
+        "action_traces",
+        "--corpus",
+        "OUTPUT",
+        "export"
+      ]
     },
     {
       "family": "card-equality",
@@ -246,14 +360,25 @@
       "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
       "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
       "purpose": "Retained monolithic reference family consumed by full-feature integration tests; no replacement or retirement authorized.",
-      "generator": "scripts/rust_oracle/; see archived fixture history",
+      "generator": "scripts/rust_oracle/card_equality_traces.py",
       "consumers": [
-        "goa2-core integration tests",
-        "reference tooling"
+        "rust/crates/goa2-core/src/objects.rs",
+        "rust/crates/goa2-core/tests/equality.rs"
       ],
       "licensing": "public redistribution review pending",
       "owner": "engine maintainers",
-      "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE"
+      "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE",
+      "rules_version": 9,
+      "runtime_manifest": "rust/oracle-manifest.json#runtime",
+      "generator_sha256": "19797fa4088df2ff5f8317f92273e77f7fe25c651549303cd1163b93e8550ee6",
+      "generator_argv": [
+        "python",
+        "scripts/rust_oracle/run_pinned.py",
+        "card_equality_traces",
+        "--corpus",
+        "OUTPUT",
+        "export"
+      ]
     },
     {
       "family": "displacement-validation",
@@ -264,14 +389,24 @@
       "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
       "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
       "purpose": "Retained monolithic reference family consumed by full-feature integration tests; no replacement or retirement authorized.",
-      "generator": "scripts/rust_oracle/; see archived fixture history",
+      "generator": "scripts/rust_oracle/displacement_effect_traces.py",
       "consumers": [
-        "goa2-core integration tests",
-        "reference tooling"
+        "rust/crates/goa2-core/tests/validation.rs"
       ],
       "licensing": "public redistribution review pending",
       "owner": "engine maintainers",
-      "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE"
+      "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE",
+      "rules_version": 9,
+      "runtime_manifest": "rust/oracle-manifest.json#runtime",
+      "generator_sha256": "790feb24f229d1c50c78da9df106857be4456c836849d773c1e6bb5eeeedc5a7",
+      "generator_argv": [
+        "python",
+        "scripts/rust_oracle/run_pinned.py",
+        "displacement_effect_traces",
+        "--corpus",
+        "OUTPUT",
+        "export"
+      ]
     },
     {
       "family": "effect-stats",
@@ -282,14 +417,24 @@
       "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
       "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
       "purpose": "Retained monolithic reference family consumed by full-feature integration tests; no replacement or retirement authorized.",
-      "generator": "scripts/rust_oracle/; see archived fixture history",
+      "generator": "scripts/rust_oracle/effect_stat_traces.py",
       "consumers": [
-        "goa2-core integration tests",
-        "reference tooling"
+        "rust/crates/goa2-core/tests/models.rs"
       ],
       "licensing": "public redistribution review pending",
       "owner": "engine maintainers",
-      "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE"
+      "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE",
+      "rules_version": 9,
+      "runtime_manifest": "rust/oracle-manifest.json#runtime",
+      "generator_sha256": "16866315f47c0baeda89081f3947f919f47345d20d6fd3a90a080d63e9f396d1",
+      "generator_argv": [
+        "python",
+        "scripts/rust_oracle/run_pinned.py",
+        "effect_stat_traces",
+        "--corpus",
+        "OUTPUT",
+        "export"
+      ]
     },
     {
       "family": "effects",
@@ -300,14 +445,25 @@
       "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
       "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
       "purpose": "Retained monolithic reference family consumed by full-feature integration tests; no replacement or retirement authorized.",
-      "generator": "scripts/rust_oracle/; see archived fixture history",
+      "generator": "scripts/rust_oracle/effect_traces.py",
       "consumers": [
-        "goa2-core integration tests",
-        "reference tooling"
+        "rust/crates/goa2-core/src/primary.rs",
+        "rust/crates/goa2-core/tests/effects.rs"
       ],
       "licensing": "public redistribution review pending",
       "owner": "engine maintainers",
-      "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE"
+      "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE",
+      "rules_version": 9,
+      "runtime_manifest": "rust/oracle-manifest.json#runtime",
+      "generator_sha256": "f9100822e06d8f92a8619e4982a529bdab4319969df99be5bef8f214848f5e27",
+      "generator_argv": [
+        "python",
+        "scripts/rust_oracle/run_pinned.py",
+        "effect_traces",
+        "--corpus",
+        "OUTPUT",
+        "export"
+      ]
     },
     {
       "family": "hex-filters",
@@ -318,14 +474,24 @@
       "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
       "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
       "purpose": "Retained monolithic reference family consumed by full-feature integration tests; no replacement or retirement authorized.",
-      "generator": "scripts/rust_oracle/; see archived fixture history",
+      "generator": "scripts/rust_oracle/movement_sequence_traces.py",
       "consumers": [
-        "goa2-core integration tests",
-        "reference tooling"
+        "rust/crates/goa2-core/tests/spatial.rs"
       ],
       "licensing": "public redistribution review pending",
       "owner": "engine maintainers",
-      "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE"
+      "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE",
+      "rules_version": 9,
+      "runtime_manifest": "rust/oracle-manifest.json#runtime",
+      "generator_sha256": "8a5ed5a832f209eed27a33633e0dbde00d219ddad75583a519394242129b275e",
+      "generator_argv": [
+        "python",
+        "scripts/rust_oracle/run_pinned.py",
+        "movement_sequence_traces",
+        "--corpus",
+        "OUTPUT",
+        "export"
+      ]
     },
     {
       "family": "mine-paths",
@@ -336,14 +502,24 @@
       "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
       "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
       "purpose": "Retained monolithic reference family consumed by full-feature integration tests; no replacement or retirement authorized.",
-      "generator": "scripts/rust_oracle/; see archived fixture history",
+      "generator": "scripts/rust_oracle/mine_traces.py",
       "consumers": [
-        "goa2-core integration tests",
-        "reference tooling"
+        "rust/crates/goa2-core/tests/mines.rs"
       ],
       "licensing": "public redistribution review pending",
       "owner": "engine maintainers",
-      "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE"
+      "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE",
+      "rules_version": 9,
+      "runtime_manifest": "rust/oracle-manifest.json#runtime",
+      "generator_sha256": "862827405b818cf62de6f78ec71efd78d5a0d134633808d546630d785925e786",
+      "generator_argv": [
+        "python",
+        "scripts/rust_oracle/run_pinned.py",
+        "mine_traces",
+        "--corpus",
+        "OUTPUT",
+        "export"
+      ]
     },
     {
       "family": "models",
@@ -354,14 +530,25 @@
       "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
       "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
       "purpose": "Retained monolithic reference family consumed by full-feature integration tests; no replacement or retirement authorized.",
-      "generator": "scripts/rust_oracle/; see archived fixture history",
+      "generator": "scripts/rust_oracle/model_traces.py",
       "consumers": [
-        "goa2-core integration tests",
-        "reference tooling"
+        "rust/crates/goa2-core/src/world.rs",
+        "rust/crates/goa2-core/tests/models.rs"
       ],
       "licensing": "public redistribution review pending",
       "owner": "engine maintainers",
-      "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE"
+      "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE",
+      "rules_version": 9,
+      "runtime_manifest": "rust/oracle-manifest.json#runtime",
+      "generator_sha256": "8eadbace7cf2f65a7b6dcf8a7cf48d5abdae5c8a08b7f175517609a6d23b354c",
+      "generator_argv": [
+        "python",
+        "scripts/rust_oracle/run_pinned.py",
+        "model_traces",
+        "--corpus",
+        "OUTPUT",
+        "export"
+      ]
     },
     {
       "family": "planning",
@@ -372,14 +559,24 @@
       "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
       "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
       "purpose": "Retained monolithic reference family consumed by full-feature integration tests; no replacement or retirement authorized.",
-      "generator": "scripts/rust_oracle/; see archived fixture history",
+      "generator": "scripts/rust_oracle/planning_traces.py",
       "consumers": [
-        "goa2-core integration tests",
-        "reference tooling"
+        "rust/crates/goa2-core/tests/planning.rs"
       ],
       "licensing": "public redistribution review pending",
       "owner": "engine maintainers",
-      "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE"
+      "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE",
+      "rules_version": 9,
+      "runtime_manifest": "rust/oracle-manifest.json#runtime",
+      "generator_sha256": "8c42756a7ec04a4338687d0492fcc00609ac80183c868b22869d259a96f484ca",
+      "generator_argv": [
+        "python",
+        "scripts/rust_oracle/run_pinned.py",
+        "planning_traces",
+        "--corpus",
+        "OUTPUT",
+        "export"
+      ]
     },
     {
       "family": "targeting",
@@ -390,14 +587,24 @@
       "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
       "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
       "purpose": "Retained monolithic reference family consumed by full-feature integration tests; no replacement or retirement authorized.",
-      "generator": "scripts/rust_oracle/; see archived fixture history",
+      "generator": "scripts/rust_oracle/targeting_rules.py",
       "consumers": [
-        "goa2-core integration tests",
-        "reference tooling"
+        "rust/crates/goa2-core/tests/targeting.rs"
       ],
       "licensing": "public redistribution review pending",
       "owner": "engine maintainers",
-      "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE"
+      "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE",
+      "rules_version": 9,
+      "runtime_manifest": "rust/oracle-manifest.json#runtime",
+      "generator_sha256": "76df39b6141d89eae579708842d0fad774d06543bf6f0d9e8184b7cf5abf30be",
+      "generator_argv": [
+        "python",
+        "scripts/rust_oracle/run_pinned.py",
+        "targeting_rules",
+        "--corpus",
+        "OUTPUT",
+        "export"
+      ]
     },
     {
       "family": "terrain-validation",
@@ -408,14 +615,25 @@
       "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
       "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
       "purpose": "Retained monolithic reference family consumed by full-feature integration tests; no replacement or retirement authorized.",
-      "generator": "scripts/rust_oracle/; see archived fixture history",
+      "generator": "scripts/rust_oracle/terrain_traces.py",
       "consumers": [
-        "goa2-core integration tests",
-        "reference tooling"
+        "rust/crates/goa2-core/tests/terrain.rs"
       ],
       "licensing": "public redistribution review pending",
       "owner": "engine maintainers",
-      "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE"
+      "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE",
+      "rules_version": 9,
+      "runtime_manifest": "rust/oracle-manifest.json#runtime",
+      "generator_sha256": "49eb7d6e1a019332f474fac5357df69e0ca3c4d2530f498e823b7d781ec2b917",
+      "generator_argv": [
+        "python",
+        "scripts/rust_oracle/run_pinned.py",
+        "terrain_traces",
+        "--corpus",
+        "OUTPUT",
+        "export"
+      ]
     }
-  ]
+  ],
+  "generation_policy": "Use the manifest-pinned Python runtime and verified source archive. Commands write only to a disposable absolute OUTPUT path. Native WORKER must be the candidate being validated. Current exporter recipes are recorded for investigation, not permission to replace frozen indexes: verify every regenerated fingerprint against this registry and retain admitted artifacts when regeneration differs."
 }

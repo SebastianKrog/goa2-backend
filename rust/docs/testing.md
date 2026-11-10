@@ -33,13 +33,17 @@ python3 tools/check.py restore
 ```
 
 Preflight verifies all selected indexes and every case hash/name one at a time,
-reporting expected, executed, missing, failed and skipped counts. It never uses
+reporting expected, executed, missing, failed and skipped counts. Complete games
+also verify each referenced snapshot chunk, its raw hash and record count, and
+that chunk record totals match the operation count. Chunk totals are reported
+separately from case totals. Preflight never uses
 the smoke fallback. Missing or changed data makes preflight fail. A family filter
 must name a registered, nonempty family. Canonical currently admits 6,592 cases;
 live object execution admits 17,347. The complete-game and object-arena families
 retain their independent coverage. The external monolithic reference families
-are also registered and verified as payloads with admitted raw-byte hashes. Acquisition of the newer missing payloads is
-a release blocker, not permission to regenerate changed identities.
+are also registered and verified as payloads with admitted raw-byte hashes. The original local WSL cache passes these admitted identities. Distribution to
+other checkouts remains a release gate; regenerated mismatches cannot replace
+frozen inputs.
 
 `tests/fixtures/registry.json` classifies every retained top-level family and
 records generator/provenance/retention. The committed allowlist, `.gitignore`

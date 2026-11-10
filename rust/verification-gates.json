@@ -3,9 +3,9 @@
   "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
   "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
   "bridge_sha256": {
-    "scripts/rust_oracle/run_pinned.py": "62375d3f61981e0e961fc2794f730d28ce08bbaa64ff16469f31926ce6f5790e",
+    "scripts/rust_oracle/run_pinned.py": "6824eb666b1c923e20931eaeeac3d892911d158e4dfb4fab2d78d12fec3d404c",
     "scripts/rust_oracle/simulation_bench.py": "c1f4caa6754e4ea001cbcb9033014c1eeb75d69c7046f2f4d8cf176f28aa0574",
-    "scripts/rust_oracle/rollout_parity.py": "ab82909a6cd0bf5b69bc6135d806ddb5eae2c13ab55b0b6bae80380804952888",
+    "scripts/rust_oracle/rollout_parity.py": "fce97a0ccabeaaf1f9a8fc999d0ec7e2cd90bab9ff6a958de38eab935e1b7b4e",
     "scripts/verify_rust_hosted_draft.py": "479f12af82a8d81bbf50f82b0c3b662b6fa73c388e83b92a2337cbe36bd5d5ca",
     "scripts/verify_rust_staging.py": "cb4f962f5b62488317649ef594bacd1ba5ea01ac53985721903b6aca94c903fc"
   },

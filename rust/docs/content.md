@@ -44,3 +44,23 @@ scripts are copied into the isolated tree; current Python gameplay is not used.
 A missing historical commit now has an acquisition error rather than requiring
 a silent repin. Export commands and fixture generators remain optional tools.
 Full fixture publication still requires rights and provenance review.
+
+## Investigating a frozen fixture
+
+Each supported family in tests/fixtures/registry.json records its exporter,
+current exporter checksum and generator_argv. The wrapper supplies the frozen
+source and Python environment checks. Set GOA2_ORACLE_SOURCE to the verified
+archive above and use the pinned Python executable. For example, from the
+repository root:
+
+~~~sh
+python scripts/rust_oracle/run_pinned.py card_equality_traces --corpus /absolute/disposable/card-equality.json export
+~~~
+
+Keep optional exporter flags before the export positional argument. Exporters
+with a trailing worker argument consume remaining arguments literally. Replace
+the registry's OUTPUT and WORKER placeholders with absolute paths.
+Generated candidates must match the admitted registry/index fingerprints before
+installation. The generator recipe alone does not establish that today's
+exporter reproduces a historical frozen case. Retain the original artifact
+when fingerprints differ.

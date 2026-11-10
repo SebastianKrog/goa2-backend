@@ -11,7 +11,8 @@ The [ten-task follow-up](audits/next-ten.md) closes the ten checked items below.
 The [second ten-task follow-up](audits/second-ten.md) closes ten further items.
 The [third ten-task follow-up](audits/third-ten.md) closes ten further items.
 The [fourth ten-task follow-up](audits/fourth-ten.md) closes ten further items.
-**40 completed; 44 remain open.** All other acceptance gates retain their scope.
+**45 completed; 39 remain open.** The [corpus recovery and Arena v2 merge verification](audits/corpus-recovery.md)
+records the additional local gate.
 
 The implemented baseline already includes catalog relocation, bundled smoke
 inputs/content, native CI definitions, SQLite migrations, service suites,
@@ -52,9 +53,9 @@ installer, small test pack and verified source-archive support already exist.
 Owner: engine and release maintainers. Depends on C01. Production catalog moves
 are already byte-verified; no fixture family has been retired.
 
-- [ ] **C03-01** Recover/acquire every admitted indexed payload: 6,592 canonical stack traces, 17,347 live object-execution cases, 12 object-arena cases and both two-game complete-game families, including their required snapshot/chunk data.
-- [ ] **C03-02** Acquire the 12 external monolithic reference payloads admitted by `tests/fixtures/registry.json`: action-validation, actions, card-equality, displacement-validation, effect-stats, effects, hex-filters, mine-paths, models, planning, targeting and terrain-validation.
-- [ ] **C03-03** Resolve the newer missing case whose targeted regeneration changed its frozen hash. Obtain the original admitted payload or separately review generator/provenance differences; do not substitute a changed case or silently repin the oracle/index.
+- [x] **C03-01** Recover/acquire every admitted indexed payload: 6,592 canonical stack traces, 17,347 live object-execution cases, 12 object-arena cases and both two-game complete-game families, including their required snapshot/chunk data.
+- [x] **C03-02** Acquire the 12 external monolithic reference payloads admitted by `tests/fixtures/registry.json`: action-validation, actions, card-equality, displacement-validation, effect-stats, effects, hex-filters, mine-paths, models, planning, targeting and terrain-validation.
+- [x] **C03-03** Resolve the newer missing case whose targeted regeneration changed its frozen hash. Obtain the original admitted payload or separately review generator/provenance differences; do not substitute a changed case or silently repin the oracle/index.
 - [ ] **C03-04** Provide verified acquisition for all retained corpora and document where ignored cache payloads live. Preserve deterministic gzip, atomic publication, logical paths and one-case-at-a-time reads; do not extract/cache the full corpus in memory.
 - [ ] **C03-05** Finish registry detail for each family: specific generator command, schema/rules version, oracle/runtime identity, expected counts/hashes, actual consumers, acquisition location, rights and owner. Replace generic generator/consumer descriptions where they leave reproduction ambiguous.
 - [x] **C03-06** Classify benchmark inputs separately from runtime catalogs, smoke examples and full parity data; record their location, identity, generator and consumers.
@@ -70,10 +71,10 @@ Owner: engine, service and search maintainers. Depends on C02/C03 for full-data
 acceptance. Native/Python CI definitions and local quick/quality checks exist.
 
 - [ ] **C04-01** Connect the full and restore CI jobs to the verified artifact acquisition route, checking identities after retrieval. Keep selected jobs failing on missing data; never satisfy them with the smoke fallback.
-- [ ] **C04-02** Run `python3 tools/fixtures.py verify --full` from `rust/` with all admitted payloads. Record separate case and monolithic-payload counts, with no missing or failed inputs.
+- [x] **C04-02** Run `python3 tools/fixtures.py verify --full` from `rust/` with all admitted payloads. Record separate case and monolithic-payload counts, with no missing or failed inputs.
 - [ ] **C04-03** Run `python3 tools/check.py full` and retain canonical/live/full-game state, request, event-order and identity comparison results with explicit counts.
 - [ ] **C04-04** Run `python3 tools/check.py restore` with the required complete data and retain exhaustive boundary/restoration and worker-isolation evidence.
-- [ ] **C04-05** Acquire the admitted setup/view inputs and explicitly run their ignored gates. Record variables, selected names and nonzero expected/executed counts; an ignored gate is not a pass.
+- [x] **C04-05** Acquire the admitted setup/view inputs and explicitly run their ignored gates. Record variables, selected names and nonzero expected/executed counts; an ignored gate is not a pass.
 - [x] **C04-06** Replace remaining generic expensive-tier command descriptions with executable, pinned workload commands and required inputs. Cover setup/view, restore, performance/strength and hosted integration, with accountable owners and event/schedule triggers.
 - [x] **C04-07** Verify CI change selection enforces the appropriate reference/restore gates for engine, worker, codec/arena and fixture changes; releases must run the full required matrix regardless of a narrow file diff.
 - [x] **C04-08** Establish periodic cold-acquisition/build verification. If CI caches are introduced, use them only as accelerators and test a path that does not depend on warm caches.

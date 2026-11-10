@@ -1,0 +1,351 @@
+{
+  "date": "2026-11-11",
+  "source_commit": "565b467bccef079386e570914d55cf2d2e3114a4",
+  "completed_tasks": [
+    "C03-01",
+    "C03-02",
+    "C03-03",
+    "C04-02",
+    "C04-05"
+  ],
+  "corpus": [
+    {
+      "family": "complete-games-hanu",
+      "expected": 2,
+      "executed": 2,
+      "missing": 0,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "family": "complete-games",
+      "expected": 2,
+      "executed": 2,
+      "missing": 0,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "family": "object-arena",
+      "expected": 12,
+      "executed": 12,
+      "missing": 0,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "family": "object-execution",
+      "expected": 17347,
+      "executed": 17347,
+      "missing": 0,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "family": "stack-traces",
+      "expected": 6592,
+      "executed": 6592,
+      "missing": 0,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "family": "action-validation",
+      "unit": "payload",
+      "expected": 1,
+      "executed": 1,
+      "missing": 0,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "family": "actions",
+      "unit": "payload",
+      "expected": 1,
+      "executed": 1,
+      "missing": 0,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "family": "card-equality",
+      "unit": "payload",
+      "expected": 1,
+      "executed": 1,
+      "missing": 0,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "family": "displacement-validation",
+      "unit": "payload",
+      "expected": 1,
+      "executed": 1,
+      "missing": 0,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "family": "effect-stats",
+      "unit": "payload",
+      "expected": 1,
+      "executed": 1,
+      "missing": 0,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "family": "effects",
+      "unit": "payload",
+      "expected": 1,
+      "executed": 1,
+      "missing": 0,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "family": "hex-filters",
+      "unit": "payload",
+      "expected": 1,
+      "executed": 1,
+      "missing": 0,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "family": "mine-paths",
+      "unit": "payload",
+      "expected": 1,
+      "executed": 1,
+      "missing": 0,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "family": "models",
+      "unit": "payload",
+      "expected": 1,
+      "executed": 1,
+      "missing": 0,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "family": "planning",
+      "unit": "payload",
+      "expected": 1,
+      "executed": 1,
+      "missing": 0,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "family": "targeting",
+      "unit": "payload",
+      "expected": 1,
+      "executed": 1,
+      "missing": 0,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "family": "terrain-validation",
+      "unit": "payload",
+      "expected": 1,
+      "executed": 1,
+      "missing": 0,
+      "failed": 0,
+      "skipped": 0
+    }
+  ],
+  "complete_game_chunks": [
+    {
+      "family": "complete-games",
+      "unit": "snapshot-chunk",
+      "expected": 111,
+      "executed": 111,
+      "missing": 0,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "family": "complete-games",
+      "expected": 2,
+      "executed": 2,
+      "missing": 0,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "family": "complete-games-hanu",
+      "unit": "snapshot-chunk",
+      "expected": 119,
+      "executed": 119,
+      "missing": 0,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "family": "complete-games-hanu",
+      "expected": 2,
+      "executed": 2,
+      "missing": 0,
+      "failed": 0,
+      "skipped": 0
+    }
+  ],
+  "tooling_tests": {
+    "expected": 51,
+    "passed": 51,
+    "failed": 0
+  },
+  "generator_interfaces": {
+    "expected": 18,
+    "passed": 18,
+    "scope": "Frozen-source wrapper help interfaces, not regeneration of all frozen corpora."
+  },
+  "independent_source_rehearsal": {
+    "commands": [
+      {
+        "name": "oracle-archive",
+        "exit": 0,
+        "seconds": 0.176
+      },
+      {
+        "name": "independent-extract",
+        "exit": 0,
+        "seconds": 1.149
+      },
+      {
+        "name": "help-action_rule_traces",
+        "exit": 0,
+        "seconds": 0.347
+      },
+      {
+        "name": "help-action_traces",
+        "exit": 0,
+        "seconds": 0.241
+      },
+      {
+        "name": "help-card_equality_traces",
+        "exit": 0,
+        "seconds": 0.262
+      },
+      {
+        "name": "help-displacement_effect_traces",
+        "exit": 0,
+        "seconds": 0.239
+      },
+      {
+        "name": "help-effect_stat_traces",
+        "exit": 0,
+        "seconds": 0.253
+      },
+      {
+        "name": "help-effect_traces",
+        "exit": 0,
+        "seconds": 0.243
+      },
+      {
+        "name": "help-mine_traces",
+        "exit": 0,
+        "seconds": 0.241
+      },
+      {
+        "name": "help-model_traces",
+        "exit": 0,
+        "seconds": 0.235
+      },
+      {
+        "name": "help-movement_sequence_traces",
+        "exit": 0,
+        "seconds": 0.239
+      },
+      {
+        "name": "help-object_arena_traces",
+        "exit": 0,
+        "seconds": 0.234
+      },
+      {
+        "name": "help-object_execution_traces",
+        "exit": 0,
+        "seconds": 0.279
+      },
+      {
+        "name": "help-oracle",
+        "exit": 0,
+        "seconds": 0.236
+      },
+      {
+        "name": "help-planning_traces",
+        "exit": 0,
+        "seconds": 0.246
+      },
+      {
+        "name": "help-stack_traces",
+        "exit": 0,
+        "seconds": 0.247
+      },
+      {
+        "name": "help-state_codec",
+        "exit": 0,
+        "seconds": 0.243
+      },
+      {
+        "name": "help-streamed_games",
+        "exit": 0,
+        "seconds": 0.273
+      },
+      {
+        "name": "help-targeting_rules",
+        "exit": 0,
+        "seconds": 0.246
+      },
+      {
+        "name": "help-terrain_traces",
+        "exit": 0,
+        "seconds": 0.245
+      },
+      {
+        "name": "regenerate-content",
+        "exit": 0,
+        "seconds": 8.638
+      },
+      {
+        "name": "install-content",
+        "exit": 0,
+        "seconds": 0.109
+      },
+      {
+        "name": "native-check-content",
+        "exit": 0,
+        "seconds": 0.179
+      }
+    ],
+    "extracted_files": 1164,
+    "original_git_history_present": false,
+    "oracle_archive_sha256": "863351ef82d3027424da1e9d3bf04be4fae4e5c809759d84785fc50cb487945f",
+    "source_map_sha256": "b7187e6a6b02ec461275edcfec0e19f968a323c526c008c0599a33f04f4e8e4e",
+    "full_content_sha256": "4b7520f058d68dda93efb15837d0b657332a1a3132d37148c14a9bb2968ff651",
+    "setup_sha256": "0acee2c10999d3a572b7112b3f3b8892124334a9a4f89f2405bbbb1b199fa322",
+    "server": {
+      "engine": "rust",
+      "server_version": "0.1.0",
+      "rules_version": 9,
+      "target_arch": "x86_64",
+      "target_os": "linux",
+      "binary_sha256": "1375dd34e70839f67b21b94f6baf9e3bff95e52677d72777c95d3ba787b36628",
+      "content_sha256": "4b7520f058d68dda93efb15837d0b657332a1a3132d37148c14a9bb2968ff651",
+      "content": {
+        "version": 1,
+        "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+        "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+        "map_count": 6,
+        "hero_count": 33
+      }
+    },
+    "scope": "Private local artifact with manifest-verified source, frozen runtime, native content load in an empty environment. Public artifact distribution and rights remain open."
+  },
+  "full_execution": "Started separately with one Cargo/test/oracle worker, MemoryMax=3G, MemorySwapMax=0 and CPUQuota=200%; no pass claimed here.",
+  "remaining_checklist_tasks": 39
+}

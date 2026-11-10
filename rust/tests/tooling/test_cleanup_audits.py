@@ -5,6 +5,7 @@ import gzip
 import hashlib
 import importlib.util
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -198,6 +199,25 @@ def test_named_gate_rejects_missing_inputs_and_zero_test_selection(monkeypatch):
         gates.execute(gate, {})
 
 
+def test_native_gate_runs_from_the_pinned_toolchain_directory(monkeypatch):
+    gates = tool("gates")
+    gate = {
+        "id": "example",
+        "scope": "test",
+        "required_variables": [],
+        "commands": [{"argv": ["cargo", "test"]}],
+    }
+
+    def run(argv, *, cwd, **kwargs):
+        assert argv == ["cargo", "test"]
+        assert cwd == gates.ROOT / "rust"
+        assert (cwd / "rust-toolchain.toml").is_file()
+        return subprocess.CompletedProcess(argv, 0, stdout="")
+
+    monkeypatch.setattr(gates.subprocess, "run", run)
+    assert gates.execute(gate, {})["status"] == "passed"
+
+
 def test_gate_uses_explicit_service_source_environment(monkeypatch):
     gates = tool("gates")
     observed = []
@@ -250,3 +270,26 @@ def test_crates_io_remains_disabled_for_every_workspace_crate():
     for path in crates:
         package = tomllib.loads(path.read_text())["package"]
         assert package["publish"] == {"workspace": True}, path
+
+
+@pytest.mark.parametrize(
+    ("minimum", "exit_code", "expected_error"),
+    [(5, 0, None), (6, 0, "Unexpected reduced suite"), (5, 7, "7")],
+)
+def test_streamed_native_counts_require_the_minimum_and_successful_exit(
+    capsys, minimum, exit_code, expected_error
+):
+    check = tool("check")
+    output = (
+        "test result: ok. 2 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out\n"
+        "test result: ok. 3 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out"
+    )
+    command = [sys.executable, "-c", f"print({output!r}); raise SystemExit({exit_code})"]
+    if expected_error:
+        with pytest.raises(SystemExit, match=expected_error):
+            check.run(command, tests=True, minimum=minimum)
+    else:
+        check.run(command, tests=True, minimum=minimum)
+        report = json.loads(capsys.readouterr().out.splitlines()[-1])
+        assert report["executed"] == 5
+        assert report["ignored"] == 3

@@ -368,5 +368,251 @@
       "remaining_checklist_tasks": 44
     }
   ],
-  "latest_verification": "audits/fourth-ten.json"
+  "arena_v2_merge_verification": {
+    "checkout_commit": "565b467bccef079386e570914d55cf2d2e3114a4",
+    "profile": "iterate",
+    "compiler": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+    "completed_tasks": [
+      "C04-05"
+    ],
+    "setup_view": [
+      {
+        "command": "python3 rust/tools/gates.py run setup-parity",
+        "native_test": "native_setup_matches_pinned_python",
+        "expected_tests": 1,
+        "passed_tests": 1,
+        "unit": "opening state and identity graph",
+        "expected": 28,
+        "executed": 28,
+        "input_sha256": {
+          "GOA2_GAME_CONTENT": "4b7520f058d68dda93efb15837d0b657332a1a3132d37148c14a9bb2968ff651",
+          "GOA2_GAME_SETUP_CASES": "0acee2c10999d3a572b7112b3f3b8892124334a9a4f89f2405bbbb1b199fa322"
+        }
+      },
+      {
+        "command": "python3 rust/tools/gates.py run view-parity",
+        "native_test": "native_frontend_projections_match_pinned_python",
+        "expected_tests": 1,
+        "passed_tests": 1,
+        "unit": "scoped projection",
+        "cases": 13,
+        "expected": 65,
+        "executed": 65,
+        "input_sha256": {
+          "GOA2_GAME_VIEW_CASES": "83541bbdff883bc3654cf976d6e2ad4846aace96ec074aad84ccbbce8f9bb2e8"
+        }
+      }
+    ],
+    "source": "Existing private WSL oracle-export cache. Full-pack SHA256 matches content/smoke-manifest.json. Generator commands are retained under Setup and frontend projection parity in docs/archive/development-history.md."
+  },
+  "latest_verification": "audits/corpus-recovery.json",
+  "recovered_local_corpus": {
+    "date": "2026-11-11",
+    "checkout_commit": "565b467bccef079386e570914d55cf2d2e3114a4",
+    "completed_tasks": [
+      "C03-01",
+      "C03-02",
+      "C03-03",
+      "C04-02"
+    ],
+    "command": "python3 tools/fixtures.py verify --full",
+    "reports": [
+      {
+        "family": "complete-games-hanu",
+        "expected": 2,
+        "executed": 2,
+        "missing": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "complete-games",
+        "expected": 2,
+        "executed": 2,
+        "missing": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "object-arena",
+        "expected": 12,
+        "executed": 12,
+        "missing": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "object-execution",
+        "expected": 17347,
+        "executed": 17347,
+        "missing": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "stack-traces",
+        "expected": 6592,
+        "executed": 6592,
+        "missing": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "action-validation",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 1,
+        "missing": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "actions",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 1,
+        "missing": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "card-equality",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 1,
+        "missing": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "displacement-validation",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 1,
+        "missing": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "effect-stats",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 1,
+        "missing": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "effects",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 1,
+        "missing": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "hex-filters",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 1,
+        "missing": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "mine-paths",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 1,
+        "missing": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "models",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 1,
+        "missing": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "planning",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 1,
+        "missing": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "targeting",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 1,
+        "missing": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "terrain-validation",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 1,
+        "missing": 0,
+        "failed": 0,
+        "skipped": 0
+      }
+    ],
+    "additional_current_chunk_command": "python3 tools/fixtures.py verify --full --family complete-games --family complete-games-hanu",
+    "additional_reports": [
+      {
+        "family": "complete-games",
+        "unit": "snapshot-chunk",
+        "expected": 111,
+        "executed": 111,
+        "missing": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "complete-games",
+        "expected": 2,
+        "executed": 2,
+        "missing": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "complete-games-hanu",
+        "unit": "snapshot-chunk",
+        "expected": 119,
+        "executed": 119,
+        "missing": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "complete-games-hanu",
+        "expected": 2,
+        "executed": 2,
+        "missing": 0,
+        "failed": 0,
+        "skipped": 0
+      }
+    ],
+    "memory_limit_bytes": 1073741824,
+    "source": "Original ignored fixture payloads in the private WSL checkout; every admitted fingerprint matches. No regeneration, frozen-index change or oracle repin.",
+    "scope": "Artifact integrity only. Differential execution, exhaustive restoration and artifact distribution remain separate acceptance gates."
+  },
+  "independent_source_acquisition": {
+    "evidence": "audits/corpus-recovery.json",
+    "summary": "audits/corpus-recovery.md",
+    "full_content_sha256": "4b7520f058d68dda93efb15837d0b657332a1a3132d37148c14a9bb2968ff651",
+    "oracle_archive_sha256": "863351ef82d3027424da1e9d3bf04be4fae4e5c809759d84785fc50cb487945f",
+    "source_history_required": false,
+    "public_distribution_approved": false
+  }
 }

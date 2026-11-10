@@ -15,7 +15,8 @@ python3 rust/tools/gates.py run setup-parity --report /absolute/path/setup-resul
 ```
 
 `validate`, `list` and `show` never execute a gate. `run` checks explicit inputs
-and executes argv directly, without shell expansion. Source/runtime, full case
+and executes argv directly, without shell expansion. Native Cargo commands run
+from the Rust workspace to honor its compiler pin. Source/runtime, full case
 preflight and test minimums still apply. Missing data and zero-match Cargo test
 filters fail. Reports contain status/counts rather than copying environment
 credentials or raw checkpoints. Caller-supplied input/output paths must be

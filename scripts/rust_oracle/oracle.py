@@ -50,6 +50,9 @@ def reference_runtime():
 
 def source_manifest():
     hashes = {}
+    # This is the explicit pin command, not the ordinary export path. Deliberate
+    # repins still read the requested Git revision; run_pinned uses verified
+    # source artifacts for normal generation without original history.
     archive = git("archive", "--format=tar", ORACLE_REVISION, *SOURCE_ROOTS)
     with tarfile.open(fileobj=io.BytesIO(archive)) as source:
         for member in source.getmembers():

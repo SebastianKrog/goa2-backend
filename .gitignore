@@ -52,3 +52,6 @@ Guards of Atlantis II - 2nd Printing_web-2.pdf
 
 # macOS
 .DS_Store
+
+# Optional native reference/tooling environment.
+/.venv-oracle/

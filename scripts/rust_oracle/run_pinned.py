@@ -1,17 +1,17 @@
 """Run a Rust export or arena command against isolated, pinned Python sources."""
 
 import argparse
-import io
 import os
+import json
 from pathlib import Path
 import shutil
 import signal
 import subprocess
 import sys
-import tarfile
 from tempfile import TemporaryDirectory
 
-from oracle import MANIFEST, ORACLE_REVISION, ROOT, SOURCE_ROOTS, git
+from oracle import MANIFEST, ORACLE_REVISION, ROOT, SOURCE_ROOTS
+from pinned_source import archive_bytes, extract_verified
 
 
 def main():
@@ -23,11 +23,10 @@ def main():
     parser.add_argument("arguments", nargs=argparse.REMAINDER)
     args = parser.parse_args()
 
-    archive = git("archive", "--format=tar", ORACLE_REVISION, *SOURCE_ROOTS)
+    archive = archive_bytes(ROOT, MANIFEST, ORACLE_REVISION, SOURCE_ROOTS)
     with TemporaryDirectory(prefix="goa2-pinned-oracle-") as temp:
         root = Path(temp)
-        with tarfile.open(fileobj=io.BytesIO(archive)) as source:
-            source.extractall(root, filter="data")
+        extract_verified(archive, root, json.loads(MANIFEST.read_text()))
 
         # Retain the current bridge scripts and committed manifest. Their
         # existing source and runtime verification runs inside this tree.

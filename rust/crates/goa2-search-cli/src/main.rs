@@ -1,4 +1,5 @@
-//! JSON-lines diagnostic worker. Native search is not yet advertised.
+//! JSON-lines rules and search worker. Diagnostic operations are experimental;
+//! see docs/compatibility.md for the retained wire contract.
 #![forbid(unsafe_code)]
 mod resolution_search;
 mod sequence_legality;

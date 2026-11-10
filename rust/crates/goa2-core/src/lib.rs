@@ -1,5 +1,6 @@
 //! Native rules primitives. No Python calls or service dependencies.
 #![forbid(unsafe_code)]
+pub mod api;
 pub mod batch;
 pub mod bitset;
 pub mod cards;

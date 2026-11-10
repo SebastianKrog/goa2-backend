@@ -70,10 +70,12 @@ def clock_smoke(binary, pack, database):
                 "freeze_clock": True,
             },
         )
+
         def frozen_view():
-            return request(
-                server, "/games/" + frozen["game_id"], token=frozen["spectator_token"]
-            )["view"]["clock"]
+            return request(server, "/games/" + frozen["game_id"], token=frozen["spectator_token"])[
+                "view"
+            ]["clock"]
+
         frozen_start = frozen_view()
         time.sleep(0.05)
         assert frozen_view() == frozen_start

@@ -1,0 +1,22 @@
+name: Native Rust bug
+description: Report a synthetic reproduction for the native engine or service.
+body:
+  - type: textarea
+    id: versions
+    attributes:
+      label: Build and content identity
+      description: Include source commit, compiler/profile, content hash and affected interface.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction and expected behavior
+      description: Use artificial data. Do not upload tokens, databases or private replays.
+    validations:
+      required: true
+  - type: textarea
+    id: checks
+    attributes:
+      label: Test evidence
+      description: Name the tier and expected/executed/missing counts.

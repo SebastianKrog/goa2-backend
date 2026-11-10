@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "tiers": [
+    {
+      "name": "quick-native",
+      "owner": "engine maintainers",
+      "when": "every PR",
+      "command": "python3 tools/check.py quick",
+      "requires": "bundled data only; no Python engine/history; corpus integration targets gated by full-parity",
+      "minimum_passed": 350
+    },
+    {
+      "name": "quality",
+      "owner": "engine maintainers",
+      "when": "every PR",
+      "command": "python3 tools/check.py quality",
+      "requires": "pinned compiler/rustfmt/Clippy"
+    },
+    {
+      "name": "service-contract",
+      "owner": "service maintainers",
+      "when": "server changes and releases",
+      "command": "python3 tools/check.py service --binary PATH",
+      "requires": "built server, bundled smoke-game.json, locked websockets; disposable processes/databases"
+    },
+    {
+      "name": "full-differential",
+      "owner": "engine maintainers",
+      "when": "engine changes, release candidates, weekly backstop",
+      "command": "python3 tools/check.py full",
+      "requires": "every retained corpus payload; missing files fail preflight; GOA2_FIXTURE_CACHE optional"
+    },
+    {
+      "name": "restore-exhaustive",
+      "owner": "engine maintainers",
+      "when": "restore/codec/arena changes and releases",
+      "command": "python3 tools/check.py restore; plus explicit setup/view environment gates in docs/testing.md",
+      "requires": "verified complete data and setup/view sources; not established by quick-native"
+    },
+    {
+      "name": "performance-strength",
+      "owner": "search maintainers",
+      "when": "search/hot-path changes and releases",
+      "command": "existing scripts/rust_oracle benchmark/arena commands; record exact workload per docs/search.md",
+      "requires": "frozen content/source, fixed work and paired runs; expensive opt-in"
+    },
+    {
+      "name": "hosted-integration",
+      "owner": "release maintainers",
+      "when": "integration changes and deployment promotion",
+      "command": "scripts/verify_rust_hosted_draft.py and verify_rust_staging.py with explicit deployment arguments",
+      "requires": "explicit compatible frontend/deployment; never an implicit external mutation"
+    }
+  ]
+}

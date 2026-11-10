@@ -1,0 +1,342 @@
+{
+  "schema_version": 1,
+  "wire_schema": 1,
+  "operations": [
+    {
+      "operation": "capabilities",
+      "status": "supported automation",
+      "callers": [
+        "scripts/rust_oracle/oracle.py",
+        "scripts/rust_oracle/arena_queue.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup"
+    },
+    {
+      "operation": "prepare_search",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/rollout_parity.py",
+        "scripts/rust_oracle/arena_calibrate.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup"
+    },
+    {
+      "operation": "aggregate_trace",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/object_arena_traces.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup"
+    },
+    {
+      "operation": "mine_paths",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/mine_traces.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup"
+    },
+    {
+      "operation": "hex_filters",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/movement_sequence_traces.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup"
+    },
+    {
+      "operation": "terrain",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/oracle.py",
+        "scripts/rust_oracle/sequence_legality.py",
+        "scripts/rust_oracle/primary_traces.py",
+        "scripts/rust_oracle/live_turret_traces.py",
+        "scripts/rust_oracle/live_token_path_traces.py",
+        "scripts/rust_oracle/live_spell_primitive_traces.py",
+        "scripts/rust_oracle/object_execution_traces.py",
+        "scripts/rust_oracle/line_of_sight_traces.py",
+        "scripts/rust_oracle/push_traces.py",
+        "scripts/rust_oracle/terrain_traces.py",
+        "scripts/rust_oracle/stack_traces.py",
+        "tests/rust_oracle/test_live_push.py",
+        "tests/rust_oracle/test_live_token_paths.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup"
+    },
+    {
+      "operation": "action_legality",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/action_rule_traces.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup"
+    },
+    {
+      "operation": "targeting",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/targeting_rules.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup"
+    },
+    {
+      "operation": "displacement_legality",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/displacement_effect_traces.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup"
+    },
+    {
+      "operation": "stats",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/effect_stat_traces.py",
+        "scripts/rust_oracle/model_traces.py",
+        "scripts/rust_oracle/live_attack_sequence_traces.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup"
+    },
+    {
+      "operation": "travel_zones",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/action_traces.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup"
+    },
+    {
+      "operation": "action_trace",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/action_traces.py",
+        "scripts/rust_oracle/action_rule_traces.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup"
+    },
+    {
+      "operation": "tie_trace",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/planning_traces.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup"
+    },
+    {
+      "operation": "planning_trace",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/planning_traces.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup"
+    },
+    {
+      "operation": "effect_trace",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/effect_traces.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup"
+    },
+    {
+      "operation": "card_equality",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/card_equality_traces.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup"
+    },
+    {
+      "operation": "card_trace",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/model_traces.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup"
+    },
+    {
+      "operation": "heuristic_input",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup"
+    },
+    {
+      "operation": "evaluate_lab_attack_range",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup"
+    },
+    {
+      "operation": "search_greedy",
+      "status": "supported automation",
+      "callers": [
+        "scripts/rust_oracle/rollout_parity.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup"
+    },
+    {
+      "operation": "search_resolution",
+      "status": "supported automation",
+      "callers": [
+        "scripts/rust_oracle/rollout_parity.py",
+        "scripts/rust_oracle/sequence_legality.py",
+        "scripts/rust_oracle/arena_match.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup"
+    },
+    {
+      "operation": "search_sampled_planning",
+      "status": "supported automation",
+      "callers": [
+        "scripts/rust_oracle/rollout_parity.py",
+        "scripts/rust_oracle/arena_match.py",
+        "tests/rust_oracle/test_arena_calibrate.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup"
+    },
+    {
+      "operation": "show_bot_commitments",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/rollout_parity.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup"
+    },
+    {
+      "operation": "rollout_game_turns",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/rollout_parity.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup"
+    },
+    {
+      "operation": "check_sequences",
+      "status": "supported automation",
+      "callers": [
+        "scripts/rust_oracle/sequence_legality.py",
+        "scripts/rust_oracle/arena_queue.py",
+        "tests/rust_oracle/test_recommendation_validation.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup"
+    },
+    {
+      "operation": "arena_start",
+      "status": "supported automation",
+      "callers": [
+        "scripts/rust_oracle/arena_match.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup"
+    },
+    {
+      "operation": "arena_submit",
+      "status": "supported automation",
+      "callers": [
+        "scripts/rust_oracle/arena_match.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup"
+    },
+    {
+      "operation": "arena_replay",
+      "status": "supported automation",
+      "callers": [
+        "scripts/rust_oracle/arena_verify.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup"
+    },
+    {
+      "operation": "offline_match",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/rollout_parity.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup"
+    },
+    {
+      "operation": "rollout_bench",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/rollout_parity.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup"
+    },
+    {
+      "operation": "resolution_reuse_census",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup"
+    },
+    {
+      "operation": "fingerprint_bench",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup"
+    },
+    {
+      "operation": "simulation_bench",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/simulation_bench.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup"
+    },
+    {
+      "operation": "stack_trace_stream",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/streamed_games.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup"
+    },
+    {
+      "operation": "stack_trace",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/object_execution_traces.py",
+        "scripts/rust_oracle/stack_traces.py",
+        "tests/rust_oracle/test_stack_traces.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup"
+    },
+    {
+      "operation": "roundtrip_state",
+      "status": "supported automation",
+      "callers": [
+        "scripts/rust_oracle/state_codec.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup"
+    },
+    {
+      "operation": "validate_execution",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/state_codec.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup"
+    },
+    {
+      "operation": "load_board",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/oracle.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup"
+    },
+    {
+      "operation": "movement",
+      "status": "experimental diagnostic/reference tooling",
+      "callers": [
+        "scripts/rust_oracle/rollout_parity.py",
+        "scripts/rust_oracle/oracle.py",
+        "scripts/rust_oracle/action_builders.py",
+        "scripts/rust_oracle/sequence_legality.py",
+        "scripts/rust_oracle/turn_traces.py",
+        "scripts/rust_oracle/live_primary_body_traces.py",
+        "scripts/rust_oracle/live_passive_body_traces.py",
+        "scripts/rust_oracle/primary_builders.py"
+      ],
+      "retirement": "retain until all named callers migrate; no removal in this cleanup"
+    }
+  ]
+}

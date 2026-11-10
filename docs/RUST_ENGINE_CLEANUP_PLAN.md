@@ -1,5 +1,9 @@
 # Rust engine cleanup plan
 
+> Implementation: native safeguards, tooling and extraction work are tracked in
+> [Rust readiness](../rust/docs/readiness.md). That record distinguishes verified
+> work from remaining artifact, licensing and later-refactor gates.
+
 Prepare the existing GoA2 Rust engine for a standalone public repository where contributors can build, test, understand, and change it without access to the original developer’s machine or private development history.
 
 The first priority is reproducibility and clear contracts. Preserve the working engine and 2D frontend integration while separating runtime content from test fixtures, establishing a dependable test workflow, and documenting the supported interfaces. Larger interpreter and search refactors should follow those safeguards. A complete architectural rewrite is not a prerequisite for opening the repository.

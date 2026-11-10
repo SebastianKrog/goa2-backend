@@ -1,3 +1,5 @@
+> Scope: Python/backend historical work. Current native Rust cleanup is tracked in [RUST_ENGINE_CLEANUP_PLAN.md](RUST_ENGINE_CLEANUP_PLAN.md) and [Rust readiness](../rust/docs/readiness.md).
+
 # Clean AI stack: merge scope
 
 This is the scope boundary for the cleaned replacement stack. It supersedes the

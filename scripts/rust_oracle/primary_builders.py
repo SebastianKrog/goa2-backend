@@ -760,7 +760,7 @@ def catalog():
 def export():
     payload = catalog()
     write_text(
-        ROOT / "rust/tests/fixtures/primary-builders.json", json.dumps(payload, indent=2) + "\n"
+        ROOT / "rust/content/catalogs/primary-builders.json", json.dumps(payload, indent=2) + "\n"
     )
     print(
         {

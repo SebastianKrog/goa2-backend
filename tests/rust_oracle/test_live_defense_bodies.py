@@ -26,7 +26,7 @@ def events(records, kind):
 
 
 def test_frozen_catalog_matches_source_methods_and_recipes():
-    expected = json.loads((ROOT / "rust/tests/fixtures/defense-builders.json").read_text())
+    expected = json.loads((ROOT / "rust/content/catalogs/defense-builders.json").read_text())
     assert catalog() == expected
     assert (
         len(

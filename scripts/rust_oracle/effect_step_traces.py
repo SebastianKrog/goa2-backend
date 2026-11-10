@@ -263,5 +263,5 @@ def cases(advance, answer):
 
 if __name__ == "__main__":
     data = defaults()
-    write_text(ROOT / "rust/tests/fixtures/effect-defaults.json", json.dumps(data, indent=2) + "\n")
+    write_text(ROOT / "rust/content/catalogs/effect-defaults.json", json.dumps(data, indent=2) + "\n")
     print(data["catalog_sha256"])

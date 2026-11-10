@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "oracle_manifest": "../oracle-manifest.json",
+  "catalogs": [
+    {
+      "path": "catalogs/action-builders.json",
+      "sha256": "30a1493fedc2144127f32fbd14234b26cc147d48f55754751f5d972b4c3cb14c",
+      "schema_version": 1,
+      "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43"
+    },
+    {
+      "path": "catalogs/defense-builders.json",
+      "sha256": "f4a798cb98eec5e7a4d28b6fc42f5ff00e4e9a207c4a98d9c9067911f6860269",
+      "schema_version": 1,
+      "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43"
+    },
+    {
+      "path": "catalogs/effect-defaults.json",
+      "sha256": "e954ca2ce924a1462b01953c2d0109fe7b25263c925075965260c4cef4dc1417",
+      "schema_version": 1,
+      "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43"
+    },
+    {
+      "path": "catalogs/instruction-templates.json",
+      "sha256": "8dfb1b369bda6665fabc3955827e46f79384c6fa68350f6c87808f9661b4b23e",
+      "schema_version": 1,
+      "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43"
+    },
+    {
+      "path": "catalogs/loadout-provenance.json",
+      "sha256": "994780b61170e31aeeb65e404dc9ccf30daa799e4afcc674829d694f3ee1ab7a",
+      "schema_version": null,
+      "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43"
+    },
+    {
+      "path": "catalogs/primary-effects.json",
+      "sha256": "403eaef064d67307849ddb9165157f557ca657d86a54a304dd2bb5a79098ab14",
+      "schema_version": 2,
+      "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43"
+    },
+    {
+      "path": "catalogs/primary-builders.json",
+      "sha256": "8b1dde928783d9c2d91703b7dc1c83618ca672fe18c4e35e02562eeabf177865",
+      "schema_version": 3,
+      "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43"
+    },
+    {
+      "path": "catalogs/spell-builders.json",
+      "sha256": "6116a09d3c6c4c45985209ace3350de719bd6eb7f3fa17ecb736756d228e82b1",
+      "schema_version": 1,
+      "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43"
+    }
+  ]
+}

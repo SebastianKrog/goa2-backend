@@ -38,9 +38,10 @@ pub struct EffectCreated {
 fn defaults() -> Result<&'static Value> {
     static DATA: OnceLock<Result<Value>> = OnceLock::new();
     DATA.get_or_init(|| {
-        let data: Value =
-            serde_json::from_str(include_str!("../../../tests/fixtures/effect-defaults.json"))
-                .map_err(|e| e.to_string())?;
+        let data: Value = serde_json::from_str(include_str!(
+            "../../../content/catalogs/effect-defaults.json"
+        ))
+        .map_err(|e| e.to_string())?;
         let manifest = crate::codec::oracle_manifest()?;
         if data["schema_version"] != 1 || data["source_sha256"] != manifest["source_sha256"] {
             return Err("effect defaults identity mismatch".into());

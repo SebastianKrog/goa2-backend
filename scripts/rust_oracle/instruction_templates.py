@@ -480,7 +480,7 @@ def export():
         "templates": {key: value.model_dump(mode="json") for key, value in values.items()},
     }
     write_text(
-        ROOT / "rust/tests/fixtures/instruction-templates.json",
+        ROOT / "rust/content/catalogs/instruction-templates.json",
         json.dumps(payload, indent=2) + "\n",
     )
     print("Exported frozen continuation templates")

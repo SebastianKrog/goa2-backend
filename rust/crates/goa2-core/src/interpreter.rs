@@ -8608,9 +8608,10 @@ mod tests {
     #[test]
     fn inert_spell_rule_primitives_import_but_reached_dense_queries_and_respawns_are_guarded_before_pop()
      {
-        let data: Value =
-            serde_json::from_str(include_str!("../../../tests/fixtures/spell-builders.json"))
-                .unwrap();
+        let data: Value = serde_json::from_str(include_str!(
+            "../../../content/catalogs/spell-builders.json"
+        ))
+        .unwrap();
         for wire in [
             &data["recipes"]["disintegrate"][1]["fields"],
             &data["recipes"]["create_undead"][0]["fields"],

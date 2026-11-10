@@ -851,7 +851,7 @@ def export():
     payload = build_catalog()
     recipes = payload["recipes"]
     write_text(
-        ROOT / "rust/tests/fixtures/primary-effects.json", json.dumps(payload, indent=2) + "\n"
+        ROOT / "rust/content/catalogs/primary-effects.json", json.dumps(payload, indent=2) + "\n"
     )
     print(
         {

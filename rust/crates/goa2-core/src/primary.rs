@@ -269,9 +269,10 @@ pub fn catalog() -> Result<&'static Value, String> {
         .map_err(Clone::clone)
 }
 fn load_catalog() -> Result<Value, String> {
-    let source: Value =
-        serde_json::from_str(include_str!("../../../tests/fixtures/primary-effects.json"))
-            .map_err(|e| e.to_string())?;
+    let source: Value = serde_json::from_str(include_str!(
+        "../../../content/catalogs/primary-effects.json"
+    ))
+    .map_err(|e| e.to_string())?;
     let manifest = crate::codec::oracle_manifest()?;
     if source["schema_version"] != 2
         || source["source_sha256"] != manifest["source_sha256"]

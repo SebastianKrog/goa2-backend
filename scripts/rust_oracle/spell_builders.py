@@ -103,7 +103,7 @@ def catalog():
 
 def export():
     data = catalog()
-    write_text(ROOT / "rust/tests/fixtures/spell-builders.json", json.dumps(data, indent=2) + "\n")
+    write_text(ROOT / "rust/content/catalogs/spell-builders.json", json.dumps(data, indent=2) + "\n")
     print(
         dict(
             effects=len(data["effects"]),

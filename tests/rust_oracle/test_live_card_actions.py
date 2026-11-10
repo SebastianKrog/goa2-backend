@@ -9,7 +9,7 @@ from oracle import ROOT
 
 
 def test_action_constructor_catalog_matches_frozen_source():
-    assert catalog() == json.loads((ROOT / "rust/tests/fixtures/action-builders.json").read_text())
+    assert catalog() == json.loads((ROOT / "rust/content/catalogs/action-builders.json").read_text())
 
 
 def test_action_edges_keep_negative_values_primary_semantics_and_piece_inputs():

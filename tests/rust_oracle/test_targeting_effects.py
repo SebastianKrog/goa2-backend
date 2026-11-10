@@ -46,5 +46,5 @@ def test_frozen_pre_action_movement_recipe_matches_the_public_source_step():
     for step in expected:
         step.step_id = "template"
     root = Path(__file__).resolve().parents[2]
-    frozen = json.loads((root / "rust/tests/fixtures/instruction-templates.json").read_text())
+    frozen = json.loads((root / "rust/content/catalogs/instruction-templates.json").read_text())
     assert frozen["pre_action_movement"] == [step.model_dump(mode="json") for step in expected]

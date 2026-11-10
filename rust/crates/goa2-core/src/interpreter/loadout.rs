@@ -151,7 +151,7 @@ fn catalog() -> Result<&'static Catalog> {
     CATALOG
         .get_or_init(|| {
             let catalog: Catalog = serde_json::from_str(include_str!(
-                "../../../../tests/fixtures/loadout-provenance.json"
+                "../../../../content/catalogs/loadout-provenance.json"
             ))
             .map_err(|error| error.to_string())?;
             if crate::codec::oracle_manifest()?["source_sha256"].as_str()
@@ -1391,7 +1391,7 @@ mod tests {
     #[test]
     fn native_provenance_matches_frozen_python_hypotheses() {
         let raw: serde_json::Value = serde_json::from_str(include_str!(
-            "../../../../tests/fixtures/loadout-provenance.json"
+            "../../../../content/catalogs/loadout-provenance.json"
         ))
         .unwrap();
         let cases: Vec<Case> = serde_json::from_value(raw["cases"].clone()).unwrap();

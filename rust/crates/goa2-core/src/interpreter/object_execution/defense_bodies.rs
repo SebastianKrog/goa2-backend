@@ -42,7 +42,7 @@ fn catalog() -> Result<&'static Value> {
     static DATA: OnceLock<std::result::Result<Value, String>> = OnceLock::new();
     DATA.get_or_init(|| {
         let data: Value = serde_json::from_str(include_str!(
-            "../../../../../tests/fixtures/defense-builders.json"
+            "../../../../../content/catalogs/defense-builders.json"
         ))
         .map_err(|error| error.to_string())?;
         let manifest = crate::codec::oracle_manifest()?;

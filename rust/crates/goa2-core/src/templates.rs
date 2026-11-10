@@ -8,7 +8,7 @@ pub fn instructions() -> Result<&'static Value, String> {
     INSTRUCTIONS
         .get_or_init(|| {
             let source: Value = serde_json::from_str(include_str!(
-                "../../../tests/fixtures/instruction-templates.json"
+                "../../../content/catalogs/instruction-templates.json"
             ))
             .map_err(|e| e.to_string())?;
             let manifest: Value =

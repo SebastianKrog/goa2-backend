@@ -9,12 +9,9 @@ use crate::{
     store::{AcceptedAction, Credentials, PlayerToken, SavedGame, Store},
 };
 use axum::http::StatusCode;
-use goa2_core::interpreter::{
-    ExecutionBudget,
-    live_game::{
-        GameCheckpoint, GameContent, GameSetup, GameTransition, LiveGame, PauseVoteChange,
-        PlayerCommand, TimeControlConfig,
-    },
+use goa2_core::api::{
+    ExecutionBudget, GameCheckpoint, GameContent, GameSetup, GameTransition, LiveGame,
+    PauseVoteChange, PlayerCommand, TimeControlConfig,
 };
 use serde_json::{Value, json};
 use std::{
@@ -230,7 +227,9 @@ impl Server {
         let mut updates = game.updates.subscribe();
         tokio::spawn(async move {
             while !*retired.borrow() && !*shutdown.borrow() {
-                let Ok(engine) = game.snapshot() else { break };
+                let Ok(engine) = game.snapshot_async().await else {
+                    break;
+                };
                 let delay = engine.clock_deadline(game.clock_now());
                 drop(engine);
                 let wake = async {
@@ -461,6 +460,13 @@ impl Game {
             return Err(ApiError::not_found("Game not found"));
         }
         Ok(())
+    }
+
+    // A command holds current through its durable SQLite commit. Async workers
+    // must not block a Tokio executor thread while waiting for that mutex.
+    pub async fn snapshot_async(self: &Arc<Self>) -> Result<Arc<LiveGame>> {
+        let game = Arc::clone(self);
+        crate::blocking(move || game.snapshot()).await
     }
 
     pub fn snapshot(&self) -> Result<Arc<LiveGame>> {
@@ -827,4 +833,56 @@ fn portable_checkpoint_at(
         checkpoint["timed"] = Value::Bool(true);
     }
     Ok(checkpoint)
+}
+
+#[cfg(test)]
+mod blocking_tests {
+    use super::*;
+    #[tokio::test(flavor = "current_thread")]
+    async fn contended_snapshot_does_not_block_the_async_executor() {
+        use std::sync::mpsc;
+        let content =
+            GameContent::read(include_bytes!("../../../content/smoke-game.json").as_slice())
+                .unwrap();
+        let setup = GameSetup {
+            map: "forgotten_island".into(),
+            red_heroes: vec!["Arien".into()],
+            blue_heroes: vec!["Brogan".into()],
+            seed: 29,
+            mode: goa2_core::api::GameMode::Quick,
+            cheats_enabled: false,
+            tie_breaker: None,
+        };
+        let engine = LiveGame::create(&content, &setup, &ExecutionBudget::default())
+            .unwrap()
+            .0;
+        let credentials = Credentials {
+            player_tokens: Vec::new(),
+            spectator_token: "synthetic".into(),
+            hero_names: BTreeMap::new(),
+            bots: BTreeMap::new(),
+            fixed_clock_ms: None,
+            provisioning_hash: None,
+        };
+        let game = Arc::new(Game::new("synthetic".into(), credentials, engine, None));
+        let (ready_send, ready) = mpsc::channel();
+        let (release, wait) = mpsc::channel();
+        let held = Arc::clone(&game);
+        let thread = std::thread::spawn(move || {
+            let _guard = held.current.lock().unwrap();
+            ready_send.send(()).unwrap();
+            let _ = wait.recv_timeout(Duration::from_secs(2));
+        });
+        ready.recv().unwrap();
+        let started = std::time::Instant::now();
+        let snapshot = tokio::spawn(async move { game.snapshot_async().await });
+        tokio::time::sleep(Duration::from_millis(25)).await;
+        release.send(()).unwrap();
+        assert!(
+            started.elapsed() < Duration::from_secs(1),
+            "mutex wait stalled current-thread runtime"
+        );
+        assert_eq!(snapshot.await.unwrap().unwrap().position().revision, 0);
+        thread.join().unwrap();
+    }
 }

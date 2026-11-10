@@ -1,13 +1,13 @@
 {
   "schema_version": 1,
   "manifest": "rust/extraction-manifest.json",
-  "selected_files": 1105,
+  "selected_files": 1119,
   "group_counts": {
     "deployment": 11,
-    "development": 660,
+    "development": 671,
     "historical": 2,
     "reference-verification": 248,
-    "runtime": 184
+    "runtime": 187
   },
   "embedded_inputs": [
     {
@@ -75,7 +75,7 @@
     },
     {
       "consumer": "rust/crates/goa2-core/src/lib.rs",
-      "line": 81,
+      "line": 83,
       "input": "rust/test-support/fixture_cache.rs",
       "kind": "rust-module",
       "status": "included"
@@ -221,6 +221,20 @@
       "status": "included"
     },
     {
+      "consumer": "rust/crates/goa2-core/tests/robustness.rs",
+      "line": 14,
+      "input": "rust/content/smoke-game.json",
+      "kind": "rust-embed",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/crates/goa2-core/tests/robustness.rs",
+      "line": 114,
+      "input": "rust/content/smoke-game.json",
+      "kind": "rust-embed",
+      "status": "included"
+    },
+    {
       "consumer": "rust/crates/goa2-core/tests/spatial.rs",
       "line": 10,
       "input": "rust/test-support/cases.rs",
@@ -249,6 +263,13 @@
       "status": "included"
     },
     {
+      "consumer": "rust/crates/goa2-game-server/src/game.rs",
+      "line": 845,
+      "input": "rust/content/smoke-game.json",
+      "kind": "rust-embed",
+      "status": "included"
+    },
+    {
       "consumer": "rust/crates/goa2-game-server/src/http.rs",
       "line": 121,
       "input": "rust/crates/goa2-game-server/src/override_schema.json",
@@ -263,9 +284,23 @@
       "status": "included"
     },
     {
+      "consumer": "rust/crates/goa2-game-server/src/replay.rs",
+      "line": 382,
+      "input": "rust/content/smoke-game.json",
+      "kind": "rust-embed",
+      "status": "included"
+    },
+    {
       "consumer": "rust/crates/goa2-game-server/src/store/migrations.rs",
       "line": 5,
       "input": "rust/crates/goa2-game-server/src/store/migrations/001-base.sql",
+      "kind": "rust-embed",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/crates/goa2-search-cli/src/main.rs",
+      "line": 1569,
+      "input": "rust/docs/worker-protocol-examples.json",
       "kind": "rust-embed",
       "status": "included"
     },
@@ -278,7 +313,7 @@
     },
     {
       "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-      "line": 1546,
+      "line": 1560,
       "input": "rust/test-support/fixture_cache.rs",
       "kind": "rust-module",
       "status": "included"
@@ -307,10 +342,10 @@
   ],
   "python_import_counts": {
     "compatible-python-service": 5,
-    "included-module": 1383,
+    "included-module": 1384,
     "optional-layout-lab": 4,
     "pinned-oracle-source": 1405,
-    "python-stdlib": 715,
+    "python-stdlib": 729,
     "third-party-runtime": 73
   },
   "python_imports": [
@@ -366,6 +401,12 @@
       "consumer": "rust/tools/baseline_games.py",
       "line": 14,
       "input": "scripts/rust_verification/baselines.py",
+      "category": "included-module"
+    },
+    {
+      "consumer": "rust/tools/boundary_inventory.py",
+      "line": 12,
+      "input": "rust/tools/dependency_audit.py",
       "category": "included-module"
     },
     {
@@ -17543,6 +17584,12 @@
       "disposition": "Resolve literal/local modules using included scripts; variable imports are caller-controlled or pinned source discovery. No ambient source checkout is admitted for native execution."
     },
     {
+      "consumer": "rust/tests/tooling/test_boundary_inventory.py",
+      "line": 10,
+      "expression": "importlib.util.spec_from_file_location('boundary_inventory', ROOT / 'rust/tools/boundary_inventory.py')",
+      "disposition": "Resolve literal/local modules using included scripts; variable imports are caller-controlled or pinned source discovery. No ambient source checkout is admitted for native execution."
+    },
+    {
       "consumer": "rust/tests/tooling/test_ci_scope.py",
       "line": 8,
       "expression": "importlib.util.spec_from_file_location('ci_scope', Path(__file__).resolve().parents[2] / 'tools/ci_scope.py')",
@@ -17580,6 +17627,11 @@
       "expression": "Path(__file__).resolve().parents[3]"
     },
     {
+      "consumer": "rust/tests/tooling/test_boundary_inventory.py",
+      "line": 8,
+      "expression": "Path(__file__).resolve().parents[3]"
+    },
+    {
       "consumer": "rust/tests/tooling/test_ci_scope.py",
       "line": 8,
       "expression": "importlib.util.spec_from_file_location('ci_scope', Path(__file__).resolve().parents[2] / 'tools/ci_scope.py')"
@@ -17602,6 +17654,11 @@
     {
       "consumer": "rust/tools/baseline_games.py",
       "line": 9,
+      "expression": "Path(__file__).resolve().parents[2]"
+    },
+    {
+      "consumer": "rust/tools/boundary_inventory.py",
+      "line": 14,
       "expression": "Path(__file__).resolve().parents[2]"
     },
     {
@@ -17748,6 +17805,42 @@
       "line": 126,
       "input": "rust/.gitignore",
       "disposition": "included"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_boundary_inventory.py",
+      "line": 11,
+      "input": "rust/tools/boundary_inventory.py",
+      "disposition": "included"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_boundary_inventory.py",
+      "line": 9,
+      "input": "rust/tools",
+      "disposition": "directory resolved by included tool"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_boundary_inventory.py",
+      "line": 19,
+      "input": "rust/crates/goa2-search-cli/src/main.rs",
+      "disposition": "included"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_boundary_inventory.py",
+      "line": 21,
+      "input": "rust/docs/worker-protocol-examples.json",
+      "disposition": "included"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_boundary_inventory.py",
+      "line": 24,
+      "input": "rust/docs/worker-operations.json",
+      "disposition": "included"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_boundary_inventory.py",
+      "line": 53,
+      "input": "rust/crates/*/src/*.rs",
+      "disposition": "review"
     },
     {
       "consumer": "rust/tests/tooling/test_ci_scope.py",
@@ -17933,6 +18026,30 @@
       "consumer": "rust/tools/baseline_games.py",
       "line": 20,
       "input": "rust/tests/baselines/manifest.json",
+      "disposition": "included"
+    },
+    {
+      "consumer": "rust/tools/boundary_inventory.py",
+      "line": 37,
+      "input": "rust/crates/goa2-search-cli/src/main.rs",
+      "disposition": "included"
+    },
+    {
+      "consumer": "rust/tools/boundary_inventory.py",
+      "line": 81,
+      "input": "rust/crates/goa2-core/src/lib.rs",
+      "disposition": "included"
+    },
+    {
+      "consumer": "rust/tools/boundary_inventory.py",
+      "line": 84,
+      "input": "rust/crates/goa2-core/src/",
+      "disposition": "directory resolved by included tool"
+    },
+    {
+      "consumer": "rust/tools/boundary_inventory.py",
+      "line": 33,
+      "input": "rust/extraction-manifest.json",
       "disposition": "included"
     },
     {
@@ -19013,7 +19130,10 @@
       "rust/crates/goa2-core/src/interpreter/object_execution/spell_bodies.rs"
     ],
     "rust/content/smoke-game.json": [
-      "rust/crates/goa2-core/tests/contracts.rs"
+      "rust/crates/goa2-core/tests/contracts.rs",
+      "rust/crates/goa2-core/tests/robustness.rs",
+      "rust/crates/goa2-game-server/src/game.rs",
+      "rust/crates/goa2-game-server/src/replay.rs"
     ],
     "rust/crates/goa2-core/Cargo.toml": [
       "rust/crates/goa2-game-server/Cargo.toml",
@@ -19027,6 +19147,9 @@
     ],
     "rust/crates/goa2-game-server/src/store/migrations/001-base.sql": [
       "rust/crates/goa2-game-server/src/store/migrations.rs"
+    ],
+    "rust/docs/worker-protocol-examples.json": [
+      "rust/crates/goa2-search-cli/src/main.rs"
     ],
     "rust/oracle-manifest.json": [
       "rust/crates/goa2-core/src/codec.rs",
@@ -19067,6 +19190,7 @@
       "rust/crates/goa2-core/tests/oracle.rs"
     ],
     "rust/tools/dependency_audit.py": [
+      "rust/tools/boundary_inventory.py",
       "rust/tools/documentation_audit.py",
       "rust/tools/extract.py"
     ],

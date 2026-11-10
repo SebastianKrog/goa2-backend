@@ -1,0 +1,314 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-10",
+  "branch": "bots-upstream",
+  "parent_commit": "c001c6a9",
+  "completed_tasks": [
+    "C08-05",
+    "C09-01",
+    "C09-02",
+    "C09-03",
+    "C09-04",
+    "C10-05",
+    "C10-07",
+    "C11-01",
+    "C11-02",
+    "C11-03"
+  ],
+  "native": {
+    "compiler": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+    "profile": "iterate",
+    "expected": 400,
+    "executed": 400,
+    "failed": 0,
+    "ignored": 64,
+    "new_tests": 11,
+    "full_parity": false,
+    "targeted_ordered_restore_tests": 4
+  },
+  "tooling": {
+    "expected": 38,
+    "executed": 38,
+    "failed": 0,
+    "extracted_expected": 38,
+    "extracted_executed": 38,
+    "extracted_failed": 0
+  },
+  "service": {
+    "suites": [
+      {
+        "suite": "auth",
+        "expected": 2,
+        "executed": 2,
+        "failed": 0,
+        "missing": 0
+      },
+      {
+        "suite": "bots",
+        "expected": 3,
+        "executed": 3,
+        "failed": 0,
+        "missing": 0
+      },
+      {
+        "suite": "clocks",
+        "expected": 2,
+        "executed": 2,
+        "failed": 0,
+        "missing": 0
+      },
+      {
+        "suite": "votes",
+        "expected": 6,
+        "executed": 6,
+        "failed": 0,
+        "missing": 0
+      },
+      {
+        "suite": "shutdown",
+        "expected": 1,
+        "executed": 1,
+        "failed": 0,
+        "missing": 0
+      },
+      {
+        "suite": "backup",
+        "expected": 1,
+        "executed": 1,
+        "failed": 0,
+        "missing": 0
+      }
+    ],
+    "expected": 15,
+    "executed": 15,
+    "failed": 0,
+    "extracted_backup_expected": 1,
+    "extracted_backup_executed": 1,
+    "extracted_backup_failed": 0
+  },
+  "worker_process": {
+    "expected": 71,
+    "executed": 71,
+    "rejected": 69,
+    "successful_after_rejections": 2,
+    "failed": 0,
+    "scope": "Transport/schema only; unavailable native workloads are not executed."
+  },
+  "protocol_schemas": {
+    "expected_operations": 39,
+    "validated": 39,
+    "executes_synthetic_envelopes": false
+  },
+  "quick_data": {
+    "expected": 572,
+    "executed": 572,
+    "missing": 0,
+    "failed": 0,
+    "extracted_same_result": true
+  },
+  "quality": {
+    "rustfmt": true,
+    "clippy_all_targets_all_features_warnings_denied": true,
+    "rustdoc_warnings_denied": true,
+    "compiled_embedding_example": true,
+    "python_black_strict_ruff": true,
+    "diff_check": true
+  },
+  "full_preflight": {
+    "exit_code": 1,
+    "results": [
+      {
+        "family": "complete-games-hanu",
+        "expected": 2,
+        "executed": 0,
+        "missing": 2,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "complete-games",
+        "expected": 2,
+        "executed": 0,
+        "missing": 2,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "object-arena",
+        "expected": 12,
+        "executed": 0,
+        "missing": 12,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "object-execution",
+        "expected": 17347,
+        "executed": 0,
+        "missing": 17347,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "stack-traces",
+        "expected": 6592,
+        "executed": 0,
+        "missing": 6592,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "action-validation",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "actions",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "card-equality",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "displacement-validation",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "effect-stats",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "effects",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "hex-filters",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "mine-paths",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "models",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "planning",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "targeting",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "terrain-validation",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 0,
+        "missing": 1,
+        "failed": 0,
+        "skipped": 0
+      }
+    ],
+    "meaning": "Missing admitted payloads; no mismatched case admitted and no smoke substitution."
+  },
+  "extraction": {
+    "scope": "Source/tooling rehearsal against the same built native binaries; not final public candidate approval.",
+    "original_git_history_required_by_extracted_checks": false,
+    "gate_definitions_validated": 9,
+    "documentation_link_failures": 0,
+    "worker_packets": 71,
+    "backup_scenarios": 1,
+    "selected_files": 1119,
+    "source_map_sha256": "6087c60732e1f4f1f9ba022db3ff8c47450c6b95b55ad7730eb33c6b2e20f42f",
+    "all_runtime_source_bytes_match_checkout": true,
+    "literal_embedded_dependencies": 45
+  },
+  "production_changes": "Executor-blocking isolation, explicit API imports/wrapper, internal diagnostic context and equal-valued active version aliases; no intended rules/wire/content changes.",
+  "remote_ci_claimed": false,
+  "publication_performed": false,
+  "deployment_performed": false,
+  "original_history_rewritten": false,
+  "commands": [
+    "python tools/check.py quick --profile iterate (cwd rust)",
+    "python tools/check.py quality --profile iterate (cwd rust)",
+    "cargo test --locked --profile iterate -p goa2-core --test robustness (cwd rust)",
+    "cargo run --locked --profile iterate -p goa2-core --example local_game (cwd rust)",
+    "python -m pytest -q rust/tests/tooling tests/rust_oracle/test_fixture_cache.py",
+    "python scripts/verify_rust_game_server.py /absolute/path/goa2-game-server rust/content/smoke-game.json",
+    "python rust/tools/worker_contracts.py --binary /absolute/path/goa2-search-cli",
+    "python rust/tools/boundary_inventory.py --output rust/docs/audits/boundaries.json",
+    "python rust/tools/fixtures.py verify --full",
+    "python rust/tools/extract.py /absolute/path/new-extracted-directory"
+  ],
+  "binary_sha256": {
+    "goa2-game-server": "b80a6294646bbd7eb132f0d8c8898ea1a4bfa316b165cd696719ed0da3431db3",
+    "goa2-search-cli": "921294b44ae72d8853c6ff516a6f8c9a50e73b5067e559ad2af716c52c691290"
+  },
+  "inventory": {
+    "core_root_modules": 44,
+    "worker_operations": 39,
+    "operations_with_literal_request_or_stream_consumers": 35,
+    "dynamic_request_sites_including_separate_http_site": 4,
+    "dense_object_consumer_sources": 114,
+    "production_panic_assumptions": 506,
+    "test_panic_sites_separately_counted": 7702,
+    "deletions": 0
+  }
+}

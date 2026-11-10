@@ -5,8 +5,8 @@ use crate::{
 };
 use axum::http::StatusCode;
 use goa2_core::{
+    api::{BotDecision, EngineError, ExecutionBudget},
     codec::Phase,
-    interpreter::{EngineError, ExecutionBudget, live_game::BotDecision},
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -56,7 +56,7 @@ async fn run(
         if *retired.borrow() || *shutdown.borrow() {
             return Ok(());
         }
-        let snapshot = game.snapshot()?;
+        let snapshot = game.snapshot_async().await?;
         let position = snapshot.position();
         let revision = position.revision;
         if position.phase == Phase::GameOver {
@@ -79,7 +79,7 @@ async fn run(
             permit = server.bot_workers.clone().acquire_owned() => permit.map_err(ApiError::internal)?,
             () = changed(&mut updates, &mut retired, &mut shutdown, revision) => continue,
         };
-        if game.snapshot()?.position().revision != revision {
+        if game.snapshot_async().await?.position().revision != revision {
             continue;
         }
 
@@ -103,7 +103,7 @@ async fn run(
                 cancelled: Some(&cancel),
                 ..ExecutionBudget::default()
             };
-            snapshot.recommend_bot(&actor, &budget)
+            goa2_core::api::recommend_bot(&snapshot, &actor, &budget)
         });
         let picked = tokio::select! {
             result = &mut search => result.map_err(ApiError::internal)?,

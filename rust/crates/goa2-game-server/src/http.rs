@@ -22,11 +22,11 @@ use axum::{
     routing::{delete, get, post, put},
 };
 use goa2_core::{
-    codec::Phase,
-    interpreter::live_game::{
+    api::{
         GameCheckpoint, GameContent, GameMode, GameSetup, PlayerCommand, SetupTeam,
         TimeControlConfig,
     },
+    codec::Phase,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -731,6 +731,28 @@ async fn send_current(
 }
 
 async fn socket_game(
+    socket: WebSocket,
+    server: Arc<Server>,
+    game: Arc<Game>,
+    viewer: Option<String>,
+    shutdown: watch::Receiver<bool>,
+) {
+    let (joined_game, joined_viewer) = (Arc::clone(&game), viewer.clone());
+    let Ok(presence) = blocking(move || joined_game.connect_voter(joined_viewer.as_deref())).await
+    else {
+        return;
+    };
+    socket_game_connected(socket, server, game, viewer, shutdown).await;
+    // Voter removal can contend with a persisted override; this applies even
+    // when the inner socket handler returns early or initial delivery fails.
+    let _ = blocking(move || {
+        drop(presence);
+        Ok(())
+    })
+    .await;
+}
+
+async fn socket_game_connected(
     mut socket: WebSocket,
     server: Arc<Server>,
     game: Arc<Game>,
@@ -741,9 +763,6 @@ async fn socket_game(
     let mut presence = game.presence.subscribe();
     let mut presence_limits = Limits::default();
     let mut retired = game.retired.subscribe();
-    let Ok(_presence) = game.connect_voter(viewer.as_deref()) else {
-        return;
-    };
     let mut last_revision = 0;
     let mut seen_override = None;
     if !send_current(
@@ -909,10 +928,11 @@ async fn send_override_notice(
 
 async fn sync_override_notice(
     socket: &mut WebSocket,
-    game: &Game,
+    game: &Arc<Game>,
     seen: &mut Option<String>,
 ) -> bool {
-    let Ok(notice) = game.override_notice() else {
+    let game = Arc::clone(game);
+    let Ok(notice) = blocking(move || game.override_notice()).await else {
         return false;
     };
     if let Some(id) = seen.clone()

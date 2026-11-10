@@ -165,6 +165,24 @@
       "status": "included"
     },
     {
+      "consumer": "rust/docs/architecture.md",
+      "link": "audits/api-boundaries.md",
+      "target": "rust/docs/audits/api-boundaries.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/architecture.md",
+      "link": "audits/concurrency-and-panics.md",
+      "target": "rust/docs/audits/concurrency-and-panics.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/architecture.md",
+      "link": "audits/versions-and-robustness.md",
+      "target": "rust/docs/audits/versions-and-robustness.md",
+      "status": "included"
+    },
+    {
       "consumer": "rust/docs/archive/development-history.md",
       "link": "../../README.md",
       "target": "rust/README.md",
@@ -393,9 +411,33 @@
       "status": "included"
     },
     {
+      "consumer": "rust/docs/audits/api-boundaries.md",
+      "link": "boundaries.json",
+      "target": "rust/docs/audits/boundaries.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/api-boundaries.md",
+      "link": "../worker-protocol-examples.json",
+      "target": "rust/docs/worker-protocol-examples.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/api-boundaries.md",
+      "link": "../worker-operations.json",
+      "target": "rust/docs/worker-operations.json",
+      "status": "included"
+    },
+    {
       "consumer": "rust/docs/audits/ci-gates.md",
       "link": "../verification-gates.md",
       "target": "rust/docs/verification-gates.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/concurrency-and-panics.md",
+      "link": "boundaries.json",
+      "target": "rust/docs/audits/boundaries.json",
       "status": "included"
     },
     {
@@ -502,6 +544,12 @@
     },
     {
       "consumer": "rust/docs/audits/second-ten.md",
+      "link": "third-ten.md",
+      "target": "rust/docs/audits/third-ten.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/second-ten.md",
       "link": "ci-gates.md",
       "target": "rust/docs/audits/ci-gates.md",
       "status": "included"
@@ -549,6 +597,54 @@
       "status": "included"
     },
     {
+      "consumer": "rust/docs/audits/third-ten.md",
+      "link": "third-ten.json",
+      "target": "rust/docs/audits/third-ten.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/third-ten.md",
+      "link": "concurrency-and-panics.md",
+      "target": "rust/docs/audits/concurrency-and-panics.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/third-ten.md",
+      "link": "boundaries.json",
+      "target": "rust/docs/audits/boundaries.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/third-ten.md",
+      "link": "api-boundaries.md",
+      "target": "rust/docs/audits/api-boundaries.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/third-ten.md",
+      "link": "api-boundaries.md#dense-versus-object-aware-execution-c10-05",
+      "target": "rust/docs/audits/api-boundaries.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/third-ten.md",
+      "link": "versions-and-robustness.md",
+      "target": "rust/docs/audits/versions-and-robustness.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/third-ten.md",
+      "link": "concurrency-and-panics.md#panic-assumptions-and-trust-distinctions",
+      "target": "rust/docs/audits/concurrency-and-panics.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/third-ten.md",
+      "link": "versions-and-robustness.md#new-deterministic-mutationproperty-coverage",
+      "target": "rust/docs/audits/versions-and-robustness.md",
+      "status": "included"
+    },
+    {
       "consumer": "rust/docs/cleanup-checklist.md",
       "link": "readiness.md",
       "target": "rust/docs/readiness.md",
@@ -573,6 +669,12 @@
       "status": "included"
     },
     {
+      "consumer": "rust/docs/cleanup-checklist.md",
+      "link": "audits/third-ten.md",
+      "target": "rust/docs/audits/third-ten.md",
+      "status": "included"
+    },
+    {
       "consumer": "rust/docs/compatibility.md",
       "link": "worker-operations.json",
       "target": "rust/docs/worker-operations.json",
@@ -588,6 +690,18 @@
       "consumer": "rust/docs/compatibility.md",
       "link": "audits/compatibility-decisions.md",
       "target": "rust/docs/audits/compatibility-decisions.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/compatibility.md",
+      "link": "audits/api-boundaries.md",
+      "target": "rust/docs/audits/api-boundaries.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/compatibility.md",
+      "link": "audits/versions-and-robustness.md",
+      "target": "rust/docs/audits/versions-and-robustness.md",
       "status": "included"
     },
     {
@@ -645,6 +759,12 @@
       "status": "included"
     },
     {
+      "consumer": "rust/docs/readiness.md",
+      "link": "audits/third-ten.md",
+      "target": "rust/docs/audits/third-ten.md",
+      "status": "included"
+    },
+    {
       "consumer": "rust/docs/search.md",
       "link": "readiness.md",
       "target": "rust/docs/readiness.md",
@@ -660,6 +780,18 @@
       "consumer": "rust/docs/search.md",
       "link": "verification-gates.md",
       "target": "rust/docs/verification-gates.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/search.md",
+      "link": "audits/api-boundaries.md",
+      "target": "rust/docs/audits/api-boundaries.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/search.md",
+      "link": "worker-protocol-examples.json",
+      "target": "rust/docs/worker-protocol-examples.json",
       "status": "included"
     },
     {
@@ -696,6 +828,12 @@
       "consumer": "rust/docs/testing.md",
       "link": "audits/server-harness.md",
       "target": "rust/docs/audits/server-harness.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/testing.md",
+      "link": "audits/versions-and-robustness.md",
+      "target": "rust/docs/audits/versions-and-robustness.md",
       "status": "included"
     },
     {

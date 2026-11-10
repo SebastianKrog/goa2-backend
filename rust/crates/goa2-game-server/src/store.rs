@@ -7,7 +7,7 @@ use crate::{
     replay::{self, Archive, Decision, Entry},
     shares::{Metadata, Seek, Share},
 };
-use goa2_core::interpreter::live_game::GameCheckpoint;
+use goa2_core::api::GameCheckpoint;
 use rusqlite::{Connection, MAIN_DB, OpenFlags, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};

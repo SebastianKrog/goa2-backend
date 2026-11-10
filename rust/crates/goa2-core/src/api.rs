@@ -71,7 +71,32 @@
 #![warn(missing_docs)]
 
 pub use crate::interpreter::live_game::{
-    GameCheckpoint, GameContent, GameMode, GamePosition, GameResult, GameSetup, GameTransition,
-    LiveGame, PlayerCommand, SetupTeam, TimeControlConfig,
+    BotDecision, CardPatchZone, GameCheckpoint, GameContent, GameMode, GamePosition, GameResult,
+    GameSetup, GameTransition, LiveGame, PatchCommand, PauseVoteChange, PlayerCommand, SetupTeam,
+    StartingPositionCommand, TableCardSlot, TimeControlConfig, UnstickCommand,
 };
 pub use crate::interpreter::{EngineError, ExecutionBudget};
+
+/// Supported bounded bot entry point on an authoritative game. Authentication
+/// belongs to the adapter. This preserves the existing legal deadline fallback
+/// and cancellation behavior; it does not submit or persist the recommendation.
+pub fn recommend_bot(
+    game: &LiveGame,
+    hero: &str,
+    budget: &ExecutionBudget<'_>,
+) -> Result<Option<BotDecision>, EngineError> {
+    game.recommend_bot(hero, budget)
+}
+
+/// Transitional worker/search surface. Types and arena slots remain experimental
+/// until all inventoried consumers migrate with complete differential/restore data.
+/// This module supplies explicit imports, not a new stability promise or new crate.
+pub mod experimental_search {
+    pub use crate::interpreter::{
+        ArenaChoice, ArenaMatch, BotPlanningScope, DecisionMove, EngineError, ExecutionBudget,
+        ForecastNodeShare, GreedySearchOptions, NativeSession, OfflinePolicy, OpponentPolicy,
+        PlanningRolloutSample, PlanningSearchOptions, PublicUpgradeBatch, RecordedArenaChoice,
+        SearchEvaluation, SearchLimits, SequenceVerdict, TeamKnowledgeMode, UpgradeCheckpoint,
+        WorkBudget, replay_public_upgrade_batches,
+    };
+}

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::collections::HashSet;
 
-pub const ORACLE_REVISION: &str = "00becf4a68615afa410f8eabe0c841809af0427b";
+pub use crate::versions::ORACLE_REVISION;
 const REFERENCE_KEY: &str = "$goa2_instance";
 
 pub(crate) fn oracle_manifest() -> Result<&'static Value, String> {
@@ -173,9 +173,9 @@ impl StateEnvelope {
     }
 
     fn validated_expansion(&self) -> Result<Value, String> {
-        if self.schema_version != 1
+        if self.schema_version != crate::versions::STATE_SCHEMA
             || self.oracle_revision != ORACLE_REVISION
-            || self.rules_version != 9
+            || self.rules_version != crate::versions::RULES
         {
             return Err("unsupported state schema, oracle revision or rules version".into());
         }
@@ -183,7 +183,10 @@ impl StateEnvelope {
         if manifest["source_sha256"].as_str() != Some(&self.source_sha256) {
             return Err("oracle source content mismatch".into());
         }
-        if self.native_resume.is_some_and(|r| r.version != 1) {
+        if self
+            .native_resume
+            .is_some_and(|r| r.version != crate::versions::NATIVE_RESUME)
+        {
             return Err("unsupported native resume version".into());
         }
         for instance in &self.instances {

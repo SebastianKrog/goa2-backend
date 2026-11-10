@@ -28,7 +28,7 @@ pub use patch::{CardPatchZone, PatchCommand};
 pub use setup::{GameContent, GameMode, GameSetup, SetupTeam};
 pub use unstick::UnstickCommand;
 
-const CHECKPOINT_VERSION: u32 = 1;
+use crate::versions::CHECKPOINT as CHECKPOINT_VERSION;
 
 /// The transport authenticates the actor separately from this payload.
 #[derive(Clone, Debug, Deserialize, Serialize)]

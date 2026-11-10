@@ -5,8 +5,8 @@ use crate::{
 };
 use flate2::{Compression, write::GzEncoder};
 use goa2_core::{
+    api::{LiveGame, PlayerCommand, StartingPositionCommand},
     codec::Phase,
-    interpreter::live_game::{LiveGame, PlayerCommand, StartingPositionCommand},
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};

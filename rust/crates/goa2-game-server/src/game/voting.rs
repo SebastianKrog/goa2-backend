@@ -7,9 +7,9 @@ use crate::{
     store::Store,
 };
 use axum::http::StatusCode;
-use goa2_core::interpreter::{
-    EngineError, ExecutionBudget,
-    live_game::{GameTransition, LiveGame, PatchCommand, PauseVoteChange, UnstickCommand},
+use goa2_core::api::{
+    EngineError, ExecutionBudget, GameTransition, LiveGame, PatchCommand, PauseVoteChange,
+    UnstickCommand,
 };
 use serde_json::{Value, json};
 use std::{

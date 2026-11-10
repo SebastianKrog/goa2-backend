@@ -1,7 +1,7 @@
 //! Atomic upgrades for legacy unversioned databases and numbered schemas.
 use rusqlite::{Connection, Transaction};
 
-const VERSION: u32 = 3;
+use crate::versions::DATABASE_SCHEMA as VERSION;
 const BASE: &str = include_str!("migrations/001-base.sql");
 
 pub(super) fn apply(connection: &mut Connection) -> rusqlite::Result<()> {

@@ -27,3 +27,9 @@ Benchmark input ownership, identities, generators and consumers are recorded in
 explicitly distinguished from full replay inputs and strength/profile recipes.
 The [gate catalog](verification-gates.md) pins runnable simulation/strength
 commands to reviewed bridge source; catalog validation is not a benchmark run.
+
+Maintained authoritative bot calls use `goa2_core::api::recommend_bot`. Worker-only
+session/search/arena imports use the explicitly experimental facade described in
+[API boundaries](audits/api-boundaries.md); this does not stabilize arena slots or
+private fingerprints. The [worker examples](worker-protocol-examples.json) are
+schema contracts, distinct from admitted gameplay/throughput inputs.

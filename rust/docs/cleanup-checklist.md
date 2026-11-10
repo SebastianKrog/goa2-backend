@@ -9,7 +9,8 @@ smoke pass does not establish its wider acceptance criterion.
 
 The [ten-task follow-up](audits/next-ten.md) closes the ten checked items below.
 The [second ten-task follow-up](audits/second-ten.md) closes ten further items.
-**20 completed; 64 remain open.** All other acceptance gates retain their scope.
+The [third ten-task follow-up](audits/third-ten.md) closes ten further items.
+**30 completed; 54 remain open.** All other acceptance gates retain their scope.
 
 The implemented baseline already includes catalog relocation, bundled smoke
 inputs/content, native CI definitions, SQLite migrations, service suites,
@@ -125,7 +126,7 @@ idempotent schema v1–v3 migration tests already pass locally.
 - [x] **C08-02** Rehearse consistent WAL backup and restoration on disposable data, then verify links, revisions, receipts, replay reconstruction and share metadata after reopening the restored database.
 - [ ] **C08-03** Rehearse binary rollback with the matching database backup across supported migration boundaries; record when a newer schema prevents direct rollback.
 - [ ] **C08-04** Run the extended replay/share service verifier for the final candidate and close any coverage gaps across auth/views, retries/concurrency, clocks/votes, persistence and bots.
-- [ ] **C08-05** Audit blocking work, lock scope, bot cancellation, deadline recovery and shutdown across transport, orchestration, persistence and replay boundaries; address concrete problems with their own regressions.
+- [x] **C08-05** Audit blocking work, lock scope, bot cancellation, deadline recovery and shutdown across transport, orchestration, persistence and replay boundaries; address concrete problems with their own regressions.
 - [x] **C08-06** Evaluate whether a server library/test harness would materially improve testing and boundaries. Record retain/defer or implement the justified change; preserve real cross-process checks either way.
 
 ## C09 — Library and worker API boundaries (P1)
@@ -133,10 +134,10 @@ idempotent schema v1–v3 migration tests already pass locally.
 Owner: engine and search maintainers. Depends on C04/C05. The embedding facade
 and initial worker operation/caller inventory exist.
 
-- [ ] **C09-01** Complete the caller inventory for broad core exports, including dynamic Python/worker uses and restore/search consumers, before restricting visibility.
-- [ ] **C09-02** Refine supported embedding/search entry points and migrate callers before making arena slots, compiler/import state and profiling structures internal. Add a crate only if it materially clarifies ownership/build cost.
-- [ ] **C09-03** Validate every retained worker operation's caller/status and link it to maintained protocol examples and schema/error tests. Isolate diagnostics and deprecate/remove a porting operation only after migrating all callers and preserving its unique coverage.
-- [ ] **C09-04** Introduce stable internal diagnostic categories and useful boundary context for unsupported rules, invalid input, budget exhaustion, cancellation and internal errors. Preserve current wire behavior or version an intentional change; test that distinction.
+- [x] **C09-01** Complete the caller inventory for broad core exports, including dynamic Python/worker uses and restore/search consumers, before restricting visibility.
+- [x] **C09-02** Refine supported embedding/search entry points and migrate callers before making arena slots, compiler/import state and profiling structures internal. Add a crate only if it materially clarifies ownership/build cost.
+- [x] **C09-03** Validate every retained worker operation's caller/status and link it to maintained protocol examples and schema/error tests. Isolate diagnostics and deprecate/remove a porting operation only after migrating all callers and preserving its unique coverage.
+- [x] **C09-04** Introduce stable internal diagnostic categories and useful boundary context for unsupported rules, invalid input, budget exhaustion, cancellation and internal errors. Preserve current wire behavior or version an intentional change; test that distinction.
 
 ## C10 — Interpreter and search modularization (P2)
 
@@ -147,9 +148,9 @@ full differential/restore coverage before semantic or representation changes.
 - [ ] **C10-02** Mechanically split interpreter responsibilities into instruction definitions/compilation, execution/session state, requests/events, import/export, budgets and tests, with no intentional semantic change.
 - [ ] **C10-03** Continue object-execution/live-game modularization and replace broad `use super::*` coupling with explicit dependencies where it clarifies ownership.
 - [ ] **C10-04** Separate search orchestration, evaluation, hidden-world sampling, generation/order, rollout, reuse, diagnostics and result types; introduce meaningful options/context types for repeated argument groups.
-- [ ] **C10-05** Inventory dense versus object-aware execution for every live, worker, search and restore caller. Migrate consumers and preserve unique dense/protocol regressions before retiring any implementation; record justified retention where needed.
+- [x] **C10-05** Inventory dense versus object-aware execution for every live, worker, search and restore caller. Migrate consumers and preserve unique dense/protocol regressions before retiring any implementation; record justified retention where needed.
 - [ ] **C10-06** Replace recipe operand sentinels such as `1234568103`/`1234568104` with a documented typed representation through a coordinated, versioned generator/catalog change and independent old/new semantic comparison.
-- [ ] **C10-07** Centralize version constants and identity metadata while retaining disagreement checks at the supported boundaries.
+- [x] **C10-07** Centralize version constants and identity metadata while retaining disagreement checks at the supported boundaries.
 - [ ] **C10-08** After each separately reviewable change, verify equivalent state, requests, ordered events, aliases/restoration and fixed-work performance, including tie breaks, random draws, cancellation, deadlines, node accounting and fallback semantics.
 
 ## C11 — Robustness and performance maintenance (P2)
@@ -157,9 +158,9 @@ full differential/restore coverage before semantic or representation changes.
 Owner: engine, service and search maintainers. Depends on C04 and coordinates
 with C08–C10. Acquisition/atomicity and small privacy/stale-input tests exist.
 
-- [ ] **C11-01** Audit panic assumptions at external content, archive, envelope, worker JSON, WebSocket and persisted-data boundaries. Distinguish trusted imports and test-only unwraps from actual reachable failures; preserve explicit size/entity/step/execution limits.
-- [ ] **C11-02** Add targeted property/fuzz cases for malformed envelopes, reference tables, hex coordinates, catalog deserialization, replay inputs and command sequences where current tests leave meaningful risk.
-- [ ] **C11-03** Extend invariant coverage for rejected-input nonmutation, worker isolation, physical-card identity, save/restore equivalence and recipient privacy, using concrete gaps rather than duplicating existing checks.
+- [x] **C11-01** Audit panic assumptions at external content, archive, envelope, worker JSON, WebSocket and persisted-data boundaries. Distinguish trusted imports and test-only unwraps from actual reachable failures; preserve explicit size/entity/step/execution limits.
+- [x] **C11-02** Add targeted property/fuzz cases for malformed envelopes, reference tables, hex coordinates, catalog deserialization, replay inputs and command sequences where current tests leave meaningful risk.
+- [x] **C11-03** Extend invariant coverage for rejected-input nonmutation, worker isolation, physical-card identity, save/restore equivalence and recipient privacy, using concrete gaps rather than duplicating existing checks.
 - [ ] **C11-04** Establish reproducible benchmark inputs/results with content/oracle identity, compiler/profile, hardware, seed, policy, workload and units; record fixed-work comparisons separately from deadline-limited strength/quality.
 - [ ] **C11-05** Measure cold startup, memory, clone/restore cost, throughput, decision latency and cancellation responsiveness for the retained baseline and relevant future changes.
 - [ ] **C11-06** Review catalog parsing/initialization and binary footprint after relocation. Optimize only where measurement justifies it, preserving immutable process-wide caches and private continuation state with correctness/identity checks.

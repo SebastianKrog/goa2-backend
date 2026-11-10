@@ -6,8 +6,8 @@ plan `fc0ff702`; reference frontend `a3c5e0a`. Implementation remains on
 
 The [remaining-task checklist](cleanup-checklist.md) expands every open C01–C12
 item, including implementation gaps, decisions and acceptance gates. The
-[first](audits/next-ten.md) and [second](audits/second-ten.md) ten-task follow-ups
-record **20 completed and 64 open items**, with reproducible commands and limits.
+[first](audits/next-ten.md), [second](audits/second-ten.md) and
+[third](audits/third-ten.md) ten-task follow-ups record **30 completed and 54 open items**, with reproducible commands and limits.
 
 | Package | Implemented work | Remaining acceptance / owner |
 | --- | --- | --- |
@@ -18,10 +18,10 @@ record **20 completed and 64 open items**, with reproducible commands and limits
 | C05 | Boundary/default/field policy, actor/team/simultaneous/event privacy regressions, receipt/restart contracts and explicit shim retention/migration decisions | Full historical corpus and hosted compatibility gates: engine/service maintainers |
 | C06 | Task-based README/guides, preserved historical logs, native agent instructions, facade rustdoc and compiled example, accessible frontend facts; retained-link/history audit and detailed API failure/determinism/privacy/budget rustdoc | Final public-tree link/metadata review: release maintainers |
 | C07 | Contribution/changelog/security/conduct drafts, issue/PR templates, dependency license inventory, clean extraction/source mapping; disabled crates.io policy enforced | License grant/holders/notices, advisory scan, named maintainers/security destination, public-tree/history review: repository owner |
-| C08 | Shared process/API/WebSocket helpers, five independently runnable service suites, atomic schema v1–v3 migrations; WAL backup/restore/independent shares and retained process-harness decision | Extended release/hosted replay-share and migration archive matrix: service maintainers |
-| C09 | Intended `api` facade, worker operation/caller inventory, explicit experimental/codec guard policy | Migration of broad internal consumers before visibility reduction: engine/search maintainers |
-| C10 | No semantic interpreter/search rewrite or dense-path retirement attempted | Blocked on dependable full parity/restore artifacts; stage options types and module moves separately: engine/search maintainers |
-| C11 | Acquisition corruption/path/membership/atomicity tests, privacy/stale-command contracts, performance evidence policy | Targeted fuzzing/trust-boundary review and measured hot-path changes after full gates: engine/search maintainers |
+| C08 | Shared process/API/WebSocket helpers, six independently runnable service suites, atomic schema v1–v3 migrations; WAL backup/restore/independent shares and retained process-harness decision; executor/lock audit and contended-mutex fix | Extended release/hosted replay-share and migration archive matrix: service maintainers |
+| C09 | Intended `api`/bot facade; maintained adapter migration, explicit experimental search imports, complete worker schema/caller/status inventory and internal diagnostic categories | Full data/caller migration before restricting raw internal visibility: engine/search maintainers |
+| C10 | Dense/object consumer inventory with explicit retention; active version constants centralized; no semantic rewrite or retirement | Blocked on dependable full parity/restore artifacts; stage options types and module moves separately: engine/search maintainers |
+| C11 | Panic/trust audit, bounded reference/catalog/replay/worker mutation tests and root/sibling/ordered-restore/privacy invariants | Measured performance/footprint and hot-path changes after full gates: engine/search maintainers |
 | C12 | Disposable manifest-based clean snapshot tooling and native/2D extraction rehearsal | Full artifacts, rights, hosted integration and final release gates remain required: release maintainers |
 
 ## Explicit blockers
@@ -41,8 +41,8 @@ record **20 completed and 64 open items**, with reproducible commands and limits
 
 Native/tooling/service results and extraction evidence are recorded in
 `cleanup-evidence.json` after checks. The earlier clean-snapshot native suite passed with 382 executed tests and 64
-explicit ignores. The second batch passes 389 native tests (64 explicit ignores)
-in the pinned optimized iterate profile, 35 tooling tests and 15 process scenarios.
+explicit ignores. The third batch passes 400 native tests (64 explicit ignores)
+in the pinned optimized iterate profile, 38 tooling tests and 15 process scenarios.
 A quick pass is never reported as full
 parity, release readiness or a remote CI success. Remaining P1/P2 work is retained
 above with owners and gates; no unique regressions are deleted to complete it.

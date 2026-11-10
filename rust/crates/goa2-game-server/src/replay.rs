@@ -1,11 +1,8 @@
 //! Versioned, private live-game replay archives. Tokens and retry receipts stay in SQLite.
 use crate::{ApiError, Result};
-use goa2_core::interpreter::{
-    ExecutionBudget,
-    live_game::{
-        GameCheckpoint, GameTransition, LiveGame, PatchCommand, PauseVoteChange, PlayerCommand,
-        UnstickCommand,
-    },
+use goa2_core::api::{
+    ExecutionBudget, GameCheckpoint, GameTransition, LiveGame, PatchCommand, PauseVoteChange,
+    PlayerCommand, UnstickCommand,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -13,7 +10,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 pub const MAX_ARCHIVE_BYTES: usize = 16 * 1024 * 1024;
 pub const MAX_STEPS: usize = 10_000;
-const SCHEMA: u32 = 1;
+use crate::versions::REPLAY_SCHEMA as SCHEMA;
 const KIND: &str = "rust-live-replay";
 
 pub fn prepare_command<'a>(
@@ -377,5 +374,57 @@ mod compatibility_tests {
         let mut invalid = value;
         invalid["at_ms"] = json!(-1);
         assert!(serde_json::from_value::<Decision>(invalid).is_err());
+    }
+    #[test]
+    fn replay_archive_mutations_reject_ranges_hashes_versions_and_rewind_overflow() {
+        use goa2_core::api::{GameContent, GameMode, GameSetup};
+        let content =
+            GameContent::read(include_bytes!("../../../content/smoke-game.json").as_slice())
+                .unwrap();
+        let setup = GameSetup {
+            map: "forgotten_island".into(),
+            red_heroes: vec!["Arien".into()],
+            blue_heroes: vec!["Brogan".into()],
+            seed: 29,
+            mode: GameMode::Quick,
+            cheats_enabled: false,
+            tie_breaker: None,
+        };
+        let game = LiveGame::create(&content, &setup, &ExecutionBudget::default())
+            .unwrap()
+            .0;
+        let checkpoint = serde_json::to_vec(&game.checkpoint().unwrap()).unwrap();
+        let archive = Archive::new(
+            0,
+            0,
+            &checkpoint,
+            Vec::new(),
+            BTreeMap::new(),
+            BTreeSet::new(),
+        )
+        .unwrap();
+        let original = serde_json::to_value(archive).unwrap();
+        for (key, value) in [
+            ("kind", json!("future")),
+            ("schema", json!(2)),
+            ("start_revision", json!(u64::MAX)),
+            ("revision", json!(u64::MAX)),
+            ("start_sha256", json!("0".repeat(64))),
+            ("bot_seats", json!(["unknown-seat"])),
+        ] {
+            let mut changed = original.clone();
+            changed[key] = value;
+            let archive: Archive = serde_json::from_value(changed).unwrap();
+            assert!(archive.restore(None).is_err(), "{key}");
+        }
+        for to in [0, 1, u64::MAX] {
+            let mut changed = original.clone();
+            changed["revision"] = json!(1);
+            changed["entries"] = json!([{"revision":1,"checkpoint_sha256":"0".repeat(64),"decision":{"at_ms":0,"operation":{"kind":"rewind","proposer":"hero_arien","to":to}}}]);
+            let archive: Archive = serde_json::from_value(changed).unwrap();
+            assert!(archive.restore(None).is_err());
+        }
+        let archive: Archive = serde_json::from_value(original).unwrap();
+        assert_eq!(archive.restore(None).unwrap().0.position().revision, 0);
     }
 }

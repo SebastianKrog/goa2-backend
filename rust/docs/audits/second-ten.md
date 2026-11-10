@@ -2,7 +2,8 @@
 
 Completed on `bots-upstream` after `a4023b72`, 10 November 2026. The
 [structured evidence](second-ten.json) records current checks separately from
-prior batches. The checklist now has **20 completed and 64 open tasks**.
+prior batches. At the end of this batch the checklist had **20 completed and 64 open tasks**.
+See the current checklist and [third batch](third-ten.md) for later progress.
 
 | Task | Result / maintained proof |
 | --- | --- |

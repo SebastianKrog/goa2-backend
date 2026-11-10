@@ -5756,7 +5756,7 @@ impl NativeSession {
             (*self.source).clone()
         };
         source.native_resume = Some(crate::codec::NativeResume {
-            version: 1,
+            version: crate::versions::NATIVE_RESUME,
             request_high_water: self.next_request,
             step_high_water: self.next_step,
         });

@@ -41,3 +41,9 @@ The [serialization/audience/shim audit](audits/compatibility-decisions.md) recor
 per-boundary defaults, strict versus additive field handling, recipient regressions
 and explicit retention/migration conditions. No breaking cleanup or rules change
 was approved by retaining those policies.
+
+[Current boundary ownership](audits/api-boundaries.md) preserves old module paths,
+worker error strings/correlation and all 39 operations while migrating maintained
+adapter imports. Typed diagnostic categories remain internal. [Version constants](audits/versions-and-robustness.md)
+centralize active readers/writers without rewriting frozen/historical literals or
+relaxing any supported-boundary disagreement checks.

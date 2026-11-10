@@ -42,3 +42,10 @@ modules and real-process suites; a new server library is deferred until a concre
 consumer or measured test limitation justifies the boundary. The `api` module's
 rustdoc now spells out trust, atomic candidate publication, error categories,
 determinism, explicit time, budgets/cancellation and recipient privacy.
+
+The [core/worker boundary audit](audits/api-boundaries.md) records all root exports,
+request/stream consumers, the supported bot recommendation entry point and the
+explicit experimental search imports. Old module aliases remain available pending
+full caller/coverage migration. [Concurrency and panic review](audits/concurrency-and-panics.md)
+records executor isolation and trusted-input assumptions. Current version ownership
+and bounded mutation/identity regressions are in [versions and robustness](audits/versions-and-robustness.md).

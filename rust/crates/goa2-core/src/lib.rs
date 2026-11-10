@@ -6,6 +6,7 @@ pub mod bitset;
 pub mod cards;
 pub mod codec;
 pub mod data;
+pub mod diagnostic;
 pub mod diagnostics;
 pub mod geometry;
 pub mod ids;
@@ -14,6 +15,7 @@ pub mod lifecycle;
 pub mod planning;
 pub mod spatial;
 pub mod stats;
+pub mod versions;
 pub mod world;
 
 pub mod actions;

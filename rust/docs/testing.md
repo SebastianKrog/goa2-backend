@@ -71,7 +71,7 @@ python3 -m venv .venv-oracle
 .venv-oracle/bin/python scripts/verify_rust_game_server.py rust/target/debug/goa2-game-server rust/content/smoke-game.json
 ```
 
-`--suite auth`, `--suite bots`, `--suite clocks`, `--suite votes` and
+`--suite auth`, `--suite bots`, `--suite clocks`, `--suite votes`,
 `--suite shutdown` and `--suite backup` select independently runnable suites; repeat the option to
 combine suites. Default runs all. Each suite reports expected/executed counts.
 Helpers in `scripts/rust_verification/` preserve real processes, temporary
@@ -99,3 +99,13 @@ selection and a complete release-candidate matrix on version tags or an explicit
 manual candidate run. Input acquisition and remote execution results remain gates.
 [Boundary/audience contracts](audits/compatibility-decisions.md) and the
 [backup rehearsal](audits/server-harness.md) describe the small local regressions.
+
+## Bounded robustness and worker protocol
+
+`cargo test --locked -p goa2-core --test robustness` checks corrupt references,
+coordinate/catalog boundaries and prepared-candidate restore/privacy/isolation.
+Worker schema examples and internal diagnostic/executor regressions are in the
+normal native suite. Run the real JSON-lines rejection/correlation check from the
+repository root with `python3 rust/tools/worker_contracts.py --binary /absolute/path/goa2-search-cli`.
+See [versions and robustness](audits/versions-and-robustness.md) for exact scope;
+these bounded cases do not substitute for full external parity or restore scans.

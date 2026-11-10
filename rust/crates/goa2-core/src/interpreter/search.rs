@@ -250,21 +250,31 @@ fn shared_row_likelihoods(
     rows: &[Vec<PlanningCommitment>],
     scores: &[(Symbol, HeroCardScores)],
 ) -> Vec<f64> {
-    let scored_heroes: Vec<_> = scores.iter().filter_map(|(hero, cards)| {
-        let best = cards.iter().map(|(_, score)| *score).max()?;
-        Some((hero, cards, best))
-    }).collect();
-    let mut weights: Vec<_> = rows.iter().map(|row| {
-        let cost: u64 = row.iter().filter_map(|commitment| {
-            let (_, cards, best) = scored_heroes.iter()
-                .find(|(hero, _, _)| **hero == commitment.hero)?;
-            let score = cards.iter().find_map(|(card, score)| {
-                (*card == commitment.first).then_some(*score)
-            });
-            Some(greedy_card_cost(*best, score))
-        }).sum();
-        (-(cost as f64) / GREEDY_CARD_TEMPERATURE as f64).exp()
-    }).collect();
+    let scored_heroes: Vec<_> = scores
+        .iter()
+        .filter_map(|(hero, cards)| {
+            let best = cards.iter().map(|(_, score)| *score).max()?;
+            Some((hero, cards, best))
+        })
+        .collect();
+    let mut weights: Vec<_> = rows
+        .iter()
+        .map(|row| {
+            let cost: u64 = row
+                .iter()
+                .filter_map(|commitment| {
+                    let (_, cards, best) = scored_heroes
+                        .iter()
+                        .find(|(hero, _, _)| **hero == commitment.hero)?;
+                    let score = cards
+                        .iter()
+                        .find_map(|(card, score)| (*card == commitment.first).then_some(*score));
+                    Some(greedy_card_cost(*best, score))
+                })
+                .sum();
+            (-(cost as f64) / GREEDY_CARD_TEMPERATURE as f64).exp()
+        })
+        .collect();
     let total: f64 = weights.iter().sum();
     for weight in &mut weights {
         *weight /= total;
@@ -282,13 +292,18 @@ fn ranked_reply_indices(
     costs: &[Option<Vec<u64>>],
     cap: usize,
 ) -> Vec<usize> {
-    use std::{cmp::Reverse, collections::{BinaryHeap, HashSet}};
+    use std::{
+        cmp::Reverse,
+        collections::{BinaryHeap, HashSet},
+    };
 
     let mut queue = BinaryHeap::from([Reverse((0u64, 0usize, 0usize))]);
     let mut seen = HashSet::from([0]);
     let mut indices = Vec::with_capacity(cap);
     while indices.len() < cap {
-        let Some(Reverse((cost, rank, index))) = queue.pop() else { break };
+        let Some(Reverse((cost, rank, index))) = queue.pop() else {
+            break;
+        };
         indices.push(index);
         if indices.len() == cap {
             break;
@@ -349,25 +364,24 @@ fn search_planning_worlds(
             if remaining == 0 {
                 break 'rows;
             }
-            let evaluate =
-                |sample: &mut PlanningWorld, shared_nodes| {
-                    sample.session.search_planning_matrix_partition(
-                        player,
-                        std::slice::from_ref(row),
-                        &sample.replies,
-                        SearchLimits {
-                            max_nodes: remaining,
-                            ..limits
-                        },
-                        PlanningPartition {
-                            shared_nodes,
-                            greedy_forecasts: &sample.forecasts,
-                            fixed_opponent_seed: sample.fixed_opponent_seed,
-                            ..partition
-                        },
-                        budget,
-                    )
-                };
+            let evaluate = |sample: &mut PlanningWorld, shared_nodes| {
+                sample.session.search_planning_matrix_partition(
+                    player,
+                    std::slice::from_ref(row),
+                    &sample.replies,
+                    SearchLimits {
+                        max_nodes: remaining,
+                        ..limits
+                    },
+                    PlanningPartition {
+                        shared_nodes,
+                        greedy_forecasts: &sample.forecasts,
+                        fixed_opponent_seed: sample.fixed_opponent_seed,
+                        ..partition
+                    },
+                    budget,
+                )
+            };
             let evaluations = if group.len() == 1 {
                 vec![evaluate(&mut group[0], None)]
             } else {
@@ -381,9 +395,11 @@ fn search_planning_worlds(
                                 .name("planning-score".into())
                                 .stack_size(SEARCH_WORKER_STACK)
                                 .spawn_scoped(threads, move || evaluate(sample, Some(shared_nodes)))
-                                .map_err(|error| EngineError::Unsupported(format!(
-                                    "could not spawn planning scoring worker: {error}",
-                                )))
+                                .map_err(|error| {
+                                    EngineError::Unsupported(format!(
+                                        "could not spawn planning scoring worker: {error}",
+                                    ))
+                                })
                         })
                         .collect::<Result<Vec<_>>>()?;
                     Ok(jobs
@@ -477,9 +493,7 @@ impl NativeSession {
             ));
         }
         let mut census = ResolutionReuseCensus::default();
-        self.census_resolution_node(
-            depth, max_nodes, &mut Default::default(), &mut census,
-        )?;
+        self.census_resolution_node(depth, max_nodes, &mut Default::default(), &mut census)?;
         Ok(census)
     }
 
@@ -508,7 +522,10 @@ impl NativeSession {
                 if let Some((previous_execution, previous)) = seen.planning.get(&key) {
                     if *previous_execution != execution {
                         census.planning_pairs_checked += 1;
-                        match previous.clone().compare_planning_continuation(self.clone())? {
+                        match previous
+                            .clone()
+                            .compare_planning_continuation(self.clone())?
+                        {
                             PlanningPair::Diverged => census.planning_pairs_diverged += 1,
                             PlanningPair::NextRound => census.planning_pairs_crossed_round += 1,
                             PlanningPair::GameOver => census.planning_pairs_ended_game += 1,
@@ -539,8 +556,15 @@ impl NativeSession {
             if census.visited == max_nodes {
                 break;
             }
-            let DecisionMove::Input { request: Some(token), selection, .. } = choice else {
-                return Err(EngineError::Unsupported("census requires a live input".into()));
+            let DecisionMove::Input {
+                request: Some(token),
+                selection,
+                ..
+            } = choice
+            else {
+                return Err(EngineError::Unsupported(
+                    "census requires a live input".into(),
+                ));
             };
             self.with_consumed_request(|branch| {
                 branch.submit(token, selection)?;
@@ -590,15 +614,20 @@ impl NativeSession {
                 let left = self.resolution_choices(owner)?;
                 let right = other.resolution_choices(owner)?;
                 let comparable = |choice: &DecisionMove| match choice {
-                    DecisionMove::Input { player, selection, .. } => Some((*player, selection.clone())),
+                    DecisionMove::Input {
+                        player, selection, ..
+                    } => Some((*player, selection.clone())),
                     _ => None,
                 };
                 if !left.iter().map(comparable).eq(right.iter().map(comparable)) {
                     return Ok(PlanningPair::Diverged);
                 }
                 for (worker, choices) in [(self as &mut Self, left), (&mut other, right)] {
-                    let Some(DecisionMove::Input { request: Some(token), selection, .. }) =
-                        choices.into_iter().next()
+                    let Some(DecisionMove::Input {
+                        request: Some(token),
+                        selection,
+                        ..
+                    }) = choices.into_iter().next()
                     else {
                         return Ok(PlanningPair::Capped);
                     };
@@ -625,7 +654,14 @@ impl NativeSession {
         cap: usize,
         controlled: Option<&[Symbol]>,
     ) -> Result<JointPlans> {
-        self.joint_plans_with_reply_order(player, friendly, cap, controlled, JointPlanOrder::PlayerFirst, &[])
+        self.joint_plans_with_reply_order(
+            player,
+            friendly,
+            cap,
+            controlled,
+            JointPlanOrder::PlayerFirst,
+            &[],
+        )
     }
 
     fn joint_plans_with_reply_order(
@@ -677,18 +713,20 @@ impl NativeSession {
                         entry.insert(self.greedy_defense_rank(hero.id, card)?);
                     }
                 }
-                choices.sort_by_key(|choice| (
-                    Some(*choice) != preferred,
-                    choice.first.map_or((true, i64::MAX), |card| ranks[&card]),
-                    choice.second.is_some(),
-                ));
+                choices.sort_by_key(|choice| {
+                    (
+                        Some(*choice) != preferred,
+                        choice.first.map_or((true, i64::MAX), |card| ranks[&card]),
+                        choice.second.is_some(),
+                    )
+                });
             }
             if let Some((_, scores)) = greedy_scores.iter().find(|(id, _)| *id == hero.id) {
                 let best = scores.iter().map(|(_, score)| *score).max().unwrap();
                 let cost = |choice: &PlanningCommitment| {
-                    let score = scores.iter().find_map(|(card, score)| {
-                        (*card == choice.first).then_some(*score)
-                    });
+                    let score = scores
+                        .iter()
+                        .find_map(|(card, score)| (*card == choice.first).then_some(*score));
                     greedy_card_cost(best, score)
                 };
                 choices.sort_by_key(cost);
@@ -702,12 +740,14 @@ impl NativeSession {
                 .ok_or_else(|| invalid("joint plan count overflow"))?;
             dimensions.push(choices);
         }
-        let indices = if !matches!(order, JointPlanOrder::PlayerFirst) || !greedy_scores.is_empty() {
+        let indices = if !matches!(order, JointPlanOrder::PlayerFirst) || !greedy_scores.is_empty()
+        {
             ranked_reply_indices(&dimensions, &strides, &costs, total.min(cap))
         } else {
             (0..total.min(cap)).collect()
         };
-        let plans = indices.into_iter()
+        let plans = indices
+            .into_iter()
             .map(|mut index| {
                 dimensions
                     .iter()
@@ -829,7 +869,9 @@ impl NativeSession {
     fn greedy_seed_budget<'a>(budget: &ExecutionBudget<'a>) -> ExecutionBudget<'a> {
         let now = std::time::Instant::now();
         ExecutionBudget {
-            deadline: budget.deadline.map(|end| now + end.saturating_duration_since(now) / 4),
+            deadline: budget
+                .deadline
+                .map(|end| now + end.saturating_duration_since(now) / 4),
             ..*budget
         }
     }
@@ -850,7 +892,9 @@ impl NativeSession {
         let mut forecasts = Vec::new();
         let mut nodes = 0;
         let now = std::time::Instant::now();
-        let seed_time = budget.deadline.map(|deadline| deadline.saturating_duration_since(now));
+        let seed_time = budget
+            .deadline
+            .map(|deadline| deadline.saturating_duration_since(now));
         for hero in heroes {
             if self.hero_planning_commitments(hero)?.len() < 2 {
                 continue;
@@ -897,7 +941,11 @@ impl NativeSession {
         forecasts: &[(Symbol, super::GreedySearch)],
         seed: u64,
     ) -> Result<JointPlans> {
-        let team = self.world.hero(player).ok_or_else(|| EngineError::InvalidInput("unknown search player".into()))?.team;
+        let team = self
+            .world
+            .hero(player)
+            .ok_or_else(|| EngineError::InvalidInput("unknown search player".into()))?
+            .team;
         let mut reply = Vec::new();
         for hero in &self.world.heroes {
             if controlled.map_or(hero.team == team, |ids| ids.contains(&hero.id)) {
@@ -906,13 +954,16 @@ impl NativeSession {
             let choice = self.sample_forecast_commitment(hero.id, forecasts, &[], seed)?;
             if let Some(choice) = choice {
                 reply.push(choice);
-            } else if let Some(choice) = self.greedy_opponent_commitment(
-                hero.id, opponent_draw_seed(self, seed, hero.id),
-            )? {
+            } else if let Some(choice) =
+                self.greedy_opponent_commitment(hero.id, opponent_draw_seed(self, seed, hero.id))?
+            {
                 reply.push(choice);
             }
         }
-        Ok(JointPlans { plans: vec![reply], total: 1 })
+        Ok(JointPlans {
+            plans: vec![reply],
+            total: 1,
+        })
     }
 
     fn sample_forecast_commitment(
@@ -926,15 +977,20 @@ impl NativeSession {
         if let Some((_, forecast)) = forecasts.iter().find(|(id, _)| *id == hero)
             && history.len() < 4
         {
-            let legal = self.planning_choices(hero)?.into_iter().map(|option| match option {
-                DecisionMove::Card { card, .. } => Some(card),
-                _ => None,
-            }).collect::<Vec<_>>();
+            let legal = self
+                .planning_choices(hero)?
+                .into_iter()
+                .map(|option| match option {
+                    DecisionMove::Card { card, .. } => Some(card),
+                    _ => None,
+                })
+                .collect::<Vec<_>>();
             let mut prefix = [None; 3];
             for (slot, batch) in prefix.iter_mut().zip(history) {
                 *slot = batch.iter().find(|entry| entry.hero == hero).copied();
             }
-            if let Some(weights) = forecast.next_card_likelihoods(&prefix[..history.len()], &legal) {
+            if let Some(weights) = forecast.next_card_likelihoods(&prefix[..history.len()], &legal)
+            {
                 let mut draw = (seed >> 11) as f64 / (1u64 << 53) as f64;
                 let mut first = weights.last().unwrap().0;
                 for (card, weight) in weights {
@@ -944,7 +1000,11 @@ impl NativeSession {
                         break;
                     }
                 }
-                return Ok(Some(PlanningCommitment { hero, first, second: None }));
+                return Ok(Some(PlanningCommitment {
+                    hero,
+                    first,
+                    second: None,
+                }));
             }
         }
         Ok(None)
@@ -969,18 +1029,31 @@ impl NativeSession {
         } else {
             (Vec::new(), 0, Vec::new())
         };
-        let limits = SearchLimits { max_nodes: limits.max_nodes - greedy_nodes, ..limits };
+        let limits = SearchLimits {
+            max_nodes: limits.max_nodes - greedy_nodes,
+            ..limits
+        };
         let fixed_opponent_seed = options.fixed_opponent_seed(seed);
         let solo = [player];
         let controlled = fixed_opponent_seed.map(|_| solo.as_slice());
         let friendly = self.joint_plans_with_reply_order(
-            player, true, cap, controlled, JointPlanOrder::PlayerFirst, &greedy_scores,
+            player,
+            true,
+            cap,
+            controlled,
+            JointPlanOrder::PlayerFirst,
+            &greedy_scores,
         )?;
         let opposing = if let Some(seed) = fixed_opponent_seed {
             self.fixed_planning_reply(player, controlled, &forecasts, seed)?
         } else {
             self.joint_plans_with_reply_order(
-                player, false, options.reply_cap.unwrap_or(cap), None, JointPlanOrder::OpponentReplies(seed), &greedy_scores,
+                player,
+                false,
+                options.reply_cap.unwrap_or(cap),
+                None,
+                JointPlanOrder::OpponentReplies(seed),
+                &greedy_scores,
             )?
         };
         let partition = PlanningPartition {
@@ -1039,7 +1112,9 @@ impl NativeSession {
         options: PlanningSearchOptions<'_>,
         budget: &ExecutionBudget<'_>,
     ) -> Result<BotTeamPlanningSearch> {
-        self.search_bot_team_planning_with_seed_pass(player, scope, cap, limits, options, budget, false)
+        self.search_bot_team_planning_with_seed_pass(
+            player, scope, cap, limits, options, budget, false,
+        )
     }
 
     pub(super) fn search_bot_team_planning_with_seed_pass(
@@ -1056,7 +1131,9 @@ impl NativeSession {
         let reply_cap = options.reply_cap.unwrap_or(cap);
         let probe_cap = options.reply_probe_cap.unwrap_or(reply_cap);
         if !(1..=4096).contains(&reply_cap) || !(1..=4096).contains(&probe_cap) {
-            return Err(EngineError::InvalidInput("planning reply caps must be in 1..4096".into()));
+            return Err(EngineError::InvalidInput(
+                "planning reply caps must be in 1..4096".into(),
+            ));
         }
 
         if !(1..=4).contains(&options.workers) {
@@ -1127,9 +1204,10 @@ impl NativeSession {
             )?;
             let (greedy_scores, greedy_nodes, forecasts) = if options.greedy_card_order {
                 let world_budget = ExecutionBudget {
-                    deadline: seed_budget.deadline.zip(seed_slice).map(|(end, slice)| {
-                        end.min(std::time::Instant::now() + slice)
-                    }),
+                    deadline: seed_budget
+                        .deadline
+                        .zip(seed_slice)
+                        .map(|(end, slice)| end.min(std::time::Instant::now() + slice)),
                     ..seed_budget
                 };
                 world.greedy_planning_scores(
@@ -1143,11 +1221,20 @@ impl NativeSession {
             };
             let fixed_opponent_seed = options.fixed_opponent_seed(sample_seed);
             let mut replies = if let Some(seed) = fixed_opponent_seed {
-                world.fixed_planning_reply(player, Some(&controlled), &forecasts, seed)?.plans
+                world
+                    .fixed_planning_reply(player, Some(&controlled), &forecasts, seed)?
+                    .plans
             } else {
-                world.joint_plans_with_reply_order(
-                    player, false, probe_cap.max(reply_cap), Some(&controlled), JointPlanOrder::OpponentReplies(sample_seed), &greedy_scores,
-                )?.plans
+                world
+                    .joint_plans_with_reply_order(
+                        player,
+                        false,
+                        probe_cap.max(reply_cap),
+                        Some(&controlled),
+                        JointPlanOrder::OpponentReplies(sample_seed),
+                        &greedy_scores,
+                    )?
+                    .plans
             };
             let probe_nodes = limits.max_nodes / 4 / scope.worlds;
             // Each cell consumes at least one node. Screening cannot change
@@ -1155,18 +1242,40 @@ impl NativeSession {
             let can_change_shortlist = probe_nodes / rows.plans.len() > reply_cap;
             let probe = if replies.len() > reply_cap && can_change_shortlist {
                 world.screen_planning_replies(
-                    player, &rows.plans, &mut replies, reply_cap,
-                    SearchLimits { max_nodes: probe_nodes, ..limits },
-                    partition, &probe_budget,
+                    player,
+                    &rows.plans,
+                    &mut replies,
+                    reply_cap,
+                    SearchLimits {
+                        max_nodes: probe_nodes,
+                        ..limits
+                    },
+                    partition,
+                    &probe_budget,
                 )?
             } else {
                 (0, 0)
             };
             replies.truncate(reply_cap);
-            let weights = options.greedy_card_order
+            let weights = options
+                .greedy_card_order
                 .then(|| shared_row_likelihoods(&rows.plans, &greedy_scores));
-            let card_scores = greedy_scores.iter().map(|(_, cards)| cards.len()).sum::<usize>();
-            Ok((PlanningWorld { session: world, replies, forecasts, fixed_opponent_seed }, probe, greedy_nodes, card_scores, weights))
+            let card_scores = greedy_scores
+                .iter()
+                .map(|(_, cards)| cards.len())
+                .sum::<usize>();
+            Ok((
+                PlanningWorld {
+                    session: world,
+                    replies,
+                    forecasts,
+                    fixed_opponent_seed,
+                },
+                probe,
+                greedy_nodes,
+                card_scores,
+                weights,
+            ))
         };
         let mut samples = Vec::with_capacity(scope.worlds);
         let mut probe_nodes = 0;
@@ -1174,7 +1283,9 @@ impl NativeSession {
         let mut greedy_nodes = 0;
         let mut greedy_tactical_probes = 0;
         let mut greedy_card_scores = 0;
-        let mut row_weights = options.greedy_card_order.then(|| vec![0.0; rows.plans.len()]);
+        let mut row_weights = options
+            .greedy_card_order
+            .then(|| vec![0.0; rows.plans.len()]);
         for start in (0..scope.worlds).step_by(options.workers) {
             let end = (start + options.workers).min(scope.worlds);
             let batch = if end - start == 1 {
@@ -1194,15 +1305,17 @@ impl NativeSession {
                             }
                         })
                         .collect::<Result<Vec<_>>>()?;
-                    Ok::<_, EngineError>(jobs.into_iter()
-                        .map(|job| {
-                            job.join().unwrap_or_else(|_| {
-                                Err(EngineError::Unsupported(
-                                    "planning sample worker panicked".into(),
-                                ))
+                    Ok::<_, EngineError>(
+                        jobs.into_iter()
+                            .map(|job| {
+                                job.join().unwrap_or_else(|_| {
+                                    Err(EngineError::Unsupported(
+                                        "planning sample worker panicked".into(),
+                                    ))
+                                })
                             })
-                        })
-                        .collect())
+                            .collect(),
+                    )
                 })?
             };
             let mut interrupted = false;
@@ -1216,7 +1329,9 @@ impl NativeSession {
                             }
                         }
                         greedy_nodes += seeded;
-                        greedy_tactical_probes += sample.forecasts.iter()
+                        greedy_tactical_probes += sample
+                            .forecasts
+                            .iter()
                             .map(|(_, forecast)| forecast.tactical_probes)
                             .sum::<usize>();
                         probe_nodes += used;
@@ -1268,7 +1383,8 @@ impl NativeSession {
         } else {
             0
         };
-        let seed_allowance = if seed_pass && limits.max_depth > 0 && options.rollout_turns.is_some() {
+        let seed_allowance = if seed_pass && limits.max_depth > 0 && options.rollout_turns.is_some()
+        {
             (remaining / 16).min(4096)
         } else {
             0
@@ -1288,9 +1404,16 @@ impl NativeSession {
                 player,
                 &rows.plans[..rows.plans.len().min(4)],
                 &mut samples,
-                SearchLimits { max_nodes: seed_allowance, max_depth: 0, ..limits },
+                SearchLimits {
+                    max_nodes: seed_allowance,
+                    max_depth: 0,
+                    ..limits
+                },
                 options.workers,
-                PlanningPartition { future_branching: Some(false), ..partition },
+                PlanningPartition {
+                    future_branching: Some(false),
+                    ..partition
+                },
                 &seed_budget,
             )?;
             seed_used = seed.nodes;
@@ -1299,7 +1422,10 @@ impl NativeSession {
                 seed_score = seed.score;
             }
         }
-        let deep_limits = SearchLimits { max_nodes: remaining - shallow_nodes - seed_used, ..limits };
+        let deep_limits = SearchLimits {
+            max_nodes: remaining - shallow_nodes - seed_used,
+            ..limits
+        };
         let deep_budget = ExecutionBudget {
             deadline: budget.deadline.map(|end| {
                 let spare = end.saturating_duration_since(std::time::Instant::now()) / 10;
@@ -1347,9 +1473,17 @@ impl NativeSession {
                 player,
                 &rows.plans[..rows.plans.len().min(4)],
                 &mut samples,
-                SearchLimits { max_nodes: shallow_nodes, max_depth: 0, ..limits },
+                SearchLimits {
+                    max_nodes: shallow_nodes,
+                    max_depth: 0,
+                    ..limits
+                },
                 options.workers,
-                PlanningPartition { rollout_turns: None, future_branching: Some(false), ..partition },
+                PlanningPartition {
+                    rollout_turns: None,
+                    future_branching: Some(false),
+                    ..partition
+                },
                 budget,
             )?;
             shallow_used = shallow.nodes;
@@ -1399,9 +1533,18 @@ impl NativeSession {
                     break 'replies;
                 }
                 let probe = self.search_planning_matrix_partition(
-                    player, std::slice::from_ref(reference), std::slice::from_ref(reply),
-                    SearchLimits { max_depth: 1, max_nodes: limits.max_nodes - used, ..limits },
-                    PlanningPartition { rollout_turns: Some(1), ..partition },
+                    player,
+                    std::slice::from_ref(reference),
+                    std::slice::from_ref(reply),
+                    SearchLimits {
+                        max_depth: 1,
+                        max_nodes: limits.max_nodes - used,
+                        ..limits
+                    },
+                    PlanningPartition {
+                        rollout_turns: Some(1),
+                        ..partition
+                    },
                     budget,
                 )?;
                 used += probe.nodes;
@@ -1522,14 +1665,19 @@ impl NativeSession {
                             player,
                             rows,
                             columns,
-                            SearchLimits { max_nodes, ..limits },
+                            SearchLimits {
+                                max_nodes,
+                                ..limits
+                            },
                             partition,
                             budget,
                         )
                     })
-                    .map_err(|error| EngineError::Unsupported(format!(
-                        "could not spawn planning matrix worker: {error}",
-                    )))?;
+                    .map_err(|error| {
+                        EngineError::Unsupported(format!(
+                            "could not spawn planning matrix worker: {error}",
+                        ))
+                    })?;
                 jobs.push(job);
             }
             jobs.into_iter()
@@ -1562,8 +1710,8 @@ impl NativeSession {
             result.pruned_rows += part.pruned_rows;
             result.evaluated_cells += part.evaluated_cells;
             result.forecast_changes += part.forecast_changes;
-                result.forecast_checks += part.forecast_checks;
-                result.forecast_matches += part.forecast_matches;
+            result.forecast_checks += part.forecast_checks;
+            result.forecast_matches += part.forecast_matches;
             result.nodes += part.nodes;
         }
         Ok(result)
@@ -1687,9 +1835,13 @@ impl NativeSession {
                     break 'rows;
                 }
                 let expand = partition.future_branching.unwrap_or(
-                    partition.fixed_opponent_seed.is_some() || !partition.greedy_forecasts.is_empty(),
+                    partition.fixed_opponent_seed.is_some()
+                        || !partition.greedy_forecasts.is_empty(),
                 );
-                if expand || !partition.greedy_forecasts.is_empty() || partition.fixed_opponent_seed.is_some() {
+                if expand
+                    || !partition.greedy_forecasts.is_empty()
+                    || partition.fixed_opponent_seed.is_some()
+                {
                     search.future_planning = Some(FuturePlanning {
                         forecasts: partition.greedy_forecasts,
                         root: joint.clone(),
@@ -1773,7 +1925,12 @@ impl NativeSession {
         budget.check(0)?;
         self.with_sampled_resolution(player, sample, |worker| {
             worker.search_resolution_inner(
-                player, limits, rollout_turns, planning_sample, budget, true,
+                player,
+                limits,
+                rollout_turns,
+                planning_sample,
+                budget,
+                true,
             )
         })
     }
@@ -1945,7 +2102,11 @@ impl NativeSession {
                                 .iter_mut()
                                 .zip(cache)
                                 .map(|(worker, cached)| {
-                                    let mut local = Search { nodes: 0, future_planning: None, ..search };
+                                    let mut local = Search {
+                                        nodes: 0,
+                                        future_planning: None,
+                                        ..search
+                                    };
                                     std::thread::Builder::new()
                                         .name("resolution-score".into())
                                         .stack_size(SEARCH_WORKER_STACK)
@@ -2056,7 +2217,12 @@ impl NativeSession {
         budget: &ExecutionBudget<'_>,
     ) -> Result<ResolutionSearch> {
         self.search_resolution_inner(
-            player, limits, rollout_turns, planning_sample, budget, false,
+            player,
+            limits,
+            rollout_turns,
+            planning_sample,
+            budget,
+            false,
         )
     }
 
@@ -2354,14 +2520,18 @@ impl NativeSession {
         if moves.len() < 3 {
             return;
         }
-        let Some(actor) = self.movement_root_actor() else { return };
+        let Some(actor) = self.movement_root_actor() else {
+            return;
+        };
         let Some(hero) = self.world.hero(actor).filter(|hero| hero.id == player) else {
             return;
         };
         let mut enemy_heroes = Vec::new();
         let mut enemy_minions = Vec::new();
         for &(id, hex) in &self.world.locations {
-            let Some(entity) = self.world.entity(id) else { continue };
+            let Some(entity) = self.world.entity(id) else {
+                continue;
+            };
             if entity.team.is_some_and(|team| team != hero.team) {
                 match entity.kind {
                     EntityKind::Hero | EntityKind::Piece => enemy_heroes.push(hex),
@@ -2374,18 +2544,25 @@ impl NativeSession {
             return;
         }
         let destination = |decision: &DecisionMove| match decision {
-            DecisionMove::Input { selection: selection @ super::Datum::Object(_), .. } => {
-                super::datum_hex(selection, &self.symbols, self.coordinates).ok()
-            }
+            DecisionMove::Input {
+                selection: selection @ super::Datum::Object(_),
+                ..
+            } => super::datum_hex(selection, &self.symbols, self.coordinates).ok(),
             _ => None,
         };
-        let nearest = |hex: Hex, enemies: &[Hex]| {
-            enemies.iter().map(|&enemy| hex.distance(enemy)).min()
-        };
-        let distances = moves.iter().filter_map(|decision| {
-            let hex = destination(decision)?;
-            Some((hex, nearest(hex, &enemy_minions), nearest(hex, &enemy_heroes)))
-        }).collect::<Vec<_>>();
+        let nearest =
+            |hex: Hex, enemies: &[Hex]| enemies.iter().map(|&enemy| hex.distance(enemy)).min();
+        let distances = moves
+            .iter()
+            .filter_map(|decision| {
+                let hex = destination(decision)?;
+                Some((
+                    hex,
+                    nearest(hex, &enemy_minions),
+                    nearest(hex, &enemy_heroes),
+                ))
+            })
+            .collect::<Vec<_>>();
         let mut approach_minion = Vec::new();
         let mut approach_hero = Vec::new();
         let mut retreat = Vec::new();
@@ -2413,7 +2590,9 @@ impl NativeSession {
             }
         }
         moves.sort_by_cached_key(|decision| {
-            destination(decision).and_then(|hex| priority.get(&hex).copied()).unwrap_or(usize::MAX)
+            destination(decision)
+                .and_then(|hex| priority.get(&hex).copied())
+                .unwrap_or(usize::MAX)
         });
     }
 
@@ -2447,13 +2626,17 @@ impl NativeSession {
                 .find(|player| !player.options.is_empty())
                 .map(|player| player.hero),
             _ => {
-                let eligible = || self.world.heroes.iter()
-                    .filter(|hero| self.resolution_request_addresses(request, hero.id));
+                let eligible = || {
+                    self.world
+                        .heroes
+                        .iter()
+                        .filter(|hero| self.resolution_request_addresses(request, hero.id))
+                };
                 controlled
                     .and_then(|ids| eligible().find(|hero| ids.contains(&hero.id)))
                     .or_else(|| eligible().next())
                     .map(|hero| hero.id)
-            },
+            }
         };
         let Some((player, hero)) =
             player.and_then(|player| self.world.hero(player).map(|hero| (player, hero)))
@@ -2567,20 +2750,37 @@ impl NativeSession {
         let mut score = self.evaluate_lab_attack_range(player)?;
         if !matches!(evaluation, SearchEvaluation::LabAttackRangeV1) {
             score = (score.clamp(-1.0 + 1e-6, 1.0 - 1e-6).atanh()
-                + self.evaluate_lane_pressure(team, evaluation) / 5.0).tanh();
+                + self.evaluate_lane_pressure(team, evaluation) / 5.0)
+                .tanh();
         }
         Ok((score * (WIN - 1) as f64).round() as i64)
     }
 
     fn evaluate_lane_pressure(&self, team: Symbol, evaluation: SearchEvaluation) -> f64 {
         let graph = &self.world.definitions.zones;
-        let direction = if self.symbols.name(team) == "RED" { 1.0 } else { -1.0 };
-        let last_wave = self.world.waves.iter().any(|(_, remaining)| *remaining <= 1);
+        let direction = if self.symbols.name(team) == "RED" {
+            1.0
+        } else {
+            -1.0
+        };
+        let last_wave = self
+            .world
+            .waves
+            .iter()
+            .any(|(_, remaining)| *remaining <= 1);
         let depth_weight = if last_wave { 0.65 } else { 0.35 };
-        let timed_push = matches!(evaluation, SearchEvaluation::LanePressureV4 | SearchEvaluation::LanePressureV5);
-        let lane_coverage = graph.lanes.len() > 1 && matches!(evaluation, SearchEvaluation::LanePressureV5);
+        let timed_push = matches!(
+            evaluation,
+            SearchEvaluation::LanePressureV4 | SearchEvaluation::LanePressureV5
+        );
+        let lane_coverage =
+            graph.lanes.len() > 1 && matches!(evaluation, SearchEvaluation::LanePressureV5);
         let any_lane_exhausted = timed_push
-            && self.world.waves.iter().any(|(_, remaining)| *remaining <= 0);
+            && self
+                .world
+                .waves
+                .iter()
+                .any(|(_, remaining)| *remaining <= 0);
         let mut score = 0.0;
         for (lane, active) in &self.world.battle_zones {
             let Some((_, ordered)) = graph.lanes.iter().find(|(id, _)| id == lane) else {
@@ -2620,23 +2820,31 @@ impl NativeSession {
                 advancing_heroes += usize::from(advances);
                 let positions = self.world.positions(hero.id);
                 let distance = if matches!(evaluation, SearchEvaluation::LanePressureV1) {
-                    positions.into_iter().any(|hex| zone.hexes.contains(&hex)).then_some(0)
+                    positions
+                        .into_iter()
+                        .any(|hex| zone.hexes.contains(&hex))
+                        .then_some(0)
                 } else {
-                    positions.filter_map(|hex| {
-                        if (matches!(evaluation, SearchEvaluation::LanePressureV3) || timed_push)
-                            && let Some(distance) = zone.spawns.iter()
-                                .filter(|spawn| spawn.team != hero.team)
-                                .map(|spawn| hex.distance(spawn.hex))
-                                .min()
-                        {
-                            return Some(distance);
-                        }
-                        if zone.hexes.contains(&hex) {
-                            Some(0)
-                        } else {
-                            zone.hexes.iter().map(|target| hex.distance(*target)).min()
-                        }
-                    }).min()
+                    positions
+                        .filter_map(|hex| {
+                            if (matches!(evaluation, SearchEvaluation::LanePressureV3)
+                                || timed_push)
+                                && let Some(distance) = zone
+                                    .spawns
+                                    .iter()
+                                    .filter(|spawn| spawn.team != hero.team)
+                                    .map(|spawn| hex.distance(spawn.hex))
+                                    .min()
+                            {
+                                return Some(distance);
+                            }
+                            if zone.hexes.contains(&hex) {
+                                Some(0)
+                            } else {
+                                zone.hexes.iter().map(|target| hex.distance(*target)).min()
+                            }
+                        })
+                        .min()
                 };
                 if let Some(distance) = distance {
                     let readiness = 0.20 / (1.0 + f64::from(distance));
@@ -2644,7 +2852,11 @@ impl NativeSession {
                         let side = usize::from(hero.team != team);
                         closest_readiness[side] = closest_readiness[side].max(readiness);
                     } else {
-                        score += if hero.team == team { readiness } else { -readiness };
+                        score += if hero.team == team {
+                            readiness
+                        } else {
+                            -readiness
+                        };
                     }
                     if advances {
                         advancing_readiness += 1.0 / (1.0 + f64::from(distance.saturating_sub(1)));
@@ -2657,8 +2869,12 @@ impl NativeSession {
             if timed_push {
                 // Once any lane is exhausted, a push in either lane can
                 // trigger the last-push comparison.
-                let lane_last_wave = any_lane_exhausted || self.world.waves.iter()
-                    .any(|(id, remaining)| id == lane && *remaining <= 1);
+                let lane_last_wave = any_lane_exhausted
+                    || self
+                        .world
+                        .waves
+                        .iter()
+                        .any(|(id, remaining)| id == lane && *remaining <= 1);
                 let weight = if lane_last_wave { 0.65 } else { 0.35 };
                 let readiness = advancing_readiness / advancing_heroes.max(1) as f64;
                 score += weight * depth * (0.25 + 0.75 * readiness);
@@ -2705,10 +2921,14 @@ impl NativeSession {
     pub(super) fn team_position_score(&self, team: Symbol, player: Symbol) -> i64 {
         let red = self.symbols.lookup("RED");
         let gold = self.symbols.lookup("GOLD");
-        self.world.heroes.iter().map(|hero| {
-            let sign = if hero.team == team { 1 } else { -1 };
-            sign * self.hero_position_score(hero, hero.id == player, red, gold)
-        }).sum()
+        self.world
+            .heroes
+            .iter()
+            .map(|hero| {
+                let sign = if hero.team == team { 1 } else { -1 };
+                sign * self.hero_position_score(hero, hero.id == player, red, gold)
+            })
+            .sum()
     }
 
     pub(super) fn hero_position_score(
@@ -2785,7 +3005,12 @@ fn opponent_draw_seed(worker: &NativeSession, seed: u64, hero: Symbol) -> u64 {
     use std::hash::{DefaultHasher, Hash, Hasher};
 
     let mut hash = DefaultHasher::new();
-    (seed, hero, worker.search_turn_index(), worker.last_request.as_ref().map(|r| r.prompt))
+    (
+        seed,
+        hero,
+        worker.search_turn_index(),
+        worker.last_request.as_ref().map(|r| r.prompt),
+    )
         .hash(&mut hash);
     hash.finish()
 }
@@ -2850,7 +3075,10 @@ impl Search<'_, '_> {
         }
         let now = std::time::Instant::now();
         let budget = ExecutionBudget {
-            deadline: self.budget.deadline.map(|end| now + end.saturating_duration_since(now) / 8),
+            deadline: self
+                .budget
+                .deadline
+                .map(|end| now + end.saturating_duration_since(now) / 8),
             ..*self.budget
         };
         let mut short = Search {
@@ -2905,8 +3133,8 @@ impl Search<'_, '_> {
             if !self.apply_input(branch, decision.clone())? {
                 return Ok(None);
             }
-            let resolved = branch.planning.phase == Phase::GameOver
-                || branch.search_turn_index() >= cutoff;
+            let resolved =
+                branch.planning.phase == Phase::GameOver || branch.search_turn_index() >= cutoff;
             Ok(Some((self.score(branch)?, resolved)))
         })
     }
@@ -3085,9 +3313,15 @@ impl Search<'_, '_> {
         }
         let mut remaining = self.budget.max_steps.min(1000);
         while worker.last_request.is_none()
-            && !matches!(worker.planning.phase, Phase::Planning | Phase::LevelUp | Phase::GameOver)
+            && !matches!(
+                worker.planning.phase,
+                Phase::Planning | Phase::LevelUp | Phase::GameOver
+            )
         {
-            let budget = ExecutionBudget { max_steps: remaining, ..*self.budget };
+            let budget = ExecutionBudget {
+                max_steps: remaining,
+                ..*self.budget
+            };
             let advance = worker.advance_search_objects(&budget, self.player)?;
             if advance.steps == 0 {
                 break;
@@ -3104,7 +3338,10 @@ impl Search<'_, '_> {
         capture_state: bool,
         lab_evaluation: bool,
     ) -> Result<Option<GameTurnRollout>> {
-        let history = self.future_planning.as_ref().map(|rollout| vec![rollout.root.clone()]);
+        let history = self
+            .future_planning
+            .as_ref()
+            .map(|rollout| vec![rollout.root.clone()]);
         self.rollout_with_history(worker, cutoff, capture_state, lab_evaluation, history)
     }
 
@@ -3120,7 +3357,8 @@ impl Search<'_, '_> {
             self.budget.check(0)?;
             if worker.planning.phase == Phase::GameOver
                 || worker.search_turn_index() >= cutoff
-                || (self.guard_hidden && worker.last_request.is_none()
+                || (self.guard_hidden
+                    && worker.last_request.is_none()
                     && (worker.planning.phase == Phase::LevelUp
                         || (worker.planning.phase != Phase::Planning && !worker.stack.is_empty())))
             {
@@ -3140,10 +3378,19 @@ impl Search<'_, '_> {
                 return Ok(None);
             }
             if worker.planning.phase == Phase::Planning {
-                if self.future_planning.as_ref().is_some_and(|rollout| rollout.expand)
+                if self
+                    .future_planning
+                    .as_ref()
+                    .is_some_and(|rollout| rollout.expand)
                     && let Some(history) = history.as_ref().filter(|history| history.len() == 1)
                 {
-                    return self.expand_rollout_planning(worker, cutoff, capture_state, lab_evaluation, history);
+                    return self.expand_rollout_planning(
+                        worker,
+                        cutoff,
+                        capture_state,
+                        lab_evaluation,
+                        history,
+                    );
                 }
                 if !self.reserve_node() {
                     return Ok(None);
@@ -3166,13 +3413,20 @@ impl Search<'_, '_> {
             let (owner, team) = worker.search_player()?.ok_or_else(|| {
                 EngineError::Unsupported("rollout stalled before its turn cutoff".into())
             })?;
-            let controlled = self.controlled.map_or(team == self.team, |ids| ids.contains(&owner));
-            let decision = match self.future_planning.as_ref().and_then(|rollout| rollout.fixed_opponent_seed) {
+            let controlled = self
+                .controlled
+                .map_or(team == self.team, |ids| ids.contains(&owner));
+            let decision = match self
+                .future_planning
+                .as_ref()
+                .and_then(|rollout| rollout.fixed_opponent_seed)
+            {
                 Some(seed) if !controlled => {
                     worker.greedy_opponent_input(owner, opponent_draw_seed(worker, seed, owner))?
                 }
                 _ => worker.first_resolution_choice(owner)?,
-            }.ok_or_else(|| {
+            }
+            .ok_or_else(|| {
                 EngineError::Unsupported("rollout decision has no native choices".into())
             })?;
             if !self.apply_input(worker, decision)? {
@@ -3186,7 +3440,8 @@ impl Search<'_, '_> {
         worker: &mut NativeSession,
         history: Option<&mut Vec<Vec<PlanningCommitment>>>,
     ) -> Result<()> {
-        let commitments = self.rollout_commitments(worker, history.as_deref().map(Vec::as_slice))?;
+        let commitments =
+            self.rollout_commitments(worker, history.as_deref().map(Vec::as_slice))?;
         worker.apply_joint_planning_ordered(&commitments)?;
         if let Some(history) = history {
             history.push(commitments);
@@ -3201,7 +3456,11 @@ impl Search<'_, '_> {
         history: &[Vec<PlanningCommitment>],
         legal: &[Option<crate::cards::CardId>],
     ) -> Option<Option<crate::cards::CardId>> {
-        let (_, forecast) = self.future_planning.as_ref()?.forecasts.iter()
+        let (_, forecast) = self
+            .future_planning
+            .as_ref()?
+            .forecasts
+            .iter()
             .find(|(id, _)| *id == hero)?;
         if history.len() >= 4 {
             return None;
@@ -3223,7 +3482,9 @@ impl Search<'_, '_> {
             let Some(fallback) = worker.first_planning_commitment(hero.id)? else {
                 continue;
             };
-            let controlled = self.controlled.map_or(hero.team == self.team, |ids| ids.contains(&hero.id));
+            let controlled = self
+                .controlled
+                .map_or(hero.team == self.team, |ids| ids.contains(&hero.id));
             let mut choice = fallback;
             if !controlled
                 && let Some(rollout) = &self.future_planning
@@ -3231,12 +3492,16 @@ impl Search<'_, '_> {
             {
                 self.forecast_checks += 1;
                 if let Some(predicted) = worker.sample_forecast_commitment(
-                    hero.id, rollout.forecasts, history.unwrap_or_default(), seed,
+                    hero.id,
+                    rollout.forecasts,
+                    history.unwrap_or_default(),
+                    seed,
                 )? {
                     self.forecast_matches += 1;
                     choice = predicted;
                 } else if let Some(predicted) = worker.greedy_opponent_commitment(
-                    hero.id, opponent_draw_seed(worker, seed, hero.id),
+                    hero.id,
+                    opponent_draw_seed(worker, seed, hero.id),
                 )? {
                     choice = predicted;
                 }
@@ -3245,7 +3510,9 @@ impl Search<'_, '_> {
                 && let Some(rollout) = &self.future_planning
                 && rollout.forecasts.iter().any(|(id, _)| *id == hero.id)
             {
-                let legal: Vec<_> = worker.planning_choices(hero.id)?.into_iter()
+                let legal: Vec<_> = worker
+                    .planning_choices(hero.id)?
+                    .into_iter()
                     .map(|option| match option {
                         DecisionMove::Card { card, .. } => Some(card),
                         _ => None,
@@ -3272,30 +3539,51 @@ impl Search<'_, '_> {
         history: &[Vec<PlanningCommitment>],
     ) -> Result<Option<GameTurnRollout>> {
         let preferred = self.rollout_commitments(worker, Some(history))?;
-        let fixed_opponents = self.future_planning.as_ref()
+        let fixed_opponents = self
+            .future_planning
+            .as_ref()
             .filter(|rollout| rollout.fixed_opponent_seed.is_some());
-        let (rows, reply_alternative) = if fixed_opponents
-            .is_some_and(|rollout| !rollout.legacy_fixed_followup)
-        {
-            // Spend the wider follow-up on legal controlled commitments.
-            // Keep opponent choices and joint submission order fixed.
-            let controlled = worker.joint_plans_with_reply_order(
-                self.player, true, 4, self.controlled, JointPlanOrder::Balanced, &[],
-            )?;
-            (controlled.plans.into_iter().map(|row| {
-                preferred.iter().map(|choice| {
-                    row.iter().find(|candidate| candidate.hero == choice.hero)
-                        .copied().unwrap_or(*choice)
-                }).collect()
-            }).collect::<Vec<Vec<PlanningCommitment>>>(), None)
-        } else {
-            self.narrow_rollout_rows(worker, history, preferred, fixed_opponents.is_some())?
-        };
+        let (rows, reply_alternative) =
+            if fixed_opponents.is_some_and(|rollout| !rollout.legacy_fixed_followup) {
+                // Spend the wider follow-up on legal controlled commitments.
+                // Keep opponent choices and joint submission order fixed.
+                let controlled = worker.joint_plans_with_reply_order(
+                    self.player,
+                    true,
+                    4,
+                    self.controlled,
+                    JointPlanOrder::Balanced,
+                    &[],
+                )?;
+                (
+                    controlled
+                        .plans
+                        .into_iter()
+                        .map(|row| {
+                            preferred
+                                .iter()
+                                .map(|choice| {
+                                    row.iter()
+                                        .find(|candidate| candidate.hero == choice.hero)
+                                        .copied()
+                                        .unwrap_or(*choice)
+                                })
+                                .collect()
+                        })
+                        .collect::<Vec<Vec<PlanningCommitment>>>(),
+                    None,
+                )
+            } else {
+                self.narrow_rollout_rows(worker, history, preferred, fixed_opponents.is_some())?
+            };
 
         let mut best = None::<GameTurnRollout>;
         'rows: for row in rows {
             let mut worst = None::<GameTurnRollout>;
-            for reply in [None, reply_alternative].into_iter().take(1 + usize::from(reply_alternative.is_some())) {
+            for reply in [None, reply_alternative]
+                .into_iter()
+                .take(1 + usize::from(reply_alternative.is_some()))
+            {
                 if !self.reserve_node() {
                     return Ok(None);
                 }
@@ -3308,12 +3596,18 @@ impl Search<'_, '_> {
                 let leaf = worker.with_joint_planning(&joint, |branch| {
                     self.advance(branch)?;
                     self.rollout_with_history(
-                        branch, cutoff, capture_state, lab_evaluation, Some(branch_history),
+                        branch,
+                        cutoff,
+                        capture_state,
+                        lab_evaluation,
+                        Some(branch_history),
                     )
                 });
                 let leaf = match leaf {
                     Ok(Some(leaf)) => leaf,
-                    Ok(None) | Err(EngineError::Deadline | EngineError::Cancelled) => return Ok(None),
+                    Ok(None) | Err(EngineError::Deadline | EngineError::Cancelled) => {
+                        return Ok(None);
+                    }
                     Err(error) => return Err(error),
                 };
                 // The row's worst reply can only lower its score further.
@@ -3339,26 +3633,43 @@ impl Search<'_, '_> {
         history: &[Vec<PlanningCommitment>],
         preferred: Vec<PlanningCommitment>,
         fixed_opponents: bool,
-    ) -> Result<(Vec<Vec<PlanningCommitment>>, Option<(usize, PlanningCommitment)>)> {
+    ) -> Result<(
+        Vec<Vec<PlanningCommitment>>,
+        Option<(usize, PlanningCommitment)>,
+    )> {
         let mut row_alternative = None;
         let mut reply_alternative = None;
         for (index, choice) in preferred.iter().enumerate() {
             let team = worker.world.hero(choice.hero).unwrap().team;
-            let controlled = self.controlled.map_or(team == self.team, |ids| ids.contains(&choice.hero));
-            if !controlled && (fixed_opponents || matches!(self.opponent_policy, OpponentPolicy::FirstLegal)) {
+            let controlled = self
+                .controlled
+                .map_or(team == self.team, |ids| ids.contains(&choice.hero));
+            if !controlled
+                && (fixed_opponents || matches!(self.opponent_policy, OpponentPolicy::FirstLegal))
+            {
                 continue;
             }
-            let slot = if controlled { &mut row_alternative } else { &mut reply_alternative };
+            let slot = if controlled {
+                &mut row_alternative
+            } else {
+                &mut reply_alternative
+            };
             if slot.is_some() {
                 continue;
             }
-            let alternatives: Vec<_> = worker.hero_planning_commitments(choice.hero)?
+            let alternatives: Vec<_> = worker
+                .hero_planning_commitments(choice.hero)?
                 .into_iter()
                 .filter(|candidate| candidate.first != choice.first && candidate.second.is_none())
                 .collect();
             if let Some(fallback) = alternatives.first() {
-                let cards: Vec<_> = alternatives.iter().map(|candidate| candidate.first).collect();
-                let first = self.forecast_card(choice.hero, history, &cards).unwrap_or(fallback.first);
+                let cards: Vec<_> = alternatives
+                    .iter()
+                    .map(|candidate| candidate.first)
+                    .collect();
+                let first = self
+                    .forecast_card(choice.hero, history, &cards)
+                    .unwrap_or(fallback.first);
                 *slot = Some((index, PlanningCommitment { first, ..*fallback }));
             }
         }
@@ -3386,7 +3697,13 @@ impl Search<'_, '_> {
             ));
         };
         let is_hex = |choice: &DecisionMove| {
-            matches!(choice, DecisionMove::Input { selection: super::Datum::Object(_), .. })
+            matches!(
+                choice,
+                DecisionMove::Input {
+                    selection: super::Datum::Object(_),
+                    ..
+                }
+            )
         };
         let skip = moves.iter().find(|choice| !is_hex(choice)).cloned();
         worker.order_movement_roots(player, &mut moves);
@@ -3411,7 +3728,10 @@ impl Search<'_, '_> {
                 break;
             }
         }
-        Ok(Some(ValueBound { score: best, resolved: false }))
+        Ok(Some(ValueBound {
+            score: best,
+            resolved: false,
+        }))
     }
 
     // The caller owns the rollback scope for this path.
@@ -3450,12 +3770,20 @@ impl Search<'_, '_> {
             let (player, team) = worker
                 .search_player_preferring(self.controlled)?
                 .expect("live request has a search owner");
-            let controlled = self.controlled.map_or(team == self.team, |ids| ids.contains(&player));
+            let controlled = self
+                .controlled
+                .map_or(team == self.team, |ids| ids.contains(&player));
             if !controlled
-                && let Some(seed) = self.future_planning.as_ref().and_then(|rollout| rollout.fixed_opponent_seed)
+                && let Some(seed) = self
+                    .future_planning
+                    .as_ref()
+                    .and_then(|rollout| rollout.fixed_opponent_seed)
             {
-                let decision = worker.greedy_opponent_input(player, opponent_draw_seed(worker, seed, player))?
-                    .ok_or_else(|| EngineError::Unsupported("fixed opponent has no native choices".into()))?;
+                let decision = worker
+                    .greedy_opponent_input(player, opponent_draw_seed(worker, seed, player))?
+                    .ok_or_else(|| {
+                        EngineError::Unsupported("fixed opponent has no native choices".into())
+                    })?;
                 if !self.apply_input(worker, decision)? {
                     return Ok(None);
                 }
@@ -3468,20 +3796,27 @@ impl Search<'_, '_> {
             };
             if depth == 0
                 && controlled
-                && matches!(self.opponent_policy, OpponentPolicy::AdversarialMovementTargets)
+                && matches!(
+                    self.opponent_policy,
+                    OpponentPolicy::AdversarialMovementTargets
+                )
                 && let Some(cutoff) = self.turn_cutoff
                 && worker.last_request.as_ref().is_some_and(|request| {
                     matches!(&request.choices, RequestChoices::Hexes(hexes)
                         if hexes.len() + usize::from(request.can_skip) > 1)
                 })
-                && worker.movement_root_actor()
+                && worker
+                    .movement_root_actor()
                     .is_some_and(|actor| worker.world.hero_identity(actor) == player)
             {
                 return self.movement_leaf(worker, player, cutoff, beta);
             }
             let extend_attack = depth == 0
                 && !fixed_policy
-                && matches!(self.opponent_policy, OpponentPolicy::AdversarialAttackTargets)
+                && matches!(
+                    self.opponent_policy,
+                    OpponentPolicy::AdversarialAttackTargets
+                )
                 && worker.pending_attack_target();
             let mut moves = if (depth == 0 && !extend_attack) || fixed_policy {
                 worker.resolution_branch_probe(player)?
@@ -3564,40 +3899,74 @@ mod tests {
 
         let fixture =
             super::super::object_execution::fixture_case("object-execution-card-planning-cycle");
-        let root = NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
-            .unwrap();
+        let root =
+            NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
+                .unwrap();
         let player = root.world.heroes[0].id;
         let seed = 39;
         let sampled = root.sampled_planning_world(player, seed).unwrap();
-        let first = sampled.joint_plans_with_reply_order(player, false, 1, None, JointPlanOrder::OpponentReplies(seed), &[])
+        let first = sampled
+            .joint_plans_with_reply_order(
+                player,
+                false,
+                1,
+                None,
+                JointPlanOrder::OpponentReplies(seed),
+                &[],
+            )
             .unwrap();
         let reply = &first.plans[0];
         assert!(!reply.is_empty());
         for choice in reply {
-            assert_eq!(Some(*choice), sampled.greedy_opponent_commitment(choice.hero, seed).unwrap());
+            assert_eq!(
+                Some(*choice),
+                sampled
+                    .greedy_opponent_commitment(choice.hero, seed)
+                    .unwrap()
+            );
         }
         let ordinary = sampled.joint_plans(player, false, 4096).unwrap();
-        let ranked = sampled.joint_plans_with_reply_order(player, false, 4096, None, JointPlanOrder::OpponentReplies(seed), &[])
+        let ranked = sampled
+            .joint_plans_with_reply_order(
+                player,
+                false,
+                4096,
+                None,
+                JointPlanOrder::OpponentReplies(seed),
+                &[],
+            )
             .unwrap();
         assert_eq!(ranked.total, ordinary.total);
         assert_eq!(ranked.plans.len(), ranked.total);
-        assert_eq!(ranked.plans.into_iter().collect::<HashSet<_>>(),
-            ordinary.plans.into_iter().collect::<HashSet<_>>());
+        assert_eq!(
+            ranked.plans.into_iter().collect::<HashSet<_>>(),
+            ordinary.plans.into_iter().collect::<HashSet<_>>()
+        );
     }
 
     #[test]
     fn joint_card_order_uses_score_gaps_and_keeps_unscored_cards() {
-        let choice = PlanningCommitment { hero: Symbol(0), first: None, second: None };
+        let choice = PlanningCommitment {
+            hero: Symbol(0),
+            first: None,
+            second: None,
+        };
         let dimensions = [vec![choice; 2], vec![choice; 3]];
         let costs = [
-            Some(vec![greedy_card_cost(0, Some(0)), greedy_card_cost(0, Some(-150))]),
+            Some(vec![
+                greedy_card_cost(0, Some(0)),
+                greedy_card_cost(0, Some(-150)),
+            ]),
             Some(vec![
                 greedy_card_cost(0, Some(0)),
                 greedy_card_cost(0, Some(-30)),
                 greedy_card_cost(0, None),
             ]),
         ];
-        assert_eq!(ranked_reply_indices(&dimensions, &[1, 2], &costs, 6), [0, 2, 1, 3, 4, 5]);
+        assert_eq!(
+            ranked_reply_indices(&dimensions, &[1, 2], &costs, 6),
+            [0, 2, 1, 3, 4, 5]
+        );
     }
 
     #[test]
@@ -3607,7 +3976,13 @@ mod tests {
         let hero = Symbol(0);
         let a = Some(CardId(1));
         let b = Some(CardId(2));
-        let rows = [a, b].map(|first| vec![PlanningCommitment { hero, first, second: None }]);
+        let rows = [a, b].map(|first| {
+            vec![PlanningCommitment {
+                hero,
+                first,
+                second: None,
+            }]
+        });
         let first = shared_row_likelihoods(&rows, &[(hero, vec![(a, 0), (b, -300)])]);
         let second = shared_row_likelihoods(&rows, &[(hero, vec![(a, -100), (b, 0)])]);
         assert!(first[0] > first[1] && second[0] < second[1]);
@@ -3626,58 +4001,74 @@ mod tests {
                 );
                 let root = NativeSession::compile(
                     serde_json::from_value(fixture["envelope"].clone()).unwrap(),
-                ).unwrap();
+                )
+                .unwrap();
                 let player = root.world.heroes[0].id;
                 let seed = 39;
                 let mut world = root.sampled_planning_world(player, seed).unwrap();
                 let before = world.semantic_state().unwrap();
-                let (scores, nodes, _) = world.greedy_planning_scores(
-                    seed, 1024, false, &ExecutionBudget::default(),
-                ).unwrap();
+                let (scores, nodes, _) = world
+                    .greedy_planning_scores(seed, 1024, false, &ExecutionBudget::default())
+                    .unwrap();
                 assert!(nodes > 0 && nodes <= 1024);
                 assert_eq!(scores.len(), world.world.heroes.len());
                 assert_eq!(world.semantic_state().unwrap(), before);
                 for friendly in [true, false] {
                     let ordinary = world.joint_plans(player, friendly, 4096).unwrap();
-                    let ranked = world.joint_plans_with_reply_order(
-                        player, friendly, 4096, None, JointPlanOrder::PlayerFirst, &scores,
-                    ).unwrap();
+                    let ranked = world
+                        .joint_plans_with_reply_order(
+                            player,
+                            friendly,
+                            4096,
+                            None,
+                            JointPlanOrder::PlayerFirst,
+                            &scores,
+                        )
+                        .unwrap();
                     for commitment in &ranked.plans[0] {
-                        let (_, row) = scores.iter()
-                            .find(|(hero, _)| *hero == commitment.hero).unwrap();
+                        let (_, row) = scores
+                            .iter()
+                            .find(|(hero, _)| *hero == commitment.hero)
+                            .unwrap();
                         assert!(row.iter().any(|(card, score)| {
-                            *card == commitment.first && Some(*score) == row.iter()
-                                .map(|(_, score)| *score).max()
+                            *card == commitment.first
+                                && Some(*score) == row.iter().map(|(_, score)| *score).max()
                         }));
                     }
-                    assert_eq!(ranked.plans.into_iter().collect::<HashSet<_>>(),
-                        ordinary.plans.into_iter().collect::<HashSet<_>>());
+                    assert_eq!(
+                        ranked.plans.into_iter().collect::<HashSet<_>>(),
+                        ordinary.plans.into_iter().collect::<HashSet<_>>()
+                    );
                 }
                 let mut outcomes = Vec::new();
                 for workers in [1, 2] {
-                    let result = world.search_plans_on_sample(
-                        player, seed, 2,
-                        SearchLimits {
-                            max_depth: 1,
-                            max_nodes: 4096,
-                            opponent_policy: OpponentPolicy::Adversarial,
-                            evaluation: SearchEvaluation::MaterialPosition,
-                        },
-                        PlanningSearchOptions {
-                            rollout_turns: Some(2),
-                            workers,
-                            upgrade_checkpoints: None,
-                            reply_cap: None,
-                            reply_probe_cap: None,
-                            greedy_card_order: true,
-                            tactical_forecast: false,
-                            forecast_node_share: ForecastNodeShare::default(),
-                            legacy_fixed_followup: false,
-                            fixed_future_planning: false,
-                            branch_future_planning: false,
-                        },
-                        &ExecutionBudget::default(),
-                    ).unwrap();
+                    let result = world
+                        .search_plans_on_sample(
+                            player,
+                            seed,
+                            2,
+                            SearchLimits {
+                                max_depth: 1,
+                                max_nodes: 4096,
+                                opponent_policy: OpponentPolicy::Adversarial,
+                                evaluation: SearchEvaluation::MaterialPosition,
+                            },
+                            PlanningSearchOptions {
+                                rollout_turns: Some(2),
+                                workers,
+                                upgrade_checkpoints: None,
+                                reply_cap: None,
+                                reply_probe_cap: None,
+                                greedy_card_order: true,
+                                tactical_forecast: false,
+                                forecast_node_share: ForecastNodeShare::default(),
+                                legacy_fixed_followup: false,
+                                fixed_future_planning: false,
+                                branch_future_planning: false,
+                            },
+                            &ExecutionBudget::default(),
+                        )
+                        .unwrap();
                     assert!(result.matrix.score.is_some());
                     assert!(result.matrix.forecast_checks > 0);
                     assert!(result.matrix.nodes <= 4096);
@@ -3695,9 +4086,9 @@ mod tests {
     fn forecast_search_uses_one_repeatable_opponent_reply() {
         let fixture =
             super::super::object_execution::fixture_case("object-execution-card-planning-cycle");
-        let mut world = NativeSession::compile(
-            serde_json::from_value(fixture["envelope"].clone()).unwrap(),
-        ).unwrap();
+        let mut world =
+            NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
+                .unwrap();
         let player = world.world.heroes[0].id;
         let budget = ExecutionBudget::default();
         let before = world.semantic_state().unwrap();
@@ -3720,19 +4111,31 @@ mod tests {
             opponent_policy: OpponentPolicy::Adversarial,
             evaluation: SearchEvaluation::MaterialPosition,
         };
-        let first = world.search_plans_on_sample(player, 17, 3, limits, options, &budget).unwrap();
-        let second = world.search_plans_on_sample(player, 17, 3, limits, options, &budget).unwrap();
+        let first = world
+            .search_plans_on_sample(player, 17, 3, limits, options, &budget)
+            .unwrap();
+        let second = world
+            .search_plans_on_sample(player, 17, 3, limits, options, &budget)
+            .unwrap();
         assert_eq!(first.total_opposing_plans, 1);
         assert_eq!(first.matrix.total_cells, 3);
         assert!(first.matrix.score.is_some());
         assert!(first.matrix.forecast_checks > 0);
         assert_eq!(first.commitment, second.commitment);
         assert_eq!(first.matrix.score, second.matrix.score);
-        let legacy = world.search_plans_on_sample(
-            player, 17, 3, limits,
-            PlanningSearchOptions { legacy_fixed_followup: true, ..options },
-            &budget,
-        ).unwrap();
+        let legacy = world
+            .search_plans_on_sample(
+                player,
+                17,
+                3,
+                limits,
+                PlanningSearchOptions {
+                    legacy_fixed_followup: true,
+                    ..options
+                },
+                &budget,
+            )
+            .unwrap();
         assert_eq!(legacy.total_opposing_plans, 1);
         assert!(legacy.matrix.score.is_some());
         assert!(legacy.matrix.forecast_checks > 0);
@@ -3743,23 +4146,34 @@ mod tests {
     fn later_planning_expansion_matches_fixed_rollout_matrix_and_requires_an_exact_value() {
         let fixture =
             super::super::object_execution::fixture_case("object-execution-card-planning-cycle");
-        let mut world = NativeSession::compile(
-            serde_json::from_value(fixture["envelope"].clone()).unwrap(),
-        ).unwrap();
+        let mut world =
+            NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
+                .unwrap();
         let player = world.world.heroes[0].id;
         let team = world.world.heroes[0].team;
         let budget = ExecutionBudget::default();
         let before = world.semantic_state().unwrap();
 
-        let preferred: Vec<_> = world.world.heroes.iter()
+        let preferred: Vec<_> = world
+            .world
+            .heroes
+            .iter()
             .filter_map(|hero| world.first_planning_commitment(hero.id).unwrap())
             .collect();
         let alternative = |friendly| {
-            let (index, choice) = preferred.iter().enumerate()
-                .find(|(_, choice)| (world.world.hero(choice.hero).unwrap().team == team) == friendly)
+            let (index, choice) = preferred
+                .iter()
+                .enumerate()
+                .find(|(_, choice)| {
+                    (world.world.hero(choice.hero).unwrap().team == team) == friendly
+                })
                 .unwrap();
-            let next = world.hero_planning_commitments(choice.hero).unwrap().into_iter()
-                .find(|next| next.first != choice.first).unwrap();
+            let next = world
+                .hero_planning_commitments(choice.hero)
+                .unwrap()
+                .into_iter()
+                .find(|next| next.first != choice.first)
+                .unwrap();
             (index, next)
         };
         let row = alternative(true);
@@ -3772,9 +4186,12 @@ mod tests {
                 for (index, choice) in row.into_iter().chain(reply) {
                     joint[index] = choice;
                 }
-                let leaf = world.with_joint_planning(&joint, |branch| {
-                    branch.rollout_game_turns(player, 1, 4096, &budget)
-                }).unwrap().unwrap();
+                let leaf = world
+                    .with_joint_planning(&joint, |branch| {
+                        branch.rollout_game_turns(player, 1, 4096, &budget)
+                    })
+                    .unwrap()
+                    .unwrap();
                 scores[i][j] = leaf.score;
                 costs[i][j] = leaf.nodes + 1;
             }
@@ -3806,7 +4223,8 @@ mod tests {
                 future_planning: None,
             };
             let cutoff = world.search_turn_index() + 1;
-            let result = search.expand_rollout_planning(&mut world, cutoff, false, false, &[vec![]])
+            let result = search
+                .expand_rollout_planning(&mut world, cutoff, false, false, &[vec![]])
                 .unwrap();
             assert_eq!(result.map(|leaf| leaf.score), score);
             assert!(search.nodes <= limit);
@@ -3815,31 +4233,34 @@ mod tests {
             }
             assert_eq!(world.semantic_state().unwrap(), before);
         }
-        let (row, replies): (Vec<_>, Vec<_>) = preferred.into_iter()
+        let (row, replies): (Vec<_>, Vec<_>) = preferred
+            .into_iter()
             .partition(|choice| world.world.hero(choice.hero).unwrap().team == team);
         let mut costs = Vec::new();
         for expand in [false, true] {
-            let result = world.search_planning_matrix_partition(
-                player,
-                std::slice::from_ref(&row),
-                std::slice::from_ref(&replies),
-                SearchLimits {
-                    max_depth: 0,
-                    max_nodes: 4096,
-                    opponent_policy: OpponentPolicy::Adversarial,
-                    evaluation: SearchEvaluation::MaterialPosition,
-                },
-                PlanningPartition {
-                    rollout_turns: Some(2),
-                    controlled: None,
-                    shared_nodes: None,
-                    greedy_forecasts: &[],
-                    future_branching: Some(expand),
-                    legacy_fixed_followup: false,
-                    fixed_opponent_seed: None,
-                },
-                &budget,
-            ).unwrap();
+            let result = world
+                .search_planning_matrix_partition(
+                    player,
+                    std::slice::from_ref(&row),
+                    std::slice::from_ref(&replies),
+                    SearchLimits {
+                        max_depth: 0,
+                        max_nodes: 4096,
+                        opponent_policy: OpponentPolicy::Adversarial,
+                        evaluation: SearchEvaluation::MaterialPosition,
+                    },
+                    PlanningPartition {
+                        rollout_turns: Some(2),
+                        controlled: None,
+                        shared_nodes: None,
+                        greedy_forecasts: &[],
+                        future_branching: Some(expand),
+                        legacy_fixed_followup: false,
+                        fixed_opponent_seed: None,
+                    },
+                    &budget,
+                )
+                .unwrap();
             assert!(result.score.is_some());
             assert_eq!(result.forecast_checks, 0);
             assert_eq!(world.semantic_state().unwrap(), before);
@@ -3944,14 +4365,22 @@ mod tests {
                     request: Some(token),
                     selection,
                     ..
-                } = choice else {
+                } = choice
+                else {
                     panic!("expected a live resolution input");
                 };
                 scores.push(session.with_rollback(|child| {
                     child.submit(token, selection)?;
                     child.last_request = None;
                     child.advance_to_decision(budget)?;
-                    exhaustive(child, player, team, depth - u8::from(branching), branches, budget)
+                    exhaustive(
+                        child,
+                        player,
+                        team,
+                        depth - u8::from(branching),
+                        branches,
+                        budget,
+                    )
                 })?);
             }
             Ok(if maximizing {
@@ -3968,17 +4397,18 @@ mod tests {
             "object-execution-attack-macro-existing",
         ] {
             let fixture = super::super::object_execution::fixture_case(name);
-            let mut session =
-                NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
-                    .unwrap();
+            let mut session = NativeSession::compile(
+                serde_json::from_value(fixture["envelope"].clone()).unwrap(),
+            )
+            .unwrap();
             session.advance_to_decision(&budget).unwrap();
             let player = session.world.heroes[0].id;
             let team = session.world.heroes[0].team;
             let state = session.semantic_state().unwrap();
             let request = session.last_request.clone();
             for depth in 0..=3 {
-                let expected = exhaustive(&mut session, player, team, depth, &mut branches, &budget)
-                    .unwrap();
+                let expected =
+                    exhaustive(&mut session, player, team, depth, &mut branches, &budget).unwrap();
                 let mut search = Search {
                     player,
                     team,
@@ -4135,47 +4565,81 @@ mod tests {
         assert_eq!(ordered.len(), original.len());
         assert!(original.iter().all(|choice| ordered.contains(choice)));
         let distance = |choice: &DecisionMove, kinds: &[EntityKind]| {
-            let DecisionMove::Input { selection, .. } = choice else { return None };
+            let DecisionMove::Input { selection, .. } = choice else {
+                return None;
+            };
             let hex = super::super::datum_hex(selection, &root.symbols, root.coordinates).ok()?;
-            root.world.locations.iter().filter_map(|&(id, enemy)| {
-                let entity = root.world.entity(id)?;
-                (entity.team.is_some_and(|owner| owner != team) && kinds.contains(&entity.kind))
-                    .then_some(hex.distance(enemy))
-            }).min()
+            root.world
+                .locations
+                .iter()
+                .filter_map(|&(id, enemy)| {
+                    let entity = root.world.entity(id)?;
+                    (entity.team.is_some_and(|owner| owner != team) && kinds.contains(&entity.kind))
+                        .then_some(hex.distance(enemy))
+                })
+                .min()
         };
-        for kinds in [&[EntityKind::Minion][..], &[EntityKind::Hero, EntityKind::Piece][..]] {
-            let closest = original.iter().filter_map(|choice| distance(choice, kinds)).min();
+        for kinds in [
+            &[EntityKind::Minion][..],
+            &[EntityKind::Hero, EntityKind::Piece][..],
+        ] {
+            let closest = original
+                .iter()
+                .filter_map(|choice| distance(choice, kinds))
+                .min();
             assert!(closest.is_some());
-            assert!(ordered[..3].iter().any(|choice| distance(choice, kinds) == closest));
+            assert!(
+                ordered[..3]
+                    .iter()
+                    .any(|choice| distance(choice, kinds) == closest)
+            );
         }
         let threats = [EntityKind::Minion, EntityKind::Hero, EntityKind::Piece];
-        let farthest = original.iter().filter_map(|choice| distance(choice, &threats)).max();
+        let farthest = original
+            .iter()
+            .filter_map(|choice| distance(choice, &threats))
+            .max();
         assert!(farthest.is_some());
-        assert!(ordered[..3].iter().any(|choice| distance(choice, &threats) == farthest));
+        assert!(
+            ordered[..3]
+                .iter()
+                .any(|choice| distance(choice, &threats) == farthest)
+        );
     }
 
     #[test]
     fn movement_extension_retains_first_legal_and_charges_each_probe() {
         let fixture =
             super::super::object_execution::fixture_case("object-execution-card-planning-cycle");
-        let mut root = NativeSession::compile(
-            serde_json::from_value(fixture["envelope"].clone()).unwrap(),
-        ).unwrap();
-        let plan: Vec<_> = root.world.heroes.iter().map(|hero| PlanningCommitment {
-            hero: hero.id,
-            first: Some(hero.hand[1]),
-            second: None,
-        }).collect();
+        let mut root =
+            NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
+                .unwrap();
+        let plan: Vec<_> = root
+            .world
+            .heroes
+            .iter()
+            .map(|hero| PlanningCommitment {
+                hero: hero.id,
+                first: Some(hero.hand[1]),
+                second: None,
+            })
+            .collect();
         let budget = ExecutionBudget::default();
         root.with_joint_planning(&plan, |worker| {
             worker.advance_to_decision(&budget)?;
             let (owner, team) = worker.search_player()?.unwrap();
             let choices = worker.resolution_choices(owner)?;
-            let (token, action) = choices.into_iter().find_map(|choice| match choice {
-                DecisionMove::Input { request: Some(token), selection: super::super::Datum::Text(id), .. }
-                    if worker.symbols.name(id) == "FAST_TRAVEL" => Some((token, id)),
-                _ => None,
-            }).expect("opening actor can Fast Travel");
+            let (token, action) = choices
+                .into_iter()
+                .find_map(|choice| match choice {
+                    DecisionMove::Input {
+                        request: Some(token),
+                        selection: super::super::Datum::Text(id),
+                        ..
+                    } if worker.symbols.name(id) == "FAST_TRAVEL" => Some((token, id)),
+                    _ => None,
+                })
+                .expect("opening actor can Fast Travel");
             worker.submit(token, super::super::Datum::Text(action))?;
             worker.last_request = None;
             worker.advance_to_decision(&budget)?;
@@ -4201,12 +4665,14 @@ mod tests {
                 forecast_checks: 0,
                 forecast_matches: 0,
             };
-            let reference = worker.with_rollback(|branch| search.value(branch, 0, i64::MIN, i64::MAX))?
+            let reference = worker
+                .with_rollback(|branch| search.value(branch, 0, i64::MIN, i64::MAX))?
                 .unwrap();
             let reference_nodes = search.nodes;
             search.opponent_policy = OpponentPolicy::AdversarialMovementTargets;
             search.nodes = 0;
-            let extended = worker.with_rollback(|branch| search.value(branch, 0, i64::MIN, i64::MAX))?
+            let extended = worker
+                .with_rollback(|branch| search.value(branch, 0, i64::MIN, i64::MAX))?
                 .unwrap();
             assert!(extended.score >= reference.score);
             assert!(search.nodes > reference_nodes);
@@ -4214,13 +4680,17 @@ mod tests {
 
             search.nodes = 0;
             search.max_nodes = 1;
-            assert!(worker.with_rollback(|branch| search.value(branch, 0, i64::MIN, i64::MAX))?
-                .is_none());
+            assert!(
+                worker
+                    .with_rollback(|branch| search.value(branch, 0, i64::MIN, i64::MAX))?
+                    .is_none()
+            );
             assert_eq!(search.nodes, 1);
             assert_eq!(worker.semantic_state()?, before);
             assert_eq!(worker.last_request, request);
             Ok(())
-        }).unwrap();
+        })
+        .unwrap();
     }
 
     #[test]
@@ -4228,10 +4698,9 @@ mod tests {
         let fixture = super::super::object_execution::fixture_case(
             "object-execution-cleanup-live-level-gold-3",
         );
-        let mut session = NativeSession::compile(
-            serde_json::from_value(fixture["envelope"].clone()).unwrap(),
-        )
-        .unwrap();
+        let mut session =
+            NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
+                .unwrap();
         session.advance_prefix(1).unwrap();
         session.advance_prefix(1).unwrap().request.unwrap();
         let (player, _) = session.search_player().unwrap().unwrap();
@@ -4413,7 +4882,10 @@ mod tests {
                     let fallback = worker.search_resolution_worlds(
                         owner,
                         (root_sample, 2, workers),
-                        SearchLimits { max_nodes: 2, ..limits },
+                        SearchLimits {
+                            max_nodes: 2,
+                            ..limits
+                        },
                         Some(2),
                         None,
                         &budget,
@@ -4426,10 +4898,20 @@ mod tests {
                     assert_eq!(worker.semantic_state()?, before);
                 }
                 let serial = worker.search_resolution_worlds(
-                    owner, (root_sample, 2, 1), limits, Some(2), None, &budget,
+                    owner,
+                    (root_sample, 2, 1),
+                    limits,
+                    Some(2),
+                    None,
+                    &budget,
                 )?;
                 let parallel = worker.search_resolution_worlds(
-                    owner, (root_sample, 2, 2), limits, Some(2), None, &budget,
+                    owner,
+                    (root_sample, 2, 2),
+                    limits,
+                    Some(2),
+                    None,
+                    &budget,
                 )?;
                 assert_eq!(serial.completed_depth, 1);
                 assert_eq!(serial.score_kind, Some(ResolutionScoreKind::TurnRollout));
@@ -4497,7 +4979,10 @@ mod tests {
             forecast_matches: 0,
             future_planning: None,
         };
-        let leaf = search.rollout(&mut worker, cutoff, false, false).unwrap().unwrap();
+        let leaf = search
+            .rollout(&mut worker, cutoff, false, false)
+            .unwrap()
+            .unwrap();
         assert_eq!(leaf.phase, Phase::LevelUp);
         assert_eq!(leaf.nodes, 0);
         assert!(!leaf.reached_cutoff(cutoff));
@@ -4513,7 +4998,12 @@ mod tests {
         assert_eq!(worker.planning.phase, Phase::Planning);
         let player = worker.world.heroes[0].id;
         let team = worker.world.heroes[0].team;
-        let opponent = worker.world.heroes.iter().find(|hero| hero.team != team).unwrap();
+        let opponent = worker
+            .world
+            .heroes
+            .iter()
+            .find(|hero| hero.team != team)
+            .unwrap();
         let (opponent, card) = (opponent.id, opponent.hand[0]);
         // Simulate a publicly revealed opposing card at a future planning
         // boundary. The ordinary planning sampler cannot rebuild this root.
@@ -4678,10 +5168,18 @@ mod tests {
             NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
                 .unwrap();
         let red = root.symbols.lookup("RED").unwrap();
-        let player = root.world.heroes.iter().find(|hero| hero.team == red).unwrap().id;
+        let player = root
+            .world
+            .heroes
+            .iter()
+            .find(|hero| hero.team == red)
+            .unwrap()
+            .id;
         let graph = &root.world.definitions.zones;
         let (lane, ordered) = &graph.lanes[0];
-        let zone = ordered.iter().enumerate()
+        let zone = ordered
+            .iter()
+            .enumerate()
             .filter(|(index, _)| index.saturating_sub(1) > ordered.len().saturating_sub(2 + index))
             .filter_map(|(_, id)| graph.zones.iter().find(|zone| zone.id == *id))
             .find(|zone| zone.spawns.iter().any(|spawn| spawn.team != red))
@@ -4689,14 +5187,21 @@ mod tests {
         let (lane, other_lane) = (*lane, graph.lanes[1].0);
         root.world.battle_zones = vec![(lane, zone.id)];
         root.world.waves = vec![(lane, 2), (other_lane, 1)];
-        let enemy_spawns: Vec<_> = zone.spawns.iter()
-            .filter(|spawn| spawn.team != red).map(|spawn| spawn.hex).collect();
+        let enemy_spawns: Vec<_> = zone
+            .spawns
+            .iter()
+            .filter(|spawn| spawn.team != red)
+            .map(|spawn| spawn.hex)
+            .collect();
         let distance = |hex: Hex| {
-            enemy_spawns.iter().map(|&spawn| hex.distance(spawn)).min().unwrap()
+            enemy_spawns
+                .iter()
+                .map(|&spawn| hex.distance(spawn))
+                .min()
+                .unwrap()
         };
         let positions = root.world.tile_hexes().iter().copied().filter(|&hex| {
-            !root.world.terrain(hex)
-                && root.world.occupant(hex).is_none_or(|id| id == player)
+            !root.world.terrain(hex) && root.world.occupant(hex).is_none_or(|id| id == player)
         });
         let near = positions.clone().min_by_key(|&hex| distance(hex)).unwrap();
         let far = positions.max_by_key(|&hex| distance(hex)).unwrap();
@@ -4711,8 +5216,13 @@ mod tests {
         root.world.move_entity(player, near).unwrap();
         assert!(timing_delta(&root) > unready);
 
-        let ally = root.world.heroes.iter()
-            .find(|hero| hero.team == red && hero.id != player).unwrap().id;
+        let ally = root
+            .world
+            .heroes
+            .iter()
+            .find(|hero| hero.team == red && hero.id != player)
+            .unwrap()
+            .id;
         let coverage_delta = |session: &NativeSession| {
             session.evaluate_lane_pressure(red, SearchEvaluation::LanePressureV5)
                 - session.evaluate_lane_pressure(red, SearchEvaluation::LanePressureV4)
@@ -4723,9 +5233,14 @@ mod tests {
             root.world.place_entity(ally, far).unwrap();
         }
         let spread = coverage_delta(&root);
-        let second_near = root.world.tile_hexes().iter().copied()
+        let second_near = root
+            .world
+            .tile_hexes()
+            .iter()
+            .copied()
             .filter(|&hex| !root.world.terrain(hex) && root.world.occupant(hex).is_none())
-            .min_by_key(|&hex| distance(hex)).unwrap();
+            .min_by_key(|&hex| distance(hex))
+            .unwrap();
         assert!(distance(second_near) < distance(far));
         root.world.move_entity(ally, second_near).unwrap();
         assert!(coverage_delta(&root) < spread);
@@ -4740,7 +5255,11 @@ mod tests {
             hero: None,
             condition: red,
         });
-        assert_eq!(root.search_score(SearchEvaluation::LanePressureV4, red, player).unwrap(), WIN);
+        assert_eq!(
+            root.search_score(SearchEvaluation::LanePressureV4, red, player)
+                .unwrap(),
+            WIN
+        );
     }
 
     #[test]
@@ -4760,8 +5279,18 @@ mod tests {
         let rows = root.joint_plans(player, true, 2).unwrap().plans;
         let replies = root.joint_plans(player, false, 1).unwrap().plans;
         let mut samples = [
-            PlanningWorld { session: root.clone(), replies: replies.clone(), forecasts: vec![], fixed_opponent_seed: None },
-            PlanningWorld { session: root, replies, forecasts: vec![], fixed_opponent_seed: None },
+            PlanningWorld {
+                session: root.clone(),
+                replies: replies.clone(),
+                forecasts: vec![],
+                fixed_opponent_seed: None,
+            },
+            PlanningWorld {
+                session: root,
+                replies,
+                forecasts: vec![],
+                fixed_opponent_seed: None,
+            },
         ];
         let result = search_planning_worlds(
             player,
@@ -4796,17 +5325,30 @@ mod tests {
     fn balanced_joint_plans_vary_the_ally_before_more_player_alternatives() {
         let fixture =
             super::super::object_execution::fixture_case("object-execution-card-planning-cycle");
-        let root = NativeSession::compile(
-            serde_json::from_value(fixture["envelope"].clone()).unwrap(),
-        ).unwrap();
+        let root =
+            NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
+                .unwrap();
         let player = root.world.heroes[0].id;
         let team = root.world.heroes[0].team;
-        let ally = root.world.heroes.iter()
-            .find(|hero| hero.id != player && hero.team == team).unwrap().id;
+        let ally = root
+            .world
+            .heroes
+            .iter()
+            .find(|hero| hero.id != player && hero.team == team)
+            .unwrap()
+            .id;
         let controlled = [player, ally];
-        let plans = root.joint_plans_with_reply_order(
-            player, true, 3, Some(&controlled), JointPlanOrder::Balanced, &[],
-        ).unwrap().plans;
+        let plans = root
+            .joint_plans_with_reply_order(
+                player,
+                true,
+                3,
+                Some(&controlled),
+                JointPlanOrder::Balanced,
+                &[],
+            )
+            .unwrap()
+            .plans;
         assert_eq!(plans.len(), 3);
         assert_eq!(plans[0][0].hero, player);
         assert_eq!(plans[0][1].hero, ally);
@@ -4846,12 +5388,12 @@ mod tests {
             upgrade_checkpoints: None,
             reply_cap: None,
             reply_probe_cap: None,
-                greedy_card_order: false,
-                tactical_forecast: false,
-                forecast_node_share: ForecastNodeShare::default(),
-                legacy_fixed_followup: false,
-                fixed_future_planning: false,
-                branch_future_planning: false,
+            greedy_card_order: false,
+            tactical_forecast: false,
+            forecast_node_share: ForecastNodeShare::default(),
+            legacy_fixed_followup: false,
+            fixed_future_planning: false,
+            branch_future_planning: false,
         };
         let budget = ExecutionBudget::default();
         let run = |root: &NativeSession, bots: &[Symbol], mode| {
@@ -4912,19 +5454,29 @@ mod tests {
             .unwrap();
         assert_eq!(parallel, before);
         let state_before_retry = root.semantic_state().unwrap();
-        let retry = root.search_bot_team_planning(
-            player,
-            BotPlanningScope {
-                bots: &only,
-                mode: TeamKnowledgeMode::TrueRules,
-                worlds: 2,
-                seed: 39,
-            },
-            2,
-            SearchLimits { max_depth: 2, max_nodes: 64, ..limits },
-            PlanningSearchOptions { rollout_turns: Some(2), reply_cap: Some(1), ..options },
-            &budget,
-        ).unwrap();
+        let retry = root
+            .search_bot_team_planning(
+                player,
+                BotPlanningScope {
+                    bots: &only,
+                    mode: TeamKnowledgeMode::TrueRules,
+                    worlds: 2,
+                    seed: 39,
+                },
+                2,
+                SearchLimits {
+                    max_depth: 2,
+                    max_nodes: 64,
+                    ..limits
+                },
+                PlanningSearchOptions {
+                    rollout_turns: Some(2),
+                    reply_cap: Some(1),
+                    ..options
+                },
+                &budget,
+            )
+            .unwrap();
         assert_eq!(retry.matrix.completed_rows, 0);
         assert!(retry.matrix.score.is_none());
         assert!(retry.shallow_score.is_some());
@@ -4934,39 +5486,60 @@ mod tests {
         assert!(retry.matrix.nodes <= 64);
         assert_eq!(retry.commitments[0].hero, player);
         assert_eq!(root.semantic_state().unwrap(), state_before_retry);
-        let seed_pass = root.search_bot_team_planning_with_seed_pass(
-            player,
-            BotPlanningScope { bots: &only, mode: TeamKnowledgeMode::TrueRules, worlds: 2, seed: 39 },
-            2,
-            SearchLimits { max_depth: 2, max_nodes: 8192, ..limits },
-            PlanningSearchOptions { rollout_turns: Some(2), reply_cap: Some(1), ..options },
-            &budget,
-            true,
-        ).unwrap();
+        let seed_pass = root
+            .search_bot_team_planning_with_seed_pass(
+                player,
+                BotPlanningScope {
+                    bots: &only,
+                    mode: TeamKnowledgeMode::TrueRules,
+                    worlds: 2,
+                    seed: 39,
+                },
+                2,
+                SearchLimits {
+                    max_depth: 2,
+                    max_nodes: 8192,
+                    ..limits
+                },
+                PlanningSearchOptions {
+                    rollout_turns: Some(2),
+                    reply_cap: Some(1),
+                    ..options
+                },
+                &budget,
+                true,
+            )
+            .unwrap();
         assert!((1..=512).contains(&seed_pass.seed_nodes));
         assert!(seed_pass.seed_score.is_some());
         assert!(seed_pass.matrix.score.is_some());
         assert!(seed_pass.matrix.nodes <= 8192);
         assert_eq!(root.semantic_state().unwrap(), state_before_retry);
-        let run_fixed = |root: &NativeSession, forecast_node_share| root.search_bot_team_planning(
-            player,
-            BotPlanningScope {
-                bots: &only,
-                mode: TeamKnowledgeMode::CoordinatedShow,
-                worlds: 2,
-                seed: 39,
-            },
-            2,
-            SearchLimits { max_nodes: 8192, ..limits },
-            PlanningSearchOptions {
-                workers: 2,
-                greedy_card_order: true,
-                rollout_turns: Some(2),
-                forecast_node_share,
-                ..options
-            },
-            &budget,
-        ).unwrap();
+        let run_fixed = |root: &NativeSession, forecast_node_share| {
+            root.search_bot_team_planning(
+                player,
+                BotPlanningScope {
+                    bots: &only,
+                    mode: TeamKnowledgeMode::CoordinatedShow,
+                    worlds: 2,
+                    seed: 39,
+                },
+                2,
+                SearchLimits {
+                    max_nodes: 8192,
+                    ..limits
+                },
+                PlanningSearchOptions {
+                    workers: 2,
+                    greedy_card_order: true,
+                    rollout_turns: Some(2),
+                    forecast_node_share,
+                    ..options
+                },
+                &budget,
+            )
+            .unwrap()
+        };
         let seeded = run_fixed(&root, ForecastNodeShare::Quarter);
         let unseeded = run_fixed(&root, ForecastNodeShare::Zero);
         assert_eq!(unseeded.greedy_nodes, 0);
@@ -4983,8 +5556,10 @@ mod tests {
         assert!(seeded.matrix.score.is_some());
         assert!(seeded.greedy_nodes > 0);
         assert_eq!(seeded.shallow_nodes, 0);
-        assert!(seeded.matrix.nodes >= seeded.greedy_nodes + seeded.probe_nodes
-            + seeded.matrix.evaluated_cells);
+        assert!(
+            seeded.matrix.nodes
+                >= seeded.greedy_nodes + seeded.probe_nodes + seeded.matrix.evaluated_cells
+        );
         assert!(seeded.matrix.nodes <= 8192);
 
         let partial_parallel = root
@@ -5317,17 +5892,23 @@ mod tests {
     fn planning_pair_replay_checks_round_rollover_and_detects_world_divergence() {
         let fixture =
             super::super::object_execution::fixture_case("object-execution-card-planning-cycle");
-        let world = NativeSession::compile(
-            serde_json::from_value(fixture["envelope"].clone()).unwrap(),
-        ).unwrap();
+        let world =
+            NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
+                .unwrap();
         assert!(matches!(
-            world.clone().compare_planning_continuation(world.clone()).unwrap(),
+            world
+                .clone()
+                .compare_planning_continuation(world.clone())
+                .unwrap(),
             PlanningPair::NextRound,
         ));
         let mut changed = world.clone();
         changed.world.heroes[0].gold += 1;
         assert!(matches!(
-            world.clone().compare_planning_continuation(changed).unwrap(),
+            world
+                .clone()
+                .compare_planning_continuation(changed)
+                .unwrap(),
             PlanningPair::Diverged,
         ));
     }
@@ -5337,10 +5918,12 @@ mod tests {
         let fixture = super::super::object_execution::fixture_case(
             "object-execution-attack-macro-optional-first",
         );
-        let mut worker = NativeSession::compile(
-            serde_json::from_value(fixture["envelope"].clone()).unwrap(),
-        ).unwrap();
-        worker.advance_to_decision(&ExecutionBudget::default()).unwrap();
+        let mut worker =
+            NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
+                .unwrap();
+        worker
+            .advance_to_decision(&ExecutionBudget::default())
+            .unwrap();
         let before = worker.semantic_state().unwrap();
         let request = worker.last_request.clone();
         let census = worker.resolution_reuse_census(4, 2).unwrap();
@@ -5384,19 +5967,27 @@ mod tests {
             forecast_checks: 0,
             forecast_matches: 0,
         };
-        worker.with_rollback(|branch| search.value(branch, 0, i64::MIN, i64::MAX))
-            .unwrap().unwrap();
+        worker
+            .with_rollback(|branch| search.value(branch, 0, i64::MIN, i64::MAX))
+            .unwrap()
+            .unwrap();
         assert_eq!(search.nodes, 0);
 
         search.opponent_policy = OpponentPolicy::AdversarialAttackTargets;
-        worker.with_rollback(|branch| search.value(branch, 0, i64::MIN, i64::MAX))
-            .unwrap().unwrap();
+        worker
+            .with_rollback(|branch| search.value(branch, 0, i64::MIN, i64::MAX))
+            .unwrap()
+            .unwrap();
         assert!(search.nodes >= choices);
 
         search.nodes = 0;
         search.max_nodes = 1;
-        assert!(worker.with_rollback(|branch| search.value(branch, 0, i64::MIN, i64::MAX))
-            .unwrap().is_none());
+        assert!(
+            worker
+                .with_rollback(|branch| search.value(branch, 0, i64::MIN, i64::MAX))
+                .unwrap()
+                .is_none()
+        );
         assert_eq!(search.nodes, 1);
         assert_eq!(worker.semantic_state().unwrap(), before);
     }
@@ -5415,10 +6006,18 @@ mod tests {
         let mut allies = worker.world.heroes.iter().filter(|hero| hero.team == team);
         let first = allies.next().unwrap().id;
         let bot = allies.next().unwrap().id;
-        let enemy = worker.world.heroes.iter().find(|hero| hero.team != team).unwrap().id;
+        let enemy = worker
+            .world
+            .heroes
+            .iter()
+            .find(|hero| hero.team != team)
+            .unwrap()
+            .id;
 
         assert_eq!(
-            worker.search_player_preferring(Some(&[enemy, bot])).unwrap(),
+            worker
+                .search_player_preferring(Some(&[enemy, bot]))
+                .unwrap(),
             Some((owner, team)),
         );
         worker.last_request.as_mut().unwrap().choices = RequestChoices::Actors {
@@ -5427,7 +6026,9 @@ mod tests {
         };
         assert_eq!(worker.search_player().unwrap(), Some((first, team)));
         assert_eq!(
-            worker.search_player_preferring(Some(&[enemy, bot])).unwrap(),
+            worker
+                .search_player_preferring(Some(&[enemy, bot]))
+                .unwrap(),
             Some((bot, team)),
         );
         assert_eq!(

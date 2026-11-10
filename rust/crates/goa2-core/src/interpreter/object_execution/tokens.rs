@@ -179,9 +179,12 @@ impl NativeSession {
         let base = objects.arena.physical_base(physical).map_err(unsupported)?;
         let instance = &self.source.instances[base as usize];
         let definition = &self.source.definitions[instance.definition as usize];
-        Ok(instance.fields.get("is_facedown")
+        Ok(instance
+            .fields
+            .get("is_facedown")
             .or_else(|| definition.fields.get("is_facedown"))
-            .and_then(Value::as_bool) == Some(false))
+            .and_then(Value::as_bool)
+            == Some(false))
     }
 
     fn any_token_supply_bound(

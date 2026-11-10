@@ -178,7 +178,6 @@ fn dense_blend_absent_radius_offers_two_space_destinations_and_exports_the_value
     assert_eq!(step["filters"][0]["max_range"], 2);
 }
 
-
 #[test]
 fn blink_strike_rejects_an_empty_landing_hex_across_static_barrier() {
     use crate::{spatial::Origin, targeting::UnitFilter};
@@ -191,7 +190,10 @@ fn blink_strike_rejects_an_empty_landing_hex_across_static_barrier() {
         let mut worker = NativeSession::compile(envelope).unwrap();
         let actor = worker.symbols.lookup("hero_arien").unwrap();
         let target = worker.symbols.lookup("friendly").unwrap();
-        worker.world.move_entity(target, Hex::new(1, -1, 0).unwrap()).unwrap();
+        worker
+            .world
+            .move_entity(target, Hex::new(1, -1, 0).unwrap())
+            .unwrap();
         assert!(!worker.world.obstacle(Hex::new(2, -2, 0).unwrap()));
 
         let context = SpatialContext {

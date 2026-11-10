@@ -149,7 +149,9 @@ impl NativeSession {
             profile.action_rules_ns = Some(started.elapsed().as_nanos());
             profile.category = Some(match &resolution {
                 ActionResolution::Prompt(_) => "resolve_card.menu",
-                ActionResolution::Finished(children) if children.is_empty() => "resolve_card.no_action",
+                ActionResolution::Finished(children) if children.is_empty() => {
+                    "resolve_card.no_action"
+                }
                 ActionResolution::Finished(_) => "resolve_card.response",
             });
         }

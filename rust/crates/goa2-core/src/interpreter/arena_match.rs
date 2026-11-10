@@ -346,7 +346,10 @@ mod tests {
         let fixture =
             super::super::object_execution::fixture_case("object-execution-card-planning-cycle");
         let envelope: StateEnvelope = serde_json::from_value(fixture["envelope"].clone()).unwrap();
-        let baseline = ArenaMatch::start(envelope.clone(), 1).unwrap().position().unwrap();
+        let baseline = ArenaMatch::start(envelope.clone(), 1)
+            .unwrap()
+            .position()
+            .unwrap();
         for seed in [i64::MAX as u64 + 1, u64::MAX] {
             let mut start = envelope.clone();
             start.state["rng_seed"] = json!(seed);

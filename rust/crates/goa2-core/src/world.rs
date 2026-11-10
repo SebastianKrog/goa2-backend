@@ -845,7 +845,8 @@ impl NativeWorld {
                 (self.has_effects, self.has_uncompiled_auras),
                 &token_overrides,
                 &board_overrides,
-            ).hash(&mut hash);
+            )
+                .hash(&mut hash);
             hash.finish()
         };
         let counters = u128::from(lane(0u64)) | (u128::from(lane(1u64)) << 64);

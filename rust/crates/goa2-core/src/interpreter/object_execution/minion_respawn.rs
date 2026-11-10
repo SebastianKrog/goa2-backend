@@ -172,11 +172,17 @@ impl NativeSession {
         store: Option<ObjectValue>,
     ) -> Result<RespawnPlan> {
         let prompt = Arc::make_mut(&mut self.symbols).intern("Choose a minion to respawn.");
-        let values = candidates.into_iter()
+        let values = candidates
+            .into_iter()
             .map(|id| (id, self.world.entity(id).unwrap().minion_kind.unwrap()))
             .collect();
-        let request = self.respawn_request_bound(objects, step, prompt, RequestChoices::Minions(values))?;
-        Ok(RespawnPlan::Prompt { request, clear: false, store })
+        let request =
+            self.respawn_request_bound(objects, step, prompt, RequestChoices::Minions(values))?;
+        Ok(RespawnPlan::Prompt {
+            request,
+            clear: false,
+            store,
+        })
     }
 
     fn respawn_place_bound(
@@ -258,7 +264,10 @@ impl NativeSession {
             let (hex, _) = self.spatial_hex_bound(objects, stored)?;
             let candidates = self.respawn_supply(team, hex);
             if candidates.is_empty() || self.world.occupant(hex).is_some() {
-                return Ok(RespawnPlan::Done { clear: false, remove: true });
+                return Ok(RespawnPlan::Done {
+                    clear: false,
+                    remove: true,
+                });
             }
             return self.respawn_minion_request_bound(objects, step, candidates, None);
         }
@@ -311,9 +320,7 @@ impl NativeSession {
                     if candidates.len() == 1 {
                         return self.respawn_place_bound(objects, candidates[0], hex, false);
                     }
-                    return self.respawn_minion_request_bound(
-                        objects, step, candidates, selection,
-                    );
+                    return self.respawn_minion_request_bound(objects, step, candidates, selection);
                 }
                 clear = lane_bound;
             }
@@ -407,7 +414,6 @@ impl NativeSession {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -415,30 +421,47 @@ mod tests {
     #[test]
     fn lane_respawn_reissues_the_minion_choice_with_its_original_token() {
         let fixture = fixture_case("object-execution-spell-primitive-respawn-ordinary");
-        let mut root = NativeSession::compile(
-            serde_json::from_value(fixture["envelope"].clone()).unwrap(),
-        ).unwrap();
+        let mut root =
+            NativeSession::compile(serde_json::from_value(fixture["envelope"].clone()).unwrap())
+                .unwrap();
         let hex_request = root.advance_prefix(1).unwrap().request.unwrap();
-        let selection = fixture["operations"].as_array().unwrap().iter()
-            .find(|operation| operation["kind"] == "input").unwrap()["selection"].clone();
+        let selection = fixture["operations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|operation| operation["kind"] == "input")
+            .unwrap()["selection"]
+            .clone();
         let selection = root.import_selection(&selection).unwrap();
         root.submit(hex_request.id, selection).unwrap();
 
         let minion_request = root.advance_prefix(1).unwrap().request.unwrap();
-        assert!(matches!(&minion_request.choices, RequestChoices::Minions(choices) if choices.len() > 1));
+        assert!(
+            matches!(&minion_request.choices, RequestChoices::Minions(choices) if choices.len() > 1)
+        );
         let before = root.semantic_state().unwrap();
-        assert_eq!(root.advance_prefix(1).unwrap().request, Some(minion_request.clone()));
+        assert_eq!(
+            root.advance_prefix(1).unwrap().request,
+            Some(minion_request.clone())
+        );
         assert_eq!(root.semantic_state().unwrap(), before);
 
         let before_choices = root.resolution_choices(minion_request.owner).unwrap();
         root.with_sampled_resolution(
             minion_request.owner,
-            crate::interpreter::PlanningRolloutSample { seed: 173, upgrade_checkpoints: None },
+            crate::interpreter::PlanningRolloutSample {
+                seed: 173,
+                upgrade_checkpoints: None,
+            },
             |sample| {
-                assert_eq!(sample.resolution_choices(minion_request.owner)?, before_choices);
+                assert_eq!(
+                    sample.resolution_choices(minion_request.owner)?,
+                    before_choices
+                );
                 Ok(())
             },
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(root.semantic_state().unwrap(), before);
 
         let expected = root.request_json(&minion_request);

@@ -308,7 +308,10 @@ impl BattleRules {
     ) -> Vec<(Symbol, Symbol)> {
         let mut triggered = Vec::new();
         let lanes = lane.into_iter().chain(
-            zones.iter().map(|(lane, _)| *lane).filter(|_| lane.is_none()),
+            zones
+                .iter()
+                .map(|(lane, _)| *lane)
+                .filter(|_| lane.is_none()),
         );
         for lane in lanes {
             let Some(zid) = zones

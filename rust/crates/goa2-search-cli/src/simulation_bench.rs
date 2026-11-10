@@ -122,7 +122,9 @@ pub(super) fn measure_rollout(
         return Err("rollout benchmark requires 1..8 samples, a seed for multiple samples and enough iterations".into());
     }
     if !(1..=4.min(iterations as usize)).contains(&workers) {
-        return Err("rollout benchmark requires 1..4 workers and at least one iteration per worker".into());
+        return Err(
+            "rollout benchmark requires 1..4 workers and at least one iteration per worker".into(),
+        );
     }
     let seeds = (0..sample_count)
         .map(|index| sample_seed.map(|seed| seed.wrapping_add(u64::from(index))))
@@ -241,7 +243,9 @@ pub(super) fn measure_fingerprints(
     root.advance_to_decision(&ExecutionBudget::default())
         .map_err(|error| error.to_string())?;
     let snapshot = |session: &NativeSession| {
-        let envelope = session.export_envelope().map_err(|error| error.to_string())?;
+        let envelope = session
+            .export_envelope()
+            .map_err(|error| error.to_string())?;
         serde_json::to_vec(&envelope).map_err(|error| error.to_string())
     };
     let commands = prepare(&mut root, &operations)?;
@@ -273,11 +277,16 @@ pub(super) fn measure_fingerprints(
     let mut dirty = Value::Null;
     if !commands.is_empty() {
         let key = |session: &mut NativeSession| {
-            (session.world_state_fingerprint(), session.execution_fingerprint())
+            (
+                session.world_state_fingerprint(),
+                session.execution_fingerprint(),
+            )
         };
-        let (branch_key, branch_state) = root.with_rollback(|branch| {
-            Ok(run(branch, &commands).and_then(|_| Ok((key(branch), snapshot(branch)?))))
-        }).map_err(|error| error.to_string())??;
+        let (branch_key, branch_state) = root
+            .with_rollback(|branch| {
+                Ok(run(branch, &commands).and_then(|_| Ok((key(branch), snapshot(branch)?))))
+            })
+            .map_err(|error| error.to_string())??;
         if branch_state == expected || branch_key == (world, execution) {
             return Err("fingerprint benchmark operations must change the state and key".into());
         }
@@ -298,7 +307,8 @@ pub(super) fn measure_fingerprints(
                     }
                     Ok(())
                 }))
-            }).map_err(|error| error.to_string())??;
+            })
+            .map_err(|error| error.to_string())??;
             let start = Instant::now();
             let restored = black_box(key(&mut root));
             restored_hash += start.elapsed();

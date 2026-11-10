@@ -275,7 +275,10 @@ impl NativeSession {
         let key = self.mine_key_bound(objects, step, Field::MinesKey)?;
         for id in self.mine_trigger_ids_bound(objects, step, key)? {
             if self.world.position(id).is_some()
-                && self.world.entity(id).is_some_and(|entity| entity.owner != Some(viewer))
+                && self
+                    .world
+                    .entity(id)
+                    .is_some_and(|entity| entity.owner != Some(viewer))
                 && !self.token_is_public_bound(objects, id)?
             {
                 return Ok(true);
@@ -454,7 +457,9 @@ mod tests {
         let mut root = session("mines-trigger-ordered");
         let viewer = root.symbols.lookup("hero_arien").unwrap();
         let before = root.semantic_state().unwrap();
-        let result = root.advance_search_objects(&ExecutionBudget::default(), viewer).unwrap();
+        let result = root
+            .advance_search_objects(&ExecutionBudget::default(), viewer)
+            .unwrap();
         assert_eq!(result.steps, 0);
         assert_eq!(root.semantic_state().unwrap(), before);
 
@@ -490,7 +495,13 @@ mod tests {
         let mut root = session("mines-movement-dud-choice-first");
         let actor = root.symbols.lookup("hero_arien").unwrap();
         let team = root.world.hero(actor).unwrap().team;
-        let enemy = root.world.heroes.iter().find(|hero| hero.team != team).unwrap().id;
+        let enemy = root
+            .world
+            .heroes
+            .iter()
+            .find(|hero| hero.team != team)
+            .unwrap()
+            .id;
         root.with_live_objects(|session, objects| {
             let pool = objects.phases.root(&objects.arena, Field::TokenPool)?;
             let mut mines = Vec::new();
@@ -508,14 +519,25 @@ mod tests {
             }
             assert!(session.has_enemy_mine_supply_bound(objects, team)?);
             let owner = objects.phases.k(Field::TokenOwner);
-            for (value, expected) in [(Datum::Null, false), (Datum::Text(actor), false), (Datum::Text(enemy), true)] {
+            for (value, expected) in [
+                (Datum::Null, false),
+                (Datum::Text(actor), false),
+                (Datum::Text(enemy), true),
+            ] {
                 for &mine in &mines {
-                    objects.arena.set_physical_field(mine, owner, value.clone()).map_err(unsupported)?;
+                    objects
+                        .arena
+                        .set_physical_field(mine, owner, value.clone())
+                        .map_err(unsupported)?;
                 }
-                assert_eq!(session.has_enemy_mine_supply_bound(objects, team)?, expected);
+                assert_eq!(
+                    session.has_enemy_mine_supply_bound(objects, team)?,
+                    expected
+                );
             }
             Ok(())
-        }).unwrap();
+        })
+        .unwrap();
     }
 
     #[test]

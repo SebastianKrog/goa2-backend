@@ -122,53 +122,83 @@ impl NativeSession {
         objects.arena.set_root(root, guess).map_err(unsupported)
     }
 
-    pub(super) fn bind_sampled_guess(&mut self, objects: &mut BoundObjects, seed: u64) -> Result<()> {
+    pub(super) fn bind_sampled_guess(
+        &mut self,
+        objects: &mut BoundObjects,
+        seed: u64,
+    ) -> Result<()> {
         let mut frames = self.stack.iter().rev();
-        let Some(guess) = frames.next().filter(|frame| matches!(
-            self.steps[frame.instruction].instruction, Instruction::LiveCardGuess { reveal: false }
-        )) else {
+        let Some(guess) = frames.next().filter(|frame| {
+            matches!(
+                self.steps[frame.instruction].instruction,
+                Instruction::LiveCardGuess { reveal: false }
+            )
+        }) else {
             return Ok(());
         };
-        let Some((guess, reveal)) = guess.object.zip(frames.next().filter(|frame| matches!(
-            self.steps[frame.instruction].instruction, Instruction::LiveCardGuess { reveal: true }
-        )).and_then(|frame| frame.object)) else {
+        let Some((guess, reveal)) = guess.object.zip(
+            frames
+                .next()
+                .filter(|frame| {
+                    matches!(
+                        self.steps[frame.instruction].instruction,
+                        Instruction::LiveCardGuess { reveal: true }
+                    )
+                })
+                .and_then(|frame| frame.object),
+        ) else {
             return Err(unsupported("sampled guess requires its paired reveal"));
         };
         let field = |name| self.symbols.lookup(name).expect("guess symbol registered");
         let operand = |step, name| objects.arena.field(step, field(name));
         let key = |name| match operand(guess, name) {
-            Some(ObjectValue::Atom(Datum::Text(value)))
-                if matches!(operand(reveal, name), Some(ObjectValue::Atom(Datum::Text(other))) if other == value) => Ok(value),
+            Some(ObjectValue::Atom(Datum::Text(value))) if matches!(operand(reveal, name), Some(ObjectValue::Atom(Datum::Text(other))) if other == value) => {
+                Ok(value)
+            }
             _ => Err(unsupported("sampled guess and reveal operands differ")),
         };
         let victim_key = key("victim_key")?;
         let card_key = key("card_key")?;
         let attempt = match operand(guess, "attempt") {
-            Some(ObjectValue::Atom(Datum::Int(value)))
-                if matches!(operand(reveal, "attempt"), Some(ObjectValue::Atom(Datum::Int(other))) if other == value) => value,
+            Some(ObjectValue::Atom(Datum::Int(value))) if matches!(operand(reveal, "attempt"), Some(ObjectValue::Atom(Datum::Int(other))) if other == value) => {
+                value
+            }
             _ => return Err(unsupported("sampled guess and reveal attempts differ")),
         };
         let Some(ObjectValue::Atom(Datum::Text(victim))) = objects.arena.context_value(victim_key)
         else {
             return Err(unsupported("sampled guess victim missing"));
         };
-        let hand = &self.world.hero(victim)
-            .ok_or_else(|| unsupported("sampled guess victim is not a hero"))?.hand;
+        let hand = &self
+            .world
+            .hero(victim)
+            .ok_or_else(|| unsupported("sampled guess victim is not a hero"))?
+            .hand;
         if hand.is_empty() {
             return Err(unsupported("sampled guess requires a card in hand"));
         }
-        let chosen = hand[super::super::loadout::sample_index(seed ^ 0xbf58476d1ce4e5b9, hand.len())];
-        let card = self.world.card(chosen).ok_or_else(|| unsupported("sampled guess card missing"))?;
+        let chosen =
+            hand[super::super::loadout::sample_index(seed ^ 0xbf58476d1ce4e5b9, hand.len())];
+        let card = self
+            .world
+            .card(chosen)
+            .ok_or_else(|| unsupported("sampled guess card missing"))?;
         let printed = self.world.definitions.cards[card.definition].printed_id;
-        objects.arena.set_context(card_key, ObjectValue::Atom(Datum::Text(printed)))
+        objects
+            .arena
+            .set_context(card_key, ObjectValue::Atom(Datum::Text(printed)))
             .map_err(unsupported)?;
-        self.record_guess_bound(objects, attempt, vec![
-            ("victim_id", Datum::Text(victim)),
-            ("card_id", Datum::Text(printed)),
-            ("guessed_color", Datum::Null),
-            ("actual_color", Datum::Null),
-            ("correct", Datum::Null),
-        ])?;
+        self.record_guess_bound(
+            objects,
+            attempt,
+            vec![
+                ("victim_id", Datum::Text(victim)),
+                ("card_id", Datum::Text(printed)),
+                ("guessed_color", Datum::Null),
+                ("actual_color", Datum::Null),
+                ("correct", Datum::Null),
+            ],
+        )?;
         self.sampled_guess_steps = Some([guess, reveal]);
         Ok(())
     }

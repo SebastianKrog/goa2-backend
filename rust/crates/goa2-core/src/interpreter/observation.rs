@@ -216,7 +216,9 @@ impl NativeSession {
         if hero.id == player {
             return Ok(hero.items);
         }
-        Ok(self.public_pre_upgrade_items(hero.id)?.unwrap_or(hero.items))
+        Ok(self
+            .public_pre_upgrade_items(hero.id)?
+            .unwrap_or(hero.items))
     }
 
     pub(super) fn public_pre_upgrade_items(&self, hero: Symbol) -> Result<Option<[i64; 6]>> {
@@ -324,12 +326,16 @@ impl NativeSession {
                             .filter(|id| self.world.card(*id).is_some_and(|card| !card.facedown))
                             .map(printed)
                             .collect::<Result<_>>()?,
-                        known_spells: row.spells
+                        known_spells: row
+                            .spells
                             .iter()
                             .copied()
-                            .filter(|id| self.world.card(*id).is_some_and(|card| {
-                                !card.facedown && self.world.definitions.cards[card.definition].spell
-                            }))
+                            .filter(|id| {
+                                self.world.card(*id).is_some_and(|card| {
+                                    !card.facedown
+                                        && self.world.definitions.cards[card.definition].spell
+                                })
+                            })
                             .map(printed)
                             .collect::<Result<_>>()?,
                     })

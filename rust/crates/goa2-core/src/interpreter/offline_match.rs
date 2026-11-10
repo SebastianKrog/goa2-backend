@@ -8,10 +8,7 @@ use super::{
 };
 use crate::codec::Phase;
 use serde_json::{Value, json};
-use std::{
-    collections::BTreeMap,
-    time::Instant,
-};
+use std::{collections::BTreeMap, time::Instant};
 
 #[derive(Clone, Copy, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -69,7 +66,10 @@ impl OfflinePolicy {
 
     fn budget_from(self, started: Instant) -> Result<ExecutionBudget<'static>> {
         ExecutionBudget::for_search(
-            started, self.time_ms, self.work_budget, self.planning_workers.unwrap_or(1),
+            started,
+            self.time_ms,
+            self.work_budget,
+            self.planning_workers.unwrap_or(1),
         )
     }
 }
@@ -141,14 +141,17 @@ pub struct OfflineMatch {
 
 impl NativeSession {
     pub(super) fn planning_trace_json(&self, plans: &[super::PlanningCommitment]) -> Result<Value> {
-        let commitments = plans.iter().map(|plan| {
-            let printed = |card| self.printed_observation_card(card);
-            Ok(json!({
-                "hero": self.symbols.name(plan.hero),
-                "first": plan.first.map(printed).transpose()?,
-                "second": plan.second.map(printed).transpose()?,
-            }))
-        }).collect::<Result<Vec<_>>>()?;
+        let commitments = plans
+            .iter()
+            .map(|plan| {
+                let printed = |card| self.printed_observation_card(card);
+                Ok(json!({
+                    "hero": self.symbols.name(plan.hero),
+                    "first": plan.first.map(printed).transpose()?,
+                    "second": plan.second.map(printed).transpose()?,
+                }))
+            })
+            .collect::<Result<Vec<_>>>()?;
         Ok(json!({"kind": "planning", "commitments": commitments}))
     }
 
@@ -167,7 +170,9 @@ impl NativeSession {
                     || policy.planning_workers.is_some_and(|workers| {
                         !(1..=2.min(policy.sampled_worlds())).contains(&workers)
                     })
-                    || policy.reply_cap.is_some_and(|cap| !(1..=4096).contains(&cap))
+                    || policy
+                        .reply_cap
+                        .is_some_and(|cap| !(1..=4096).contains(&cap))
                     || policy.max_nodes == 0
                     || policy.resolution_nodes() == 0
                     || policy
@@ -185,10 +190,12 @@ impl NativeSession {
         }
         if red.work_budget != blue.work_budget
             || (red.work_budget.is_some()
-                && (red.max_nodes != blue.max_nodes || red.resolution_nodes() != blue.resolution_nodes()))
+                && (red.max_nodes != blue.max_nodes
+                    || red.resolution_nodes() != blue.resolution_nodes()))
         {
             return Err(EngineError::InvalidInput(
-                "work-budget matches require the same accounting and node caps on both sides".into(),
+                "work-budget matches require the same accounting and node caps on both sides"
+                    .into(),
             ));
         }
         let budget = ExecutionBudget::default();
@@ -256,7 +263,8 @@ impl NativeSession {
                     };
                     let index = team_index(self.symbols.name(hero.team))?;
                     let policy = policies[index];
-                    if let Some(plan) = coordinated[index].iter().find(|plan| plan.hero == hero.id) {
+                    if let Some(plan) = coordinated[index].iter().find(|plan| plan.hero == hero.id)
+                    {
                         joint.push(*plan);
                         continue;
                     }
@@ -270,7 +278,10 @@ impl NativeSession {
                         let team_bots;
                         let solo = [hero.id];
                         let (bots, mode) = if policy.coordinated_planning {
-                            team_bots = self.world.heroes.iter()
+                            team_bots = self
+                                .world
+                                .heroes
+                                .iter()
                                 .filter(|ally| ally.team == hero.team)
                                 .map(|ally| ally.id)
                                 .collect::<Vec<_>>();
@@ -291,7 +302,9 @@ impl NativeSession {
                             PlanningSearchOptions {
                                 rollout_turns: policy.rollout_turns,
                                 workers: policy.planning_workers.unwrap_or(1),
-                                upgrade_checkpoints: upgrades.as_ref().and_then(PublicUpgradeHistory::checkpoints),
+                                upgrade_checkpoints: upgrades
+                                    .as_ref()
+                                    .and_then(PublicUpgradeHistory::checkpoints),
                                 reply_cap: policy.reply_cap,
                                 reply_probe_cap: None,
                                 greedy_card_order: policy.greedy_card_order,
@@ -307,7 +320,8 @@ impl NativeSession {
                         if let Ok(result) = &search {
                             stats[index].planning_nodes += result.matrix.nodes;
                             stats[index].planning_greedy_nodes += result.greedy_nodes;
-                            stats[index].planning_greedy_tactical_probes += result.greedy_tactical_probes;
+                            stats[index].planning_greedy_tactical_probes +=
+                                result.greedy_tactical_probes;
                             stats[index].planning_probe_nodes += result.probe_nodes;
                             stats[index].planning_shallow_nodes += result.shallow_nodes;
                             stats[index].planning_seed_nodes += result.seed_nodes;
@@ -323,13 +337,18 @@ impl NativeSession {
                             stats[index].planning_with_greedy_scores +=
                                 usize::from(result.greedy_card_scores > 0);
                             stats[index].planning_greedy_card_scores += result.greedy_card_scores;
-                            stats[index].planning_forecast_changes += result.matrix.forecast_changes;
+                            stats[index].planning_forecast_changes +=
+                                result.matrix.forecast_changes;
                             stats[index].planning_forecast_checks += result.matrix.forecast_checks;
-                            stats[index].planning_forecast_matches += result.matrix.forecast_matches;
+                            stats[index].planning_forecast_matches +=
+                                result.matrix.forecast_matches;
                         }
                         match search {
-                            Ok(result) if result.matrix.score.is_some()
-                                || result.seed_score.is_some() || result.shallow_score.is_some() => {
+                            Ok(result)
+                                if result.matrix.score.is_some()
+                                    || result.seed_score.is_some()
+                                    || result.shallow_score.is_some() =>
+                            {
                                 if result.matrix.score.is_none() && result.seed_score.is_some() {
                                     stats[index].planning_seed_choices += 1;
                                 }
@@ -337,31 +356,43 @@ impl NativeSession {
                                     stats[index].planning_shallow_scores += 1;
                                 } else if result.matrix.score.is_some()
                                     && result.matrix.completed_rows + result.matrix.pruned_rows
-                                    < result.total_rows
+                                        < result.total_rows
                                 {
                                     stats[index].planning_best_so_far += 1;
                                 }
-                                let chosen = result.commitments.iter().find(|plan| plan.hero == hero.id)
-                                    .copied().ok_or_else(|| {
-                                        EngineError::Unsupported("offline team plan omitted its requesting hero".into())
+                                let chosen = result
+                                    .commitments
+                                    .iter()
+                                    .find(|plan| plan.hero == hero.id)
+                                    .copied()
+                                    .ok_or_else(|| {
+                                        EngineError::Unsupported(
+                                            "offline team plan omitted its requesting hero".into(),
+                                        )
                                     })?;
                                 if policy.coordinated_planning {
                                     coordinated[index] = result.commitments;
                                 }
                                 chosen
-                            },
+                            }
                             other => {
                                 let work = match &other {
                                     Ok(result) => format!(
                                         "; {} of {} nodes, {} probe nodes, {} of {} scored cells, {} of {} worlds",
-                                        result.matrix.nodes, policy.max_nodes, result.probe_nodes,
-                                        result.matrix.evaluated_cells, result.matrix.total_cells,
-                                        result.prepared_worlds, result.requested_worlds,
+                                        result.matrix.nodes,
+                                        policy.max_nodes,
+                                        result.probe_nodes,
+                                        result.matrix.evaluated_cells,
+                                        result.matrix.total_cells,
+                                        result.prepared_worlds,
+                                        result.requested_worlds,
                                     ),
                                     Err(_) => String::new(),
                                 };
                                 let reason = match other {
-                                    Ok(result) if result.prepared_worlds < result.requested_worlds => {
+                                    Ok(result)
+                                        if result.prepared_worlds < result.requested_worlds =>
+                                    {
                                         "interrupted while preparing sampled worlds".into()
                                     }
                                     Ok(_) => "no scored planning row".into(),
@@ -378,9 +409,14 @@ impl NativeSession {
                                         } else {
                                             work
                                         };
-                                        stats.planning_fallback_trace.entry(trace.len()).or_default().push(
-                                            format!("{}: {reason}{detail}", self.symbols.name(hero.id)),
-                                        );
+                                        stats
+                                            .planning_fallback_trace
+                                            .entry(trace.len())
+                                            .or_default()
+                                            .push(format!(
+                                                "{}: {reason}{detail}",
+                                                self.symbols.name(hero.id)
+                                            ));
                                     }
                                     *stats.planning_fallbacks.entry(reason).or_default() += 1;
                                 }
@@ -396,7 +432,9 @@ impl NativeSession {
                         }
                     };
                     if capture_trace && policy.depth > 0 && policy.time_ms.is_some() {
-                        stats[index].planning_micros.push(started.elapsed().as_micros() as u64);
+                        stats[index]
+                            .planning_micros
+                            .push(started.elapsed().as_micros() as u64);
                     }
                     joint.push(plan);
                 }
@@ -445,7 +483,9 @@ impl NativeSession {
                 } else {
                     let sample = PlanningRolloutSample {
                         seed: epoch_seed,
-                        upgrade_checkpoints: upgrades.as_ref().and_then(PublicUpgradeHistory::checkpoints),
+                        upgrade_checkpoints: upgrades
+                            .as_ref()
+                            .and_then(PublicUpgradeHistory::checkpoints),
                     };
                     let searched = self.search_resolution_worlds(
                         owner,
@@ -464,7 +504,7 @@ impl NativeSession {
                                 stats[index].resolution_best_so_far += 1;
                             }
                             result.decision
-                        },
+                        }
                         other => {
                             let reason = match other {
                                 Ok(result) => format!("{:?} before a scored move", result.stop),
@@ -483,7 +523,9 @@ impl NativeSession {
                                     });
                                 let description = format!("{prompt}: {reason}");
                                 if let Some(trace) = &trace {
-                                    stats.resolution_fallback_trace.insert(trace.len(), description.clone());
+                                    stats
+                                        .resolution_fallback_trace
+                                        .insert(trace.len(), description.clone());
                                 }
                                 *stats.resolution_fallbacks.entry(description).or_default() += 1;
                             }
@@ -492,7 +534,9 @@ impl NativeSession {
                     }
                 };
                 if capture_trace && policy.depth > 0 && policy.time_ms.is_some() {
-                    stats[index].resolution_micros.push(started.elapsed().as_micros() as u64);
+                    stats[index]
+                        .resolution_micros
+                        .push(started.elapsed().as_micros() as u64);
                 }
                 let DecisionMove::Input {
                     request: Some(token),

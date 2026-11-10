@@ -40,8 +40,13 @@ impl PrimaryOperands {
         let frozen = catalog()?;
         let defaults = |key: &str| -> Result<Arc<[(i64, i64)]>, String> {
             let shared = frozen[key].as_object().ok_or("primary fallbacks missing")?;
-            let live = live[key].as_object().ok_or("live primary fallbacks missing")?;
-            if shared.iter().any(|(slot, value)| live.get(slot) != Some(value)) {
+            let live = live[key]
+                .as_object()
+                .ok_or("live primary fallbacks missing")?;
+            if shared
+                .iter()
+                .any(|(slot, value)| live.get(slot) != Some(value))
+            {
                 return Err(format!("primary {key} catalogs disagree"));
             }
             live.iter()

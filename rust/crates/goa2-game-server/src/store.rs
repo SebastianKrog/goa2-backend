@@ -1,4 +1,6 @@
 mod migrations;
+mod unsigned;
+use unsigned::{SqlU64, unsigned};
 
 use crate::{
     ApiError, Result,
@@ -93,7 +95,7 @@ impl Store {
                 snapshot
                     .query_row("SELECT 1 FROM games LIMIT 1", [], |_| Ok(()))
                     .optional()?;
-                snapshot.backup(MAIN_DB, &staged, None)?;
+                snapshot.backup(MAIN_DB, &staged, None::<fn(rusqlite::backup::Progress)>)?;
             }
             {
                 let copy = Connection::open(&staged)?;
@@ -146,7 +148,7 @@ impl Store {
             .query_map([], |row| {
                 Ok((
                     row.get(0)?,
-                    row.get(1)?,
+                    unsigned(row, 1)?,
                     row.get::<_, Vec<u8>>(2)?,
                     row.get::<_, Vec<u8>>(3)?,
                 ))
@@ -170,12 +172,17 @@ impl Store {
         let tx = db.transaction().map_err(ApiError::internal)?;
         tx.execute(
             "INSERT INTO games (id, revision, credentials, checkpoint) VALUES (?1, ?2, ?3, ?4)",
-            params![game.id, game.revision, encode(&game.credentials)?, snapshot],
+            params![
+                game.id,
+                SqlU64(game.revision),
+                encode(&game.credentials)?,
+                snapshot
+            ],
         )
         .map_err(ApiError::internal)?;
         tx.execute(
             "INSERT INTO replay_starts (game_id, revision, checkpoint) VALUES (?1, ?2, ?3)",
-            params![game.id, game.revision, snapshot],
+            params![game.id, SqlU64(game.revision), snapshot],
         )
         .map_err(ApiError::internal)?;
         tx.commit().map_err(ApiError::internal)
@@ -250,7 +257,7 @@ impl Store {
         let count = tx
             .execute(
                 "UPDATE games SET revision=?1, checkpoint=?2 WHERE id=?3 AND revision=?4",
-                params![revision, snapshot, game, previous],
+                params![SqlU64(revision), snapshot, game, SqlU64(previous)],
             )
             .map_err(ApiError::internal)?;
         if count != 1 {
@@ -264,7 +271,7 @@ impl Store {
         }
         tx.execute(
             "INSERT INTO replay_entries (game_id, revision, entry, history) VALUES (?1, ?2, ?3, ?4)",
-            params![game, revision, entry, history],
+            params![game, SqlU64(revision), entry, history],
         )
         .map_err(ApiError::internal)?;
         tx.commit().map_err(ApiError::internal)
@@ -284,7 +291,7 @@ impl Store {
                 "INSERT INTO reported_replays (game_id, revision, archive) VALUES (?1, ?2, ?3)
              ON CONFLICT(game_id) DO UPDATE SET revision=excluded.revision, archive=excluded.archive
              WHERE reported_replays.revision < excluded.revision",
-                params![game, archive.revision, encoded],
+                params![game, SqlU64(archive.revision), encoded],
             )
             .map_err(ApiError::internal)?;
         Ok(())
@@ -328,10 +335,10 @@ impl Store {
                 .query_map([], |row| {
                     Ok((
                         row.get::<_, String>(0)?,
-                        row.get::<_, u64>(1)?,
+                        unsigned(row, 1)?,
                         row.get::<_, String>(2)?,
                         row.get::<_, String>(3)?,
-                        row.get::<_, Option<u64>>(4)?,
+                        row.get::<_, Option<SqlU64>>(4)?.map(|value| value.0),
                     ))
                 })
                 .map_err(ApiError::internal)?
@@ -365,8 +372,8 @@ impl Store {
             .query_map([], |row| {
                 Ok(json!({
                     "token": row.get::<_, String>(0)?, "game_id": row.get::<_, String>(1)?,
-                    "total_decisions": row.get::<_, u64>(2)?, "created_at": row.get::<_, Option<u64>>(3)?,
-                    "size_bytes": row.get::<_, u64>(4)?, "engine": "rust",
+                    "total_decisions": unsigned(row,2)?, "created_at": row.get::<_,Option<SqlU64>>(3)?.map(|value|value.0),
+                    "size_bytes": unsigned(row,4)?, "engine": "rust",
                 }))
             })
             .map_err(ApiError::internal)?
@@ -407,13 +414,13 @@ impl Store {
         let tx = db.transaction().map_err(ApiError::internal)?;
         tx.execute(
             "INSERT INTO replay_shares (token, game_id, total, metadata, created_at) VALUES (?1, ?2, ?3, ?4, unixepoch())",
-            params![token, game, share.total, metadata],
+            params![token, game, SqlU64(share.total), metadata],
         )
         .map_err(ApiError::internal)?;
         for (start, gzip) in share.groups {
             tx.execute(
                 "INSERT INTO replay_share_groups (token, start, gzip) VALUES (?1, ?2, ?3)",
-                params![token, start, gzip],
+                params![token, SqlU64(start), gzip],
             )
             .map_err(ApiError::internal)?;
         }
@@ -447,7 +454,7 @@ impl Store {
             .query_row(
                 "SELECT total FROM replay_shares WHERE token=?1",
                 [token],
-                |row| row.get(0),
+                |row| unsigned(row, 0),
             )
             .optional()
             .map_err(ApiError::internal)?
@@ -455,7 +462,7 @@ impl Store {
         let start = seek.group_start(total, metadata.as_ref());
         db.query_row(
             "SELECT gzip FROM replay_share_groups WHERE token=?1 AND start=?2",
-            params![token, start],
+            params![token, SqlU64(start)],
             |row| row.get(0),
         )
         .map_err(ApiError::internal)
@@ -468,7 +475,7 @@ impl Store {
             .query_row(
                 "SELECT revision FROM replay_starts WHERE game_id=?1",
                 [game],
-                |row| row.get(0),
+                |row| unsigned(row, 0),
             )
             .optional()
             .map_err(ApiError::internal)?
@@ -481,7 +488,7 @@ impl Store {
             .query_row(
                 "SELECT revision FROM replay_starts WHERE game_id=?1",
                 [game],
-                |row| row.get(0),
+                |row| unsigned(row, 0),
             )
             .optional()
             .map_err(ApiError::internal)?
@@ -494,7 +501,7 @@ impl Store {
             .map_err(ApiError::internal)?;
         let first = start.max(revision.saturating_sub(replay::MAX_STEPS as u64));
         let rows = query
-            .query_map(params![game, first, revision], |row| {
+            .query_map(params![game, SqlU64(first), SqlU64(revision)], |row| {
                 Ok((row.get::<_, Vec<u8>>(0)?, row.get::<_, Option<Vec<u8>>>(1)?))
             })
             .map_err(ApiError::internal)?;
@@ -532,7 +539,7 @@ impl Store {
              FROM replay_starts JOIN games ON games.id = replay_starts.game_id
              WHERE game_id=?1",
                 [game],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                |row| Ok((unsigned(row, 0)?, unsigned(row, 1)?, row.get(2)?)),
             )
             .optional()
             .map_err(ApiError::internal)?

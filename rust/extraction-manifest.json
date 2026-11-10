@@ -55,7 +55,9 @@
         "rust/tools/requirements.lock",
         "rust/tests/baselines/**/*",
         "rust/benchmarks/*.json",
-        "rust/verification-gates.json"
+        "rust/verification-gates.json",
+        "rust/tests/compatibility/**/*",
+        "rust/deny.toml"
       ],
       "destination": "same path",
       "consumer": "native development, quick/contract suites, documentation",

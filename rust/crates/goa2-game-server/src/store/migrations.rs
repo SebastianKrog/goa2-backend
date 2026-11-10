@@ -50,6 +50,7 @@ fn add_column(tx: &Transaction<'_>, table: &str, column: &str, kind: &str) -> ru
 
 #[cfg(test)]
 mod tests {
+    use super::super::unsigned::unsigned;
     use super::*;
 
     #[test]
@@ -89,7 +90,7 @@ mod tests {
                     .query_row(
                         "SELECT revision,credentials,checkpoint FROM games",
                         [],
-                        |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+                        |r| Ok((unsigned(r, 0)?, r.get(1)?, r.get(2)?)),
                     )
                     .unwrap();
                 assert_eq!(row, (7, vec![1, 2], vec![3, 4]));
@@ -112,7 +113,7 @@ mod tests {
         apply(&mut db).unwrap();
         let row: (u64, Vec<u8>) = db
             .query_row("SELECT revision,checkpoint FROM replay_starts", [], |r| {
-                Ok((r.get(0)?, r.get(1)?))
+                Ok((unsigned(r, 0)?, r.get(1)?))
             })
             .unwrap();
         assert_eq!(row, (9, vec![2]));

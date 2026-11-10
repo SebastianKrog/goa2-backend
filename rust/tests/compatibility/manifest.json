@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "producer_commit": "f0fb93e117f358266ef522e6d5f23d3452e83e97",
+  "producer_binary_sha256": "905053e527fb7c438a41f1b9b6ce7f8a379facd6e6ddd35ef075926a7d01aac1",
+  "content_sha256": "69ce2e47927eab8427fa8c2932f369044a30297716f1a4402a1ba6e1673c3ee2",
+  "payload": {
+    "path": "legacy-v0.json.gz",
+    "sha256": "62de2b35b1aae6899a960a53707fdbdbad7696d8d1aa94291951fc485591e3ad",
+    "gzip_sha256": "16653d1cdb4a81d8fba3431b6a0a4bf8440c3a9d1abe5394f6d70ed07a8238a4",
+    "bytes": 2993700
+  },
+  "checkpoint_version": 1,
+  "replay_schema": 1,
+  "database_versions": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "stage_provenance": {
+    "0": "Actual pre-versioning producer database; implicit optional columns retained.",
+    "1": "Synthetic numbered migration intermediate: omit history/created_at columns.",
+    "2": "Synthetic numbered migration intermediate: retain history, omit created_at.",
+    "3": "Same producer rows at current schema version; no gameplay regeneration."
+  },
+  "redistribution": "Synthetic test archive; separate public rights/payload decision remains C01/C07.",
+  "contains_real_credentials": false,
+  "contains_real_matches": false,
+  "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+  "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+  "producer_toolchain": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+  "producer_profile": "iterate",
+  "producer_source_archive_sha256": "2babcb98467da23baca51cec3e369d3995df87ad6d1bc2a159b2cc81ac7588a0"
+}

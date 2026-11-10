@@ -64,11 +64,18 @@ jobs:
           python -m ruff check --select E,F,I --ignore E501 rust/tools rust/tests/tooling scripts/rust_oracle/pinned_source.py scripts/rust_oracle/run_pinned.py scripts/rust_verification scripts/verify_rust_game_server.py
       - name: Test fixture, archive and content acquisition
         run: python -m pytest -q rust/tests/tooling tests/rust_oracle/test_fixture_cache.py
+      - name: Install pinned dependency scanner
+        working-directory: rust
+        run: cargo install cargo-deny --version 0.20.2 --locked --root "${{ runner.temp }}/cargo-deny"
+      - name: Check locked dependency advisories and licenses
+        run: python rust/tools/dependency_review.py --scanner "${{ runner.temp }}/cargo-deny/bin/cargo-deny" --output "${{ runner.temp }}/dependency-review.json"
       - name: Build native service
         working-directory: rust
         run: cargo build --locked -p goa2-game-server
       - name: Run all disposable service contracts
         run: python scripts/verify_rust_game_server.py rust/target/debug/goa2-game-server rust/content/smoke-game.json
+      - name: Verify admitted historical reader matrix
+        run: python rust/tools/historical_compatibility.py verify --binary rust/target/debug/goa2-game-server --content rust/content/smoke-game.json
   full-parity:
     needs: [scope, native]
     if: needs.scope.outputs.full == 'true'
@@ -131,3 +138,14 @@ jobs:
           for gate in setup-parity view-parity timed-bot-native simulation-benchmark strength-baseline hosted-local-contract hosted-staging-readonly; do
             python rust/tools/gates.py run "$gate" --report "${gate}-result.json"
           done
+  cold-native:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the pinned compiler and components
+        working-directory: rust
+        run: rustup show active-toolchain
+      - name: Acquire dependencies and verify without warm project caches
+        run: python3 rust/tools/cold_build.py --work "${{ runner.temp }}/goa2-cold" --report "${{ runner.temp }}/goa2-cold-result.json"

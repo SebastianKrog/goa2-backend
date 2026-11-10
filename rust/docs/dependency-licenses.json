@@ -1,5 +1,5 @@
 {
-  "cargo_lock_sha256": "9a9d6c4cdaf0e43e08facc3dbf537abd56557a1a8b64ca51da4abb6b6c33d80d",
+  "cargo_lock_sha256": "8ad64f41089cbdeea24a8b7c197108eafdb164844a8eb259472d7c2fdc6564ee",
   "scope": "Metadata inventory only; not an advisory scan or a rights approval.",
   "packages": [
     {
@@ -136,12 +136,6 @@
     },
     {
       "name": "foldhash",
-      "version": "0.1.5",
-      "license": "Zlib",
-      "source": "registry+https://github.com/rust-lang/crates.io-index"
-    },
-    {
-      "name": "foldhash",
       "version": "0.2.0",
       "license": "Zlib",
       "source": "registry+https://github.com/rust-lang/crates.io-index"
@@ -195,10 +189,22 @@
       "source": "registry+https://github.com/rust-lang/crates.io-index"
     },
     {
-      "name": "hashbrown",
-      "version": "0.15.5",
-      "license": "MIT OR Apache-2.0",
-      "source": "registry+https://github.com/rust-lang/crates.io-index"
+      "name": "goa2-core",
+      "version": "0.1.0",
+      "license": "MIT",
+      "source": null
+    },
+    {
+      "name": "goa2-game-server",
+      "version": "0.1.0",
+      "license": "MIT",
+      "source": null
+    },
+    {
+      "name": "goa2-search-cli",
+      "version": "0.1.0",
+      "license": "MIT",
+      "source": null
     },
     {
       "name": "hashbrown",
@@ -208,7 +214,7 @@
     },
     {
       "name": "hashlink",
-      "version": "0.10.0",
+      "version": "0.12.2",
       "license": "MIT OR Apache-2.0",
       "source": "registry+https://github.com/rust-lang/crates.io-index"
     },
@@ -280,7 +286,7 @@
     },
     {
       "name": "libsqlite3-sys",
-      "version": "0.35.0",
+      "version": "0.39.1",
       "license": "MIT",
       "source": "registry+https://github.com/rust-lang/crates.io-index"
     },
@@ -393,8 +399,14 @@
       "source": "registry+https://github.com/rust-lang/crates.io-index"
     },
     {
+      "name": "rsqlite-vfs",
+      "version": "0.2.0",
+      "license": "MIT",
+      "source": "registry+https://github.com/rust-lang/crates.io-index"
+    },
+    {
       "name": "rusqlite",
-      "version": "0.37.0",
+      "version": "0.41.1",
       "license": "MIT",
       "source": "registry+https://github.com/rust-lang/crates.io-index"
     },
@@ -492,6 +504,12 @@
       "name": "socket2",
       "version": "0.6.5",
       "license": "MIT OR Apache-2.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index"
+    },
+    {
+      "name": "sqlite-wasm-rs",
+      "version": "0.6.3",
+      "license": "MIT",
       "source": "registry+https://github.com/rust-lang/crates.io-index"
     },
     {

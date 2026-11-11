@@ -1,4 +1,5 @@
 use super::*;
+use std::sync::atomic::AtomicBool;
 #[test]
 fn dense_candidate_count_cleans_null_before_selector_or_query_output() {
     for kind in ["select_step", "multi_select", "count"] {

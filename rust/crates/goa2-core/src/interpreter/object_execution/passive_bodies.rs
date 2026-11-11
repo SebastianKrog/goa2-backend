@@ -59,6 +59,7 @@ pub(super) struct Recipe {
     pub(super) step: StepRecipe,
     pub(super) topology_anchor: Option<(Symbol, ObjectId)>,
     pub(super) objects: Vec<(Vec<ObjectSlot>, ObjectKind)>,
+    pub(super) primary_operands: Vec<super::primary_operands::Binding>,
     pub(super) raw_card_bindings: Vec<Vec<ObjectSlot>>,
     imports: Vec<(Vec<ObjectSlot>, usize, Vec<ObjectSlot>)>,
     range: Option<Vec<ObjectSlot>>,
@@ -66,6 +67,18 @@ pub(super) struct Recipe {
     programs: Vec<(Vec<ObjectSlot>, usize)>,
 }
 impl Recipe {
+    pub(super) fn compile_primary(
+        row: &Value,
+        steps: &mut Vec<CompiledStep>,
+        symbols: &mut Symbols,
+    ) -> Result<Self> {
+        let mut row = row.clone();
+        let operands = super::primary_operands::extract(&mut row["fields"], symbols)?;
+        let mut recipe = Self::compile(&row, steps, symbols)?;
+        recipe.primary_operands = operands;
+        Ok(recipe)
+    }
+
     pub(super) fn compile(
         row: &Value,
         steps: &mut Vec<CompiledStep>,
@@ -152,6 +165,7 @@ impl Recipe {
             },
             objects,
             topology_anchor: None,
+            primary_operands: Vec::new(),
             raw_card_bindings: Vec::new(),
             imports,
             range,

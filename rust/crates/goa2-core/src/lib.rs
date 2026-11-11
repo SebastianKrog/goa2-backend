@@ -35,6 +35,7 @@ pub mod markers;
 pub mod card_selection;
 
 pub mod primary;
+mod primary_operand;
 
 mod templates;
 

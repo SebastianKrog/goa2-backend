@@ -19,7 +19,7 @@ impl SpellBodies {
                     "../../../../../content/catalogs/spell-builders.json"
                 ))
                 .map_err(|e| e.to_string())?;
-                if data["schema_version"] != 1
+                if data["schema_version"] != 2
                     || data["source_sha256"] != crate::codec::oracle_manifest()?["source_sha256"]
                 {
                     return Err("spell builder source identity mismatch".into());
@@ -38,7 +38,7 @@ impl SpellBodies {
                 rows.as_array()
                     .ok_or_else(|| unsupported("spell rows missing"))?
                     .iter()
-                    .map(|row| Recipe::compile(row, steps, symbols))
+                    .map(|row| Recipe::compile_primary(row, steps, symbols))
                     .collect::<Result<Vec<_>>>()?,
             );
         }

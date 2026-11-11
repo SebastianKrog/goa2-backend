@@ -734,7 +734,7 @@ def catalog():
             for name, rows in body["variants"].items()
         }
     source = {
-        "schema_version": 3,
+        "schema_version": 4,
         "source_sha256": verify_sources()["source_sha256"],
         "methods": methods,
         "spell_effects": sorted(CardEffectRegistry._spell_effects),
@@ -754,6 +754,13 @@ def catalog():
         },
         "default_method": CardEffect.build_steps.__qualname__,
     }
+    from primary_operand_wire import encode_primary_operands
+
+    source = encode_primary_operands(
+        source, primary=PRIMARY, range_=RANGE, radius=RADIUS,
+        primary_plus_two=1234568102,
+        radius_or_zero=1234568103, primary_plus_three=1234568104,
+    )
     return {**source, "catalog_sha256": digest(source)}
 
 

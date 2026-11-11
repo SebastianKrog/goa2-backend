@@ -34,20 +34,20 @@
     },
     {
       "path": "catalogs/primary-effects.json",
-      "sha256": "403eaef064d67307849ddb9165157f557ca657d86a54a304dd2bb5a79098ab14",
-      "schema_version": 2,
-      "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43"
-    },
-    {
-      "path": "catalogs/primary-builders.json",
-      "sha256": "8b1dde928783d9c2d91703b7dc1c83618ca672fe18c4e35e02562eeabf177865",
+      "sha256": "095f7d4002fc1b19c2c6b52037fe9ad1a103df6d888bd1f70187e67505353d70",
       "schema_version": 3,
       "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43"
     },
     {
+      "path": "catalogs/primary-builders.json",
+      "sha256": "17da93d5b6c5138496152bc8e14c3caa0a94dc2f9b1e1f361727959b1df38329",
+      "schema_version": 4,
+      "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43"
+    },
+    {
       "path": "catalogs/spell-builders.json",
-      "sha256": "6116a09d3c6c4c45985209ace3350de719bd6eb7f3fa17ecb736756d228e82b1",
-      "schema_version": 1,
+      "sha256": "4b895923b54885c96280ab0f647e899e0ce82417f409a6099a0b99fc104c220e",
+      "schema_version": 2,
       "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43"
     }
   ]

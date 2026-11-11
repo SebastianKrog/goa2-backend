@@ -150,11 +150,7 @@ impl NativeSession {
         let marker_rules = MarkerRules::compile(&mut symbols);
         let attack_rules = AttackRules::compile(&mut symbols);
         let action_rules = ActionRules::compile(&mut symbols);
-        let primary_operands = PrimaryOperands::compile_with_live(
-            &mut symbols,
-            object_execution::primary_operand_catalog()?,
-        )
-        .map_err(unsupported)?;
+        let primary_operands = PrimaryOperands::compile(&mut symbols).map_err(unsupported)?;
         let reaction_rules = Arc::new(ReactionRules::compile(&mut symbols).map_err(unsupported)?);
         let mut context_items = Vec::new();
         for (key, value) in raw["execution_context"]
@@ -819,7 +815,7 @@ impl NativeSession {
                         let mut wire = self.steps[frame.instruction].wire.clone();
                         if let Some(values) = frame.effect.as_ref().and_then(|e| e.primary.as_ref())
                         {
-                            values.patch_wire(&mut wire, &self.symbols, &self.primary_operands);
+                            values.patch_wire(&mut wire, &self.symbols, &self.primary_operands).map_err(unsupported)?;
                             if matches!(&self.steps[frame.instruction].instruction,Instruction::Attack{spec,..} if spec.card_ranged){wire["is_ranged"]=json!(values.ranged);}
                         }
                         if let Some(cont)=&frame.continuation {patch_continuation(&mut wire,cont,&self.symbols);}
@@ -1074,9 +1070,9 @@ impl NativeSession {
                         ) {
                             wire["current_index"] = json!(frame.index);
                         }
-                        wire
+                        Ok(wire)
                     })
-                    .collect(),
+                    .collect::<Result<Vec<_>>>()?,
             ),
         );
         self.boundary.export(&mut source.state, &self.symbols);

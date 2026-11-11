@@ -73,3 +73,26 @@ response identified all 33 heroes and six maps, and a game creation request
 returned HTTP 201. The binary and pack identities are recorded in the
 [cleanup evidence](cleanup-evidence.json). C02-04 remains open for the approved
 distribution route.
+
+## Primary recipe operands
+
+The primary effect catalog uses schema version 3. The live primary builder
+catalog uses schema version 4, and the spell builder catalog uses schema version
+2. Generated numeric operands use a single-key
+object with a `$operand` property, for example
+`{"$operand":{"kind":"primary_add","amount":2}}`. Plain numbers represent
+literal values. The operand object is restricted to recipe generation and
+compilation. Game snapshots continue to carry resolved values.
+
+| Kind | Resolution |
+| --- | --- |
+| `primary` | The card's primary value. |
+| `primary_add` | The primary value plus the signed `amount`, with overflow rejected. |
+| `range` | The card's range, including zero or negative values. |
+| `range_or_default` | The card's range, with zero replaced by the recipe's `default`. |
+| `radius` | The card's optional radius. A required numeric field rejects an absent radius. |
+| `radius_or_zero` | The card's radius, with an absent radius replaced by zero. |
+| `radius_or_default` | The card's radius, with an absent or zero radius replaced by the recipe's `default`. |
+
+Use `python rust/tools/primary_operand_parity.py LEGACY_CATALOGS CANDIDATE_CATALOGS`
+to compare the new catalogs against their frozen numeric predecessors.

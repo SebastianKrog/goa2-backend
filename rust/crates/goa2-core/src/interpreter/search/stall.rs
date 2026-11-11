@@ -1,4 +1,5 @@
-use super::{EntityKind, NativeSession, SearchEvaluation, Symbol};
+use super::{NativeSession, SearchEvaluation, Symbol};
+use crate::world::EntityKind;
 
 impl NativeSession {
     pub(super) fn stall_pressure(&self, evaluation: SearchEvaluation, team: Symbol) -> Option<f64> {

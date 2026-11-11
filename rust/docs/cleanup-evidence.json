@@ -1999,5 +1999,19 @@
     },
     "log_sha256": "0694eabbaf0ec015d45468f14949b9d9b1940379a8ba91bb68012f9ec45c8798",
     "scope": "The verified release migrated and advanced a disposable database, then the rebuilt historical binary reopened its matching pre-upgrade backup and continued play. The original admitted archive was verified independently with the current reader. The original producer executable was unavailable; its hash did not match this rebuild."
+  },
+  "merged_import_refactor_static_audit": {
+    "candidate": "ed24857c0fd4474a65d4f7268f2a767a42a32e28",
+    "local_links": 192,
+    "payload_files": 1202,
+    "embedded_inputs": 46,
+    "cargo_path_dependencies": 2,
+    "findings": 0,
+    "report_sha256": {
+      "documentation": "5165b6e28b0dfcb430bd1cc55984c79c83c8337aa5079973fd14e0c3a380007d",
+      "payload": "3ad325698d241eb4e6cff4055354b4dbc6d4ed363b89ba4c8b6afe8b792d1aff",
+      "dependency": "a546f683fad019e379a1aea643620735ba20fac145fe36f497b3eca4be780189"
+    },
+    "scope": "Static audit of the local extraction selection. Remote links and external boundaries require their own verification. Rights and final public payload approval remain separate."
   }
 }

@@ -1552,5 +1552,69 @@
     "log_sha256": "da8a819977c82d42943c282f7f319866d85a98d8e5027a8d0c554eca4ea19db5",
     "result_sha256": "e77f7346af5a680a0ebd6d0b668afda55b9448b71008ea4767cfd0586f98f7f0",
     "scope": "Full differential parity. Exhaustive boundary restore is a separate run."
+  },
+  "combined_candidate_exhaustive_restore": {
+    "candidate": "ebd520350dba4e4ba73e18f6d192115791fc28db",
+    "source_identity": "cd56d7f827fc145c86bc825ee20d3d4007be17883e803c33f86a2f932ffdb07c",
+    "cases": 17347,
+    "shards": [
+      {
+        "shard": 1,
+        "cases": 2169,
+        "test_seconds": 289.22,
+        "log_sha256": "0d5588bad65bb8683fafb2511907605a7cc91debcf7cb7ee1dac059465d36494",
+        "result_sha256": "77ccb3f13f358720e1b975c9beea4f0042a0c230d6bb5d34fb823ced0726cb06"
+      },
+      {
+        "shard": 2,
+        "cases": 2169,
+        "test_seconds": 250.11,
+        "log_sha256": "e9d2ebea812c4897debb723f14872882c1635d44aa5ea680e917babe21ef0776",
+        "result_sha256": "12a77aac73f1617627b8d4854de9938f7c41dda4b2ce50394de36a6b654c1202"
+      },
+      {
+        "shard": 3,
+        "cases": 2169,
+        "test_seconds": 247.56,
+        "log_sha256": "a14f0d03e1138c76ad16130f15be63718fd863c32650c101e21c1281b40e962d",
+        "result_sha256": "5cb9dc8abdb6650a71d50f8ff004c16c62c3da9d55c8bca392b166ecf1551d46"
+      },
+      {
+        "shard": 4,
+        "cases": 2168,
+        "test_seconds": 254.85,
+        "log_sha256": "2c296d4abb785d993f1bf77799dda0a626756060246fe4431cb17d18db2d6e0c",
+        "result_sha256": "dc8d8d7f76c11d1409c21e1f52d3e3f4b6af401b5acc4a1288168eff59a8e113"
+      },
+      {
+        "shard": 5,
+        "cases": 2168,
+        "test_seconds": 243.27,
+        "log_sha256": "76d84b11beb4cc4cb453e1a46ae5a27e23f7dc4e99084dd1a5e307f9d0c41c4a",
+        "result_sha256": "c2ed288efa4f60aaf07f47495c7535f6671a02b8b241ab6326526ac5bd06a2b6"
+      },
+      {
+        "shard": 6,
+        "cases": 2168,
+        "test_seconds": 243.82,
+        "log_sha256": "91156ce4fbd66347f335de2fb0a69753da396ada0f2a1358faa2fe24daf53810",
+        "result_sha256": "53a0b23199b3ad182af058d01fab6fb3bcd3b592ef21baf99eb5da5806868e07"
+      },
+      {
+        "shard": 7,
+        "cases": 2168,
+        "test_seconds": 267.71,
+        "log_sha256": "1ef19fb3e9304e301e48d048fc20a54470eac9a4882b23f8a32b7aba2e071bb5",
+        "result_sha256": "0b87a19e32547832f91e83c407f9b29da9c1471b27589f1ca6c5263498c048db"
+      },
+      {
+        "shard": 8,
+        "cases": 2168,
+        "test_seconds": 248.7,
+        "log_sha256": "e8deba81bfbd55be017223faf5b565499b2a6d0be97980f8f4894a3ef9d42ffe",
+        "result_sha256": "0403bb64b8a8d6f1f9289bf5260933cd447094202d190b95c2c1ef8f3f086378"
+      }
+    ],
+    "result_sha256": "4e9bd4c975decad36d986b2397f3919bf3a9ab5dfb316cdf621c005645150c4a"
   }
 }

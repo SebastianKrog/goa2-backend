@@ -1,6 +1,9 @@
 //! Live UNIT/UNIT_OR_TOKEN selectors share typed targeting and sparse context.
 use super::phases::Field;
-use super::*;
+use super::{
+    BoundObjects, Datum, NativeRequest, NativeSession, ObjectId, ObjectValue, RequestChoices,
+    RequestToken, Result, Symbol, unsupported,
+};
 use crate::{
     spatial::SpatialContext,
     targeting::{Relation, UnitCandidates, UnitFilter},

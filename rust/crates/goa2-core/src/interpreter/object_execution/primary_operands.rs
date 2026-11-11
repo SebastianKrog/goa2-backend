@@ -1,6 +1,6 @@
 //! Extract operand bindings from live recipe fields before compiling the step.
 
-use super::*;
+use super::{Datum, Result, Symbols, Value, json, unsupported};
 use crate::{objects::ObjectSlot, stats::CardStats};
 
 pub(super) type Binding = (Vec<ObjectSlot>, crate::primary::Operand);

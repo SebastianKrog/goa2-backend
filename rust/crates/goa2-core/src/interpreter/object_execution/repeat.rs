@@ -1,6 +1,9 @@
 //! Repeat continuations preserve the live step and deepcopy each template root.
 use super::phases::Field;
-use super::*;
+use super::{
+    BoundObjects, Datum, NativeRequest, NativeSession, ObjectId, ObjectValue, RequestChoices,
+    RequestToken, Result, unsupported,
+};
 
 pub(super) enum RepeatPlan {
     Done,

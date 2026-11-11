@@ -1,6 +1,9 @@
 //! Live spellbook operations preserve physical spell and continuation identities.
 use super::phases::Field;
-use super::*;
+use super::{
+    BoundObjects, Datum, NativeEvent, NativeRequest, NativeSession, ObjectId, ObjectValue,
+    RequestChoices, RequestToken, Result, Symbol, unsupported,
+};
 use crate::{
     cards::CardId,
     spells::{SpellEvent, SpellOp},

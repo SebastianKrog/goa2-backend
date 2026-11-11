@@ -1,5 +1,8 @@
 //! Card corrections reuse live physical instances and preserve the deck registry.
-use super::{phases::Field, *};
+use super::{
+    BoundObjects, Datum, EngineError, NativeSession, ObjectValue, Phase, Result, Symbol,
+    phases::Field, unsupported,
+};
 use crate::{
     cards::{CardId, HeroRecord},
     interpreter::live_game::CardPatchZone,

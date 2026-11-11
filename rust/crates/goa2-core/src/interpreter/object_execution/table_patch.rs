@@ -1,5 +1,8 @@
 //! Table corrections update both dense bindings and the corresponding typed caches.
-use super::{phases::Field, *};
+use super::{
+    Arc, BoundObjects, Datum, EngineError, EntityKind, GameOutcome, Hex, NativeEvent,
+    NativeSession, ObjectValue, Phase, Result, Symbol, phases::Field, unsupported,
+};
 use crate::{
     objects::{Mutation, Target},
     stats::{MarkerKind, Stat},

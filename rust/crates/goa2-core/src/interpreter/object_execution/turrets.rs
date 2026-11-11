@@ -1,7 +1,10 @@
 //! Persistent turret models and spatial updates without token effect expiry.
 use super::phases::Field;
 use super::placement::Placement;
-use super::*;
+use super::{
+    BoundObjects, Datum, Hex, NativeEvent, NativeSession, ObjectId, ObjectKind, ObjectValue,
+    Result, Symbol, unsupported,
+};
 pub(super) enum TurretPlan {
     Fail,
     Place {

@@ -1,7 +1,10 @@
 //! Namespaced spell builders: immutable prototypes plus explicit live state operands.
 use super::passive_bodies::Recipe;
 use super::phases::Field;
-use super::*;
+use super::{
+    Arc, BoundObjects, CompiledStep, Datum, HashMap, NativeSession, ObjectValue, Result, Symbol,
+    Symbols, Value, unsupported,
+};
 use crate::{cards::CardId, stats::CardStats, world::CardLifecycle};
 use std::sync::OnceLock;
 

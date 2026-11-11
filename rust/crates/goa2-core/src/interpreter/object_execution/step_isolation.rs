@@ -1,5 +1,5 @@
 //! Reproduce GameStep's after-validator at source StepResult/AnyStep boundaries.
-use super::*;
+use super::{BoundObjects, NativeSession, ObjectId, ObjectKind, ObjectValue, Result, unsupported};
 impl NativeSession {
     fn isolate_nested_step_value(
         objects: &mut BoundObjects,

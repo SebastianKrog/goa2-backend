@@ -1,7 +1,10 @@
 //! Deferred red-card text and permanent-item conversion retain live physical data.
 use super::passive_bodies::Recipe;
 use super::phases::Field;
-use super::*;
+use super::{
+    BoundObjects, Datum, Instruction, NativeEvent, NativeSession, ObjectId, ObjectKind,
+    ObjectValue, Result, Symbol, unsupported,
+};
 use crate::{cards::CardId, stats::Stat, world::CardLifecycle};
 
 pub(super) struct ItemPlan {

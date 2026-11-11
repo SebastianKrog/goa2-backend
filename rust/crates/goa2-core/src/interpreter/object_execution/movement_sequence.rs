@@ -1,7 +1,10 @@
 //! Movement macros allocate the exact source selector/filter/move structure.
 use super::passive_bodies::Kind;
 use super::phases::Field;
-use super::*;
+use super::{
+    Arc, BoundObjects, Datum, Hex, NativeSession, ObjectId, ObjectKind, ObjectValue, Result, Stat,
+    Symbol, unsupported,
+};
 
 pub(super) struct SequencePlan {
     actor: Option<Symbol>,

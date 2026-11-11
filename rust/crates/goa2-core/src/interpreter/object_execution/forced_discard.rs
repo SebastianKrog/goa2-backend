@@ -1,6 +1,9 @@
 //! Forced discard snapshots the victim into its actual selection/discard steps.
 use super::phases::Field;
-use super::*;
+use super::{
+    Arc, BoundObjects, Datum, EngineError, NativeSession, ObjectId, ObjectValue, Result, Symbol,
+    unsupported,
+};
 
 pub(super) struct ForcedDiscardPlan {
     victim: Symbol,

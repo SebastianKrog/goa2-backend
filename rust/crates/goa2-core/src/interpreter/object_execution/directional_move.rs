@@ -1,6 +1,8 @@
 //! Snapshot-based movement for Tali's directional shifts.
 use super::phases::Field;
-use super::*;
+use super::{
+    BoundObjects, Datum, NativeEvent, NativeSession, ObjectId, ObjectValue, Result, unsupported,
+};
 use crate::{spatial::SpatialContext, validation::DisplacementKind, world::EntityKind};
 
 impl NativeSession {

@@ -1,5 +1,8 @@
 //! Opening deployment is an administrative board edit, with teammate consent.
-use super::{phases::Field, *};
+use super::{
+    Arc, Datum, EngineError, Hex, NativeSession, ObjectValue, Result, Symbol, Value, json,
+    phases::Field, unsupported,
+};
 use crate::interpreter::live_game::StartingPositionCommand;
 use std::collections::HashSet;
 

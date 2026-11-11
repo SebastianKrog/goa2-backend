@@ -1,6 +1,9 @@
 //! Sequential selection with live candidates and persistent list identity.
 use super::phases::Field;
-use super::*;
+use super::{
+    Arc, BoundObjects, Datum, NativeRequest, NativeSession, ObjectId, ObjectValue, RequestChoices,
+    RequestToken, Result, Symbol, unsupported,
+};
 use crate::{data::SparseRegisters, spatial::SpatialContext, targeting::UnitCandidates};
 
 pub(super) struct MultiSelectionPlan {

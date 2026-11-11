@@ -1,6 +1,9 @@
 //! Attack macro expansion with live history/filter aliases and source model copies.
 use super::phases::Field;
-use super::*;
+use super::{
+    BoundObjects, Datum, NativeSession, ObjectId, ObjectKind, ObjectValue, Result, Symbol,
+    unsupported,
+};
 use crate::{
     attack::{AttackSpec, AttackValues},
     objects::ObjectSlot,

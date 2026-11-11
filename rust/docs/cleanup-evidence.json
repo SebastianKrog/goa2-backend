@@ -2191,5 +2191,91 @@
       "search-merged-import-results.json": "104634a1c68e922ff07ea56a1ce6aab39eb9a24dc5d1efc4b44486bd9c975a9e"
     },
     "scope": "Fixed-work results matched. Maintenance prepare_submission timings rose on both packs across separately collected fresh-process samples. A same-session paired comparison is needed to attribute this difference."
+  },
+  "merged_import_refactor_paired_prepare_benchmark": {
+    "worker_sha256": {
+      "baseline": "0fc851d312251519ab816533664e5d3b76071760121a48ec3a082ce6f58ec1a2",
+      "merged": "5ae76d9c0e97b570442668c7e2a6a6b3334dd158d4eed41a6cecdd5ea20d805a"
+    },
+    "content": {
+      "smoke-game.json": {
+        "sha256": "69ce2e47927eab8427fa8c2932f369044a30297716f1a4402a1ba6e1673c3ee2",
+        "pairs": [
+          {
+            "baseline": 14202.99,
+            "merged": 43640.97
+          },
+          {
+            "merged": 42453.97,
+            "baseline": 13675.99
+          },
+          {
+            "baseline": 13645.99,
+            "merged": 41024.98
+          },
+          {
+            "merged": 42407.97,
+            "baseline": 14844.0
+          },
+          {
+            "baseline": 14867.99,
+            "merged": 42056.98
+          },
+          {
+            "merged": 42751.98,
+            "baseline": 13870.99
+          },
+          {
+            "baseline": 14689.99,
+            "merged": 38407.98
+          },
+          {
+            "merged": 42098.98,
+            "baseline": 15080.99
+          }
+        ],
+        "median_ratio": 2.9316430473546307
+      },
+      "live-game-content.json": {
+        "sha256": "4b7520f058d68dda93efb15837d0b657332a1a3132d37148c14a9bb2968ff651",
+        "pairs": [
+          {
+            "baseline": 14423.0,
+            "merged": 41629.97
+          },
+          {
+            "merged": 40149.98,
+            "baseline": 16252.99
+          },
+          {
+            "baseline": 14106.99,
+            "merged": 38616.98
+          },
+          {
+            "merged": 45849.97,
+            "baseline": 14305.99
+          },
+          {
+            "baseline": 14640.99,
+            "merged": 39278.97
+          },
+          {
+            "merged": 39876.97,
+            "baseline": 14177.99
+          },
+          {
+            "baseline": 14410.99,
+            "merged": 36900.97
+          },
+          {
+            "merged": 37583.98,
+            "baseline": 14713.99
+          }
+        ],
+        "median_ratio": 2.7101220866137874
+      }
+    },
+    "report_sha256": "a692ce9cd9e27f5e756127cc83bdb7cebc2b3c15bc8c2b915256ed9ab66cead8",
+    "scope": "Eight alternating fresh-process pairs per content pack using both originally measured executables. Fixed search results matched within each pair. Preparation slowdown reproduced and requires attribution."
   }
 }

@@ -171,20 +171,27 @@ fn ranked_reply_indices(
     indices
 }
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "Retain explicit search operands until the planned search API split"
-)]
+struct PlanningWorldOptions<'a> {
+    limits: SearchLimits,
+    workers: usize,
+    partition: PlanningPartition<'a>,
+    budget: &'a ExecutionBudget<'a>,
+    min_live_rows: Option<usize>,
+}
+
 fn search_planning_worlds(
     player: Symbol,
     rows: &[Vec<PlanningCommitment>],
     samples: &mut [PlanningWorld],
-    limits: SearchLimits,
-    workers: usize,
-    partition: PlanningPartition<'_>,
-    budget: &ExecutionBudget<'_>,
-    min_live_rows: Option<usize>,
+    options: PlanningWorldOptions<'_>,
 ) -> Result<PlanningSearch> {
+    let PlanningWorldOptions {
+        limits,
+        workers,
+        partition,
+        budget,
+        min_live_rows,
+    } = options;
     let mut result = PlanningSearch {
         row: 0,
         score: None,
@@ -993,18 +1000,20 @@ impl NativeSession {
                 player,
                 &rows.plans[..rows.plans.len().min(4)],
                 &mut samples,
-                SearchLimits {
-                    max_nodes: seed_allowance,
-                    max_depth: 0,
-                    ..limits
+                PlanningWorldOptions {
+                    limits: SearchLimits {
+                        max_nodes: seed_allowance,
+                        max_depth: 0,
+                        ..limits
+                    },
+                    workers: options.workers,
+                    partition: PlanningPartition {
+                        future_branching: Some(false),
+                        ..partition
+                    },
+                    budget: &seed_budget,
+                    min_live_rows: None,
                 },
-                options.workers,
-                PlanningPartition {
-                    future_branching: Some(false),
-                    ..partition
-                },
-                &seed_budget,
-                None,
             )?;
             seed_used = seed.nodes;
             if seed.score.is_some() {
@@ -1045,11 +1054,13 @@ impl NativeSession {
                 player,
                 &rows.plans,
                 &mut samples,
-                deep_limits,
-                options.workers,
-                partition,
-                &deep_budget,
-                live_incumbent.map(|_| 4),
+                PlanningWorldOptions {
+                    limits: deep_limits,
+                    workers: options.workers,
+                    partition,
+                    budget: &deep_budget,
+                    min_live_rows: live_incumbent.map(|_| 4),
+                },
             )?
         };
         // A seed winner was moved to row zero. Keep it only when no deep
@@ -1064,19 +1075,21 @@ impl NativeSession {
                 player,
                 &rows.plans[..rows.plans.len().min(4)],
                 &mut samples,
-                SearchLimits {
-                    max_nodes: shallow_nodes,
-                    max_depth: 0,
-                    ..limits
+                PlanningWorldOptions {
+                    limits: SearchLimits {
+                        max_nodes: shallow_nodes,
+                        max_depth: 0,
+                        ..limits
+                    },
+                    workers: options.workers,
+                    partition: PlanningPartition {
+                        rollout_turns: None,
+                        future_branching: Some(false),
+                        ..partition
+                    },
+                    budget,
+                    min_live_rows: None,
                 },
-                options.workers,
-                PlanningPartition {
-                    rollout_turns: None,
-                    future_branching: Some(false),
-                    ..partition
-                },
-                budget,
-                None,
             )?;
             shallow_used = shallow.nodes;
             matrix.nodes += shallow_used;

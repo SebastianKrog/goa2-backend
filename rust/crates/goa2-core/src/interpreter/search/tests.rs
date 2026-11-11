@@ -1666,24 +1666,26 @@ fn multi_world_planning_prunes_rows_that_can_only_tie_a_win() {
         player,
         &rows,
         &mut samples,
-        SearchLimits {
-            max_depth: 0,
-            max_nodes: 2,
-            opponent_policy: OpponentPolicy::Adversarial,
-            evaluation: SearchEvaluation::MaterialPosition,
+        PlanningWorldOptions {
+            limits: SearchLimits {
+                max_depth: 0,
+                max_nodes: 2,
+                opponent_policy: OpponentPolicy::Adversarial,
+                evaluation: SearchEvaluation::MaterialPosition,
+            },
+            workers: 1,
+            partition: PlanningPartition {
+                rollout_turns: None,
+                controlled: None,
+                shared_nodes: None,
+                greedy_forecasts: &[],
+                future_branching: None,
+                legacy_fixed_followup: false,
+                fixed_opponent_seed: None,
+            },
+            budget: &ExecutionBudget::default(),
+            min_live_rows: None,
         },
-        1,
-        PlanningPartition {
-            rollout_turns: None,
-            controlled: None,
-            shared_nodes: None,
-            greedy_forecasts: &[],
-            future_branching: None,
-            legacy_fixed_followup: false,
-            fixed_opponent_seed: None,
-        },
-        &ExecutionBudget::default(),
-        None,
     )
     .unwrap();
     assert_eq!(result.row, 0);

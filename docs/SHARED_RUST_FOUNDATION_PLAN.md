@@ -462,7 +462,7 @@ the foundation implementation only when its evidence exists.
 | Order | Plan | Foundation handoff | Reserved decisions |
 | --- | --- | --- | --- |
 | 1 | Shared foundation — this document | Current identity, observation/decision/command, transitions, features, budgets and harness | Implement F01–F08 |
-| 2 | Player-run bot client — to write next | Observation-only native agent, transport and host contracts | Native packaging/platforms, authentication/seat delegation, reconnect, disconnect/fallback policy, browser/WASM product decision |
+| 2 | [Player-run bot client](CLIENT_SIDE_BOT_EXECUTION_PLAN.md) — plan written; implementation pending | Observation-only native agent, transport and host contracts | Three stages: native Rust client, browser WASM, then local neural inference gated on the full NN implementation |
 | 3 | Live-server database integration — pending | Private checkpoint and transactional acceptance/recovery contract | Backend choice, schema/queries, retention, game loading, backups, deployment, multi-instance ownership and notifications |
 | 4 | Neural-search preparation — pending | Features, geometry, value/policy seam, sampled worlds and measured search boundaries | Data structures/optimization, NNUE versus hex convolution/graph experiments, incremental evaluation, search/training objectives and promotion evidence |
 | 5 | Rules/oracle/Python updates — reminder after plans 1–4 are written | Artifact/version identities and current-game compatibility boundary | Source-of-truth changes, rule corrections, oracle/runtime updates, regeneration, current-game transition policy and release validation |

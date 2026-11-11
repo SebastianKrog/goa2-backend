@@ -1829,5 +1829,92 @@
       "release-profile-game-server.log": "d3fefacf64e1797c206ecffef31161b36e348eb0f1da0592d52eebf5477ee6ea",
       "release-profile-replay-share.log": "1bb8d9f9a67d3d0562488e4dd5dc7039b2a5211e99e99f20230ec0de4f9c5079"
     }
+  },
+  "merged_candidate_release_package_and_startup": {
+    "candidate": "33e7e8bdb0a1d7cb2d4d10c6d8f4b2f0d9c78bbe",
+    "archive_sha256": "8eec8b4b74e3924ec7afdb337dd05b55c94e168b538e3e46c6117a4fa8490fb5",
+    "deterministic": true,
+    "service": {
+      "engine": "rust",
+      "server_version": "0.1.0",
+      "rules_version": 9,
+      "target_arch": "x86_64",
+      "target_os": "linux",
+      "binary_sha256": "6aedaa7f4504196b0ec32c9a009c89f29dfc4cf91161257ce791ce4abe51bd4f",
+      "content_sha256": "4b7520f058d68dda93efb15837d0b657332a1a3132d37148c14a9bb2968ff651",
+      "content": {
+        "version": 1,
+        "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+        "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+        "map_count": 6,
+        "hero_count": 33
+      }
+    },
+    "historical_reader_check_passed": true,
+    "historical_reader_log_sha256": "03889f60fa827217e59dab156bb3dd913836949ee48e8bd7e9561eb4aae7ce4f",
+    "startup": {
+      "candidate": "33e7e8bdb0a1d7cb2d4d10c6d8f4b2f0d9c78bbe",
+      "archive_sha256": "8eec8b4b74e3924ec7afdb337dd05b55c94e168b538e3e46c6117a4fa8490fb5",
+      "health": {
+        "engine": "rust",
+        "server_version": "0.1.0",
+        "rules_version": 9,
+        "target_arch": "x86_64",
+        "target_os": "linux",
+        "binary_sha256": "6aedaa7f4504196b0ec32c9a009c89f29dfc4cf91161257ce791ce4abe51bd4f",
+        "content_sha256": "4b7520f058d68dda93efb15837d0b657332a1a3132d37148c14a9bb2968ff651",
+        "content": {
+          "version": 1,
+          "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+          "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+          "map_count": 6,
+          "hero_count": 33
+        },
+        "ok": true
+      },
+      "empty_home_and_database": true
+    },
+    "historical_reader": {
+      "producer_commit": "f0fb93e117f358266ef522e6d5f23d3452e83e97",
+      "matrix": [
+        {
+          "source_database_version": 0,
+          "consumer_database_version": 3,
+          "expected": 1,
+          "executed": 1,
+          "failed": 0,
+          "scope": "load/scopes/links/receipt/replay/share/command/event-order/restart/retry/rollback"
+        },
+        {
+          "source_database_version": 1,
+          "consumer_database_version": 3,
+          "expected": 1,
+          "executed": 1,
+          "failed": 0,
+          "scope": "load/scopes/links/receipt/replay/share/command/event-order/restart/retry/rollback"
+        },
+        {
+          "source_database_version": 2,
+          "consumer_database_version": 3,
+          "expected": 1,
+          "executed": 1,
+          "failed": 0,
+          "scope": "load/scopes/links/receipt/replay/share/command/event-order/restart/retry/rollback"
+        },
+        {
+          "source_database_version": 3,
+          "consumer_database_version": 3,
+          "expected": 1,
+          "executed": 1,
+          "failed": 0,
+          "scope": "load/scopes/links/receipt/replay/share/command/event-order/restart/retry/rollback"
+        }
+      ],
+      "future_database_rejected_without_mutation": true,
+      "rollback": null,
+      "full_frozen_parity": false
+    },
+    "historical_verifier_commit": "1d7c1d39",
+    "scope": "Local deterministic Linux release packaging and loopback startup from that archive. Public acquisition, release promotion and binary rollback are separate."
   }
 }

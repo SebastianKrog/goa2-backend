@@ -1,4 +1,4 @@
-use super::*;
+use super::{diagnostics::PlanningPair, *};
 use crate::interpreter::{NativeRequest, RequestToken};
 
 #[test]

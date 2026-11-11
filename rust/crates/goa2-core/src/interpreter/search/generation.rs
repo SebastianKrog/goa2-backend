@@ -174,9 +174,6 @@ impl NativeSession {
         Ok(choices)
     }
 
-    /// Search generated plans on one clean sampled world. The returned
-    /// commitment belongs to the requesting hero and is valid on the live root.
-
     pub(in crate::interpreter) fn order_movement_roots(
         &self,
         player: Symbol,

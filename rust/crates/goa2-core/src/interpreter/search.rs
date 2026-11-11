@@ -318,6 +318,8 @@ fn search_planning_worlds(
 pub(super) const WIN: i64 = 1_000_000;
 
 impl NativeSession {
+    /// Search generated plans on one clean sampled world. The returned
+    /// commitment belongs to the requesting hero and is valid on the live root.
     pub fn search_sampled_planning(
         &self,
         player: Symbol,

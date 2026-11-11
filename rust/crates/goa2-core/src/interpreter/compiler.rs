@@ -155,8 +155,10 @@ fn compile_primary_program(
     symbols: &mut Symbols,
 ) -> Result<PrimaryProgram> {
     let source = crate::primary::catalog().map_err(unsupported)?;
+    let compiled = crate::primary::compiled_catalog().map_err(unsupported)?;
     let mut bodies = Vec::new();
-    for (name, wires) in source["recipes"]
+    for (name, wires) in compiled
+        .recipes
         .as_object()
         .ok_or_else(|| unsupported("primary recipes missing"))?
     {
@@ -187,12 +189,12 @@ fn compile_primary_program(
     }
     let mut movement = combat_template("movement_sequence")?;
     movement["unit_id"] = json!(crate::primary::HERO);
-    movement["range_val"] = json!(crate::primary::PRIMARY);
+    movement["range_val"] = json!(compiled.primary);
     movement["range_stat_type"] = Value::Null;
     let movement = compile_step(&movement, steps, symbols)?;
     let mut attack = combat_template("attack_sequence")?;
-    attack["damage"] = json!(crate::primary::PRIMARY);
-    attack["range_val"] = json!(crate::primary::RANGE);
+    attack["damage"] = json!(compiled.primary);
+    attack["range_val"] = json!(compiled.range);
     attack["damage_stat_type"] = Value::Null;
     attack["range_stat_type"] = Value::Null;
     let attack = compile_step(&attack, steps, symbols)?;

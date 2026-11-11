@@ -5,9 +5,6 @@ use super::*;
 use crate::{objects::ObjectSlot, world::ActionKind};
 use std::sync::OnceLock;
 
-const RADIUS_OR_ZERO: i64 = 1234568103;
-const PRIMARY_PLUS_THREE: i64 = 1234568104;
-
 #[derive(Clone, Debug)]
 pub(super) struct PrimaryRules {
     methods: HashMap<Symbol, Symbol>,
@@ -84,7 +81,7 @@ pub(super) fn catalog() -> Result<&'static Value> {
             "../../../../../content/catalogs/primary-builders.json"
         ))
         .map_err(|e| e.to_string())?;
-        if data["schema_version"] != 3
+        if data["schema_version"] != 4
             || data["source_sha256"] != crate::codec::oracle_manifest()?["source_sha256"]
         {
             return Err("primary builder source identity mismatch".into());
@@ -94,6 +91,18 @@ pub(super) fn catalog() -> Result<&'static Value> {
     .as_ref()
     .map_err(|error| unsupported(error.clone()))
 }
+fn compile_primary_recipe(
+    row: &Value,
+    steps: &mut Vec<CompiledStep>,
+    symbols: &mut Symbols,
+) -> Result<Recipe> {
+    let mut row = row.clone();
+    let operands = super::primary_operands::extract(&mut row["fields"], symbols)?;
+    let mut recipe = Recipe::compile(&row, steps, symbols)?;
+    recipe.primary_operands = operands;
+    Ok(recipe)
+}
+
 fn attach_raw_bindings(recipe: &mut Recipe, paths: &Value, symbols: &mut Symbols) -> Result<()> {
     for path in paths
         .as_array()
@@ -183,7 +192,7 @@ impl PrimaryRules {
                     .iter()
                     .enumerate()
                     .map(|(index, row)| {
-                        let mut recipe = Recipe::compile(row, steps, symbols)?;
+                        let mut recipe = compile_primary_recipe(row, steps, symbols)?;
                         attach_raw_bindings(
                             &mut recipe,
                             &data["raw_card_bindings"][effect][index],
@@ -206,7 +215,7 @@ impl PrimaryRules {
                         .iter()
                         .enumerate()
                         .map(|(index, row)| {
-                            let mut recipe = Recipe::compile(row, steps, symbols)?;
+                            let mut recipe = compile_primary_recipe(row, steps, symbols)?;
                             attach_raw_bindings(
                                 &mut recipe,
                                 &body["raw_card_bindings"][name][index],
@@ -1375,9 +1384,7 @@ impl NativeSession {
             value: &mut Datum,
             rules: &PrimaryRules,
             card: Symbol,
-            stats: &CardStats,
             texts: &[(Symbol, Symbol)],
-            operands: &crate::primary::PrimaryOperands,
             retired: Option<(Symbol, &[Symbol])>,
         ) -> Result<()> {
             match value {
@@ -1385,32 +1392,6 @@ impl NativeSession {
                 Datum::Text(v) => {
                     if let Some((_, replacement)) = texts.iter().find(|(key, _)| key == v) {
                         *v = *replacement;
-                    }
-                }
-                Datum::Int(v) if *v == crate::primary::PRIMARY => *v = stats.primary_value,
-                Datum::Int(v) if *v == crate::primary::PRIMARY_PLUS_TWO => {
-                    *v = stats
-                        .primary_value
-                        .checked_add(2)
-                        .ok_or_else(|| unsupported("charge attack exceeds i64"))?;
-                }
-                Datum::Int(v) if *v == crate::primary::RANGE => *v = stats.range,
-                Datum::Int(v) if *v == PRIMARY_PLUS_THREE => {
-                    *v = stats
-                        .primary_value
-                        .checked_add(3)
-                        .ok_or_else(|| unsupported("rune damage exceeds i64"))?;
-                }
-                Datum::Int(v) if *v == RADIUS_OR_ZERO => *v = stats.radius.unwrap_or(0),
-                Datum::Int(v) if *v == crate::primary::RADIUS => {
-                    *value = stats.radius.map_or(Datum::Null, Datum::Int)
-                }
-                Datum::Int(v) => {
-                    if let Some(default) = operands
-                        .range_default(*v, stats.range)
-                        .or_else(|| operands.radius_default(*v, stats.radius))
-                    {
-                        *v = default;
                     }
                 }
                 Datum::List(values) => {
@@ -1421,13 +1402,13 @@ impl NativeSession {
                         *values = ids.iter().copied().map(Datum::Text).collect();
                     } else {
                         for value in values {
-                            bind(value, rules, card, stats, texts, operands, retired)?;
+                            bind(value, rules, card, texts, retired)?;
                         }
                     }
                 }
                 Datum::Object(fields) => {
                     for (_, value) in fields {
-                        bind(value, rules, card, stats, texts, operands, retired)?;
+                        bind(value, rules, card, texts, retired)?;
                     }
                 }
                 _ => {}
@@ -1448,6 +1429,11 @@ impl NativeSession {
                 .truncate(2 + 3 * (supply.clamp(1, 4) as usize - 1));
         }
         for (index, recipe) in plan.recipes.iter_mut().enumerate() {
+            super::primary_operands::bind(
+                &mut recipe.step.fields,
+                &recipe.primary_operands,
+                &stats,
+            )?;
             if matches!(mode, PrimaryMode::Passive { raw: true, .. }) {
                 clear_raw_card_bindings(recipe)?;
             }
@@ -1455,9 +1441,7 @@ impl NativeSession {
                 &mut recipe.step.fields,
                 &rules,
                 binding_card,
-                &stats,
                 &texts,
-                &self.primary_operands,
                 list_binding
                     .as_ref()
                     .map(|(marker, ids)| (*marker, ids.as_slice())),

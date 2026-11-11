@@ -110,15 +110,8 @@ fn terrain_filter_matches_source_virtual_edge_and_physical_tiles() {
 #[test]
 fn shared_radius_defaults_bind_execution_nullable_fields_and_exported_wires() {
     let worker = session("primary-text-blend_into_shadows-ordinary");
-    let slot = crate::primary::catalog().unwrap()["radius_fallbacks"]
-        .as_object()
-        .unwrap()
-        .iter()
-        .find(|(_, v)| **v == serde_json::json!(2))
-        .unwrap()
-        .0
-        .parse::<i64>()
-        .unwrap();
+    let operands = crate::primary::compiled_catalog().unwrap();
+    let slot = operands.binding(crate::primary::Operand::RadiusOrDefault { default: 2 });
     for radius in [None, Some(0), Some(3), Some(-1)] {
         let expected = radius.filter(|v| *v != 0).unwrap_or(2);
         let values = PrimaryValues {
@@ -139,14 +132,16 @@ fn shared_radius_defaults_bind_execution_nullable_fields_and_exported_wires() {
             worker.primary_operands.number(slot, &values).unwrap(),
             expected
         );
-        let mut nullable = Some(crate::primary::RADIUS);
+        let mut nullable = Some(operands.binding(crate::primary::Operand::Radius));
         worker
             .primary_operands
             .optional_number(&mut nullable, &values)
             .unwrap();
         assert_eq!(nullable, radius);
         let mut wire = serde_json::json!({"radius":slot,"nested":[slot]});
-        values.patch_wire(&mut wire, &worker.symbols, &worker.primary_operands);
+        values
+            .patch_wire(&mut wire, &worker.symbols, &worker.primary_operands)
+            .unwrap();
         assert_eq!(
             wire,
             serde_json::json!({"radius":expected,"nested":[expected]})

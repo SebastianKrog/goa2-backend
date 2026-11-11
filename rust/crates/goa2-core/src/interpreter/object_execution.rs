@@ -60,6 +60,7 @@ pub(super) fn with_card_sync_profile<T>(run: impl FnOnce() -> T) -> (T, CardSync
 }
 mod pre_action;
 mod primary_bodies;
+mod primary_operands;
 mod push;
 mod queries;
 mod reaction_window;

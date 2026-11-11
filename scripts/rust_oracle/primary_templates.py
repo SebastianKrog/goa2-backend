@@ -829,7 +829,7 @@ def build_catalog():
         recipes[effect_id] = merge_operand_bindings(wires, radius_fields, range_fields, RANGE)
         bind_charge_damage(effect_id, recipes[effect_id])
     source = {
-        "schema_version": 2,
+        "schema_version": 3,
         "source_sha256": verify_sources()["source_sha256"],
         "operands": {
             "hero": HERO,
@@ -843,6 +843,12 @@ def build_catalog():
         "radius_fallbacks": radius_fallbacks,
         "range_fallbacks": range_fallbacks,
     }
+    from primary_operand_wire import encode_primary_operands
+
+    source = encode_primary_operands(
+        source, primary=PRIMARY, range_=RANGE, radius=RADIUS,
+        primary_plus_two=PRIMARY_PLUS_TWO,
+    )
     payload = {**source, "catalog_sha256": digest(source)}
     return payload
 

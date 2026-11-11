@@ -1,6 +1,11 @@
 //! SetActor reads live operands, including save-before-read key aliasing.
-use super::phases::Field;
-use super::*;
+use std::sync::Arc;
+
+use super::{BoundObjects, NativeSession, Result, phases::Field, unsupported};
+use crate::{
+    data::{Datum, Symbol},
+    objects::{ObjectId, ObjectValue},
+};
 
 pub(super) struct ActorPlan {
     save: Symbol,

@@ -1,6 +1,15 @@
 //! Coordinate utilities preserve fresh dict versus immutable Hex identities.
-use super::phases::Field;
-use super::*;
+use std::sync::Arc;
+
+use super::{
+    BoundObjects, CoordinateOp, NativeSession, Result, native_hex, phases::Field, unsupported,
+};
+use crate::{
+    codec::ObjectKind,
+    data::{Datum, Symbol},
+    geometry::Hex,
+    objects::{ObjectId, ObjectValue},
+};
 
 pub(super) enum CoordinatePlan {
     Done,

@@ -1,5 +1,6 @@
 use super::{diagnostics::PlanningPair, *};
 use crate::interpreter::{NativeRequest, RequestToken};
+use crate::{geometry::Hex, world::EntityKind};
 
 #[test]
 fn sampled_reply_cap_prefers_greedy_commitments_and_full_search_keeps_every_reply() {

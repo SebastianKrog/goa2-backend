@@ -1230,5 +1230,16 @@
     "local_archive_hardlinked": true,
     "memory_max_bytes": 1073741824,
     "scope": "Private local tar packed from admitted corpus and installed into an empty destination using the manifest-based standalone source extraction. Remote acquisition and redistribution approval are separate."
+  },
+  "wsl_fixed_work_baseline": {
+    "source_commit": "ff8ffed534ef190fa507399492a5db4c361c2c14",
+    "report": "../benchmarks/maintenance-v1-wsl-results.json",
+    "sha256": "c9a1061729e73b6831fe5603a32a2a3064cd8dbd4cbe2ff48e94548df4670dfd",
+    "benchmark_sha256": "913d60bda32a0f74b090a10fd13e4a83e172f4be3aa86449990707cff6bac5c7",
+    "server_sha256": "9e91c9b81ea74b5569d52b87ca2319238b1abcad04efef3bcb1291bd729fca71",
+    "packs": 2,
+    "fresh_process_runs": 6,
+    "fresh_database_server_starts": 6,
+    "scope": "Fixed opening planning, setup, clone and restore baseline. Deeper search and resolution require additional workloads."
   }
 }

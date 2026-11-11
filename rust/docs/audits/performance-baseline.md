@@ -49,6 +49,19 @@ claim. All six cancellation samples observe cancellation after a requested 10 ms
 delay; response is measured from the actual flag signal, not from thread creation.
 Cooperative checks do not guarantee hard instruction preemption.
 
+## WSL baseline before interpreter changes
+
+The [WSL run](../../benchmarks/maintenance-v1-wsl-results.json) repeats this
+workload at source `ff8ffed5` with Rust 1.99.1. Three fresh processes and three
+fresh-database starts completed for each pack. The verifier ran under a two-CPU
+quota and a 2 GiB memory cap on an Intel Core i5-10400F. All six samples agreed
+on 24 nodes, four evaluated cells, two completed rows and score zero.
+Median fixed planning search took 0.954 ms with the seven-hero pack and
+0.974 ms with the 33-hero pack. Median checkpoint parse and restore took
+15.87 ms and 16.21 ms respectively. Compare future measurements on the same
+host and workload. Search refactors that affect deeper planning or resolution
+also need fixed-work workloads for those paths.
+
 ## Catalog and footprint decision
 
 The release server is 23,363,784 bytes (ELF text 21,222,058, data 167,984, bss
@@ -72,7 +85,9 @@ From `rust/`, build the pinned release artifacts:
 cargo build --locked --release --workspace --bins --example maintenance_bench
 ```
 
-From the repository root (use a new output path):
+From the repository root, use the locked Python tooling environment from
+`rust/tools/requirements.lock` and keep the pinned Rust toolchain on PATH.
+Use a new output path:
 
 ```sh
 python3 rust/tools/maintenance_measurements.py --benchmark-binary /absolute/path/release/examples/maintenance_bench --server-binary /absolute/path/release/goa2-game-server --content rust/content/smoke-game.json --content /absolute/path/live-game-content.json --repetitions 3 --output /absolute/path/new-measurements.json

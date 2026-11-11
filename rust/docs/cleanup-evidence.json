@@ -1396,5 +1396,19 @@
         "interpreter_median_ns": 322232818
       }
     ]
+  },
+  "typed_spell_operand_regression": {
+    "failed_candidate": "7e87efd76ff7e0ba7aa53524f0bd33debcd98eb7",
+    "failed_full_log_sha256": "ee4ff3419018a39eff603942af0c8845b341f8661af2cbf0722f2e4603d35d4a",
+    "failure": "Spell catalog still used numeric probes after the generic binder was removed. A spell selector did not issue its expected request.",
+    "corrected_candidate": "930606bf86e8d6882dc43ddbf211fc45e4ee299e",
+    "focused_test": "spell_bodies_restore_each_boundary_with_private_cards_filters_and_respawns",
+    "focused_result": "passed",
+    "focused_log_sha256": "7a1017f3fa42fd9d3ba5ef8931e14031761f92dc5e879d23292b93718ad44094",
+    "compared_operands": {
+      "primary-effects": 249,
+      "primary-builders": 1664,
+      "spell-builders": 30
+    }
   }
 }

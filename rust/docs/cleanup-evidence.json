@@ -1440,5 +1440,31 @@
     "focused_result": "passed",
     "focused_log_sha256": "f81ee1d85c0ee0fdd0014cff494d8af71a338a2e0f855ad6c841ff2c241dfb94",
     "scope": "Focused Python oracle replay. Full differential and exhaustive restore evidence remain separate."
+  },
+  "typed_operand_full_differential": {
+    "candidate": "67a852ed01996a378fc0248fdeb7f7ac1817df1b",
+    "fixture_counts": {
+      "expected": 24197,
+      "executed": 24197,
+      "missing": 0,
+      "failed": 0,
+      "skipped": 0
+    },
+    "native_tests": {
+      "tier": "native",
+      "executed": 638,
+      "failed": 0,
+      "ignored": 9,
+      "full_parity": true
+    },
+    "oracle_tests": {
+      "tier": "native",
+      "executed": 5,
+      "failed": 0,
+      "ignored": 0,
+      "full_parity": true
+    },
+    "log_sha256": "e9f0de85d07920eeb4285a2dccb2fe5f5d1807a1a89b9e11b98b7d2c868652b7",
+    "result_sha256": "ffbfc78a7d3530b7ed4133d1e33ef6590b6fade9cf4f594cd1793f6c6f4c8312"
   }
 }

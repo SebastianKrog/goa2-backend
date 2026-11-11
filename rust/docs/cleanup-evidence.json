@@ -1693,5 +1693,56 @@
         "seconds": 42.11977036099415
       }
     ]
+  },
+  "merged_candidate_native_service": {
+    "candidate": "33e7e8bdb0a1d7cb2d4d10c6d8f4b2f0d9c78bbe",
+    "server_sha256": "2b3e85ad346977ed754e6ba899c5cc1caaa758eef4ffdf6e12de1cdb00096df1",
+    "content_sha256": "4b7520f058d68dda93efb15837d0b657332a1a3132d37148c14a9bb2968ff651",
+    "suites": [
+      {
+        "suite": "auth",
+        "expected": 2,
+        "executed": 2,
+        "failed": 0,
+        "missing": 0
+      },
+      {
+        "suite": "bots",
+        "expected": 3,
+        "executed": 3,
+        "failed": 0,
+        "missing": 0
+      },
+      {
+        "suite": "clocks",
+        "expected": 2,
+        "executed": 2,
+        "failed": 0,
+        "missing": 0
+      },
+      {
+        "suite": "votes",
+        "expected": 6,
+        "executed": 6,
+        "failed": 0,
+        "missing": 0
+      },
+      {
+        "suite": "shutdown",
+        "expected": 1,
+        "executed": 1,
+        "failed": 0,
+        "missing": 0
+      },
+      {
+        "suite": "backup",
+        "expected": 1,
+        "executed": 1,
+        "failed": 0,
+        "missing": 0
+      }
+    ],
+    "log_sha256": "d3fefacf64e1797c206ecffef31161b36e348eb0f1da0592d52eebf5477ee6ea",
+    "scope": "Extracted Linux debug server with the pinned full content pack and disposable SQLite databases."
   }
 }

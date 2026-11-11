@@ -773,9 +773,17 @@ Writing this plan does not certify ranked play or authorize production migration
 Plan 3 is this document. The [neural-search plan](NEURAL_SEARCH_IMPLEMENTATION_PLAN.md)
 is now written, including full-model/export/runtime deliverables and interfaces
 that consume these admitted datasets. All four planning documents are complete;
-the reminder is now due to write plan 5: rules/oracle/Python updates and the policy
-for current games and data/model identities during those updates. This remains
-a sequence reminder, not a scheduled task.
+plan 5 is also written: [rule/oracle/Python updates](RULE_ENGINE_UPDATE_PROCEDURE.md)
+and [later NN updates](NN_RULE_CHANGE_UPDATE_PROCEDURE.md). The sequence reminder
+is fulfilled; no scheduled task was created.
+
+The [dedicated version/audit implementation plan](RULE_VERSION_AUDIT_IMPLEMENTATION_PLAN.md)
+adds structured Python/Rust rule contracts and compact original canonical
+decision-space hashes to private journal/archive evidence. A target checks them
+in one replay, with separate state/event/result evidence and truthful missing
+coverage. No full before/after snapshot per decision or repeated original-engine
+replay is required. Connect audit findings to the existing versioned annotation/
+result/admission workflow rather than changing original results or Elo directly.
 
 References: [shared foundation](SHARED_RUST_FOUNDATION_PLAN.md),
 [client execution and ownership](CLIENT_SIDE_BOT_EXECUTION_PLAN.md),

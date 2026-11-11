@@ -596,10 +596,12 @@ incremental implementation. Its section 9 specifies actual model-admission
 deliverables needed to unblock this plan's stage 3; writing the plan or providing
 an interface/smoke network is insufficient.
 
-All four planning documents are now written. The reminder is due to write plan 5:
-the rules/oracle/Python update procedure, including current-game transition
-policy. This remains the sequence reminder from the foundation, not a scheduled
-job.
+Plan 5 is now written: the [rule/oracle/Python procedure](RULE_ENGINE_UPDATE_PROCEDURE.md)
+and [later NN rule-change procedure](NN_RULE_CHANGE_UPDATE_PROCEDURE.md).
+They preserve pinned current-game contracts and define revalidation, fresh or
+current/earlier-model warm-start updates. A model still needs actual target-rule
+admission before client activation. The sequence reminder is fulfilled; no
+scheduled job was created.
 
 Implementation references: [shared foundation](SHARED_RUST_FOUNDATION_PLAN.md),
 [current bot coordinator](../rust/crates/goa2-game-server/src/bots.rs),

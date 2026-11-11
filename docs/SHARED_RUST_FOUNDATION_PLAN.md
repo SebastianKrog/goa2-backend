@@ -99,7 +99,7 @@ reuse existing authoritative fields rather than introducing competing versions.
 
 | Identity | Required meaning |
 | --- | --- |
-| Rules/content identity | Rules version, oracle revision/source digest, static pack digest and catalog identities needed to execute this game |
+| Rules/content identity | Structured Python rule version plus Rust rules revision/variant digest; exact oracle/source, static pack and catalog identities needed to execute this game |
 | Runtime compatibility | Current checkpoint/resume and replay schemas, plus an execution compatibility identifier where rules/content identity alone is insufficient |
 | Observation/decision schema | Meaning of player-visible fields, decision kinds and command encoding |
 | Feature schema | Feature names/order, types, normalization, masks, coordinate and team conventions |
@@ -465,13 +465,21 @@ the foundation implementation only when its evidence exists.
 | 2 | [Player-run bot client](CLIENT_SIDE_BOT_EXECUTION_PLAN.md) — plan written; implementation pending | Observation-only native agent, transport and host contracts | Three stages: native Rust client, browser WASM, then local neural inference gated on the full NN implementation |
 | 3 | [Database, training data, statistics and Elo](DATABASE_TRAINING_STATISTICS_PLAN.md) — plan written; implementation pending | Private checkpoint and transactional acceptance/recovery contract | Operational PostgreSQL, derived statistics/rating database, immutable training datasets, purpose/lineage and isolated testing sessions |
 | 4 | [Neural search](NEURAL_SEARCH_IMPLEMENTATION_PLAN.md) — plan written; implementation pending | Features, geometry, value/policy seam, sampled worlds and measured search boundaries | Four stages: features/simple evaluation points, inference/evaluation framework, NN designs, incremental implementation and scaling |
-| 5 | Rules/oracle/Python updates — next plan; reminder now due | Artifact/version identities and current-game compatibility boundary | Source-of-truth changes, rule corrections, oracle/runtime updates, regeneration, current-game transition policy and release validation |
+| 5 | [Rules/oracle/Python procedure](RULE_ENGINE_UPDATE_PROCEDURE.md) and [later NN procedure](NN_RULE_CHANGE_UPDATE_PROCEDURE.md) — written; implementation pending | Python-aligned rule version/Rust subrevision, current-game binding and evidence hooks | [Dedicated version/audit plan](RULE_VERSION_AUDIT_IMPLEMENTATION_PLAN.md), single target replay against recorded decision-space hashes, fixtures and model/data disposition |
 
-**Reminder now due:** the first four planning documents are written. Remind
-the user to write plan 5 for rules/oracle/Python updates. This is a sequence
-reminder, not a scheduled job.
-Do not fold that update procedure into the foundation or silently repin rules/
-oracle/Python while implementing it.
+**Plan 5 is now written:** see the rule and NN procedures and their repository
+skills. The sequence reminder is fulfilled; no scheduled job was created.
+Do not silently repin rules/oracle/Python while implementing the foundation.
+
+Small foundation additions: F01 owns the structured Python/Rust rule identity
+and current-save binding. Existing projection/prepare/journal boundaries expose
+nonmutating evidence integration hooks. The complete hash/adapter specification,
+trace capture/archival, single-replay historical scanner, findings and version
+dispatch are substantial work in the dedicated R01–R08 plan, not new hidden
+foundation acceptance gates. Record complete canonical issued decision-space
+hashes during original play and compare them during one replay per target;
+mandatory per-decision full snapshots or repeated original-engine replay are
+not the design.
 
 Related source and prior work: [cleanup plan](RUST_ENGINE_CLEANUP_PLAN.md),
 [native workspace](../rust/README.md),

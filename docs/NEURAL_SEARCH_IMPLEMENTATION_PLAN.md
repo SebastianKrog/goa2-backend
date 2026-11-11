@@ -758,13 +758,16 @@ All four planning documents are now written:
 3. [Database, training data, statistics and Elo](DATABASE_TRAINING_STATISTICS_PLAN.md).
 4. Neural search — this document.
 
-**Reminder now due:** next write plan 5 for rules/oracle/Python updates:
-source-of-truth rule changes and corrections, pinned oracle/runtime updates,
-artifact/fixture regeneration and admission, feature/model compatibility,
-current-game transition policy, statistics/rating cohorts, dataset invalidation
-and release validation. Do not silently repin rules or regenerate changed
-frozen data as a shortcut while implementing this neural plan. This is the
-requested sequence reminder, not a scheduled job.
+**Plan 5 is now written:** the [rule/oracle/Python update procedure](RULE_ENGINE_UPDATE_PROCEDURE.md),
+[later NN rule-change procedure](NN_RULE_CHANGE_UPDATE_PROCEDURE.md) and
+[version/single-replay implementation plan](RULE_VERSION_AUDIT_IMPLEMENTATION_PLAN.md).
+The NN procedure covers revalidating weights, fresh training and warm-starting
+the current or an earlier compatible model, with explicit feature/target/optimizer
+and split/ancestor-exposure decisions. Original recorded decision-space hashes
+support a single target replay; state/result evidence is still required before
+reusing complete new-rule value labels. Do not silently repin rules, overwrite
+old artifacts or claim a model was retrained when only compatibility was tested.
+The requested reminder is fulfilled; no scheduled job was created.
 
 Prior art and reviewed implementation:
 [current Rust search](../rust/crates/goa2-core/src/interpreter/search.rs),

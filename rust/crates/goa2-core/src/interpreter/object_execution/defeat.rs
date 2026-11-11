@@ -1,6 +1,10 @@
 //! Defeat/protection reuse typed combat rules and commit through live arena handles.
 use super::phases::Field;
-use super::*;
+use super::{
+    Arc, BoundObjects, CombatEvent, Datum, GameOutcome, NativeEvent, NativeRequest, NativeSession,
+    ObjectId, ObjectKind, ObjectValue, Phase, RequestChoices, RequestToken, Result, Symbol,
+    combat_error, unsupported,
+};
 use crate::{
     cards::CardId,
     combat::DefeatResult,

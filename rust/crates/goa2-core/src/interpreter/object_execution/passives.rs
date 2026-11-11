@@ -1,6 +1,9 @@
 //! Live passive discovery reads only the context operands its predicate needs.
 use super::phases::Field;
-use super::*;
+use super::{
+    BoundObjects, Datum, NativeEvent, NativeRequest, NativeSession, ObjectId, ObjectValue,
+    Registers, RequestChoices, RequestToken, Result, Symbol, unsupported,
+};
 use crate::{
     cards::CardId,
     passives::{Offer, Predicate},
@@ -617,6 +620,7 @@ impl NativeSession {
 
 #[cfg(test)]
 mod tests {
+    use super::super::Value;
     use super::*;
     fn session(name: &str) -> NativeSession {
         let base = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures");

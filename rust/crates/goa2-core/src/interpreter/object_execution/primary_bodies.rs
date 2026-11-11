@@ -1,7 +1,11 @@
 //! Registered primary text uses alias-aware cold builders and live card bindings.
 use super::passive_bodies::Recipe;
 use super::phases::Field;
-use super::*;
+use super::{
+    Arc, BoundObjects, CardStats, CompiledStep, Datum, HashMap, HashSet, Hex, Instruction,
+    NativeSession, ObjectId, ObjectKind, ObjectValue, Result, Stat, Symbol, Symbols, Team, Value,
+    unsupported,
+};
 use crate::{objects::ObjectSlot, world::ActionKind};
 use std::sync::OnceLock;
 
@@ -1584,6 +1588,7 @@ mod tests {
 
 #[cfg(test)]
 mod hanu_tests {
+    use super::super::fixture_case;
     use super::*;
     fn session(effect: &str) -> NativeSession {
         let case = fixture_case(&format!(

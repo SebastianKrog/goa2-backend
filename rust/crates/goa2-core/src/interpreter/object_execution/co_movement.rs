@@ -1,7 +1,10 @@
 //! Co-directional sequencer and token walking retain source movement ordering.
 use super::phases::Field;
 use super::placement::Placement;
-use super::*;
+use super::{
+    Arc, BoundObjects, Datum, EntityKind, Hex, NativeEvent, NativeSession, ObjectId, ObjectValue,
+    Result, Symbol, unsupported,
+};
 
 pub(super) enum CoMovementPlan {
     Done,
@@ -287,6 +290,7 @@ impl NativeSession {
 
 #[cfg(test)]
 mod tests {
+    use super::super::{Value, fixture_case, json, native_hex};
     use super::*;
     fn root(token: bool) -> NativeSession {
         let name = format!(

@@ -2,7 +2,10 @@
 use super::effect_creation::CreatePlan;
 use super::passive_bodies::Recipe;
 use super::phases::Field;
-use super::*;
+use super::{
+    Arc, BoundObjects, CompiledStep, Datum, HashSet, NativeEvent, NativeSession, ObjectId,
+    ObjectKind, ObjectValue, Result, Symbol, Symbols, unsupported,
+};
 
 pub(super) fn compile_finishing(
     steps: &mut Vec<CompiledStep>,
@@ -155,6 +158,7 @@ impl NativeSession {
 
 #[cfg(test)]
 mod tests {
+    use super::super::{Value, fixture_case, json};
     use super::*;
     fn session(name: &str) -> NativeSession {
         let case = fixture_case(&format!("object-execution-journey-{name}"));

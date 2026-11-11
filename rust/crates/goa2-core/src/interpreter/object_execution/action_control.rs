@@ -1,7 +1,9 @@
 //! Hanu's ultimate schedules control over the target's current physical face.
 use super::effect_creation::CreatePlan;
 use super::phases::Field;
-use super::*;
+use super::{
+    Arc, BoundObjects, Datum, NativeEvent, NativeSession, ObjectId, Result, Symbol, unsupported,
+};
 use crate::world::CardLifecycle;
 
 pub(super) struct ActionControlPlan {
@@ -94,6 +96,7 @@ impl NativeSession {
 
 #[cfg(test)]
 mod tests {
+    use super::super::{ObjectValue, Value, fixture_case, json};
     use super::*;
     fn session(name: &str) -> NativeSession {
         let case = fixture_case(&format!("object-execution-action-control-{name}"));

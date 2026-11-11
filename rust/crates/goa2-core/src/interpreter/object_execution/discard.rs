@@ -1,6 +1,9 @@
 //! Source discard precedence uses model equality, while mutations keep identity.
 use super::phases::Field;
-use super::*;
+use super::{
+    BoundObjects, Datum, NativeSession, ObjectId, ObjectKind, ObjectValue, Result, Symbol,
+    unsupported,
+};
 use crate::{
     cards::CardId,
     objects::{Mutation, Target},
@@ -379,6 +382,7 @@ impl NativeSession {
 
 #[cfg(test)]
 mod tests {
+    use super::super::Value;
     use super::*;
     #[test]
     fn shared_log_mutation_refreshes_every_hero_history_cache() {

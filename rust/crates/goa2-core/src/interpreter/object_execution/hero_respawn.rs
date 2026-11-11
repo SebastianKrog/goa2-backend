@@ -1,6 +1,9 @@
 //! Hero respawn preserves live operands, token unlinking and fresh Hex identity.
 use super::phases::Field;
-use super::*;
+use super::{
+    Arc, BoundObjects, Datum, NativeEvent, NativeRequest, NativeSession, ObjectId, ObjectKind,
+    ObjectValue, RequestChoices, RequestToken, Result, unsupported,
+};
 
 impl NativeSession {
     fn hero_respawn_direct_bound(
@@ -115,6 +118,7 @@ impl NativeSession {
 #[cfg(test)]
 mod tests {
     use super::super::test_support::object_session;
+    use super::super::{Hex, native_hex};
     use super::*;
     fn selected_hex(worker: &mut NativeSession, hex: Hex) -> Datum {
         native_hex(hex, worker.coordinates)

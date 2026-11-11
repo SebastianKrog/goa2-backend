@@ -1,7 +1,10 @@
 //! Registered defense/on-block construction with source-derived cold recipes.
 use super::passive_bodies::Recipe;
 use super::phases::Field;
-use super::*;
+use super::{
+    Arc, BoundObjects, CompiledStep, Datum, HashMap, HashSet, Instruction, NativeSession,
+    ObjectKind, ObjectValue, Result, Symbol, Symbols, Value, unsupported,
+};
 use std::sync::OnceLock;
 
 #[derive(Clone, Copy, Debug)]
@@ -662,6 +665,7 @@ impl NativeSession {
 
 #[cfg(test)]
 mod tests {
+    use super::super::{EngineError, fixture_case};
     use super::*;
     fn session(name: &str) -> NativeSession {
         let case = fixture_case(name);

@@ -1,6 +1,9 @@
 //! Hidden card choices and public color-guess reveals.
 use super::phases::Field;
-use super::*;
+use super::{
+    BoundObjects, Datum, Instruction, NativeEvent, NativeRequest, NativeSession, ObjectId,
+    ObjectValue, RequestChoices, RequestToken, Result, Symbol, unsupported,
+};
 
 impl NativeSession {
     fn standard_card_colors(&self) -> [Symbol; 5] {

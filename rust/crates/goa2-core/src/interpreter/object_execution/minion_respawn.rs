@@ -1,6 +1,9 @@
 //! Hex-first lane supply selection and legacy chosen-minion respawning.
 use super::phases::Field;
-use super::*;
+use super::{
+    Arc, BoundObjects, Datum, Hex, NativeEvent, NativeRequest, NativeSession, ObjectId, ObjectKind,
+    ObjectValue, RequestChoices, RequestToken, Result, Symbol, unsupported,
+};
 use crate::{
     spatial::{HexFilter, SpatialContext},
     world::EntityKind,
@@ -416,6 +419,7 @@ impl NativeSession {
 
 #[cfg(test)]
 mod tests {
+    use super::super::fixture_case;
     use super::*;
 
     #[test]

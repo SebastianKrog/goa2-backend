@@ -1,6 +1,9 @@
 //! Live committed-card reveal, two-card retrieval and initiative handoff.
 use super::phases::Field;
-use super::*;
+use super::{
+    BoundObjects, Datum, NativeEvent, NativeRequest, NativeSession, ObjectId, ObjectValue, Phase,
+    RequestChoices, RequestToken, Result, Symbol, Team, card_error, unsupported,
+};
 use crate::{
     cards::CardId,
     planning::{ActorChoice, TieResolution},
@@ -725,6 +728,7 @@ impl NativeSession {
 
 #[cfg(test)]
 mod tests {
+    use super::super::json;
     use super::*;
     use crate::interpreter::UpgradeCheckpoint;
 

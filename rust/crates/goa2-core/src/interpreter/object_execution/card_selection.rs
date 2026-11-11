@@ -1,6 +1,9 @@
 //! Card selectors read live operands and share the typed candidate rules.
 use super::phases::Field;
-use super::*;
+use super::{
+    BoundObjects, Datum, NativeRequest, NativeSession, ObjectId, ObjectKind, ObjectValue,
+    RequestChoices, RequestToken, Result, Symbol, unsupported,
+};
 use crate::cards::CardId;
 use crate::{
     card_selection::{CardSelectSpec, Container},
@@ -321,6 +324,7 @@ impl NativeSession {
 
 #[cfg(test)]
 mod tests {
+    use super::super::fixture_case;
     use super::*;
     fn session() -> NativeSession {
         let case = fixture_case("object-execution-card-selector-hand");

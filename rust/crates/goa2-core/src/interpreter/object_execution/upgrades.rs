@@ -1,6 +1,9 @@
 //! Simultaneous upgrades and round reset retain authoritative container identities.
 use super::phases::Field;
-use super::*;
+use super::{
+    BoundObjects, Datum, EngineError, NativeRequest, NativeSession, ObjectId, ObjectKind,
+    ObjectValue, Phase, RequestChoices, RequestToken, Result, Symbol, card_error, unsupported,
+};
 use crate::{
     cards::CardId,
     objects::{Mutation, Target},

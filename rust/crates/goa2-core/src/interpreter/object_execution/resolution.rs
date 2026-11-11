@@ -1,6 +1,9 @@
 //! Live resolution boundaries, preserving the actual step input and context.
 use super::phases::Field;
-use super::*;
+use super::{
+    BoundObjects, Datum, NativeRequest, NativeSession, ObjectId, ObjectKind, ObjectValue,
+    RequestChoices, RequestToken, Result, Symbol, unsupported,
+};
 
 impl NativeSession {
     fn finalization_hero_bound(&self, objects: &BoundObjects, step: ObjectId) -> Result<Symbol> {
@@ -230,6 +233,7 @@ impl NativeSession {
 
 #[cfg(test)]
 mod tests {
+    use super::super::fixture_case;
     use super::*;
 
     #[test]

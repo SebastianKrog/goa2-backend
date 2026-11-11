@@ -1,7 +1,10 @@
 //! Copy a physical card action while preserving both heroes' card collections.
 use super::passive_bodies::Recipe;
 use super::phases::Field;
-use super::*;
+use super::{
+    ActionResolution, ActionStep, Arc, BoundObjects, Datum, NativeRequest, NativeSession, ObjectId,
+    ObjectKind, ObjectValue, RequestChoices, RequestToken, Result, Symbol, unsupported,
+};
 use crate::data::Registers;
 
 pub(super) enum CopiedPlan {
@@ -246,6 +249,7 @@ impl NativeSession {
 
 #[cfg(test)]
 mod tests {
+    use super::super::fixture_case;
     use super::*;
     fn session(name: &str) -> NativeSession {
         let case = fixture_case(&format!("object-execution-perform-card-edge-{name}"));

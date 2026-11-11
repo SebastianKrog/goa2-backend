@@ -1,7 +1,11 @@
 //! Action menus reuse typed rules; child models bind through source recipes.
 use super::passive_bodies::Recipe;
 use super::phases::Field;
-use super::*;
+use super::{
+    ActionResolution, ActionStep, Arc, BoundObjects, CompiledStep, Datum, HashMap, Instant,
+    NativeRequest, NativeSession, ObjectId, ObjectKind, Passive, RequestChoices, RequestToken,
+    Result, RuleStepTimer, Symbol, Symbols, Value, unsupported,
+};
 use crate::data::Registers;
 use std::sync::OnceLock;
 
@@ -377,6 +381,7 @@ impl NativeSession {
 
 #[cfg(test)]
 mod tests {
+    use super::super::{ObjectValue, fixture_case};
     use super::*;
     fn session(name: &str) -> NativeSession {
         let case = fixture_case(&format!("object-execution-card-action-edge-{name}"));

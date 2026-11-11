@@ -1,6 +1,9 @@
 //! Live defense windows: shared menus, physical-card equality and arena action stacks.
 use super::phases::Field;
-use super::*;
+use super::{
+    Arc, BoundObjects, Datum, NativeRequest, NativeSession, ObjectId, ObjectKind, ObjectValue,
+    RequestChoices, RequestToken, Result, Symbol, unsupported,
+};
 use crate::reactions::{DefenseCard, DefenseMenu};
 
 const RESET: [Field; 5] = [

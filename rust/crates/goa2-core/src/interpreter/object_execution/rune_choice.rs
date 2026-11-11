@@ -1,6 +1,9 @@
 //! Rune choice preserves retry, pending-token and optional metadata semantics.
 use super::phases::Field;
-use super::*;
+use super::{
+    BoundObjects, Datum, EngineError, NativeEvent, NativeRequest, NativeSession, ObjectId,
+    ObjectValue, RequestChoices, RequestToken, Result, Symbol, unsupported,
+};
 
 pub(super) struct RunePlan {
     prompt: Symbol,

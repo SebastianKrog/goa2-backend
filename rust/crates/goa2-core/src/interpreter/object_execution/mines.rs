@@ -1,6 +1,9 @@
 //! Mine choices and ordered triggers use live operands and retained aliases.
 use super::phases::Field;
-use super::*;
+use super::{
+    BoundObjects, Datum, EngineError, EntityKind, Hex, NativeEvent, NativeRequest, NativeSession,
+    ObjectId, ObjectKind, ObjectValue, RequestChoices, RequestToken, Result, Symbol, unsupported,
+};
 use crate::mines::MinePath;
 
 pub(super) struct MineChoicePlan {
@@ -447,6 +450,7 @@ impl NativeSession {
 
 #[cfg(test)]
 mod tests {
+    use super::super::{ExecutionBudget, fixture_case, json};
     use super::*;
     fn session(name: &str) -> NativeSession {
         let case = fixture_case(&format!("object-execution-{name}"));

@@ -1,6 +1,9 @@
 //! Live singleton marker models, aliases, and post-placement passive dispatch.
 use super::phases::Field;
-use super::*;
+use super::{
+    BoundObjects, Datum, MarkerEvent, NativeEvent, NativeSession, ObjectId, ObjectKind,
+    ObjectValue, Result, Symbol, unsupported,
+};
 use crate::markers::MarkerRules;
 use crate::stats::{MarkerKind, NativeMarker};
 
@@ -276,6 +279,7 @@ impl NativeSession {
 
 #[cfg(test)]
 mod tests {
+    use super::super::{EngineError, fixture_case};
     use super::*;
     fn session(name: &str) -> NativeSession {
         let case = fixture_case(&format!("object-execution-live-marker-poison-{name}"));

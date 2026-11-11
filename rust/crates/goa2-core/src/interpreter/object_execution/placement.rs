@@ -1,6 +1,9 @@
 //! Live placement keeps original location/tile containers and Hex aliases.
 use super::phases::Field;
-use super::*;
+use super::{
+    BoundObjects, Datum, EngineError, EntityKind, Hex, NativeEvent, NativeSession, ObjectId,
+    ObjectKind, ObjectValue, Result, Symbol, native_hex, unsupported,
+};
 use crate::validation::DisplacementKind;
 
 pub(super) enum SwapPlan {
@@ -429,6 +432,7 @@ impl NativeSession {
 
 #[cfg(test)]
 mod tests {
+    use super::super::{StateEnvelope, Value, fixture_case, json};
     use super::*;
     fn session(name: &str) -> NativeSession {
         let case = fixture_case(&format!("object-execution-placement-alias-{name}"));

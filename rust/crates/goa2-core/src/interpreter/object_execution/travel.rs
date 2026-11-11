@@ -1,6 +1,9 @@
 //! Fast travel revalidates destinations without movement/path/placement rules.
 use super::phases::Field;
-use super::*;
+use super::{
+    BoundObjects, Datum, NativeEvent, NativeSession, ObjectId, ObjectKind, ObjectValue, Result,
+    Symbol, placement, unsupported,
+};
 use crate::{data::Registers, spatial::SpatialContext, world::ActionKind};
 
 pub(super) enum TravelPlan {
@@ -229,6 +232,7 @@ impl NativeSession {
 
 #[cfg(test)]
 mod tests {
+    use super::super::{Hex, StateEnvelope, fixture_case, json, native_hex};
     use super::*;
     fn session(name: &str) -> NativeSession {
         let case = fixture_case(&format!("object-execution-arena-travel-{name}"));

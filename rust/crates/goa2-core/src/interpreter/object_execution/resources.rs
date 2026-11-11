@@ -1,6 +1,9 @@
 //! Resource effects stage live operands before consuming the executing step.
 use super::phases::Field;
-use super::*;
+use super::{
+    Arc, BoundObjects, Datum, EngineError, GameOutcome, NativeEvent, NativeSession, ObjectId,
+    ObjectValue, Result, Symbol, unsupported,
+};
 
 pub(super) enum ResourcePlan {
     Done,
@@ -588,6 +591,7 @@ impl NativeSession {
 
 #[cfg(test)]
 mod tests {
+    use super::super::Value;
     use super::*;
     fn session() -> NativeSession {
         let base = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures");

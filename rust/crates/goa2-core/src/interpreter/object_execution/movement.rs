@@ -1,7 +1,10 @@
 //! Live walking: validate before mutation, retain spatial object aliases.
 use super::phases::Field;
 use super::placement::Placement;
-use super::*;
+use super::{
+    BoundObjects, Datum, EntityKind, Hex, NativeEvent, NativeSession, ObjectId, ObjectValue,
+    Result, Symbol, native_hex, unsupported,
+};
 use crate::validation::DisplacementKind;
 
 pub(super) enum MovePlan {
@@ -407,6 +410,7 @@ impl NativeSession {
 
 #[cfg(test)]
 mod tests {
+    use super::super::fixture_case;
     use super::*;
     fn session() -> NativeSession {
         let case = fixture_case("object-execution-walking-alias-dict");

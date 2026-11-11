@@ -1,6 +1,8 @@
 //! Live noninteractive queries read arena operands and allocate fresh results.
 use super::phases::Field;
-use super::*;
+use super::{
+    BoundObjects, Datum, NativeSession, ObjectId, ObjectValue, Result, Symbol, unsupported,
+};
 use crate::{queries::Query, spatial::SpatialContext};
 
 pub(super) struct QueryPlan {
@@ -492,6 +494,7 @@ impl NativeSession {
 
 #[cfg(test)]
 mod adjacent_tests {
+    use super::super::{EngineError, Value, fixture_case, json};
     use super::*;
     fn session(suffix: &str) -> NativeSession {
         let case = fixture_case(&format!("object-execution-xargatha-count-{suffix}"));

@@ -1,5 +1,8 @@
 //! Live effect construction; arena models own identity, typed payloads serve rules.
-use super::*;
+use super::{
+    Arc, BoundObjects, Datum, NativeEvent, NativeSession, ObjectArena, ObjectId, ObjectKind,
+    ObjectValue, Result, Symbol, Symbols, unsupported,
+};
 use crate::{
     data::SparseRegisters,
     effects::{CreationContext, EffectCreateSpec, EffectInstance},
@@ -779,6 +782,7 @@ impl NativeSession {
 
 #[cfg(test)]
 mod tests {
+    use super::super::{EngineError, HashSet, fixture_case};
     use super::*;
     fn session(name: &str) -> NativeSession {
         let fixture = fixture_case(name);

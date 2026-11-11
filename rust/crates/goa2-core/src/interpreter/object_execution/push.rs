@@ -1,7 +1,10 @@
 //! Source push validation/path rules commit through authoritative spatial handles.
 use super::phases::Field;
 use super::placement::Placement;
-use super::*;
+use super::{
+    Arc, BoundObjects, Datum, Hex, NativeEvent, NativeRequest, NativeSession, ObjectId,
+    ObjectValue, Registers, RequestChoices, RequestToken, Result, Symbol, native_hex, unsupported,
+};
 use crate::{displacement::PushResult, validation::DisplacementKind, world::EntityKind};
 
 pub(super) enum PushPlan {
@@ -582,6 +585,7 @@ impl NativeSession {
 
 #[cfg(test)]
 mod tests {
+    use super::super::fixture_case;
     use super::*;
     fn session(name: &str) -> NativeSession {
         let case = fixture_case(&format!("object-execution-arena-push-{name}"));

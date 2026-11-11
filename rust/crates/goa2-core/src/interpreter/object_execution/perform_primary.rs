@@ -1,7 +1,10 @@
 //! Re-perform the selected card's primary under a shallow, restorable action scope.
 use super::passive_bodies::Recipe;
 use super::phases::Field;
-use super::*;
+use super::{
+    Arc, BoundObjects, Datum, NativeRequest, NativeSession, ObjectId, ObjectKind, ObjectValue,
+    RequestChoices, RequestToken, Result, Symbol, unsupported,
+};
 use crate::{
     data::Registers, spatial::SpatialContext, targeting::UnitCandidates, world::ActionKind,
 };
@@ -408,6 +411,7 @@ impl NativeSession {
 
 #[cfg(test)]
 mod tests {
+    use super::super::fixture_case;
     use super::*;
     fn session(name: &str) -> NativeSession {
         let case = fixture_case(&format!("object-execution-perform-primary-{name}"));

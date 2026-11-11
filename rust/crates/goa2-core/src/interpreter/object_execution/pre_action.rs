@@ -1,6 +1,9 @@
 //! Live pre-action movement and reentrant disruptor processing.
 use super::phases::Field;
-use super::*;
+use super::{
+    Arc, BoundObjects, Datum, NativeSession, ObjectId, ObjectKind, ObjectValue, Result, Symbol,
+    unsupported,
+};
 use crate::{effect_rules::Kind, objects::ObjectSlot};
 
 pub(super) struct PreMovementPlan {
@@ -299,6 +302,7 @@ impl NativeSession {
 
 #[cfg(test)]
 mod tests {
+    use super::super::EngineError;
     use super::*;
     #[test]
     fn pre_action_generation_guards_preserve_processed_lists_and_stack() {

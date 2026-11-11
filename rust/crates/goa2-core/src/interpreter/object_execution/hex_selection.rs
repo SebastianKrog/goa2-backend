@@ -1,6 +1,9 @@
 //! Live hex selectors share native scans and read only referenced context slots.
 use super::phases::Field;
-use super::*;
+use super::{
+    BoundObjects, Datum, Hex, NativeRequest, NativeSession, ObjectId, ObjectValue, RequestChoices,
+    RequestToken, Result, Symbol, native_hex, unsupported,
+};
 use crate::{
     data::{RegisterRead, SparseRegisters},
     spatial::{AdjacencyTag, HexFilter, Origin, SpatialContext},

@@ -1,6 +1,9 @@
 //! Hurry Up! mutates the unresolved physical face, preserving all card aliases.
 use super::phases::Field;
-use super::*;
+use super::{
+    BoundObjects, Datum, NativeEvent, NativeSession, ObjectId, ObjectValue, Result, Symbol,
+    unsupported,
+};
 use crate::{cards::CardId, world::CardLifecycle};
 
 pub(super) struct InitiativePlan {
@@ -79,6 +82,7 @@ impl NativeSession {
 
 #[cfg(test)]
 mod tests {
+    use super::super::{Value, fixture_case, json};
     use super::*;
     fn session(suffix: &str) -> NativeSession {
         let case = fixture_case(&format!("object-execution-initiative-{suffix}"));

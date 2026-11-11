@@ -1,7 +1,10 @@
 //! Live planning commands preserve source collection replacement and aliasing.
 use super::super::{TeamKnowledgeMode, UpgradeCheckpoint, loadout::HiddenGoldSlot};
 use super::phases::Field;
-use super::*;
+use super::{
+    BoundObjects, Datum, EngineError, ExecutionBudget, Instruction, NativeSession, ObjectId,
+    ObjectValue, Phase, RequestChoices, Result, Symbol, card_error, unsupported,
+};
 use crate::cards::CardId;
 use std::collections::BTreeMap;
 
@@ -2097,6 +2100,7 @@ impl NativeSession {
 
 #[cfg(test)]
 mod tests {
+    use super::super::{Arc, StateEnvelope, fixture_case, json};
     use super::*;
 
     #[test]

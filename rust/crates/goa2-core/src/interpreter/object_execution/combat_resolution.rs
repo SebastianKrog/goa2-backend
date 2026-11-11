@@ -1,6 +1,9 @@
 //! Live combat values and attack-history queries; mutation stays in the arena.
 use super::phases::Field;
-use super::*;
+use super::{
+    BoundObjects, CombatEvent, Datum, DefeatBinding, NativeEvent, NativeSession, ObjectId,
+    ObjectKind, ObjectValue, Result, Symbol, combat_error, unsupported,
+};
 use crate::{
     data::RegisterRead,
     spatial::{HexFilter, Origin, SpatialContext},

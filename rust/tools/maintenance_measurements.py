@@ -61,8 +61,19 @@ def memory(pid):
     return rows
 
 
+def cgroup_limits():
+    memberships = Path("/proc/self/cgroup").read_text().splitlines()
+    unified = next((row.removeprefix("0::") for row in memberships if row.startswith("0::")), "/")
+    group = Path("/sys/fs/cgroup") / unified.lstrip("/")
+    return {
+        name: (group / name).read_text().strip() if (group / name).exists() else None
+        for name in ("cpu.max", "memory.max", "memory.swap.max")
+    }
+
+
 def measure(benchmark, server, contents, repetitions):
     oracle = json.loads((ROOT / "rust/oracle-manifest.json").read_text())
+    cgroup = cgroup_limits()
     hardware = {
         "architecture": platform.machine(),
         "kernel": platform.release(),
@@ -76,11 +87,9 @@ def measure(benchmark, server, contents, repetitions):
             ),
             "unknown",
         ),
-        "cgroup_cpu_max": (
-            Path("/sys/fs/cgroup/cpu.max").read_text().strip()
-            if Path("/sys/fs/cgroup/cpu.max").exists()
-            else None
-        ),
+        "cgroup_cpu_max": cgroup["cpu.max"],
+        "cgroup_memory_max": cgroup["memory.max"],
+        "cgroup_memory_swap_max": cgroup["memory.swap.max"],
     }
     cases = []
     for content in contents:

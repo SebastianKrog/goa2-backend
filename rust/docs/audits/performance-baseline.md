@@ -82,3 +82,9 @@ The full pack's recorded hash is an input identity, not an established public
 acquisition route or rights grant. Results generated using another binary,
 compiler, hardware or workload require their own report; do not overwrite this
 baseline or compare deadline-limited results as equal work.
+
+New measurements read CPU, memory and swap controller settings from the
+reporter's current cgroup. Keep those limits consistent for comparisons.
+The resource metadata probe verified a live scope with a 50% CPU quota,
+128 MiB memory limit and zero swap allowance. That probe ran no benchmark;
+the historical timing and memory samples above retain their original scope.

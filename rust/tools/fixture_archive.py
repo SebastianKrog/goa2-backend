@@ -47,27 +47,44 @@ def complete_game_paths(payload, paths):
     return required
 
 
+def archive_digest(incoming, outgoing=None):
+    digest = hashlib.sha256()
+    count = 0
+    while chunk := incoming.read(1024 * 1024):
+        count += len(chunk)
+        if count > MAX_ARCHIVE_BYTES:
+            raise ValueError("Reference archive exceeds the download limit")
+        digest.update(chunk)
+        if outgoing is not None:
+            outgoing.write(chunk)
+    return digest.hexdigest()
+
+
 def copy_archive(source, expected, output):
     if not re.fullmatch(r"[0-9a-f]{64}", expected):
         raise ValueError("Archive SHA256 must be 64 lowercase hex characters")
-    if "://" in source and not source.startswith("https://"):
+    remote = source.startswith("https://")
+    if "://" in source and not remote:
         raise ValueError("Remote reference archives must use HTTPS")
-    digest = hashlib.sha256()
-    with (
-        (
-            urlopen(source, timeout=60) if source.startswith("https://") else open(source, "rb")
-        ) as incoming,
-        output.open("xb") as outgoing,
-    ):
-        count = 0
-        while chunk := incoming.read(1024 * 1024):
-            count += len(chunk)
-            if count > MAX_ARCHIVE_BYTES:
-                raise ValueError("Reference archive exceeds the download limit")
-            digest.update(chunk)
-            outgoing.write(chunk)
-    if digest.hexdigest() != expected:
+    linked = False
+    if not remote:
+        try:
+            os.link(source, output)
+            linked = True
+        except OSError:
+            pass
+    if linked:
+        with output.open("rb") as incoming:
+            actual = archive_digest(incoming)
+    else:
+        with (
+            urlopen(source, timeout=60) if remote else open(source, "rb") as incoming,
+            output.open("xb") as outgoing,
+        ):
+            actual = archive_digest(incoming, outgoing)
+    if actual != expected:
         raise ValueError("Reference archive checksum mismatch")
+    return linked
 
 
 def unpack(archive_path, payload, allowed):
@@ -109,7 +126,7 @@ def install(source, expected, destination):
         with tempfile.TemporaryDirectory(prefix=".reference-", dir=destination.parent) as staging:
             staging = Path(staging)
             archive = staging / "reference.tar"
-            copy_archive(source, expected, archive)
+            linked = copy_archive(source, expected, archive)
             payload = staging / "payload"
             payload.mkdir()
             families, allowed = admitted_paths()
@@ -119,10 +136,19 @@ def install(source, expected, destination):
                 raise ValueError("Incomplete or changed reference archive: " + json.dumps(reports))
             if seen != complete_game_paths(payload, allowed):
                 raise ValueError("Reference archive contains unreferenced payloads")
+            if linked:
+                with archive.open("rb") as incoming:
+                    if archive_digest(incoming) != expected:
+                        raise ValueError("Reference archive changed during installation")
             if destination.exists() or destination.is_symlink():
                 raise FileExistsError(f"Refusing to replace fixture cache: {destination}")
             payload.rename(destination)
-    return {"sha256": expected, "files": len(seen), "reports": reports}
+    return {
+        "sha256": expected,
+        "files": len(seen),
+        "reports": reports,
+        "source_hardlinked": linked,
+    }
 
 
 def pack(source, destination):

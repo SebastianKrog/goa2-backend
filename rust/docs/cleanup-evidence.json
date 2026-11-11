@@ -618,10 +618,10 @@
   "reference_archive_acquisition": {
     "date": "2026-11-11",
     "summary": "fixture-archives.md",
-    "tool_sha256": "e646012063fd3448f3186f1cd55db51be015b46f26a5bcb051e15ae1446cd7e5",
+    "tool_sha256": "0e831978b231c213c0667aa335370f4bc01cd811463704ba8054d72f748a4ceb",
     "tooling_tests": {
-      "expected": 66,
-      "passed": 66,
+      "expected": 75,
+      "passed": 75,
       "failed": 0
     },
     "tested": [
@@ -657,7 +657,8 @@
         "pack"
       ]
     },
-    "fixture_reader_sha256": "231fbe74a938d8e71c48a916433d09e2321358eab6f341855fbebae67a26a40f"
+    "fixture_reader_sha256": "231fbe74a938d8e71c48a916433d09e2321358eab6f341855fbebae67a26a40f",
+    "local_staging": "Use a local hardlink when supported, then recheck its checksum before publishing. Fall back to copying across filesystems."
   },
   "preliminary_payload_review": {
     "date": "2026-11-11",
@@ -680,5 +681,31 @@
     "schema_version": 1,
     "raw_bytes_and_corpus_hashes": "Verified by bounded streaming of the admitted raw payloads; raw SHA256 values were retained.",
     "rights_and_final_acquisition_metadata": "Pending owner decisions and actual distribution route; C03-05 remains open."
+  },
+  "measurement_resource_metadata": {
+    "date": "2026-11-11",
+    "fix": "Read the reporter's current cgroup instead of the root cgroup",
+    "live_probe": {
+      "cpu.max": "50000 100000",
+      "memory.max": "134217728",
+      "memory.swap.max": "0"
+    },
+    "probe_expected": {
+      "cpu.max": "50000 100000",
+      "memory.max": "134217728",
+      "memory.swap.max": "0"
+    },
+    "benchmark_executed": false,
+    "new_refactor_performance_baseline_claimed": false
+  },
+  "verification_interruption": {
+    "date": "2026-11-11",
+    "stage": "full-differential",
+    "status": "interrupted",
+    "wsl_shutdown_utc": "2026-11-11T00:28:40+00:00",
+    "kernel_oom_event_found": false,
+    "completed_full_or_restore_gate_claimed": false,
+    "recovery": "Retain original logs; retry with a foreground non-systemd WSL keepalive and a 2 GiB job cap",
+    "reference": "https://learn.microsoft.com/en-us/windows/wsl/systemd"
   }
 }

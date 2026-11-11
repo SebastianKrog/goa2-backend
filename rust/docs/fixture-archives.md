@@ -39,8 +39,10 @@ reference bundle cannot be admitted through a warm local cache.
 
 ## Installation and retries
 
-The installer streams the download and tar members to staging, checking the
-download checksum before extraction. It rejects paths outside the cache,
+The installer streams downloads and tar members to staging, checking the
+archive checksum before extraction. Local archives use a hardlink when available
+and are checked again before cache publication. Other local files and HTTPS
+downloads use a separate staged copy. It rejects paths outside the cache,
 symlinks, sparse files, duplicate logical files, unknown members, unreferenced
 chunks and oversized inputs. Archive/download size is limited to 8 GiB and
 individual compressed or expanded payloads to 256 MiB. Every payload is

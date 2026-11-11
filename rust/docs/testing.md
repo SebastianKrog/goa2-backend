@@ -134,3 +134,17 @@ python3 rust/tools/dependency_review.py --scanner /absolute/path/scanner/bin/car
 record exact scope. Remote workflow results remain open. Historical matrix
 verification needs the admitted archive and native binary, not original history
 or Python gameplay. Full frozen cases remain a separate required tier.
+
+## Long verification jobs in WSL
+
+Keep a foreground WSL command attached for the lifetime of jobs launched through
+systemd. Services and scopes can outlive their launching shell, but systemd
+services alone do not keep a WSL instance alive. See the
+[Microsoft systemd guidance](https://learn.microsoft.com/en-us/windows/wsl/systemd).
+
+A clean WSL shutdown interrupts an unfinished verification stage. Retain its
+partial log and require a completed successful result before closing a gate.
+The local bounded workflow uses a separate foreground keepalive, one build/test
+worker and explicit cgroup memory limits. Current verification was reduced from
+3 GiB to 2 GiB when Windows commit headroom became small. Resource settings
+belong in the run evidence rather than changing game/search semantics.

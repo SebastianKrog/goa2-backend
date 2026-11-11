@@ -295,3 +295,51 @@ def test_compressed_reference_expansion_is_bounded_before_parsing(tmp_path, refe
         archive.install(str(source), identity, cache)
     assert not cache.exists()
     assert not list(tmp_path.glob(".reference-*"))
+
+
+def test_local_archive_uses_no_duplicate_data_copy(tmp_path, reference):
+    archive, members = reference
+    source = tmp_path / "source.tar"
+    identity = write_archive(source, members)
+    result = archive.install(str(source), identity, tmp_path / "cache")
+    assert result["source_hardlinked"] is True
+    assert source.stat().st_nlink == 1
+    assert hashlib.sha256(source.read_bytes()).hexdigest() == identity
+
+
+def test_archive_falls_back_to_copy_when_hardlinks_are_unavailable(
+    tmp_path, reference, monkeypatch
+):
+    archive, members = reference
+    source = tmp_path / "source.tar"
+    identity = write_archive(source, members)
+
+    def cannot_link(*args, **kwargs):
+        raise OSError("Cross-filesystem link unavailable")
+
+    monkeypatch.setattr(archive.os, "link", cannot_link)
+    result = archive.install(str(source), identity, tmp_path / "cache")
+    assert result["source_hardlinked"] is False
+    assert sum(row["executed"] for row in result["reports"]) == 2
+
+
+def test_changed_local_archive_is_rejected_before_cache_publication(
+    tmp_path, reference, monkeypatch
+):
+    archive, members = reference
+    source = tmp_path / "source.tar"
+    identity = write_archive(source, members)
+    original = archive.fixtures.full
+
+    def verify_then_change(*args, **kwargs):
+        result = original(*args, **kwargs)
+        with source.open("ab") as output:
+            output.write(b"changed after extraction")
+        return result
+
+    monkeypatch.setattr(archive.fixtures, "full", verify_then_change)
+    cache = tmp_path / "cache"
+    with pytest.raises(ValueError, match="changed during installation"):
+        archive.install(str(source), identity, cache)
+    assert not cache.exists()
+    assert not list(tmp_path.glob(".reference-*"))

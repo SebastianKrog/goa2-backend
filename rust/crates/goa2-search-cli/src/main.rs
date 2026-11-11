@@ -1555,6 +1555,8 @@ mod trace_tests {
             assert_eq!(index.cases.len(), count);
         }
         let total = index.cases.len();
+        let report_progress = std::env::var_os("GOA2_ORACLE_PROGRESS").is_some();
+        let finished = std::sync::atomic::AtomicUsize::new(0);
         let checked = fixture_parallel::for_each_case(index.cases.into_iter(), |entry| {
             let case: TraceCase = serde_json::from_reader(std::io::BufReader::new(
                 crate::fixture_cache::open(base.join(entry.path)).unwrap(),
@@ -1562,6 +1564,12 @@ mod trace_tests {
             .unwrap();
             assert_eq!(case.name, entry.name);
             verify_case(case);
+            if report_progress {
+                let done = finished.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+                if done.is_multiple_of(512) || done == total {
+                    eprintln!("{filename}: verified {done}/{total} cases");
+                }
+            }
         });
         assert_eq!(checked, total, "every oracle case must run");
     }

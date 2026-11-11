@@ -150,3 +150,14 @@ case worker for full verification, then one test thread with two case workers
 for exhaustive restore. Current verification was reduced from
 3 GiB to 2 GiB when Windows commit headroom became small. Resource settings
 belong in the run evidence rather than changing game/search semantics.
+
+To see progress from the indexed oracle comparisons while they run, use the
+same admitted fixture cache and run the trace stage with output capture disabled:
+
+~~~sh
+GOA2_ORACLE_PROGRESS=1 cargo test --locked --profile iterate -p goa2-search-cli --bin goa2-search-cli trace_tests:: -- --ignored --nocapture
+~~~
+
+The indexed comparisons print a count every 512 completed cases and at the
+end of each index. The full verification tier also runs the native suite and
+fixture preflight.

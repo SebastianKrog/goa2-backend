@@ -533,6 +533,37 @@ perspective, relevant knowledge and search/continuation semantics. Never persist
 private process keys as public game identities. Quantization, model replacement,
 changed visibility or changed features invalidates incompatible cached values.
 
+#### Deferred cards and upgrades
+
+Treat an undetermined node as a constrained family of concrete witness plans.
+Retain each witness's cards, upgrade history and joint binding constraints;
+independent lists must not invent incompatible card/upgrade combinations.
+
+Encode identical shared spatial features once, then use conditional card/loadout
+features and nonlinear heads for each relevant binding. N01 declares these
+feature dependencies; N06 evaluates the factorization. A positional head can
+prioritize route families. Backed-up values retain the declared stable-boundary
+and binding semantics. NNUE-style partial accumulators may reuse contributions
+where exact feature dependencies permit it.
+
+Refine when legality, effects, available continuations or evaluator inputs differ.
+Equal NN embeddings/scores do not prove rule equivalence. Preserve existing
+grouping guards until replacement is validated; inserting a full conditional NN
+score into a shared grouping key may destroy useful sharing. Learned priorities
+are not admissible pruning bounds without proof.
+
+Deferred computation must preserve commitment timing. A choice made before
+hidden information is revealed stays consistent across indistinguishable worlds;
+do not select the best upgrade separately in each sampled world. Preserve a
+legal concrete incumbent, and resolve the selected binding into actual issued
+commands before play.
+
+L3/I02 tests compare bounded grouped versus fully concrete enumeration, including
+identical positions with different hands/bonuses, incompatible bindings,
+information-set consistency and final command legality. Count duplicate witnesses
+correctly in policy/target statistics. Implement shared encoding over existing
+witnesses first; justify further symbolic execution with measured benefit.
+
 ### 5.2 Batching and distributed generation
 
 Add batching only after measuring full decision latency, queue wait, cancellation
@@ -665,7 +696,7 @@ All packages are open. Owners are roles to assign.
 | N05 | 3 / ML-search | Small MLP, NNUE, masked hex-CNN and graph experiments/ablations | Accepted stages 1–2 | A01–A03 with measured rejection/acceptance of each family |
 | N06 | 3 / engine-ML | Initial architecture/precision/runtime selection and separately identified search experiments | N05 | A04/A05 and explicit supported scope/tradeoffs |
 | N07 | 4 / ML-engine | One bounded complete implementation, current-data trained native candidate and admission report | N03–N06, actual required dataset/pipeline components | L1/L2, I01/I04 and section-9 checklist |
-| N08 | 4 / engine-runtime | Profiled representation/feature/incremental/SIMD improvements | N07 and frozen reference | L3/I02; no optimization without correctness and measured benefit |
+| N08 | 4 / engine-runtime | Profiled state/feature/incremental/SIMD work and witness-preserving deferred card/upgrade sharing | N07 and frozen reference | L3/I02, concrete-enumeration/commit-timing equivalence and measured benefit |
 | N09 | 4 / ML-data-operations | Broader scope, bounded generation/training throughput and worker/batch implementation as justified | N07, database storage/isolation | L4/L5/I03/I06 and declared resource ceilings |
 | N10 | 4 / client-release | Native/browser NN handoff, model registry rollout/retraction and ongoing evidence | N07 plus relevant N08/N09, client stages 1/2 | L6/I04/I05 and client-plan E gates for each advertised host |
 

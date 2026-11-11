@@ -1,7 +1,10 @@
 //! Automatic return controller; relocation consumers keep their own live guards.
 use super::phases::Field;
-use super::*;
-use crate::minion_return::ReturnPlan;
+use super::{
+    BoundObjects, Datum, Hex, NativeRequest, NativeSession, ObjectId, ObjectKind, ObjectValue,
+    RequestChoices, RequestToken, Result, Symbol, Team, unsupported,
+};
+use crate::{data::Registers, interpreter::native_hex, minion_return::ReturnPlan};
 
 impl NativeSession {
     fn processed_minions_bound(
@@ -213,7 +216,9 @@ impl NativeSession {
 
 #[cfg(test)]
 mod tests {
+    use super::super::fixture_case;
     use super::*;
+    use crate::{data::Symbols, interpreter::Instruction};
     #[test]
     fn live_return_cold_compilation_does_not_link_ordinary_move_or_mine_bodies() {
         let case = fixture_case("object-execution-minion-return-walk");

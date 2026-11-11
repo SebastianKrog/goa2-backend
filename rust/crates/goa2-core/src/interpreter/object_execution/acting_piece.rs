@@ -1,7 +1,11 @@
 //! Bind acting pieces using the same per-piece action legality as the menu.
 use super::phases::Field;
-use super::*;
+use super::{
+    BoundObjects, Datum, NativeEvent, NativeRequest, NativeSession, ObjectId, ObjectValue,
+    RequestChoices, RequestToken, Result, Symbol, unsupported,
+};
 use crate::{data::Registers, world::ActionKind};
+use std::sync::Arc;
 pub(super) enum PiecePlan {
     Done,
     Bind(Symbol),

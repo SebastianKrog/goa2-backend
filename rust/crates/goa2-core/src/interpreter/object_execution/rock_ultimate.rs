@@ -1,7 +1,9 @@
 //! Source-ordered rock-ultimate discovery and optional discard continuation.
 use super::passive_bodies::Kind;
 use super::phases::Field;
-use super::*;
+use super::{
+    BoundObjects, Datum, NativeSession, ObjectId, ObjectValue, Result, Symbol, unsupported,
+};
 pub(super) struct RockUltimatePlan {
     used: Symbol,
     affected: Vec<Symbol>,

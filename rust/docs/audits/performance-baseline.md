@@ -49,6 +49,12 @@ claim. All six cancellation samples observe cancellation after a requested 10 ms
 delay; response is measured from the actual flag signal, not from thread creation.
 Cooperative checks do not guarantee hard instruction preemption.
 
+The submission workload runs immediately after the checkpoint restore workload.
+Its 100-call aggregate includes the first preparation and candidate disposal.
+New reports also give the first-call cost and the mean for the following 99
+calls. Use the separate fields when comparing first-call and steady-state
+costs. Historical aggregate-only reports cannot distinguish those costs.
+
 ## WSL baseline before interpreter changes
 
 The [WSL run](../../benchmarks/maintenance-v1-wsl-results.json) repeats this

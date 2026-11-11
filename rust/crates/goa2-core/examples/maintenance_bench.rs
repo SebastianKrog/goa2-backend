@@ -90,22 +90,38 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
         40,
     );
-    let candidate_work = measure(
-        || {
-            black_box(
-                root.prepare_submission(
-                    "hero_arien",
-                    0,
-                    PlayerCommand::Commit {
-                        card_id: "aspiring_duelist".into(),
-                    },
-                    &budget,
-                )
-                .unwrap(),
-            );
-        },
-        100,
-    );
+    let prepare_candidate = || {
+        black_box(
+            root.prepare_submission(
+                "hero_arien",
+                0,
+                PlayerCommand::Commit {
+                    card_id: "aspiring_duelist".into(),
+                },
+                &budget,
+            )
+            .unwrap(),
+        );
+    };
+    const WARM_SUBMISSIONS: usize = 99;
+    let start = Instant::now();
+    prepare_candidate();
+    let first = Instant::now();
+    for _ in 0..WARM_SUBMISSIONS {
+        prepare_candidate();
+    }
+    let end = Instant::now();
+    let total_ns = (end - start).as_nanos();
+    let warm_ns = (end - first).as_nanos();
+    let candidate_work = json!({
+        "iterations": WARM_SUBMISSIONS + 1,
+        "total_ns": total_ns,
+        "ns_per_operation": total_ns as f64 / (WARM_SUBMISSIONS + 1) as f64,
+        "first_ns": (first - start).as_nanos(),
+        "warm_iterations": WARM_SUBMISSIONS,
+        "warm_total_ns": warm_ns,
+        "warm_ns_per_operation": warm_ns as f64 / WARM_SUBMISSIONS as f64,
+    });
     let setup_work = measure(
         || {
             black_box(LiveGame::create(&content, &setup, &budget).unwrap());

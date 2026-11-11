@@ -28,10 +28,15 @@ record the implementation history and verification commands. The checklist has
 
 ## Local release candidate verification
 
-- The combined engine candidate `ebd52035` passed full differential verification
+- The merged engine source at `ed24857c` passed full differential verification
   over 24,197 admitted fixtures, including 6,592 canonical cases, 17,347 live
   cases and four complete games. All 17,347 live cases passed exhaustive
-  restore across eight shards.
+  restoration across eight shards on the same source fingerprint.
+- Fixed-work planning and resolution on two maps matched decisions, scores and
+  node counts. A separate submission diagnostic found a 2.1–2.3 ms first-call
+  cost after the restore workload in both the earlier and typed-operand builds.
+  Subsequent calls took about 11–12 µs to prepare. The historical aggregate
+  mixed these costs, and its original baseline discrepancy remains unexplained.
 - The merged candidate `33e7e8bd` passed a clean, locked WSL build from a
   history-free 1,202-file export. Strict Clippy, rustdoc, formatting, 413 native
   tests and the local game example passed.
@@ -57,13 +62,6 @@ in [cleanup evidence](cleanup-evidence.json).
   **12 monolithic payloads**. All **230 snapshot chunks** pass the additional
   complete-game preflight. This includes the previously unavailable frozen case;
   no regenerated substitute or changed oracle/index was installed.
-- Local full differential verification at source `616f52d4` passed 636 native
-  tests (eight ignored in that pass) and all four trace tests, covering 6,592
-  canonical cases, 17,347 live cases and four complete games. See
-  `local_full_differential_verification` in `cleanup-evidence.json`.
-- Local exhaustive restoration passed for all 17,347 live cases across eight
-  disjoint shards. See `local_exhaustive_restore_verification` in
-  `cleanup-evidence.json`.
 - The private fixture archive packed and installed all 24,197 files in a fresh
   cache from standalone source. The approved remote acquisition route and CI
   results are still pending.

@@ -2567,5 +2567,31 @@
       }
     },
     "scope": "Both revisions show a first preparation of approximately 2.1 to 2.3 ms when measured separately immediately after the restore workload. Aggregate timing was high when run first and low when run after separate measurements. Warm preparation and disposal medians are close. The measured order effect reproduces on both packs and both revisions. The underlying cause of the first-call cost and why the original baseline aggregate omitted it remain unverified."
+  },
+  "maintenance_first_and_warm_report_verification": {
+    "benchmark_source_sha256": "b322d1cd70fef8514018a6300498ec90369b28d4c83c00f8f0d8109b2f731284",
+    "benchmark_binary_sha256": "e38f258c661b6941842dcdec09a383780b853744dc73ddf4a79675bf8085a31f",
+    "log_sha256": "eba88f7fc5ed5c8caeea4fb130b97b890bbf4aad6e580125f0ad493032bc050f",
+    "results": {
+      "smoke-game.json": {
+        "iterations": 100,
+        "total_ns": 4021098,
+        "ns_per_operation": 40210.98,
+        "first_ns": 2670899,
+        "warm_iterations": 99,
+        "warm_total_ns": 1350199,
+        "warm_ns_per_operation": 13638.373737373737
+      },
+      "live-game-content.json": {
+        "iterations": 100,
+        "total_ns": 3460198,
+        "ns_per_operation": 34601.98,
+        "first_ns": 2048099,
+        "warm_iterations": 99,
+        "warm_total_ns": 1412099,
+        "warm_ns_per_operation": 14263.626262626263
+      }
+    },
+    "scope": "Release example executed on both retained content packs. The first and warm intervals add to the preserved 100-call aggregate. These two validation runs establish report behavior."
   }
 }

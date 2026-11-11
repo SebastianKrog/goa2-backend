@@ -1937,5 +1937,67 @@
       "Authenticated REST from both browser tabs returned HTTP 200 at revision 4"
     ],
     "scope": "Local browser walkthrough using the exact tested release binary. Hosted frontend, production routing and deployment are separate."
+  },
+  "merged_candidate_disposable_binary_rollback": {
+    "candidate": "33e7e8bdb0a1d7cb2d4d10c6d8f4b2f0d9c78bbe",
+    "release_binary_sha256": "6aedaa7f4504196b0ec32c9a009c89f29dfc4cf91161257ce791ce4abe51bd4f",
+    "producer_source_archive_sha256": "2babcb98467da23baca51cec3e369d3995df87ad6d1bc2a159b2cc81ac7588a0",
+    "original_producer_binary_sha256": "905053e527fb7c438a41f1b9b6ce7f8a379facd6e6ddd35ef075926a7d01aac1",
+    "rebuilt_producer_binary_sha256": "47fbc33a55e63ae7929ae01c88e88bfcb0a4657ea997cb9dc5560e326ee0b584",
+    "scratch_fixture": {
+      "path": "legacy-v0.json.gz",
+      "sha256": "d17857ff4b77ea75e741c06c030ac661aa695dbed5a9e1f17bf168ec0dcbe1a3",
+      "gzip_sha256": "e5e02bd364a335641d39c9b887cb6776929d4a155b0eb402eb3ead2440091b8a",
+      "bytes": 2993700
+    },
+    "result": {
+      "producer_commit": "f0fb93e117f358266ef522e6d5f23d3452e83e97",
+      "matrix": [
+        {
+          "source_database_version": 0,
+          "consumer_database_version": 3,
+          "expected": 1,
+          "executed": 1,
+          "failed": 0,
+          "scope": "load/scopes/links/receipt/replay/share/command/event-order/restart/retry/rollback"
+        },
+        {
+          "source_database_version": 1,
+          "consumer_database_version": 3,
+          "expected": 1,
+          "executed": 1,
+          "failed": 0,
+          "scope": "load/scopes/links/receipt/replay/share/command/event-order/restart/retry/rollback"
+        },
+        {
+          "source_database_version": 2,
+          "consumer_database_version": 3,
+          "expected": 1,
+          "executed": 1,
+          "failed": 0,
+          "scope": "load/scopes/links/receipt/replay/share/command/event-order/restart/retry/rollback"
+        },
+        {
+          "source_database_version": 3,
+          "consumer_database_version": 3,
+          "expected": 1,
+          "executed": 1,
+          "failed": 0,
+          "scope": "load/scopes/links/receipt/replay/share/command/event-order/restart/retry/rollback"
+        }
+      ],
+      "future_database_rejected_without_mutation": true,
+      "rollback": {
+        "expected": 1,
+        "executed": 1,
+        "failed": 0,
+        "from_database_version": 3,
+        "restored_matching_backup_version": 0,
+        "old_binary_on_new_live_database_attempted": false
+      },
+      "full_frozen_parity": false
+    },
+    "log_sha256": "0694eabbaf0ec015d45468f14949b9d9b1940379a8ba91bb68012f9ec45c8798",
+    "scope": "The verified release migrated and advanced a disposable database, then the rebuilt historical binary reopened its matching pre-upgrade backup and continued play. The original admitted archive was verified independently with the current reader. The original producer executable was unavailable; its hash did not match this rebuild."
   }
 }

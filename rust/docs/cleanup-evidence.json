@@ -2609,5 +2609,30 @@
       "dependency": "a546f683fad019e379a1aea643620735ba20fac145fe36f497b3eca4be780189"
     },
     "scope": "Local history-free extraction with every mapped file hash checked. The audits cover the selected payload, local links, and embedded dependencies. Final payload approval, remote links, and public rights review remain open."
+  },
+  "updated_benchmark_candidate_standalone_verification": {
+    "source_commit": "a457892142e4416aeded5510a4c69e5be515cef2",
+    "source_map_sha256": "ebe76694d4c7d177532a7e4f1bb0f4bd281e2a1d8e5a66b08d38c302147879fe",
+    "passed": [
+      "locked workspace build",
+      "formatting",
+      "strict all-target all-feature Clippy",
+      "rustdoc",
+      "quick tests",
+      "local_game example"
+    ],
+    "quick": {
+      "passed": 413,
+      "failed": 0,
+      "ignored": 65
+    },
+    "log_sha256": {
+      "verify": "dda02760bc9075d8f4699f7bc843ff0af18a9af298d009c8030253e95bb536ae",
+      "build": "3c3825002d28c770b94938f623877493ca07b1f27c6b86eecf0803341ca23940",
+      "quality": "f2f76c27e5e1bcdb925af25da93445266c7a27da611ad8480a5e816b0915b010",
+      "quick": "2db7811376ecfe2907cffc34dcebeb034a367d12cd4829981e61133619f53cb9",
+      "example": "edd61a0460c6b58d42ab264155c89a074c771ba7754f3ad1f258d47864a88b57"
+    },
+    "scope": "History-free local extraction with new build and project caches and an offline Cargo dependency cache. This does not establish the final approved public payload or the remote acquisition route."
   }
 }

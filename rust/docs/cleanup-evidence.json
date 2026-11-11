@@ -2100,5 +2100,96 @@
       }
     ],
     "scope": "Exhaustive restoration on the local frozen corpus, including restored values, aliases, and request generations."
+  },
+  "merged_import_refactor_fixed_work_measurements": {
+    "search": {
+      "revisions": {
+        "structure": "d284805c19b018a28682531b826c9a8fa129ab0d",
+        "merged": "4cf74943044077a1880811aa7ce96516a3b6c845"
+      },
+      "workloads": [
+        {
+          "case": "complete-game-hanu-forgotten_island-progress-41",
+          "operation": "search_sampled_planning",
+          "nodes": 4096,
+          "structure_median_ns": 384028137,
+          "merged_median_ns": 419812365
+        },
+        {
+          "case": "complete-game-hanu-forgotten_island-progress-41",
+          "operation": "search_resolution",
+          "nodes": 4096,
+          "structure_median_ns": 426312041,
+          "merged_median_ns": 437277251
+        },
+        {
+          "case": "complete-game-hanu-magma_and_ice-progress-43",
+          "operation": "search_sampled_planning",
+          "nodes": 4096,
+          "structure_median_ns": 394989037,
+          "merged_median_ns": 395210094
+        },
+        {
+          "case": "complete-game-hanu-magma_and_ice-progress-43",
+          "operation": "search_resolution",
+          "nodes": 4096,
+          "structure_median_ns": 439230841,
+          "merged_median_ns": 464501339
+        }
+      ]
+    },
+    "maintenance": [
+      {
+        "content": "smoke-game.json",
+        "same_fixed_work": true,
+        "before_cancellation_observed": 3,
+        "after_cancellation_observed": 3,
+        "setup_work": {
+          "before_median_ns": 15271307.35,
+          "after_median_ns": 15014556.05
+        },
+        "clone_drop_work": {
+          "before_median_ns": 5961.525,
+          "after_median_ns": 5683.5
+        },
+        "restore_parse_work": {
+          "before_median_ns": 16602415.7,
+          "after_median_ns": 16378717.725
+        },
+        "prepare_commit_work": {
+          "before_median_ns": 14263.07,
+          "after_median_ns": 38285.98
+        }
+      },
+      {
+        "content": "live-game-content.json",
+        "same_fixed_work": true,
+        "before_cancellation_observed": 3,
+        "after_cancellation_observed": 3,
+        "setup_work": {
+          "before_median_ns": 14735105.1,
+          "after_median_ns": 14788032.4
+        },
+        "clone_drop_work": {
+          "before_median_ns": 5695.525,
+          "after_median_ns": 5873.495
+        },
+        "restore_parse_work": {
+          "before_median_ns": 16379637.35,
+          "after_median_ns": 16519319.025
+        },
+        "prepare_commit_work": {
+          "before_median_ns": 14136.06,
+          "after_median_ns": 40860.98
+        }
+      }
+    ],
+    "sha256": {
+      "maintenance-v1-interpreter-wsl-results.json": "aa8a361e47549d5fb4ca3d49f450b0287c7c9a59f8211fdf45127f8129e8b551",
+      "maintenance-merged-import-results.json": "e4a7e6e1e78f5e81d67d9c5894432282bf6bac4edbba637f799bfef08c1ddbd2",
+      "search-merged-import-comparison.json": "9e9f62e54d09dcff39f7f8e8d3e1deafe7ac40b6b9555fc2e9457ae2f9a594c7",
+      "search-merged-import-results.json": "104634a1c68e922ff07ea56a1ce6aab39eb9a24dc5d1efc4b44486bd9c975a9e"
+    },
+    "scope": "Fixed-work results matched. Maintenance prepare_submission timings rose on both packs across separately collected fresh-process samples. A same-session paired comparison is needed to attribute this difference."
   }
 }

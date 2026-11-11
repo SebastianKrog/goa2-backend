@@ -509,6 +509,45 @@ optimizer resume and full-run resume are different operations with separately
 validated provenance. Resuming under a changed data/schema/model/search identity
 must fail or create a new run, not silently continue the old one.
 
+### Bootstrap library from the current search
+
+Use a frozen current bot/search as the teacher and Rust as the rules environment;
+human games are not required. Begin collecting once engine correctness and
+reproducibility are established, without waiting for a perfect teacher or final
+NN tensor layout. The teacher uses the future agent's authorized information;
+privileged debug runs remain a separately labelled source.
+
+| Completed games | Initial purpose |
+| --- | --- |
+| 1,000 | Pilot collection, labels, coverage, failure rate, storage and generation cost |
+| 3,000–5,000 | First useful small-model training baseline |
+| 10,000–20,000 | Initial bootstrap candidate for bounded iterative self-improvement |
+| More if justified | Broader coverage or model capacity supported by learning curves |
+
+These are starting budgets, not guaranteed sample requirements or automatic
+admission thresholds. Measure useful policy decisions and stable-value samples
+separately; game length and correlated/repeated states affect effective data.
+A broad all-hero/map/mode model may need more than a compact initial scope.
+
+Retain complete replay inputs, engine/rule/content/teacher identities, seeds,
+concrete commands/candidate mappings, available search scores/coverage/stop
+reasons and termination outcomes. Preserve raw games so features can be derived
+later. Prioritize original decision-hash capture before large collection; mark
+missing hashes honestly. Search scores are not automatically MCTS visit targets,
+and deferred-plan diagnostics cannot replace valid concrete-action labels.
+
+Vary rosters, maps, sides, upgrades and controlled exploration around plausible
+moves. Measure unique starts/trajectories and tactical/card/upgrade exposure;
+different seeds alone do not establish diversity. Freeze lineage/start-family
+splits before training and keep related variants together.
+
+Train comparable small models on nested 1k/3k/10k subsets with a fixed held-out
+cohort and declared initialization/update budgets. Compare prediction quality
+and actual search-backed play against the frozen teacher. Start bounded
+iterative self-play when reliability, playing quality and resource criteria
+pass; retain that teacher as a fixed benchmark. Do not wait for exhaustive game
+coverage or treat a chosen corpus size as proof of readiness.
+
 ### 5.1 State and feature optimization
 
 Use profiling to decide whether the bottleneck is engine transition/clone,

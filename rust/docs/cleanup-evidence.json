@@ -2408,5 +2408,92 @@
       }
     },
     "scope": "The first typed-operand commit reproduced the preparation slowdown on both pinned content packs. Its debug commitment changes an internal hero symbol number from 3399 to 3402 while the card index, score and work counters match in this diagnostic. The later midpoint matched the merged fixed-work output exactly. Neither result identifies the slow function."
+  },
+  "submission_preparation_phase_diagnostics": {
+    "reports": {
+      "maintenance-prepare-profile.json": {
+        "sha256": "2c4b7430480caf46266975ae5d98bfc522035265f532da9ed87396f3dc638b3f",
+        "results": {
+          "typed": {
+            "revision": "7e87efd76ff7e0ba7aa53524f0bd33debcd98eb7",
+            "content": {
+              "smoke-game.json": {
+                "median_ns": {
+                  "clone": 6600,
+                  "apply": 6900,
+                  "advance": 300,
+                  "bookkeeping": 100
+                },
+                "reported_prepare_ns": 51931.98
+              },
+              "live-game-content.json": {
+                "median_ns": {
+                  "clone": 6400,
+                  "apply": 7100,
+                  "advance": 300,
+                  "bookkeeping": 100
+                },
+                "reported_prepare_ns": 52723.98
+              }
+            }
+          },
+          "baseline": {
+            "revision": "832ea43ee14ba32f1610baf846ecd43a75c52260",
+            "content": {
+              "smoke-game.json": {
+                "median_ns": {
+                  "clone": 6200,
+                  "apply": 5800,
+                  "advance": 200,
+                  "bookkeeping": 100
+                },
+                "reported_prepare_ns": 48629.99
+              },
+              "live-game-content.json": {
+                "median_ns": {
+                  "clone": 7500,
+                  "apply": 9900,
+                  "advance": 400,
+                  "bookkeeping": 200
+                },
+                "reported_prepare_ns": 67742.98
+              }
+            }
+          }
+        }
+      },
+      "maintenance-prepare-disposal.json": {
+        "sha256": "f73ccbd3f5a6e8f402d062cc958a7fbace9c75772f402c00cabfbab21727f1d3",
+        "results": {
+          "typed": {
+            "revision": "7e87efd76ff7e0ba7aa53524f0bd33debcd98eb7",
+            "content": {
+              "smoke-game.json": {
+                "prepare_median_ns": 11300,
+                "drop_median_ns": 1900
+              },
+              "live-game-content.json": {
+                "prepare_median_ns": 11100,
+                "drop_median_ns": 1900
+              }
+            }
+          },
+          "baseline": {
+            "revision": "832ea43ee14ba32f1610baf846ecd43a75c52260",
+            "content": {
+              "smoke-game.json": {
+                "prepare_median_ns": 11300,
+                "drop_median_ns": 2000
+              },
+              "live-game-content.json": {
+                "prepare_median_ns": 11600,
+                "drop_median_ns": 2100
+              }
+            }
+          }
+        }
+      }
+    },
+    "scope": "Per-phase timings used stderr logging in the candidate function and changed aggregate timings. A separate harness with unmodified engine code measured preparation and disposal independently, excluding the first 20 calls. Warm medians agree closely. The original unmodified aggregate regression remains unexplained by these diagnostics."
   }
 }

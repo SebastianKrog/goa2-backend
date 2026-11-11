@@ -72,7 +72,7 @@ acceptance. Native/Python CI definitions and local quick/quality checks exist.
 
 - [ ] **C04-01** Connect the full and restore CI jobs to the verified artifact acquisition route, checking identities after retrieval. Keep selected jobs failing on missing data; never satisfy them with the smoke fallback.
 - [x] **C04-02** Run `python3 tools/fixtures.py verify --full` from `rust/` with all admitted payloads. Record separate case and monolithic-payload counts, with no missing or failed inputs.
-- [ ] **C04-03** Run `python3 tools/check.py full` and retain canonical/live/full-game state, request, event-order and identity comparison results with explicit counts.
+- [x] **C04-03** Run `python3 tools/check.py full` and retain canonical/live/full-game state, request, event-order and identity comparison results with explicit counts.
 - [ ] **C04-04** Run `python3 tools/check.py restore` with the required complete data and retain exhaustive boundary/restoration and worker-isolation evidence.
 - [x] **C04-05** Acquire the admitted setup/view inputs and explicitly run their ignored gates. Record variables, selected names and nonzero expected/executed counts; an ignored gate is not a pass.
 - [x] **C04-06** Replace remaining generic expensive-tier command descriptions with executable, pinned workload commands and required inputs. Cover setup/view, restore, performance/strength and hosted integration, with accountable owners and event/schedule triggers.

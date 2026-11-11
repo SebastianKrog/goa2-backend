@@ -790,5 +790,33 @@
     ],
     "distribution_route_exercised": false,
     "scope": "Native process started in a disposable directory with an empty home, fresh database and minimal environment. The local pack passed the standalone installer using its pinned hash. C02-04 still requires the approved distribution route."
+  },
+  "local_full_differential_verification": {
+    "stage": "full",
+    "command": [
+      "python3",
+      "tools/check.py",
+      "full",
+      "--profile",
+      "iterate"
+    ],
+    "started_utc": "2026-11-11T00:44:38.385972+00:00",
+    "boot_id": "9de09eb3-f762-4dac-b617-b94be8db2741",
+    "source_commit": "616f52d4d38d770f6ff6e3665431de395e767376",
+    "source_identity": "1c677a33fa407aa3842fe1d8f4eba1c7e0fcd38c852915d9de5e7334a138ea02",
+    "test_threads": "2",
+    "oracle_workers": "1",
+    "memory_max_bytes": 2147483648,
+    "finished_utc": "2026-11-11T01:42:42.140995+00:00",
+    "exit_code": 0,
+    "source_identity_unchanged": true,
+    "full-result.json_sha256": "251b35c6a0c63a737901f2bc3e5670e4e0faa44a060f35a40bc0a067a8aa4446",
+    "full.log_sha256": "6d2e80dce140cda1c1873959c36077759da16caab6ecf99998f54fe7a170045f",
+    "native_passed": 636,
+    "native_ignored": 8,
+    "trace_tests_passed": 4,
+    "canonical_cases": 6592,
+    "live_cases": 17347,
+    "complete_games": 4
   }
 }

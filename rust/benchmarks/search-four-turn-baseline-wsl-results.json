@@ -1,0 +1,192 @@
+{
+  "schema_version": 1,
+  "worker_sha256": "71564f327344fb39b5c1d9619dce3015ff20a4b35c6fddff7116f863bb62d945",
+  "source_checkout_commit": "ff8ffed534ef190fa507399492a5db4c361c2c14",
+  "architecture": "x86_64",
+  "kernel": "6.18.58.1-microsoft-standard-WSL2",
+  "scope": "Fresh worker process, envelope compilation, and search",
+  "workloads": [
+    {
+      "case": "complete-game-hanu-forgotten_island-progress-41",
+      "case_sha256": "9f1f83c47c182af163f3e0f0d4095109f5b8155f66eb353eb2e901925481f5af",
+      "measurements": [
+        {
+          "request": {
+            "work_budget": "nodes_v2",
+            "max_depth": 4,
+            "rollout_turns": 4,
+            "max_nodes": 4096,
+            "evaluation": "material_position",
+            "operation": "search_sampled_planning",
+            "player_id": "hero_hanu",
+            "seed": 29,
+            "cap": 4,
+            "workers": 1,
+            "greedy_card_order": true,
+            "bot_team": {
+              "mode": "true_rules",
+              "bot_ids": [
+                "hero_hanu"
+              ],
+              "worlds": 2
+            },
+            "upgrade_checkpoints": null
+          },
+          "envelope_sha256": "505d15fcbbd851296e52272c393b42d1e2336b12d945ba585e713b272c0a6353",
+          "result": {
+            "commitments": [
+              {
+                "player_id": "hero_hanu",
+                "first_card": 12,
+                "second_card": null
+              }
+            ],
+            "requested_worlds": 2,
+            "total_rows": 4,
+            "probe_nodes": 0,
+            "screened_replies": 0,
+            "prepared_worlds": 2,
+            "score": 0,
+            "shallow_score": null,
+            "completed_rows": 4,
+            "pruned_rows": 0,
+            "evaluated_cells": 8,
+            "total_cells": 8,
+            "nodes": 4096
+          },
+          "wall_ns": [
+            281904151,
+            267767330,
+            279245447
+          ]
+        },
+        {
+          "request": {
+            "work_budget": "nodes_v2",
+            "max_depth": 4,
+            "rollout_turns": 4,
+            "max_nodes": 4096,
+            "evaluation": "material_position",
+            "operation": "search_resolution",
+            "player_id": "hero_arien",
+            "resolution_sample_seed": 29,
+            "resolution_sample_worlds": 2,
+            "resolution_sample_workers": 1,
+            "upgrade_checkpoints": null
+          },
+          "envelope_sha256": "548aab080c797d3e5cd44d0db21df89302577e8df115358ba48b112e0ec71a28",
+          "result": {
+            "decision": {
+              "kind": "input",
+              "player_id": "hero_arien",
+              "request_id": "native-request-1",
+              "selection": "SKILL"
+            },
+            "score": 0,
+            "score_kind": "turn_rollout",
+            "completed_depth": 3,
+            "resolved": false,
+            "stop": "node_limit",
+            "nodes": 4096
+          },
+          "wall_ns": [
+            337441741,
+            320152113,
+            310145497
+          ]
+        }
+      ]
+    },
+    {
+      "case": "complete-game-hanu-magma_and_ice-progress-43",
+      "case_sha256": "c1d4a7fbd7f6c8243d16827b9810ca020d098438097efc84a1ac9db0d9fb47bd",
+      "measurements": [
+        {
+          "request": {
+            "work_budget": "nodes_v2",
+            "max_depth": 4,
+            "rollout_turns": 4,
+            "max_nodes": 4096,
+            "evaluation": "material_position",
+            "operation": "search_sampled_planning",
+            "player_id": "hero_hanu",
+            "seed": 29,
+            "cap": 4,
+            "workers": 1,
+            "greedy_card_order": true,
+            "bot_team": {
+              "mode": "true_rules",
+              "bot_ids": [
+                "hero_hanu"
+              ],
+              "worlds": 2
+            },
+            "upgrade_checkpoints": null
+          },
+          "envelope_sha256": "10a42958bfd7614da522a9a821d9fae69327f82d3d6b27f53cac71c84a47b79f",
+          "result": {
+            "commitments": [
+              {
+                "player_id": "hero_hanu",
+                "first_card": 12,
+                "second_card": null
+              }
+            ],
+            "requested_worlds": 2,
+            "total_rows": 4,
+            "probe_nodes": 0,
+            "screened_replies": 0,
+            "prepared_worlds": 2,
+            "score": 0,
+            "shallow_score": null,
+            "completed_rows": 4,
+            "pruned_rows": 0,
+            "evaluated_cells": 8,
+            "total_cells": 8,
+            "nodes": 4096
+          },
+          "wall_ns": [
+            280439349,
+            274384240,
+            278162645
+          ]
+        },
+        {
+          "request": {
+            "work_budget": "nodes_v2",
+            "max_depth": 4,
+            "rollout_turns": 4,
+            "max_nodes": 4096,
+            "evaluation": "material_position",
+            "operation": "search_resolution",
+            "player_id": "hero_arien",
+            "resolution_sample_seed": 29,
+            "resolution_sample_worlds": 2,
+            "resolution_sample_workers": 1,
+            "upgrade_checkpoints": null
+          },
+          "envelope_sha256": "e539415153f63d6c0b531006319eccf18a2aa8565f314caab2135fac8b228810",
+          "result": {
+            "decision": {
+              "kind": "input",
+              "player_id": "hero_arien",
+              "request_id": "native-request-1",
+              "selection": "SKILL"
+            },
+            "score": 0,
+            "score_kind": "turn_rollout",
+            "completed_depth": 3,
+            "resolved": false,
+            "stop": "node_limit",
+            "nodes": 4096
+          },
+          "wall_ns": [
+            327814425,
+            323540818,
+            327952526
+          ]
+        }
+      ]
+    }
+  ]
+}

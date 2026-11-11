@@ -1362,5 +1362,39 @@
         "median_ms": 322.233
       }
     ]
+  },
+  "wsl_interpreter_four_turn_comparison": {
+    "report": "../benchmarks/search-four-turn-interpreter-comparison.json",
+    "sha256": "52b9a173dc0ad3e6d94078a652ea499bf893a82fa4e2fcb4f0627761c5051c0b",
+    "baseline_report": "../benchmarks/search-four-turn-baseline-wsl-results.json",
+    "baseline": "ff8ffed534ef190fa507399492a5db4c361c2c14",
+    "candidate": "832ea43ee14ba32f1610baf846ecd43a75c52260",
+    "baseline_report_sha256": "0ea1b983072ae6a10b6fafbcb9aacae812a109b36dd90ebca85a1eea7e7e34a6",
+    "workloads": [
+      {
+        "case_sha256": "9f1f83c47c182af163f3e0f0d4095109f5b8155f66eb353eb2e901925481f5af",
+        "operation": "search_sampled_planning",
+        "baseline_median_ns": 279245447,
+        "interpreter_median_ns": 267952979
+      },
+      {
+        "case_sha256": "9f1f83c47c182af163f3e0f0d4095109f5b8155f66eb353eb2e901925481f5af",
+        "operation": "search_resolution",
+        "baseline_median_ns": 320152113,
+        "interpreter_median_ns": 304330439
+      },
+      {
+        "case_sha256": "c1d4a7fbd7f6c8243d16827b9810ca020d098438097efc84a1ac9db0d9fb47bd",
+        "operation": "search_sampled_planning",
+        "baseline_median_ns": 278162645,
+        "interpreter_median_ns": 276602617
+      },
+      {
+        "case_sha256": "c1d4a7fbd7f6c8243d16827b9810ca020d098438097efc84a1ac9db0d9fb47bd",
+        "operation": "search_resolution",
+        "baseline_median_ns": 327814425,
+        "interpreter_median_ns": 322232818
+      }
+    ]
   }
 }

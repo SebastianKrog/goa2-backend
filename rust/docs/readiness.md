@@ -21,7 +21,7 @@ record **45 completed and 39 open items**, with reproducible commands and limits
 | C07 | Contribution/changelog/security/conduct drafts, issue/PR templates, dependency license inventory, clean extraction/source mapping; disabled crates.io policy enforced; maintained advisory/license scan, SQLite advisory remediated, internal release notes/provenance; preliminary payload scan and neutral historical machine paths | License grant/holders/notices, named maintainers/security destination, public-tree/history review: repository owner |
 | C08 | Shared process/API/WebSocket helpers, six independently runnable service suites, atomic schema v1–v3 migrations; WAL backup/restore/independent shares and retained process-harness decision; executor/lock audit and contended-mutex fix; historical migration archive and actual matching-backup binary rollback | Final candidate/hosted extended replay-share checks: service maintainers |
 | C09 | Intended `api`/bot facade; maintained adapter migration, explicit experimental search imports, complete worker schema/caller/status inventory and internal diagnostic categories | Full data/caller migration before restricting raw internal visibility: engine/search maintainers |
-| C10 | Dense/object consumer inventory with explicit retention; active version constants centralized; no semantic rewrite or retirement | Local full differential passed; exhaustive restore and fixed-work baseline remain before module or representation changes: engine/search maintainers |
+| C10 | Dense/object consumer inventory with explicit retention; active version constants centralized; no semantic rewrite or retirement | Local full differential and exhaustive restore passed; fixed-work baseline remains before module or representation changes: engine/search maintainers |
 | C11 | Panic/trust audit, bounded reference/catalog/replay/worker mutation tests and root/sibling/ordered-restore/privacy invariants; reproducible release-profile startup/clone/restore/search/cancellation/memory baseline and catalog/footprint retention decision | Representative full regression and performance gates before hot-path changes: engine/search maintainers |
 | C12 | Disposable manifest-based clean snapshot tooling and native/2D extraction rehearsal | Full artifacts, rights, hosted integration and final release gates remain required: release maintainers |
 
@@ -36,8 +36,10 @@ record **45 completed and 39 open items**, with reproducible commands and limits
   tests (eight ignored in that pass) and all four trace tests, covering 6,592
   canonical cases, 17,347 live cases and four complete games. See
   `local_full_differential_verification` in `cleanup-evidence.json`.
-- Exhaustive restoration, verified distribution from a fresh independent
-  checkout and remote CI remain required.
+- Local exhaustive restoration passed for all 17,347 live cases across eight
+  disjoint shards. See `local_exhaustive_restore_verification` in
+  `cleanup-evidence.json`. Independent archive installation and remote CI
+  remain separate verification gates.
 - Public redistribution rights, attribution and the full license text need the
   repository owner's decision. Cargo's existing MIT metadata is not that decision.
 - Destination repository, private security reporting contact and named ownership

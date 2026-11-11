@@ -1,7 +1,7 @@
 # Client-side bot execution plan
 
 Status: proposed implementation plan; no client implementation or release is
-claimed complete. Written 11 November 2026. This is plan 2 of four, following
+claimed complete. Written 11 November 2026. This is plan 2 of five, following
 the [shared Rust foundation](SHARED_RUST_FOUNDATION_PLAN.md).
 
 Deliver in three stages: **native Rust client**, then **browser WebAssembly**,
@@ -422,6 +422,7 @@ of a neural evaluator.
 
 ### Hard dependency and scope
 
+Dependency/ownership details are indexed in [the plan map](PLANS_INDEX.md).
 This stage is **blocked until the full GoA2 NN implementation is ready**.
 Plan 4's preparation document, an evaluator interface, random weights or a mock
 runtime do not satisfy that dependency. Required upstream deliverables are:
@@ -583,25 +584,21 @@ Before each stage release:
       real deployment/browser verification and actual promotion decisions.
 
 Stage 1 and stage 2 use heuristic evaluation until stage 3 is admitted.
-Stage 3 remains visibly blocked on full NN readiness even if its loader and
-interface stubs have already been written.
+Stage 3 remains blocked on the neural plan's L2/model-readiness milestone even
+if loader/interface stubs exist. Native NN release requires E01/E02/E04/E05/E06
+for its advertised native scope; it need not wait for browser E03. Browser NN
+release separately requires the relevant E01–E06 browser evidence. Overall
+stage-3 completion covers both advertised hosts. Neither host claims support
+outside its admitted rules/model/platform scope; use only an explicitly selected
+compatible heuristic fallback, never a silently misbound model.
 
-## 10. Planning sequence and handoff
+## 10. Handoffs
 
-This document supplies plan 2's three-stage execution path. The
-[database, training data, statistics and Elo plan](DATABASE_TRAINING_STATISTICS_PLAN.md)
-is now recorded. The [neural-search plan](NEURAL_SEARCH_IMPLEMENTATION_PLAN.md)
-defines feature/evaluation points, model frameworks, architecture exploration and
-incremental implementation. Its section 9 specifies actual model-admission
-deliverables needed to unblock this plan's stage 3; writing the plan or providing
-an interface/smoke network is insufficient.
-
-Plan 5 is now written: the [rule/oracle/Python procedure](RULE_ENGINE_UPDATE_PROCEDURE.md)
-and [later NN rule-change procedure](NN_RULE_CHANGE_UPDATE_PROCEDURE.md).
-They preserve pinned current-game contracts and define revalidation, fresh or
-current/earlier-model warm-start updates. A model still needs actual target-rule
-admission before client activation. The sequence reminder is fulfilled; no
-scheduled job was created.
+Use the [plan index](PLANS_INDEX.md) for dependency slices and contract ownership.
+Heuristic native/browser clients do not wait for NN training. Neural activation
+uses the neural plan's [model-readiness milestone](NEURAL_SEARCH_IMPLEMENTATION_PLAN.md#9-what-unblocks-client-side-neural-evaluation)
+and this plan's per-host E gates. Rules and model changes follow the two
+procedures in plan 5; neither an interface nor a smoke model fulfils readiness.
 
 Implementation references: [shared foundation](SHARED_RUST_FOUNDATION_PLAN.md),
 [current bot coordinator](../rust/crates/goa2-game-server/src/bots.rs),

@@ -1,8 +1,8 @@
 # Shared Rust game and search foundation
 
 Status: proposed implementation plan; no foundation work is claimed complete.
-Written 11 November 2026. This is plan 1 of four: shared foundation, player-run
-bot client, live-server database integration, and neural-search preparation.
+Written 11 November 2026. Plan 1 of five. The [plan index](PLANS_INDEX.md)
+owns navigation, dependency slices and the cross-plan responsibility map.
 
 ## 1. Goal and assumptions
 
@@ -14,8 +14,12 @@ Provide one Rust rules runtime and explicit contracts that can support:
 
 Assume the cleanup is complete. Use its supported facade, immutable catalogs,
 test tiers, content acquisition and reproducible build workflow. This plan does
-not repeat cleanup tasks or require historical formats, deprecated worker
-operations, old Python models, or older client releases to remain supported.
+not repeat cleanup tasks or require obsolete APIs, formats or model families.
+“Current support” includes every in-progress contract admitted at implementation
+cutover, even after a newer contract starts serving new games. Active-game
+pinning and declared audit-artifact retention are required; blanket compatibility
+with all historical versions is not. Rule-version routing beyond the initial
+baseline belongs to plan 5's R01/R07.
 
 **Current games must keep working.** At implementation start, record the exact
 current engine/content identity and formats, then test games created and saved
@@ -208,7 +212,8 @@ never trust a body-provided actor ID. The game revision and decision token must
 invalidate work across advancement, rollback, replacement and restart as
 appropriate, including states that look visually identical.
 
-Resolve idempotency before rejecting an already accepted retry for its old
+Authenticate and recheck current read permissions before returning any receipt.
+Then resolve idempotency before rejecting an already accepted retry for its old
 revision: same ID and same authenticated command returns the stored reply;
 same ID with different command content is a conflict. Fresh stale, foreign,
 out-of-turn or illegal submissions change no game, receipt, replay or clock
@@ -309,12 +314,17 @@ takes the legal candidates separately and maps scores back to their typed
 commands. Finite scores, shape checks and an explicit no-policy path are required.
 Changing candidate enumeration must not change the meaning of a position value.
 
-Specify boundary kinds rather than evaluating arbitrary interpreter frames:
-root decision, subsequent decision, completed action/turn, terminal and budget
-cutoff. Forced-effect draining uses the same execution budget. A partial
-continuation at interruption is not silently labelled a completed boundary.
-The neural-search plan chooses the search algorithm and training targets;
-this foundation supplies explicit hooks and traces for the supported boundaries.
+F06 implements the common policy/value ports, full-recompute reference and
+parametric proof evaluator. Policy consumes typed legal candidates; stable value
+does not. Scores carry an explicit convention/units, fixed perspective and
+boundary; never compare raw heuristic integers with an expected-outcome NN value
+without a declared conversion. The neural plan owns its head targets, tensor
+adapters, model semantics and wider learned-search integration tests.
+
+The boundary contract below belongs to this core facade, so local bots and neural
+search use one detector. Forced-effect draining shares the execution budget.
+Adding a learning hook must not change the production bot's default strategy or
+claim equivalent strength: the parametric agent has its own policy identity.
 
 Features cover public board geometry and units, resources, known card state,
 phase/decision ownership, public history and permitted private information.
@@ -340,6 +350,50 @@ insufficient. Private caches include perspective, schemas and evaluator identity
 
 Replacing parameter values or the evaluator implementation must not require
 changing game rules, persistence schemas, command decoding or transport code.
+
+### Evaluation boundaries
+
+F06 owns one typed boundary detector/transition anchor in the core facade,
+shared by heuristic/neural search and actual-trajectory recording. Do not infer a completed transition from phase
+name, a generic prompt, an empty stack alone or an arbitrary interpreter tick.
+
+| Point | Policy evaluation | Value evaluation | Required semantics |
+| --- | --- | --- | --- |
+| Root planning decision | Allowed over that seat's current legal commitments/pass/finish choices | No intermediate stable-value call | Partial commitments and second slots are still decisions, not completed transitions |
+| Root or descendant action/response/upgrade prompt | Allowed over addressed legal choices | Not a stable value merely because input is requested | Actor/defender/team owner is separate from fixed root viewer and score team |
+| `ACTOR_READY` | Only if an actual legal decision is present | Allowed | Resolution has selected the next actor; execution is before their unstarted respawn/card action; previous required transition is complete |
+| `PLANNING_READY` | Allowed when there is a real planning choice | Allowed, candidate-free | Fresh planning, no partial commitments or pending resolution/cleanup; automatic empty-hand passes do not manufacture partial planning |
+| Terminal | No search policy call needed | Exact rules-derived outcome; bypass the evaluator | Resolve winner hero through its team; accept a draw only if current rules actually define that terminal result |
+| Budget/cancellation cutoff | No new model call after budget expiry | Use only an already completed admissible evaluation, or no score/fallback | A partially executed continuation is not relabelled stable or terminal |
+
+Transition anchors bind kind, round/turn and enclosing resolution actor:
+
+- From a planning root, complete remaining planning/reveal and initiative until
+  the first genuine actor-ready boundary. If all pass and no actor starts,
+  continue required cleanup to the next genuine planning-ready boundary.
+- From an actor-bound root, including a defender reaction, complete the
+  enclosing actor's action/turn and finalization. A second card or respawn for
+  the same actor does not by itself complete the transition. Stop at a different
+  actor-ready boundary or a later planning-ready boundary.
+- From actorless/tie/cleanup work, advance through required effects to the next
+  real actor/planning boundary.
+- At the end of the round, execute required minion battles, removal/lane movement,
+  upgrades and reset. Entering cleanup is not the endpoint.
+- Record terminal outcomes immediately when the rules establish them.
+  Mandatory aborts, no options, loop guards and watchdog exhaustion are not
+  implicit terminal wins/draws.
+
+Specify these semantics against current typed Rust state and prove the detector
+does not alter steps, events, RNG draws or normal gameplay. If an intended
+boundary cannot be observed without changing rules execution, fix the
+observation hook rather than adding synthetic confirmation/input prompts.
+
+The core may expose other diagnostic decision/cutoff hooks. A cutoff is a
+stop reason, not permission to call a stable-value evaluator on a partial frame.
+A future decision-value or partial-continuation API needs a separately named
+schema, targets and evidence. The neural plan adopts this detector; it does
+not implement a competing copy.
+
 
 ## 9. Portable execution and bounded resources
 
@@ -386,7 +440,7 @@ named maintainers. Each package produces evidence before downstream sign-off.
 | F03 | Engine/search | Observation-only world constructor and constrained sampling spike, including difficult continuations | F02 | No privileged input reachable; valid samples preserve known state and all required root decisions reconstruct |
 | F04 | Engine/service | Shared typed command conversion, revision/decision binding, idempotency and current API adapter | F02 | Offered choices round-trip; stale/foreign/duplicate/conflicting cases have exact expected effects |
 | F05 | Engine/service/storage | Prepared transition and storage acceptance conformance using current SQLite and injected failures | F01, F04 | Durable ordering and crash/retry recovery matrix passes without exposing candidate state |
-| F06 | Search | Feature schema, full recompute extractor, weighted evaluator and replaceable value/policy interfaces | F01, F03, F04 | Deterministic reference tests, terminal semantics, candidate-independent value and replacement demonstration pass |
+| F06 | Search | Shared semantic features/reference extractor, core boundary detector, policy/value ports and parametric proof evaluator | F01, F03, F04 | One detector/contract with deterministic reference, boundary/terminal, value-independence and replacement tests |
 | F07 | Engine/search/client | Bounded serial execution, branch ownership, host adapters and native/WASM spike | F03, F06 | Budget/cancellation/nonmutation tests pass; native reference works and browser feasibility is measured |
 | F08 | Engine/service/search | Headless integrations, current-game regression matrix, evidence report and handoff contracts | F02–F07 | All mandatory acceptance rows below pass and three follow-on plans have usable inputs |
 
@@ -396,6 +450,16 @@ then proceed independently where dependencies permit. Keep semantic rule fixes,
 representation optimizations and model experiments in separate changes.
 
 ## 11. Completion evidence and acceptance
+
+### Evidence and scope
+
+This is the common evidence/coverage contract for all five plans. Follow-on gates
+add their workload-specific checks and link the same cohort/report; they do not
+need separate copies of generic engine regressions. A completed package's
+unchanged evidence may be referenced by exact identity, but relevant changed
+boundaries must be rerun. The [index](PLANS_INDEX.md#dependency-slices) identifies
+which foundation slices each consumer needs; F08 does not wait for installers,
+PostgreSQL deployment, NN training or the full historical audit platform.
 
 Create a reproducible acceptance report with source commit, commands/toolchain,
 content/schema identities, declared fixtures, expected/executed/missing/failed
@@ -457,29 +521,19 @@ semantics and use this harness for before/after comparisons.
 Writing or approving this document does not mark those boxes complete. F08 closes
 the foundation implementation only when its evidence exists.
 
-## 12. Follow-on plans and reminder
+## 12. Handoffs
 
-| Order | Plan | Foundation handoff | Reserved decisions |
-| --- | --- | --- | --- |
-| 1 | Shared foundation — this document | Current identity, observation/decision/command, transitions, features, budgets and harness | Implement F01–F08 |
-| 2 | [Player-run bot client](CLIENT_SIDE_BOT_EXECUTION_PLAN.md) — plan written; implementation pending | Observation-only native agent, transport and host contracts | Three stages: native Rust client, browser WASM, then local neural inference gated on the full NN implementation |
-| 3 | [Database, training data, statistics and Elo](DATABASE_TRAINING_STATISTICS_PLAN.md) — plan written; implementation pending | Private checkpoint and transactional acceptance/recovery contract | Operational PostgreSQL, derived statistics/rating database, immutable training datasets, purpose/lineage and isolated testing sessions |
-| 4 | [Neural search](NEURAL_SEARCH_IMPLEMENTATION_PLAN.md) — plan written; implementation pending | Features, geometry, value/policy seam, sampled worlds and measured search boundaries | Four stages: features/simple evaluation points, inference/evaluation framework, NN designs, incremental implementation and scaling |
-| 5 | [Rules/oracle/Python procedure](RULE_ENGINE_UPDATE_PROCEDURE.md) and [later NN procedure](NN_RULE_CHANGE_UPDATE_PROCEDURE.md) — written; implementation pending | Python-aligned rule version/Rust subrevision, current-game binding and evidence hooks | [Dedicated version/audit plan](RULE_VERSION_AUDIT_IMPLEMENTATION_PLAN.md), single target replay against recorded decision-space hashes, fixtures and model/data disposition |
+The [plan index](PLANS_INDEX.md) owns the five-plan map, implementation dependency
+slices and procedure/skill entry points. This plan owns shared core contracts;
+consumer release/deployment and audit-platform gates remain in their own plans.
 
-**Plan 5 is now written:** see the rule and NN procedures and their repository
-skills. The sequence reminder is fulfilled; no scheduled job was created.
-Do not silently repin rules/oracle/Python while implementing the foundation.
-
-Small foundation additions: F01 owns the structured Python/Rust rule identity
-and current-save binding. Existing projection/prepare/journal boundaries expose
-nonmutating evidence integration hooks. The complete hash/adapter specification,
-trace capture/archival, single-replay historical scanner, findings and version
-dispatch are substantial work in the dedicated R01–R08 plan, not new hidden
-foundation acceptance gates. Record complete canonical issued decision-space
-hashes during original play and compare them during one replay per target;
-mandatory per-decision full snapshots or repeated original-engine replay are
-not the design.
+F01 includes the structured Python/Rust identity and current-save binding.
+Projection/prepare/journal boundaries expose nonmutating evidence integration
+hooks. The full hash/adapter specification, trace capture/archival, historical
+scanner, findings and multi-version dispatch belong to the dedicated R01–R08
+plan. It uses recorded complete decision-space hashes and one replay per target;
+mandatory per-decision full snapshots and repeated original replay are not
+required. These integrations do not turn R01–R08 into hidden F08 prerequisites.
 
 Related source and prior work: [cleanup plan](RUST_ENGINE_CLEANUP_PLAN.md),
 [native workspace](../rust/README.md),

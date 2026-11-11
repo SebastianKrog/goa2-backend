@@ -134,8 +134,13 @@ error. During the same play/replay stream, also support:
   portable semantic comparison.
 
 Cross-engine state/effect profiles normalize only documented nonsemantic fields.
-Do not demand byte equality of different engines' private stacks, or delete a
-semantic field to obtain equality. Record unsupported profile components instead
+Keep rule/build/content identity metadata in the bound envelope, not as an
+unconditional semantic-state difference: changing a version string alone must
+not make every state fail. Raw checkpoint hashes still protect exact originals.
+Include genuine changed game values, effects, definition meaning, clock resources
+and physical bindings; exclude only specified transport handles/implementation
+bookkeeping. Do not demand byte equality of different engines' private stacks,
+or delete a semantic field to obtain equality. Record unsupported profile components instead
 of certifying full equivalence. Identity/format versioning alone is not a rule
 correctness proof.
 
@@ -160,10 +165,37 @@ equivalent manifest binding to original game/revision/source authority; a digest
 alone does not prove who recorded it. Reject client-submitted baseline hashes
 as authoritative original evidence.
 
+### Target start and audit range
+
+Strict source/runtime checks remain in force. An old checkpoint cannot simply
+have its rule/oracle header edited so a new engine accepts it.
+
+For as-played/original-contract checks, load through the adapter for that
+declared original contract. For candidate-contract checks, use an explicit,
+versioned target-start recipe: reconstruct an admitted target setup/state from
+the recorded start and target definitions, preserving supported original physical
+bindings/deal/chance context. Record source and target start digests, changed
+definition/field mapping, validation and intended differences. Keep the original
+unchanged. A rebuild from the same seed is sufficient only when its start/RNG
+equivalence has actually been proved.
+
+If the source start cannot be mapped without inventing state or choices, report
+unsupported target start. Do not force the old snapshot into a new decoder,
+silently generate a different starting game or report target illegality as an
+original rule violation. Test a no-change contract, supported real rule change,
+definition change, invalid start and unsupported RNG/context mapping.
+
+Default whole-game checks start at the original initial setup via that recipe.
+Starting from an ordinary mid-game anchor only verifies a suffix conditional on
+that anchor. It cannot certify the whole game under new rules unless a matching
+target-prefix proof already exists. Bind the audited range/prefix proof to
+coverage and cache identity.
+
 For each target job:
 
 1. Verify input integrity, original trace provenance and target/adapter/profile.
-2. Restore start/anchor and process recorded operations in order exactly once.
+2. Validate the target start/range as above, restore it once and process recorded
+   operations in order exactly once.
 3. At each applicable pre-command boundary, compute target H_decision and compare
    the stored original H_decision; test selected command membership.
 4. Execute the recorded operation once, with explicit time/chance semantics;
@@ -183,11 +215,15 @@ causality and do not count every downstream mismatch as an independent root bug.
 Record original random/chance evidence sufficient for supported replay:
 exact generator/version/state where applicable, realized semantic chance outcomes
 or a tested cross-engine tape mapping. The same seed with different RNG algorithms
-or draw order is not equivalent. New-rule chance/schema changes can be an expected
+or draw order is not equivalent. Merely realizing a still-possible outcome does
+not prove an unchanged probability law. Bind/check the chance contract where
+supported and report changed laws/sampling separately, even when the observed
+path matches. New-rule chance/schema changes can be an expected
 non-replayable path; classify them instead of forcing old draws into new semantics.
 
 Cache by source trace/archive digest, target contract/artifact, adapter/profile/
-hash schema and exception-registry digest. A target change invalidates its audit
+hash schema, target-start recipe/digest, audited range/prefix proof and
+exception-registry digest. A target change invalidates its audit
 cache, but does not require recomputing immutable original hashes.
 
 ## 5. Historical coverage, findings and downstream consumers
@@ -211,10 +247,14 @@ data/result workflow. No automatic winner/Elo rewrite, player accusation or
 external messaging.
 
 The same target replay may stream features/targets into staging for the NN
-procedure. Admit only after the declared whole-game/result/split/usage checks.
-Decision-hash-only equality is insufficient for reusing complete value labels.
-A complete matched target path with relevant state/result checks can provide
-reuse evidence without an extra original-engine pass.
+procedure. Keep two admissions separate: reuse of original labels needs proved
+original/target equivalence; a completely executed target trajectory may instead
+be admitted as a new scripted replay-derived record with its own target state,
+outcome, lineage and recipe. Missing original hashes block equivalence claims,
+not necessarily this second admission. Neither is new human/competitive play.
+Incomplete/illegal/unmapped target paths provide no terminal value labels.
+All admissions need the declared result/split/usage checks and must not reuse
+old search-policy telemetry as target search evidence.
 
 Older games with missing evidence receive explicit coverage gaps. Optional
 one-time original backfill uses pinned artifacts, isolated resources and its own
@@ -251,10 +291,10 @@ All packages are open; no new audit CLI is assumed to exist.
 
 | ID | Deliverable | Depends on | Complete when |
 | --- | --- | --- | --- |
-| R01 | Structured contracts/variant and known-reference-error registry; current-game binding/dispatch design | Foundation identity | Version gates/current saved games and exact scoped exception tests pass |
+| R01 | Extend F01 identity/current binding with multi-revision variant/known-error registries and dispatch design | Foundation identity | Version gates/current saved games and exact scoped exception tests pass |
 | R02 | Canonical decision/action/reference spec and golden hash vectors | R01, foundation decisions | Rust/Python independent canonicalization agrees; completeness and order/precision cases pass |
 | R03 | Nonmutating trace capture, state/effect profiles and atomic journal/archive integration | R02, current store | Recording on/off preserves gameplay/RNG; retry/failure/recovery tests preserve evidence once |
-| R04 | Rust/Python target adapters and bounded single-replay runner | R01–R03 | One target replay compares stored hashes/effects; source original runtime is not invoked again |
+| R04 | Rust/Python adapters, validated target-start recipes and bounded single-replay runner | R01–R03 | One target replay compares stored hashes/effects; original source is unchanged and no repeated original runtime is invoked |
 | R05 | Historical inventory, optional one-time baseline backfill, cohorts/resume and honest reporting | R03–R04 | Recorded/reconstructed/missing coverage is distinguishable; no prefix is falsely certified |
 | R06 | Findings registry/scoped annotations, fixture/artifact impact and NN/data export integration | R04–R05 | Witnesses/expected changes/known errors are classified without mutating source results |
 | R07 | Version-pinned live routing/current transition, client/content/model compatibility and rollback drills | R01, R03 | Existing games keep correct rules; new games select target; no lost accepted operations |
@@ -273,6 +313,10 @@ Acceptance must cover:
       by same-pass state/effect/result checks.
 - [ ] Instrumented runner shows one replay per target, with zero repeated
       original-engine runs when a recorded baseline exists.
+- [ ] Cross-version start adaptation never bypasses source guards; suffix-only
+      checks cannot certify an unaudited prefix or a whole target game.
+- [ ] Rule/build metadata changes alone do not force semantic-state inequality;
+      genuine changed effects/state still compare under the selected profile.
 - [ ] Missing original hashes, unsupported engine/contract, broken alignment,
       chance mapping, known Python error and unreachable suffix are not passes.
 - [ ] Record/no-record, replay, private scope, retry/fault/rewind/clock and

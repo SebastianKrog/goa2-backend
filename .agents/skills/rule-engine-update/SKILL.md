@@ -52,7 +52,9 @@ invent a CLI command. Verify availability before using one.
    changed cases; preserve old hashes/artifacts and unique coverage.
 6. **Audit history once per target.** Replay recorded operations in each target
    once, comparing complete canonical decision-space hashes to original recorded
-   hashes. Check selected legality and same-pass state/effect/result evidence.
+   hashes. Use an admitted target-start recipe without editing source headers;
+   record whether the range is a whole game or a suffix. Check selected legality
+   and same-pass state/effect/result evidence.
    Do not rerun the original engine for every comparison. Missing hashes may
    justify a separately recorded one-time original backfill; otherwise report
    the coverage gap. Never force an illegal continuation or treat its suffix

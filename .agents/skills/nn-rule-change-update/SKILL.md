@@ -37,8 +37,10 @@ stubs are not evidence of an implemented NN.
    changes, stable-value/outcome changes, distribution shifts and representation
    changes. Decision hashes alone cannot certify old value labels.
 3. **Admit target data.** Re-extract/revalidate eligible data or generate bounded
-   new target-rule games. Quarantine broken/incomplete labels; do not attach an
-   old winner to an unexecuted counterfactual path. Preserve usage restrictions,
+   new target-rule games. Separate equivalent original-label reuse from a new
+   fully executed scripted target trajectory; missing original hashes limit the
+   former, not automatically the latter. Quarantine incomplete labels and never
+   borrow a winner for an unexecuted path. Preserve usage restrictions,
    lineage/start/seed groups and held-out/ancestor-exposure records.
 4. **Choose candidate initialization.** Compare as appropriate: unchanged weights
    after revalidation, fresh training, current-model warm start and an earlier

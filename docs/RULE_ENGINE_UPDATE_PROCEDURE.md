@@ -171,8 +171,10 @@ For each audit:
 
 1. Select immutable original records/trace and an exact target engine/contract.
    Validate hashes, schemas, versions and reference exceptions before execution.
-2. Restore the game's start/anchor once and replay its recorded operations once
-   in the target. At each archived decision point, compute the canonical full
+2. Validate an admitted target-start recipe and audit range as specified in the
+   audit plan. Preserve the source checkpoint/identity; never just rewrite its
+   header to bypass compatibility. Restore once and replay recorded operations
+   once in the target. At each archived decision point, compute the canonical full
    issued decision-space hash and compare it to the recorded hash.
 3. Check the recorded selected action against the target's real legal space,
    then execute it with recorded time/chance semantics. Compare supported
@@ -181,8 +183,8 @@ For each audit:
    and alignment is meaningful. If it is not, report the earliest divergence and
    an unreachable/unverified suffix. Do not invent replacement actions or force
    illegal input just to reach the original terminal.
-5. Store findings/coverage keyed to original trace, target, adapter and comparison
-   profile. Reusing a completed identical audit is permitted; changing a contract,
+5. Store findings/coverage keyed to original trace, target, adapter, target-start
+   recipe, audited range and comparison profile. Reusing a completed identical audit is permitted; changing a contract,
    adapter, hash schema or exception registry invalidates its cache.
 
 Each additional target engine runs its own single replay; comparison to original
@@ -267,11 +269,14 @@ enters rating certification/rebuild decisions. A new rule alone does not
 retroactively make an old ranked game invalid.
 
 Quarantine affected training sources/targets pending review. A decision-hash
-match alone does not prove that old outcomes/value labels remain valid under
-changed rules. Reuse as new-contract data requires complete relevant target
-validation, state/result evidence and schema/feature re-extraction; otherwise
-regenerate/admit new-contract data or exclude the old rows.
-Incomplete traces/sampled game audits do not certify complete value labels.
+match alone does not prove that original outcomes/value labels remain equivalent
+under changed rules. Reusing those labels requires the relevant complete
+comparison evidence and feature/target re-extraction. Separately, a fully
+executed target replay can supply a new scripted replay-derived trajectory and
+its own validated outcome, even when original hashes are missing or states differ.
+Admit it under its own lineage/recipe; do not call it original equivalence or new
+human/ranked play, and do not borrow old search-policy telemetry. Incomplete
+or unreachable target paths have no complete terminal value labels.
 
 If no NN exists, record NN work not applicable and preserve the impact record.
 When one exists, invoke the [NN rule-change procedure](NN_RULE_CHANGE_UPDATE_PROCEDURE.md).

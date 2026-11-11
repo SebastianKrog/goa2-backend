@@ -62,13 +62,19 @@ Classify each source cohort:
   and terminal result: eligible for a new target-version dataset only after
   explicit admission and feature/target re-extraction.
 - Decision spaces match but state/result semantics changed or are unchecked:
-  old value labels are not certified for the target.
-- Recorded action becomes illegal or path/alignment diverges: do not attach
-  the old winner to the target's hypothetical trajectory. Quarantine affected
+  old value labels are not certified as equivalent. A completely executed target
+  path may supply its own new labels through a separate derived-data recipe.
+- Recorded action becomes illegal or semantic prompt/chance alignment is lost:
+  do not attach the old winner to the target's hypothetical trajectory. Quarantine affected
   labels and generate new complete target-contract games.
-- Missing original hashes or incomplete/sampled audit: retain truthful coverage.
-  Selected validated policy examples may be admitted under an explicit recipe;
-  incomplete coverage cannot certify the whole game's outcome labels.
+- Missing original hashes with a complete, valid target execution: historical
+  equivalence is unproved, but a new scripted replay-derived trajectory may be
+  admitted under a separate recipe, using its actual target states/outcome,
+  features and lineage. It is not fresh human/self-play evidence and cannot
+  inherit original search visits as target policy labels.
+- Incomplete/sampled/unreachable target execution: retain truthful coverage.
+  Selected supported policy examples need their own recipe; no unexecuted
+  terminal outcome or complete-game value certification may be borrowed.
 - Known original-contract defect: quarantine affected source/target labels and
   record its result/correction disposition rather than simply changing the
   recorded winner.
@@ -80,6 +86,10 @@ under the new schema/contract. Changed action meanings, terminal/reward rules
 or evaluation boundaries require updated targets and affected head treatment.
 Never treat numeric feature-column equality as semantic compatibility.
 Preserve current-game winner truth separately from counterfactual labels.
+If chance probabilities/start distributions changed, a legally executed old
+sample is not automatically an unbiased new-distribution example. Regenerate
+under the target by default, or use an explicitly validated off-policy/weighting
+recipe; never infer equivalent sampling from the same seed/outcome.
 
 Add targeted new-rule cases and independently generated target games. Retain
 verified unaffected rehearsal data when admissible to limit catastrophic

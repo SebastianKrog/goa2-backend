@@ -2,7 +2,7 @@
 
 Status: proposed implementation plan; no training run, model admission or neural
 search release is claimed complete. Written 11 November 2026. This is plan 4 of
-four, following the [shared foundation](SHARED_RUST_FOUNDATION_PLAN.md),
+five, following the [shared foundation](SHARED_RUST_FOUNDATION_PLAN.md),
 [client execution plan](CLIENT_SIDE_BOT_EXECUTION_PLAN.md), and
 [database/data plan](DATABASE_TRAINING_STATISTICS_PLAN.md).
 
@@ -75,8 +75,10 @@ part of comparing two model architectures.
 
 ### 2.1 Versioned semantic representation
 
-Define a Rust-owned semantic feature schema over the foundation's
-`PlayerObservation` and allowed hypothetical continuation. Give policy inputs
+Adopt the foundation's Rust-owned semantic feature records, full-recompute
+extractor and evaluator ports over `PlayerObservation` and allowed hypothetical
+continuations. Add/version only the neural-specific fields, tensor adapters
+and head semantics; do not create another observation or reference extractor. Give policy inputs
 and stable-value inputs distinct context types. Sharing feature blocks does not
 make their temporal meanings interchangeable.
 
@@ -117,45 +119,18 @@ flattened board or make feature storage depend on a particular neural library.
 
 ### 2.2 Explicit evaluation points
 
-Implement one typed boundary detector/transition anchor shared by search and
-actual-trajectory recording. Do not infer a completed transition from phase
-name, a generic prompt, an empty stack alone or an arbitrary interpreter tick.
+Adopt the foundation's [evaluation boundaries](SHARED_RUST_FOUNDATION_PLAN.md#evaluation-boundaries)
+and its single core detector/transition anchor. Policy scores actual legal
+planning/response/upgrade choices; stable value is candidate-free at ACTOR_READY
+or PLANNING_READY, and terminal outcomes bypass the network. Budget cutoff is
+a stop reason, not another value point.
 
-| Point | Policy evaluation | Value evaluation | Required semantics |
-| --- | --- | --- | --- |
-| Root planning decision | Allowed over that seat's current legal commitments/pass/finish choices | No intermediate learned value by default | Partial commitments and second slots are still decisions, not completed transitions |
-| Root or descendant action/response/upgrade prompt | Allowed over addressed legal choices | Not a stable-value sample merely because input is requested | Actor/defender/team owner is separate from fixed root viewer and score team |
-| `ACTOR_READY` | Only if an actual legal decision is present | Allowed | Resolution has selected the next actor; execution is before their unstarted respawn/card action; previous required transition is complete |
-| `PLANNING_READY` | Allowed when there is a real planning choice | Allowed, candidate-free | Fresh planning, no partial commitments or pending resolution/cleanup; automatic empty-hand passes do not manufacture partial planning |
-| Terminal | No search policy call needed | Exact rules-derived outcome; bypass NN | Resolve winner hero through its team; accept a draw only if current rules actually define that terminal result |
-| Budget/cancellation cutoff | No new model call after budget expiry | Use only an already completed admissible evaluation, or no score/fallback | A partially executed continuation is not relabelled stable or terminal |
-
-Transition anchors bind kind, round/turn and enclosing resolution actor:
-
-- From a planning root, complete remaining planning/reveal and initiative until
-  the first genuine actor-ready boundary. If all pass and no actor starts,
-  continue required cleanup to the next genuine planning-ready boundary.
-- From an actor-bound root, including a defender reaction, complete the
-  enclosing actor's action/turn and finalization. A second card or respawn for
-  the same actor does not by itself complete the transition. Stop at a different
-  actor-ready boundary or a later planning-ready boundary.
-- From actorless/tie/cleanup work, advance through required effects to the next
-  real actor/planning boundary.
-- At the end of the round, execute required minion battles, removal/lane movement,
-  upgrades and reset. Entering cleanup is not the endpoint.
-- Record terminal outcomes immediately when the rules establish them.
-  Mandatory aborts, no options, loop guards and watchdog exhaustion are not
-  implicit terminal wins/draws.
-
-Specify these semantics against current typed Rust state and prove the detector
-does not alter steps, events, RNG draws or normal gameplay. If an intended
-boundary cannot be observed without changing rules execution, fix the
-observation hook rather than adding synthetic confirmation/input prompts.
-
-The generic foundation can expose other diagnostic decision/cutoff hooks.
-This neural value schema is deliberately stable-transition value. A future
-decision-value or partial-continuation head needs a separately named schema,
-targets and evidence; it cannot silently reuse this one.
+Stage 1 extends the shared tests to neural-specific call coverage, feature/head
+alignment, targets and score semantics. If a hook is missing, extend the core
+facade and its conformance tests rather than adding a second detector. Model
+features/recorders cannot infer boundaries from phase/prompt text or add synthetic
+inputs. A future partial-decision value head requires a distinct schema/targets;
+it cannot reuse stable-transition labels.
 
 ### 2.3 Plug in simple parametric evaluators first
 
@@ -172,6 +147,8 @@ rules_terminal_outcome(state)
   -> exact_outcome                  // not a model prediction
 ```
 
+Reuse the foundation's parametric proof artifacts/ports; extend them for the
+neural score convention explicitly rather than adding a second heuristic runner.
 Begin with a uniform policy control, a deterministic weighted policy
 `w · candidate_features`, and a candidate-free weighted value
 `b + v · position_features` with an explicit bounded score transform.
@@ -672,12 +649,17 @@ not private live matches copied into public fixtures.
 
 ## 8. Implementation packages and decisions
 
+Use the [dependency slices](PLANS_INDEX.md#dependency-slices): research smoke
+runs need the data/admission contracts and a conforming bounded local backend,
+not a production PostgreSQL rollout. The Rust game/feature/boundary contract is
+shared; neural tensor adapters, head targets and experiment runners live here.
+
 All packages are open. Owners are roles to assign.
 
 | ID | Stage / owner | Deliverable | Depends on | Completion evidence |
 | --- | --- | --- | --- | --- |
-| N01 | 1 / engine-search | Current identity/scope, typed features, golden vectors and tensor-adapter contract | Shared observation/feature foundation | S01/S04 and reference extractor |
-| N02 | 1 / engine-search | Typed stable detector/anchors, policy hooks, candidate-free value and simple evaluator artifacts | N01, current search/transition API | S02–S05, real call traces and current-game regression |
+| N01 | 1 / engine-search | Adopt shared identity/features/extractor; specify neural tensor/head schema and cross-adapter golden vectors | Foundation F01/F02/F06 | S01/S04 against the same reference extractor |
+| N02 | 1 / engine-search | Adopt shared detector/ports and parametric artifacts; extend neural call/head/target coverage through the same core hooks | N01, foundation F06 | S02–S05 and shared-detector conformance; no second implementation |
 | N03 | 2 / ML-runtime | Reuse assessment, backend/operator/export decision, CPU inference and artifact loader | N01–N02 | M01/M02/M05 with actual bounded trained smoke network |
 | N04 | 2 / ML-data-evaluation | Run manifests, train/validate/export harness, metrics, paired controls and model registry | N02–N03, database admission contracts | M03/M04 and reproducible bounded runs |
 | N05 | 3 / ML-search | Small MLP, NNUE, masked hex-CNN and graph experiments/ablations | Accepted stages 1–2 | A01–A03 with measured rejection/acceptance of each family |
@@ -743,7 +725,7 @@ An artifact with random weights or a tiny synthetic fit proves infrastructure,
 not this checklist. If the model fails admission, keep heuristic clients working
 and record the research result rather than disguising fallback as neural success.
 
-## 10. Completion reporting and fifth-plan reminder
+## 10. Completion reporting and handoffs
 
 Each completed package/stage records commands, source/toolchain/hardware,
 current game/content identity, dataset/model hashes, expected/executed/missing/
@@ -751,23 +733,13 @@ failed/censored counts, raw feature/inference/performance metrics and decisions.
 Tests at the wrong timepoint or comparisons under changed budgets do not close
 the stated gate. Writing/committing the plan itself does not claim implementation.
 
-All four planning documents are now written:
-
-1. [Shared foundation](SHARED_RUST_FOUNDATION_PLAN.md).
-2. [Native, WASM and later neural client execution](CLIENT_SIDE_BOT_EXECUTION_PLAN.md).
-3. [Database, training data, statistics and Elo](DATABASE_TRAINING_STATISTICS_PLAN.md).
-4. Neural search — this document.
-
-**Plan 5 is now written:** the [rule/oracle/Python update procedure](RULE_ENGINE_UPDATE_PROCEDURE.md),
-[later NN rule-change procedure](NN_RULE_CHANGE_UPDATE_PROCEDURE.md) and
-[version/single-replay implementation plan](RULE_VERSION_AUDIT_IMPLEMENTATION_PLAN.md).
-The NN procedure covers revalidating weights, fresh training and warm-starting
-the current or an earlier compatible model, with explicit feature/target/optimizer
-and split/ancestor-exposure decisions. Original recorded decision-space hashes
-support a single target replay; state/result evidence is still required before
-reusing complete new-rule value labels. Do not silently repin rules, overwrite
-old artifacts or claim a model was retrained when only compatibility was tested.
-The requested reminder is fulfilled; no scheduled job was created.
+All five plans and their [ownership/dependency index](PLANS_INDEX.md) are written.
+Follow the [rule update](RULE_ENGINE_UPDATE_PROCEDURE.md) and
+[later NN update](NN_RULE_CHANGE_UPDATE_PROCEDURE.md) procedures for changes.
+They distinguish revalidated weights, fresh training and current/earlier-model
+warm starts. The [audit plan](RULE_VERSION_AUDIT_IMPLEMENTATION_PLAN.md) separates
+original-label equivalence from new target-derived trajectories. None of these
+documents is evidence that training, retraining or deployment has occurred.
 
 Prior art and reviewed implementation:
 [current Rust search](../rust/crates/goa2-core/src/interpreter/search.rs),

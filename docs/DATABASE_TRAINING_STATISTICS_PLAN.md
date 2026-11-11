@@ -1,7 +1,7 @@
 # Database, training data, statistics and Elo plan
 
 Status: proposed implementation plan; no database migration or data admission is
-claimed complete. Written 11 November 2026. This is plan 3 of four, following
+claimed complete. Written 11 November 2026. This is plan 3 of five, following
 the [shared foundation](SHARED_RUST_FOUNDATION_PLAN.md) and
 [client-side bot execution](CLIENT_SIDE_BOT_EXECUTION_PLAN.md).
 
@@ -532,11 +532,20 @@ game/result version and certified outcome to ordered pre/post player ratings,
 expected scores, K/policy and numerical recipe. Its uniqueness prevents duplicate
 delivery or two workers updating the same game twice.
 
-Assign a deterministic per-pool processing order to certified results. Persist
-it once (including tie handling and late arrivals); do not reorder history on
-every wall-clock query. Serialize pool application or lock subjects/pool in a
+Give each rated game a stable key (pool, origin, game ID) and assign its order
+slot on first certification. Corrections/result versions reuse that same slot;
+they never append a second match. A retracted/ineligible game leaves an empty
+slot until a valid replacement certification exists. Keep the full event audit,
+but each active ledger generation has at most one effective contribution per
+rated game and one change per participant in that contribution.
+
+Persist this deterministic per-pool order once, including tie/late-arrival rules;
+do not reorder history on every wall-clock query. Serialize pool application or lock subjects/pool in a
 fixed order and atomically append all participants' changes plus the processed
-event/current ratings. Do not update one team's ratings then calculate the
+event/current ratings. Key materialized changes by pool, ledger generation,
+rated-game slot and participant so a rebuild retains old generations without
+colliding with or double-counting the active one. Do not update one team's
+ratings then calculate the
 other team's expectation from already updated numbers.
 
 If an earlier result is corrected, reverse-and-continue is not generally enough:
@@ -551,8 +560,7 @@ order; retroactive ordering requires an explicit rebuild.
 Current leaderboard reads only a complete active generation. While a correction
 invalidates that generation, mark the pool rebuilding/provisional or withhold
 its competitive view; do not present the invalidated ratings as freshly certified.
-Ratings may lag
-game completion while certification/projection runs. Show provisional, quarantined
+Ratings may lag game completion while certification/projection runs. Show provisional, quarantined
 and retracted results clearly. Tests must cover same-result redelivery, concurrent
 workers, draw/equal/unequal strengths, correction after later games, duplicate
 account attempts and clean full rebuild equality.
@@ -768,22 +776,18 @@ identities, expected/executed/missing/failed counts, raw reports and the recorde
 product decisions for ranked eligibility, usage, retention and recovery.
 Writing this plan does not certify ranked play or authorize production migration.
 
-## 14. Planning sequence and references
+## 14. Handoffs and references
 
-Plan 3 is this document. The [neural-search plan](NEURAL_SEARCH_IMPLEMENTATION_PLAN.md)
-is now written, including full-model/export/runtime deliverables and interfaces
-that consume these admitted datasets. All four planning documents are complete;
-plan 5 is also written: [rule/oracle/Python updates](RULE_ENGINE_UPDATE_PROCEDURE.md)
-and [later NN updates](NN_RULE_CHANGE_UPDATE_PROCEDURE.md). The sequence reminder
-is fulfilled; no scheduled task was created.
+Use the [plan index](PLANS_INDEX.md) for dependencies and the [neural plan](NEURAL_SEARCH_IMPLEMENTATION_PLAN.md)
+for consumers of admitted datasets. NN development may use a conforming local
+manifest/shard backend; production database rollout is not a research prerequisite.
 
-The [dedicated version/audit implementation plan](RULE_VERSION_AUDIT_IMPLEMENTATION_PLAN.md)
-adds structured Python/Rust rule contracts and compact original canonical
-decision-space hashes to private journal/archive evidence. A target checks them
-in one replay, with separate state/event/result evidence and truthful missing
-coverage. No full before/after snapshot per decision or repeated original-engine
-replay is required. Connect audit findings to the existing versioned annotation/
-result/admission workflow rather than changing original results or Elo directly.
+The [dedicated rule audit plan](RULE_VERSION_AUDIT_IMPLEMENTATION_PLAN.md) owns
+compact private trace hashes, cross-engine profiles and target-start recipes.
+A target checks recorded evidence in one replay. Preserve comparison coverage
+separately from admission of a fully executed new derived trajectory; neither
+automatically changes original results or Elo. No per-decision full snapshot
+or repeated original-engine replay is required.
 
 References: [shared foundation](SHARED_RUST_FOUNDATION_PLAN.md),
 [client execution and ownership](CLIENT_SIDE_BOT_EXECUTION_PLAN.md),

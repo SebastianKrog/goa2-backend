@@ -62,6 +62,28 @@ Median fixed planning search took 0.954 ms with the seven-hero pack and
 host and workload. Search refactors that affect deeper planning or resolution
 also need fixed-work workloads for those paths.
 
+## Four-turn search workloads
+
+Build the search worker from the revision under measurement. From the Rust
+workspace:
+
+~~~sh
+cargo build --locked --release -p goa2-search-cli
+python3 tools/search_measurements.py --worker /absolute/path/release/goa2-search-cli --fixtures /absolute/path/verified-cache --output /absolute/path/new-search-results.json
+~~~
+
+The runner verifies the two pinned Hanu replay roots against the fixture
+registry. For each map it uses the opening planning position and the first
+non-forced resolution position after submitting the referee's fallback
+commitments. Both searches use a four-turn horizon, two sampled worlds,
+one worker and the `nodes_v2` work limit. The default cap is 4,096 nodes.
+The report retains the worker hash, case and envelope identities, request
+parameters, chosen move, work counts and timing samples. A fresh process,
+request transfer and envelope compilation are included in each wall time.
+Use the same executable build profile, host and node cap when comparing
+revisions. A matching work count and decision establish repeatability for
+these inputs. Playing strength is measured in the arena.
+
 ## Catalog and footprint decision
 
 The release server is 23,363,784 bytes (ELF text 21,222,058, data 167,984, bss

@@ -1410,5 +1410,21 @@
       "primary-builders": 1664,
       "spell-builders": 30
     }
+  },
+  "corrected_combined_candidate_static_checks": {
+    "candidate": "b3ca2ffcab1fb0281470b3df1e4ce716ff82aba1",
+    "strict_clippy": "passed",
+    "local_links_checked": 185,
+    "payload_files_scanned": 1195,
+    "embedded_inputs_checked": 46,
+    "cargo_path_dependencies": 2,
+    "findings": 0,
+    "report_sha256": {
+      "corrected-clippy.log": "c67eddab43c4da3e868dc2594f73f75f70798e864fe0a6e34ed863cf9f2db9d3",
+      "corrected-documentation-audit.json": "82414c7a151d847aa46018273a5a9679179986cac9d53dbf6b131ab2c8a85767",
+      "corrected-payload-audit.json": "9ff1f95c8a1349a6906d33a27eb3b39f8d0bbc4767d6141ca4d8278d28f14670",
+      "corrected-dependency-audit.json": "38438a9022717085b68c6c6edb093e93cb62ad550edfaea62949e285feac49ac"
+    },
+    "scope": "Local static and compilation checks; full parity, exhaustive restore, and release authorization are separate."
   }
 }

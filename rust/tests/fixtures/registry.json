@@ -10,7 +10,7 @@
       "case_count": 0,
       "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
       "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
-      "generator": "scripts/rust_oracle/fixture_cache.py compress --workers 1",
+      "generator": "scripts/rust_oracle/fixture_cache.py",
       "consumers": [
         "scripts/rust_oracle/fixture_cache.py",
         "rust/tools/fixtures.py"
@@ -20,7 +20,15 @@
       "owner": "engine maintainers",
       "retention": "retain unique coverage; no retirement authorized",
       "rules_version": 9,
-      "runtime_manifest": "rust/oracle-manifest.json#runtime"
+      "runtime_manifest": "rust/oracle-manifest.json#runtime",
+      "generator_argv": [
+        "python",
+        "scripts/rust_oracle/fixture_cache.py",
+        "compress",
+        "--workers",
+        "1"
+      ],
+      "generator_sha256": "e4952d6c9650722817d01481e4a75e25913a3d9ea28a201abdf9893a29ee0dbd"
     },
     {
       "family": "complete-games-hanu",
@@ -33,7 +41,8 @@
       "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
       "generator": "scripts/rust_oracle/streamed_games.py",
       "consumers": [
-        "rust/crates/goa2-search-cli/src/main.rs"
+        "rust/crates/goa2-search-cli/src/main.rs",
+        "rust/tools/search_measurements.py"
       ],
       "acquisition": "Use the committed index with the verified reference archive installed into GOA2_FIXTURE_CACHE. See rust/docs/fixture-archives.md.",
       "licensing": "requires upstream/content rights review before public distribution",
@@ -98,7 +107,7 @@
       "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
       "generator": "Historical isolated Python failure capture; no current standalone exporter. Preserve admitted bytes and original source provenance in rust/docs/audits/error-guards.json.",
       "consumers": [
-        "rust/crates/goa2-core/src/interpreter.rs"
+        "rust/crates/goa2-core/src/interpreter/tests.rs"
       ],
       "acquisition": "Use the committed file and verify its registered SHA256.",
       "licensing": "requires upstream/content rights review before public distribution",
@@ -245,7 +254,7 @@
       "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
       "generator": "scripts/rust_oracle/stack_traces.py",
       "consumers": [
-        "rust/crates/goa2-core/src/interpreter.rs",
+        "rust/crates/goa2-core/src/interpreter/tests.rs",
         "rust/crates/goa2-search-cli/src/main.rs"
       ],
       "acquisition": "Use the committed index with the verified reference archive installed into GOA2_FIXTURE_CACHE. See rust/docs/fixture-archives.md.",
@@ -695,5 +704,5 @@
       "acquisition": "Install the named monolithic payload from the verified reference archive into GOA2_FIXTURE_CACHE. See rust/docs/fixture-archives.md."
     }
   ],
-  "generation_policy": "Use the manifest-pinned Python runtime and verified source archive. Commands write only to a disposable absolute OUTPUT path. Native WORKER must be the candidate being validated. Current exporter recipes are recorded for investigation, not permission to replace frozen indexes: verify every regenerated fingerprint against this registry and retain admitted artifacts when regeneration differs."
+  "generation_policy": "Use the manifest-pinned Python runtime and verified source archive. Commands write only to a disposable absolute OUTPUT path. Native WORKER must be the candidate being validated. Current exporter recipes are recorded for investigation, not permission to replace frozen indexes: verify every regenerated fingerprint against this registry and retain admitted artifacts when regeneration differs. Run cache metadata compression only inside a disposable checkout populated with the admitted payloads. It writes metadata relative to that checkout."
 }

@@ -2495,5 +2495,77 @@
       }
     },
     "scope": "Per-phase timings used stderr logging in the candidate function and changed aggregate timings. A separate harness with unmodified engine code measured preparation and disposal independently, excluding the first 20 calls. Warm medians agree closely. The original unmodified aggregate regression remains unexplained by these diagnostics."
+  },
+  "submission_preparation_measurement_order": {
+    "report_sha256": "d9e2fdcc2017e6085b4e661783fa4b479a6fe933e9d5efd291b44380dfd34430",
+    "results": {
+      "typed": {
+        "revision": "7e87efd76ff7e0ba7aa53524f0bd33debcd98eb7",
+        "content": {
+          "smoke-game.json": {
+            "original_first": {
+              "aggregate_ns_per_operation": 38366.98,
+              "first_prepare_ns": 13400,
+              "warm_prepare_median_ns": 11700.0,
+              "warm_drop_median_ns": 2000.0
+            },
+            "split_first": {
+              "aggregate_ns_per_operation": 14268.99,
+              "first_prepare_ns": 2066800,
+              "warm_prepare_median_ns": 12200.0,
+              "warm_drop_median_ns": 1900.0
+            }
+          },
+          "live-game-content.json": {
+            "original_first": {
+              "aggregate_ns_per_operation": 33963.99,
+              "first_prepare_ns": 13400,
+              "warm_prepare_median_ns": 11700.0,
+              "warm_drop_median_ns": 2000.0
+            },
+            "split_first": {
+              "aggregate_ns_per_operation": 14140.99,
+              "first_prepare_ns": 2176899,
+              "warm_prepare_median_ns": 11700.0,
+              "warm_drop_median_ns": 2100.0
+            }
+          }
+        }
+      },
+      "baseline": {
+        "revision": "832ea43ee14ba32f1610baf846ecd43a75c52260",
+        "content": {
+          "smoke-game.json": {
+            "original_first": {
+              "aggregate_ns_per_operation": 39974.98,
+              "first_prepare_ns": 13000,
+              "warm_prepare_median_ns": 11400.0,
+              "warm_drop_median_ns": 2000.0
+            },
+            "split_first": {
+              "aggregate_ns_per_operation": 12694.99,
+              "first_prepare_ns": 2337999,
+              "warm_prepare_median_ns": 10800.0,
+              "warm_drop_median_ns": 1900.0
+            }
+          },
+          "live-game-content.json": {
+            "original_first": {
+              "aggregate_ns_per_operation": 37526.99,
+              "first_prepare_ns": 14700,
+              "warm_prepare_median_ns": 11500.0,
+              "warm_drop_median_ns": 2000.0
+            },
+            "split_first": {
+              "aggregate_ns_per_operation": 13503.0,
+              "first_prepare_ns": 2133300,
+              "warm_prepare_median_ns": 11400.0,
+              "warm_drop_median_ns": 2000.0
+            }
+          }
+        }
+      }
+    },
+    "scope": "Both revisions show a first preparation of approximately 2.1 to 2.3 ms when measured separately immediately after the restore workload. Aggregate timing was high when run first and low when run after separate measurements. Warm preparation and disposal medians are close. The measured order effect reproduces on both packs and both revisions. The underlying cause of the first-call cost and why the original baseline aggregate omitted it remain unverified."
   }
 }

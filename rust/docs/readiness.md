@@ -9,7 +9,7 @@ item, including implementation gaps, decisions and acceptance gates. The
 [first](audits/next-ten.md), [second](audits/second-ten.md) and
 [third](audits/third-ten.md) and [fourth](audits/fourth-ten.md) ten-task follow-ups and the [corpus recovery and Arena v2 merge verification](audits/corpus-recovery.md)
 record the implementation history and verification commands. The checklist has
-**54 completed and 30 open items**.
+**55 completed and 29 open items**.
 
 | Package | Implemented work | Remaining acceptance / owner |
 | --- | --- | --- |

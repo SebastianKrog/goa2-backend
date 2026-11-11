@@ -2102,6 +2102,9 @@ impl NativeSession {
 mod tests {
     use super::super::{Arc, StateEnvelope, fixture_case, json};
     use super::*;
+    use crate::interpreter::{
+        OpponentPolicy, PlanningRolloutSample, SearchEvaluation, SearchLimits,
+    };
 
     #[test]
     fn concealed_discard_only_blocks_selectors_that_can_read_it() {
@@ -2347,7 +2350,7 @@ mod tests {
             }
             let before = root.semantic_state().unwrap();
             let view = root.player_observation(request.owner).unwrap();
-            let sample = super::super::PlanningRolloutSample {
+            let sample = PlanningRolloutSample {
                 seed: 39,
                 upgrade_checkpoints: None,
             };
@@ -2356,11 +2359,11 @@ mod tests {
                 .search_resolution_in_sampled_world(
                     request.owner,
                     sample,
-                    super::super::SearchLimits {
+                    SearchLimits {
                         max_depth: 2,
                         max_nodes: 64,
-                        opponent_policy: super::super::OpponentPolicy::Adversarial,
-                        evaluation: super::super::SearchEvaluation::MaterialPosition,
+                        opponent_policy: OpponentPolicy::Adversarial,
+                        evaluation: SearchEvaluation::MaterialPosition,
                     },
                     &ExecutionBudget::default(),
                 )
@@ -2676,7 +2679,7 @@ mod tests {
             opponent_policy: OpponentPolicy::Adversarial,
             evaluation: SearchEvaluation::MaterialPosition,
         };
-        let sample = super::super::PlanningRolloutSample {
+        let sample = PlanningRolloutSample {
             seed: 39,
             upgrade_checkpoints: None,
         };
@@ -2801,7 +2804,7 @@ mod tests {
         let result = root
             .search_resolution_in_sampled_world(
                 player,
-                super::super::PlanningRolloutSample {
+                PlanningRolloutSample {
                     seed: 39,
                     upgrade_checkpoints: None,
                 },

@@ -1,6 +1,13 @@
 //! Live shared-object execution and controlled effect/card-lifecycle bindings.
 //! Other world-changing instructions stay guarded until their dense slots bind.
-use super::*;
+use super::{
+    ActionResolution, ActionStep, AdvanceResult, Arc, CardStats, CombatEvent, CompiledStep,
+    CoordinateOp, Datum, DefeatBinding, EngineError, EntityKind, ExecutionBudget, Frame,
+    GameOutcome, Hex, Instant, Instruction, MarkerEvent, NativeEvent, NativeRequest, NativeSession,
+    Passive, Phase, Registers, RequestChoices, RequestToken, Result, Stat, StateEnvelope, Symbol,
+    Symbols, Team, Value, card_error, combat_error, combat_template, compile_step, json,
+    native_hex, prompt_actor, unsupported,
+};
 mod acting_piece;
 mod action_control;
 mod actor;

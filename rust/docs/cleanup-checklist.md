@@ -127,7 +127,7 @@ idempotent schema v1–v3 migration tests already pass locally.
 - [x] **C08-01** Extend the migration archive matrix to retained historical databases and realistic combinations of replay journals, credentials, accepted-action receipts and share metadata. Preserve actual process restart/failure behavior alongside unit tests.
 - [x] **C08-02** Rehearse consistent WAL backup and restoration on disposable data, then verify links, revisions, receipts, replay reconstruction and share metadata after reopening the restored database.
 - [x] **C08-03** Rehearse binary rollback with the matching database backup across supported migration boundaries; record when a newer schema prevents direct rollback.
-- [ ] **C08-04** Run the extended replay/share service verifier for the final candidate and close any coverage gaps across auth/views, retries/concurrency, clocks/votes, persistence and bots.
+- [x] **C08-04** Run the extended replay/share service verifier for the final candidate and close any coverage gaps across auth/views, retries/concurrency, clocks/votes, persistence and bots. The extracted release binary passed both service suites at `33e7e8bd`. See [verification evidence](cleanup-evidence.json).
 - [x] **C08-05** Audit blocking work, lock scope, bot cancellation, deadline recovery and shutdown across transport, orchestration, persistence and replay boundaries; address concrete problems with their own regressions.
 - [x] **C08-06** Evaluate whether a server library/test harness would materially improve testing and boundaries. Record retain/defer or implement the justified change; preserve real cross-process checks either way.
 

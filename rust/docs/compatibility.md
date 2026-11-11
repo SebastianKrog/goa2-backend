@@ -55,3 +55,23 @@ scoped reads, restart, retry and rollback; [matrix evidence](audits/historical-m
 also records future-version nonmutation and actual matching-backup binary rollback.
 Full frozen physical-object/alias differential evidence remains independently gated
 on acquisition; this archive does not replace those suites or broaden supported versions.
+
+## Replay and share service verification
+
+Run both verifiers against the same candidate server binary and content pack.
+Use the matching Python backend environment from the source checkout. Generate
+`MATCH_FIXTURE` from an oracle-verified complete arena game with
+[`lab_match_fixture`](archive/development-history.md#verify-a-complete-game-through-the-lab).
+
+~~~sh
+PYTHONPATH=src python scripts/verify_rust_game_server.py SERVER CONTENT_PACK
+PYTHONPATH=src python scripts/verify_rust_replay_share.py SERVER CONTENT_PACK MATCH_FIXTURE
+~~~
+
+The first verifier runs real-process checks for recipient views, retries and
+concurrent submissions, clocks, votes, bots, persistence, and shutdown. The
+second plays the complete fixture through the hosted API, checks a rewind vote,
+and exercises share authorization, a failed write, replay projection, concurrent
+gameplay, and persistence after restart. Use its default mode to verify shares.
+Both commands create disposable databases. Record the candidate binary and
+content hashes, the fixture identity, and both exit statuses for the release gate.

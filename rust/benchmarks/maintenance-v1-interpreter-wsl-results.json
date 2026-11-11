@@ -1,0 +1,999 @@
+{
+  "schema_version": 1,
+  "workload": "maintenance-v1",
+  "profile": "release (explicit documented build command)",
+  "compiler": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+  "hardware": {
+    "architecture": "x86_64",
+    "kernel": "6.18.58.1-microsoft-standard-WSL2",
+    "logical_cpus": 12,
+    "affinity_cpus": 12,
+    "cpu_model": "Intel(R) Core(TM) i5-10400F CPU @ 2.90GHz",
+    "cgroup_cpu_max": "200000 100000",
+    "cgroup_memory_max": "2147483648",
+    "cgroup_memory_swap_max": "max"
+  },
+  "source_parent_commit": "832ea43ee14ba32f1610baf846ecd43a75c52260",
+  "program_path": "rust/crates/goa2-core/examples/maintenance_bench.rs",
+  "program_sha256": "193e57da3b8ed129a9eebbb4e2a2a9156238daa41dfb9732e2ffe834296a15c2",
+  "benchmark_binary_sha256": "0fc851d312251519ab816533664e5d3b76071760121a48ec3a082ce6f58ec1a2",
+  "benchmark_binary_bytes": 16770440,
+  "server_binary_sha256": "73e8b219416a273849688a0f83250117705fa3b5807ae7a1e97af15d8da8a44a",
+  "server_binary_bytes": 23562248,
+  "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+  "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+  "rules_version": 9,
+  "catalog_manifest_sha256": "c0d102bd4ce51a9804e907e5d47af21d2aac3087f333ef49e2202047de21750f",
+  "catalog_manifest": {
+    "schema_version": 1,
+    "oracle_manifest": "../oracle-manifest.json",
+    "catalogs": [
+      {
+        "path": "catalogs/action-builders.json",
+        "sha256": "30a1493fedc2144127f32fbd14234b26cc147d48f55754751f5d972b4c3cb14c",
+        "schema_version": 1,
+        "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43"
+      },
+      {
+        "path": "catalogs/defense-builders.json",
+        "sha256": "f4a798cb98eec5e7a4d28b6fc42f5ff00e4e9a207c4a98d9c9067911f6860269",
+        "schema_version": 1,
+        "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43"
+      },
+      {
+        "path": "catalogs/effect-defaults.json",
+        "sha256": "e954ca2ce924a1462b01953c2d0109fe7b25263c925075965260c4cef4dc1417",
+        "schema_version": 1,
+        "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43"
+      },
+      {
+        "path": "catalogs/instruction-templates.json",
+        "sha256": "8dfb1b369bda6665fabc3955827e46f79384c6fa68350f6c87808f9661b4b23e",
+        "schema_version": 1,
+        "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43"
+      },
+      {
+        "path": "catalogs/loadout-provenance.json",
+        "sha256": "994780b61170e31aeeb65e404dc9ccf30daa799e4afcc674829d694f3ee1ab7a",
+        "schema_version": null,
+        "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43"
+      },
+      {
+        "path": "catalogs/primary-effects.json",
+        "sha256": "403eaef064d67307849ddb9165157f557ca657d86a54a304dd2bb5a79098ab14",
+        "schema_version": 2,
+        "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43"
+      },
+      {
+        "path": "catalogs/primary-builders.json",
+        "sha256": "8b1dde928783d9c2d91703b7dc1c83618ca672fe18c4e35e02562eeabf177865",
+        "schema_version": 3,
+        "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43"
+      },
+      {
+        "path": "catalogs/spell-builders.json",
+        "sha256": "6116a09d3c6c4c45985209ace3350de719bd6eb7f3fa17ecb736756d228e82b1",
+        "schema_version": 1,
+        "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43"
+      }
+    ]
+  },
+  "repetitions_per_content": 3,
+  "units": {
+    "time": "nanoseconds unless field says seconds",
+    "memory": "KiB; allocator/OS high-water, not per-object size"
+  },
+  "cold_scope": "Fresh processes and disposable databases; OS filesystem/page caches and host load are uncontrolled. No cache drop or strength-quality claim.",
+  "cases": [
+    {
+      "id": "smoke-game.json",
+      "content_sha256": "69ce2e47927eab8427fa8c2932f369044a30297716f1a4402a1ba6e1673c3ee2",
+      "fresh_process_runs": [
+        {
+          "wall_ns": 1278935939,
+          "user_cpu_seconds": 1.162889,
+          "system_cpu_seconds": 0.10789599999999999,
+          "peak_rss_kib": 155044,
+          "result": {
+            "schema_version": 1,
+            "workload": "maintenance-v1",
+            "content_identity": {
+              "version": 1,
+              "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+              "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+              "map_count": 1,
+              "hero_count": 7
+            },
+            "setup": {
+              "map": "forgotten_island",
+              "red_heroes": [
+                "Arien",
+                "Brogan"
+              ],
+              "blue_heroes": [
+                "Tigerclaw",
+                "Sabina"
+              ],
+              "seed": 29,
+              "mode": "QUICK",
+              "cheats_enabled": false,
+              "tie_breaker": null
+            },
+            "content_read_ns": 88439690,
+            "catalog_first_prepare_ns": 130835577,
+            "catalog_warm_prepare": {
+              "iterations": 100,
+              "total_ns": 500,
+              "ns_per_operation": 5.0
+            },
+            "setup_first_ns": 16960675,
+            "setup_work": {
+              "iterations": 20,
+              "total_ns": 298490516,
+              "ns_per_operation": 14924525.8
+            },
+            "clone_drop_work": {
+              "iterations": 200,
+              "total_ns": 1138605,
+              "ns_per_operation": 5693.025
+            },
+            "restore_parse_work": {
+              "iterations": 40,
+              "total_ns": 664272029,
+              "ns_per_operation": 16606800.725
+            },
+            "prepare_commit_work": {
+              "iterations": 100,
+              "total_ns": 1388506,
+              "ns_per_operation": 13885.06
+            },
+            "checkpoint_bytes": 300463,
+            "fixed_search": {
+              "iterations": 4,
+              "total_ns": 3716016,
+              "max_nodes_per_search": 256,
+              "cap": 2,
+              "seed": 29,
+              "workers": 1,
+              "max_depth": 1,
+              "opponent_policy": "adversarial",
+              "evaluation": "material_position",
+              "result": {
+                "commitment": "PlanningCommitment { hero: Symbol(3399), first: Some(CardId(12)), second: None }",
+                "score": 0,
+                "nodes": 24,
+                "evaluated_cells": 4,
+                "completed_rows": 2
+              }
+            },
+            "timed_decision": {
+              "budget_ms": 5,
+              "elapsed_ns": 2523711,
+              "used_fallback": false,
+              "strength_claimed": false
+            },
+            "cancellation": {
+              "signal_delay_ms": 10,
+              "response_ns": 287802,
+              "completed_before_signal": false,
+              "observed_cancelled": true,
+              "scope": "Cooperative bot-search response; no hard instruction preemption guarantee."
+            },
+            "memory_kib": {
+              "process_start": {
+                "VmHWM": 3076,
+                "VmRSS": 3076,
+                "VmSize": 19604
+              },
+              "after_setup": {
+                "VmHWM": 137008,
+                "VmRSS": 137008,
+                "VmSize": 140836
+              },
+              "after_clones": {
+                "VmHWM": 147456,
+                "VmRSS": 147456,
+                "VmSize": 151420
+              },
+              "after_search": {
+                "VmHWM": 154232,
+                "VmRSS": 154232,
+                "VmSize": 157184
+              },
+              "final": {
+                "VmHWM": 155044,
+                "VmRSS": 154900,
+                "VmSize": 224820
+              }
+            }
+          }
+        },
+        {
+          "wall_ns": 1287153375,
+          "user_cpu_seconds": 1.124232,
+          "system_cpu_seconds": 0.16003299999999998,
+          "peak_rss_kib": 155084,
+          "result": {
+            "schema_version": 1,
+            "workload": "maintenance-v1",
+            "content_identity": {
+              "version": 1,
+              "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+              "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+              "map_count": 1,
+              "hero_count": 7
+            },
+            "setup": {
+              "map": "forgotten_island",
+              "red_heroes": [
+                "Arien",
+                "Brogan"
+              ],
+              "blue_heroes": [
+                "Tigerclaw",
+                "Sabina"
+              ],
+              "seed": 29,
+              "mode": "QUICK",
+              "cheats_enabled": false,
+              "tie_breaker": null
+            },
+            "content_read_ns": 88383490,
+            "catalog_first_prepare_ns": 128061764,
+            "catalog_warm_prepare": {
+              "iterations": 100,
+              "total_ns": 400,
+              "ns_per_operation": 4.0
+            },
+            "setup_first_ns": 17427977,
+            "setup_work": {
+              "iterations": 20,
+              "total_ns": 305426147,
+              "ns_per_operation": 15271307.35
+            },
+            "clone_drop_work": {
+              "iterations": 200,
+              "total_ns": 1240106,
+              "ns_per_operation": 6200.53
+            },
+            "restore_parse_work": {
+              "iterations": 40,
+              "total_ns": 664096628,
+              "ns_per_operation": 16602415.7
+            },
+            "prepare_commit_work": {
+              "iterations": 100,
+              "total_ns": 1438306,
+              "ns_per_operation": 14383.06
+            },
+            "checkpoint_bytes": 300463,
+            "fixed_search": {
+              "iterations": 4,
+              "total_ns": 3927717,
+              "max_nodes_per_search": 256,
+              "cap": 2,
+              "seed": 29,
+              "workers": 1,
+              "max_depth": 1,
+              "opponent_policy": "adversarial",
+              "evaluation": "material_position",
+              "result": {
+                "commitment": "PlanningCommitment { hero: Symbol(3399), first: Some(CardId(12)), second: None }",
+                "score": 0,
+                "nodes": 24,
+                "evaluated_cells": 4,
+                "completed_rows": 2
+              }
+            },
+            "timed_decision": {
+              "budget_ms": 5,
+              "elapsed_ns": 2532612,
+              "used_fallback": false,
+              "strength_claimed": false
+            },
+            "cancellation": {
+              "signal_delay_ms": 10,
+              "response_ns": 315701,
+              "completed_before_signal": false,
+              "observed_cancelled": true,
+              "scope": "Cooperative bot-search response; no hard instruction preemption guarantee."
+            },
+            "memory_kib": {
+              "process_start": {
+                "VmHWM": 3204,
+                "VmRSS": 3204,
+                "VmSize": 19604
+              },
+              "after_setup": {
+                "VmHWM": 136900,
+                "VmRSS": 136900,
+                "VmSize": 140832
+              },
+              "after_clones": {
+                "VmHWM": 147356,
+                "VmRSS": 147356,
+                "VmSize": 151352
+              },
+              "after_search": {
+                "VmHWM": 154252,
+                "VmRSS": 154252,
+                "VmSize": 157060
+              },
+              "final": {
+                "VmHWM": 155084,
+                "VmRSS": 154924,
+                "VmSize": 224696
+              }
+            }
+          }
+        },
+        {
+          "wall_ns": 1319598125,
+          "user_cpu_seconds": 1.17696,
+          "system_cpu_seconds": 0.135649,
+          "peak_rss_kib": 154872,
+          "result": {
+            "schema_version": 1,
+            "workload": "maintenance-v1",
+            "content_identity": {
+              "version": 1,
+              "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+              "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+              "map_count": 1,
+              "hero_count": 7
+            },
+            "setup": {
+              "map": "forgotten_island",
+              "red_heroes": [
+                "Arien",
+                "Brogan"
+              ],
+              "blue_heroes": [
+                "Tigerclaw",
+                "Sabina"
+              ],
+              "seed": 29,
+              "mode": "QUICK",
+              "cheats_enabled": false,
+              "tie_breaker": null
+            },
+            "content_read_ns": 87381986,
+            "catalog_first_prepare_ns": 128641667,
+            "catalog_warm_prepare": {
+              "iterations": 100,
+              "total_ns": 500,
+              "ns_per_operation": 5.0
+            },
+            "setup_first_ns": 16710774,
+            "setup_work": {
+              "iterations": 20,
+              "total_ns": 350030345,
+              "ns_per_operation": 17501517.25
+            },
+            "clone_drop_work": {
+              "iterations": 200,
+              "total_ns": 1192305,
+              "ns_per_operation": 5961.525
+            },
+            "restore_parse_work": {
+              "iterations": 40,
+              "total_ns": 654102087,
+              "ns_per_operation": 16352552.175
+            },
+            "prepare_commit_work": {
+              "iterations": 100,
+              "total_ns": 1426307,
+              "ns_per_operation": 14263.07
+            },
+            "checkpoint_bytes": 300463,
+            "fixed_search": {
+              "iterations": 4,
+              "total_ns": 3868218,
+              "max_nodes_per_search": 256,
+              "cap": 2,
+              "seed": 29,
+              "workers": 1,
+              "max_depth": 1,
+              "opponent_policy": "adversarial",
+              "evaluation": "material_position",
+              "result": {
+                "commitment": "PlanningCommitment { hero: Symbol(3399), first: Some(CardId(12)), second: None }",
+                "score": 0,
+                "nodes": 24,
+                "evaluated_cells": 4,
+                "completed_rows": 2
+              }
+            },
+            "timed_decision": {
+              "budget_ms": 5,
+              "elapsed_ns": 2547411,
+              "used_fallback": false,
+              "strength_claimed": false
+            },
+            "cancellation": {
+              "signal_delay_ms": 10,
+              "response_ns": 310302,
+              "completed_before_signal": false,
+              "observed_cancelled": true,
+              "scope": "Cooperative bot-search response; no hard instruction preemption guarantee."
+            },
+            "memory_kib": {
+              "process_start": {
+                "VmHWM": 3104,
+                "VmRSS": 3104,
+                "VmSize": 19604
+              },
+              "after_setup": {
+                "VmHWM": 137040,
+                "VmRSS": 137040,
+                "VmSize": 140836
+              },
+              "after_clones": {
+                "VmHWM": 147288,
+                "VmRSS": 147288,
+                "VmSize": 151424
+              },
+              "after_search": {
+                "VmHWM": 153980,
+                "VmRSS": 153980,
+                "VmSize": 157112
+              },
+              "final": {
+                "VmHWM": 154872,
+                "VmRSS": 154684,
+                "VmSize": 224748
+              }
+            }
+          }
+        }
+      ],
+      "fresh_database_server_starts": [
+        {
+          "ready_ns": 110232087,
+          "first_game_ns": 186350622,
+          "second_game_ns": 27016520,
+          "memory_at_ready_kib": {
+            "VmHWM": 12464,
+            "VmRSS": 12464
+          },
+          "memory_after_games_kib": {
+            "VmHWM": 151316,
+            "VmRSS": 151316
+          },
+          "identity": {
+            "engine": "rust",
+            "server_version": "0.1.0",
+            "rules_version": 9,
+            "target_arch": "x86_64",
+            "target_os": "linux",
+            "binary_sha256": "73e8b219416a273849688a0f83250117705fa3b5807ae7a1e97af15d8da8a44a",
+            "content_sha256": "69ce2e47927eab8427fa8c2932f369044a30297716f1a4402a1ba6e1673c3ee2",
+            "content": {
+              "version": 1,
+              "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+              "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+              "map_count": 1,
+              "hero_count": 7
+            },
+            "ok": true
+          }
+        },
+        {
+          "ready_ns": 109375483,
+          "first_game_ns": 186201222,
+          "second_game_ns": 28218625,
+          "memory_at_ready_kib": {
+            "VmHWM": 12164,
+            "VmRSS": 12164
+          },
+          "memory_after_games_kib": {
+            "VmHWM": 151100,
+            "VmRSS": 151100
+          },
+          "identity": {
+            "engine": "rust",
+            "server_version": "0.1.0",
+            "rules_version": 9,
+            "target_arch": "x86_64",
+            "target_os": "linux",
+            "binary_sha256": "73e8b219416a273849688a0f83250117705fa3b5807ae7a1e97af15d8da8a44a",
+            "content_sha256": "69ce2e47927eab8427fa8c2932f369044a30297716f1a4402a1ba6e1673c3ee2",
+            "content": {
+              "version": 1,
+              "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+              "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+              "map_count": 1,
+              "hero_count": 7
+            },
+            "ok": true
+          }
+        },
+        {
+          "ready_ns": 111628793,
+          "first_game_ns": 182092404,
+          "second_game_ns": 26889419,
+          "memory_at_ready_kib": {
+            "VmHWM": 12476,
+            "VmRSS": 12476
+          },
+          "memory_after_games_kib": {
+            "VmHWM": 151344,
+            "VmRSS": 151344
+          },
+          "identity": {
+            "engine": "rust",
+            "server_version": "0.1.0",
+            "rules_version": 9,
+            "target_arch": "x86_64",
+            "target_os": "linux",
+            "binary_sha256": "73e8b219416a273849688a0f83250117705fa3b5807ae7a1e97af15d8da8a44a",
+            "content_sha256": "69ce2e47927eab8427fa8c2932f369044a30297716f1a4402a1ba6e1673c3ee2",
+            "content": {
+              "version": 1,
+              "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+              "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+              "map_count": 1,
+              "hero_count": 7
+            },
+            "ok": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "live-game-content.json",
+      "content_sha256": "4b7520f058d68dda93efb15837d0b657332a1a3132d37148c14a9bb2968ff651",
+      "fresh_process_runs": [
+        {
+          "wall_ns": 1709041147,
+          "user_cpu_seconds": 1.239938,
+          "system_cpu_seconds": 0.467976,
+          "peak_rss_kib": 169468,
+          "result": {
+            "schema_version": 1,
+            "workload": "maintenance-v1",
+            "content_identity": {
+              "version": 1,
+              "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+              "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+              "map_count": 6,
+              "hero_count": 33
+            },
+            "setup": {
+              "map": "forgotten_island",
+              "red_heroes": [
+                "Arien",
+                "Brogan"
+              ],
+              "blue_heroes": [
+                "Tigerclaw",
+                "Sabina"
+              ],
+              "seed": 29,
+              "mode": "QUICK",
+              "cheats_enabled": false,
+              "tie_breaker": null
+            },
+            "content_read_ns": 535085463,
+            "catalog_first_prepare_ns": 131252480,
+            "catalog_warm_prepare": {
+              "iterations": 100,
+              "total_ns": 500,
+              "ns_per_operation": 5.0
+            },
+            "setup_first_ns": 18076580,
+            "setup_work": {
+              "iterations": 20,
+              "total_ns": 294702102,
+              "ns_per_operation": 14735105.1
+            },
+            "clone_drop_work": {
+              "iterations": 200,
+              "total_ns": 1141805,
+              "ns_per_operation": 5709.025
+            },
+            "restore_parse_work": {
+              "iterations": 40,
+              "total_ns": 643527942,
+              "ns_per_operation": 16088198.55
+            },
+            "prepare_commit_work": {
+              "iterations": 100,
+              "total_ns": 1413606,
+              "ns_per_operation": 14136.06
+            },
+            "checkpoint_bytes": 300463,
+            "fixed_search": {
+              "iterations": 4,
+              "total_ns": 3742116,
+              "max_nodes_per_search": 256,
+              "cap": 2,
+              "seed": 29,
+              "workers": 1,
+              "max_depth": 1,
+              "opponent_policy": "adversarial",
+              "evaluation": "material_position",
+              "result": {
+                "commitment": "PlanningCommitment { hero: Symbol(3399), first: Some(CardId(12)), second: None }",
+                "score": 0,
+                "nodes": 24,
+                "evaluated_cells": 4,
+                "completed_rows": 2
+              }
+            },
+            "timed_decision": {
+              "budget_ms": 5,
+              "elapsed_ns": 2526311,
+              "used_fallback": false,
+              "strength_claimed": false
+            },
+            "cancellation": {
+              "signal_delay_ms": 10,
+              "response_ns": 302901,
+              "completed_before_signal": false,
+              "observed_cancelled": true,
+              "scope": "Cooperative bot-search response; no hard instruction preemption guarantee."
+            },
+            "memory_kib": {
+              "process_start": {
+                "VmHWM": 3156,
+                "VmRSS": 3156,
+                "VmSize": 19604
+              },
+              "after_setup": {
+                "VmHWM": 151608,
+                "VmRSS": 151608,
+                "VmSize": 155608
+              },
+              "after_clones": {
+                "VmHWM": 161852,
+                "VmRSS": 161852,
+                "VmSize": 166192
+              },
+              "after_search": {
+                "VmHWM": 168828,
+                "VmRSS": 168828,
+                "VmSize": 172104
+              },
+              "final": {
+                "VmHWM": 169468,
+                "VmRSS": 169308,
+                "VmSize": 239740
+              }
+            }
+          }
+        },
+        {
+          "wall_ns": 1708285044,
+          "user_cpu_seconds": 1.233528,
+          "system_cpu_seconds": 0.471056,
+          "peak_rss_kib": 169524,
+          "result": {
+            "schema_version": 1,
+            "workload": "maintenance-v1",
+            "content_identity": {
+              "version": 1,
+              "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+              "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+              "map_count": 6,
+              "hero_count": 33
+            },
+            "setup": {
+              "map": "forgotten_island",
+              "red_heroes": [
+                "Arien",
+                "Brogan"
+              ],
+              "blue_heroes": [
+                "Tigerclaw",
+                "Sabina"
+              ],
+              "seed": 29,
+              "mode": "QUICK",
+              "cheats_enabled": false,
+              "tie_breaker": null
+            },
+            "content_read_ns": 525948922,
+            "catalog_first_prepare_ns": 129571173,
+            "catalog_warm_prepare": {
+              "iterations": 100,
+              "total_ns": 700,
+              "ns_per_operation": 7.0
+            },
+            "setup_first_ns": 16598273,
+            "setup_work": {
+              "iterations": 20,
+              "total_ns": 294552600,
+              "ns_per_operation": 14727630.0
+            },
+            "clone_drop_work": {
+              "iterations": 200,
+              "total_ns": 1139105,
+              "ns_per_operation": 5695.525
+            },
+            "restore_parse_work": {
+              "iterations": 40,
+              "total_ns": 655185494,
+              "ns_per_operation": 16379637.35
+            },
+            "prepare_commit_work": {
+              "iterations": 100,
+              "total_ns": 1379306,
+              "ns_per_operation": 13793.06
+            },
+            "checkpoint_bytes": 300463,
+            "fixed_search": {
+              "iterations": 4,
+              "total_ns": 3848317,
+              "max_nodes_per_search": 256,
+              "cap": 2,
+              "seed": 29,
+              "workers": 1,
+              "max_depth": 1,
+              "opponent_policy": "adversarial",
+              "evaluation": "material_position",
+              "result": {
+                "commitment": "PlanningCommitment { hero: Symbol(3399), first: Some(CardId(12)), second: None }",
+                "score": 0,
+                "nodes": 24,
+                "evaluated_cells": 4,
+                "completed_rows": 2
+              }
+            },
+            "timed_decision": {
+              "budget_ms": 5,
+              "elapsed_ns": 2522311,
+              "used_fallback": false,
+              "strength_claimed": false
+            },
+            "cancellation": {
+              "signal_delay_ms": 10,
+              "response_ns": 296201,
+              "completed_before_signal": false,
+              "observed_cancelled": true,
+              "scope": "Cooperative bot-search response; no hard instruction preemption guarantee."
+            },
+            "memory_kib": {
+              "process_start": {
+                "VmHWM": 3196,
+                "VmRSS": 3196,
+                "VmSize": 19604
+              },
+              "after_setup": {
+                "VmHWM": 151584,
+                "VmRSS": 151584,
+                "VmSize": 155604
+              },
+              "after_clones": {
+                "VmHWM": 162000,
+                "VmRSS": 162000,
+                "VmSize": 166192
+              },
+              "after_search": {
+                "VmHWM": 168772,
+                "VmRSS": 168772,
+                "VmSize": 171940
+              },
+              "final": {
+                "VmHWM": 169524,
+                "VmRSS": 169384,
+                "VmSize": 239572
+              }
+            }
+          }
+        },
+        {
+          "wall_ns": 1726166523,
+          "user_cpu_seconds": 1.254127,
+          "system_cpu_seconds": 0.467302,
+          "peak_rss_kib": 169536,
+          "result": {
+            "schema_version": 1,
+            "workload": "maintenance-v1",
+            "content_identity": {
+              "version": 1,
+              "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+              "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+              "map_count": 6,
+              "hero_count": 33
+            },
+            "setup": {
+              "map": "forgotten_island",
+              "red_heroes": [
+                "Arien",
+                "Brogan"
+              ],
+              "blue_heroes": [
+                "Tigerclaw",
+                "Sabina"
+              ],
+              "seed": 29,
+              "mode": "QUICK",
+              "cheats_enabled": false,
+              "tie_breaker": null
+            },
+            "content_read_ns": 522394307,
+            "catalog_first_prepare_ns": 130300076,
+            "catalog_warm_prepare": {
+              "iterations": 100,
+              "total_ns": 500,
+              "ns_per_operation": 5.0
+            },
+            "setup_first_ns": 16556773,
+            "setup_work": {
+              "iterations": 20,
+              "total_ns": 301843133,
+              "ns_per_operation": 15092156.65
+            },
+            "clone_drop_work": {
+              "iterations": 200,
+              "total_ns": 1106805,
+              "ns_per_operation": 5534.025
+            },
+            "restore_parse_work": {
+              "iterations": 40,
+              "total_ns": 665433739,
+              "ns_per_operation": 16635843.475
+            },
+            "prepare_commit_work": {
+              "iterations": 100,
+              "total_ns": 1414506,
+              "ns_per_operation": 14145.06
+            },
+            "checkpoint_bytes": 300463,
+            "fixed_search": {
+              "iterations": 4,
+              "total_ns": 4249619,
+              "max_nodes_per_search": 256,
+              "cap": 2,
+              "seed": 29,
+              "workers": 1,
+              "max_depth": 1,
+              "opponent_policy": "adversarial",
+              "evaluation": "material_position",
+              "result": {
+                "commitment": "PlanningCommitment { hero: Symbol(3399), first: Some(CardId(12)), second: None }",
+                "score": 0,
+                "nodes": 24,
+                "evaluated_cells": 4,
+                "completed_rows": 2
+              }
+            },
+            "timed_decision": {
+              "budget_ms": 5,
+              "elapsed_ns": 2531111,
+              "used_fallback": false,
+              "strength_claimed": false
+            },
+            "cancellation": {
+              "signal_delay_ms": 10,
+              "response_ns": 285601,
+              "completed_before_signal": false,
+              "observed_cancelled": true,
+              "scope": "Cooperative bot-search response; no hard instruction preemption guarantee."
+            },
+            "memory_kib": {
+              "process_start": {
+                "VmHWM": 3248,
+                "VmRSS": 3248,
+                "VmSize": 19604
+              },
+              "after_setup": {
+                "VmHWM": 151428,
+                "VmRSS": 151428,
+                "VmSize": 155604
+              },
+              "after_clones": {
+                "VmHWM": 161868,
+                "VmRSS": 161868,
+                "VmSize": 166192
+              },
+              "after_search": {
+                "VmHWM": 168832,
+                "VmRSS": 168832,
+                "VmSize": 171876
+              },
+              "final": {
+                "VmHWM": 169536,
+                "VmRSS": 169464,
+                "VmSize": 239516
+              }
+            }
+          }
+        }
+      ],
+      "fresh_database_server_starts": [
+        {
+          "ready_ns": 141664425,
+          "first_game_ns": 185520919,
+          "second_game_ns": 26489617,
+          "memory_at_ready_kib": {
+            "VmHWM": 26728,
+            "VmRSS": 26728
+          },
+          "memory_after_games_kib": {
+            "VmHWM": 165808,
+            "VmRSS": 165808
+          },
+          "identity": {
+            "engine": "rust",
+            "server_version": "0.1.0",
+            "rules_version": 9,
+            "target_arch": "x86_64",
+            "target_os": "linux",
+            "binary_sha256": "73e8b219416a273849688a0f83250117705fa3b5807ae7a1e97af15d8da8a44a",
+            "content_sha256": "4b7520f058d68dda93efb15837d0b657332a1a3132d37148c14a9bb2968ff651",
+            "content": {
+              "version": 1,
+              "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+              "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+              "map_count": 6,
+              "hero_count": 33
+            },
+            "ok": true
+          }
+        },
+        {
+          "ready_ns": 143028532,
+          "first_game_ns": 184100113,
+          "second_game_ns": 27162920,
+          "memory_at_ready_kib": {
+            "VmHWM": 26736,
+            "VmRSS": 26736
+          },
+          "memory_after_games_kib": {
+            "VmHWM": 165760,
+            "VmRSS": 165760
+          },
+          "identity": {
+            "engine": "rust",
+            "server_version": "0.1.0",
+            "rules_version": 9,
+            "target_arch": "x86_64",
+            "target_os": "linux",
+            "binary_sha256": "73e8b219416a273849688a0f83250117705fa3b5807ae7a1e97af15d8da8a44a",
+            "content_sha256": "4b7520f058d68dda93efb15837d0b657332a1a3132d37148c14a9bb2968ff651",
+            "content": {
+              "version": 1,
+              "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+              "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+              "map_count": 6,
+              "hero_count": 33
+            },
+            "ok": true
+          }
+        },
+        {
+          "ready_ns": 141469524,
+          "first_game_ns": 187197126,
+          "second_game_ns": 27017520,
+          "memory_at_ready_kib": {
+            "VmHWM": 26916,
+            "VmRSS": 26916
+          },
+          "memory_after_games_kib": {
+            "VmHWM": 165840,
+            "VmRSS": 165840
+          },
+          "identity": {
+            "engine": "rust",
+            "server_version": "0.1.0",
+            "rules_version": 9,
+            "target_arch": "x86_64",
+            "target_os": "linux",
+            "binary_sha256": "73e8b219416a273849688a0f83250117705fa3b5807ae7a1e97af15d8da8a44a",
+            "content_sha256": "4b7520f058d68dda93efb15837d0b657332a1a3132d37148c14a9bb2968ff651",
+            "content": {
+              "version": 1,
+              "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+              "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+              "map_count": 6,
+              "hero_count": 33
+            },
+            "ok": true
+          }
+        }
+      ]
+    }
+  ]
+}

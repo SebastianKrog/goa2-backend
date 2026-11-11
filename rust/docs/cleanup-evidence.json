@@ -1241,5 +1241,126 @@
     "fresh_process_runs": 6,
     "fresh_database_server_starts": 6,
     "scope": "Fixed opening planning, setup, clone and restore baseline. Deeper search and resolution require additional workloads."
+  },
+  "local_interpreter_split_differential": {
+    "stage": "full",
+    "command": [
+      "python3",
+      "tools/check.py",
+      "full",
+      "--profile",
+      "iterate"
+    ],
+    "started_utc": "2026-11-11T08:16:01.776376+00:00",
+    "boot_id": "9268e384-40c1-406e-8fe0-5076d87d4505",
+    "source_commit": "3356c5da63a28ecdc455d6fbe1dd5e4c0a7a3741",
+    "source_identity": "a72201691a86f7e3dae61890e4cebb2c8af0d0eebb4161f8633b3b76c10e5378",
+    "test_threads": "2",
+    "oracle_workers": "1",
+    "memory_max_bytes": 2147483648,
+    "finished_utc": "2026-11-11T09:25:20.176919+00:00",
+    "exit_code": 0,
+    "source_identity_unchanged": true,
+    "full-result.json_sha256": "6f6a5dfe1558508eeaf9853494771c46412fc154cef503f23e8edf1a5e495f89",
+    "full.log_sha256": "1ec2cdc0867eaef1e0510657a57713e9e9cbc8a57e20ad60ec3a3baadade9248",
+    "native_passed": 636,
+    "native_ignored": 8,
+    "trace_tests_passed": 4,
+    "canonical_cases": 6592,
+    "live_cases": 17347,
+    "complete_games": 4
+  },
+  "wsl_interpreter_split_maintenance": {
+    "report": "../benchmarks/maintenance-v1-interpreter-wsl-results.json",
+    "sha256": "aa8a361e47549d5fb4ca3d49f450b0287c7c9a59f8211fdf45127f8129e8b551",
+    "source_commit": "832ea43ee14ba32f1610baf846ecd43a75c52260",
+    "baseline_source_commit": "ff8ffed534ef190fa507399492a5db4c361c2c14",
+    "benchmark_binary_sha256": "0fc851d312251519ab816533664e5d3b76071760121a48ec3a082ce6f58ec1a2",
+    "server_binary_sha256": "73e8b219416a273849688a0f83250117705fa3b5807ae7a1e97af15d8da8a44a",
+    "repetitions_per_pack": 3,
+    "rows": [
+      {
+        "content": "smoke-game.json",
+        "content_sha256": "69ce2e47927eab8427fa8c2932f369044a30297716f1a4402a1ba6e1673c3ee2",
+        "checkpoint_bytes": 300463,
+        "result": {
+          "commitment": "PlanningCommitment { hero: Symbol(3399), first: Some(CardId(12)), second: None }",
+          "score": 0,
+          "nodes": 24,
+          "evaluated_cells": 4,
+          "completed_rows": 2
+        },
+        "planning_ms": {
+          "baseline": 0.954325,
+          "interpreter_split": 0.967055
+        },
+        "restore_ms": {
+          "baseline": 15.873568,
+          "interpreter_split": 16.602416
+        }
+      },
+      {
+        "content": "live-game-content.json",
+        "content_sha256": "4b7520f058d68dda93efb15837d0b657332a1a3132d37148c14a9bb2968ff651",
+        "checkpoint_bytes": 300463,
+        "result": {
+          "commitment": "PlanningCommitment { hero: Symbol(3399), first: Some(CardId(12)), second: None }",
+          "score": 0,
+          "nodes": 24,
+          "evaluated_cells": 4,
+          "completed_rows": 2
+        },
+        "planning_ms": {
+          "baseline": 0.974425,
+          "interpreter_split": 0.962079
+        },
+        "restore_ms": {
+          "baseline": 16.206458,
+          "interpreter_split": 16.379637
+        }
+      }
+    ],
+    "scope": "Fresh processes and disposable databases; OS filesystem/page caches and host load are uncontrolled. No cache drop or strength-quality claim."
+  },
+  "wsl_interpreter_split_four_turn_search": {
+    "source_commit": "832ea43ee14ba32f1610baf846ecd43a75c52260",
+    "report": "../benchmarks/search-four-turn-interpreter-wsl-results.json",
+    "sha256": "8e77ba3320d26777b7ceb439420c4a3ec00472983473445f63370540dc44cd91",
+    "worker_sha256": "5488c41332f9f2f700557be55442c2c71de98aa473af47958e46740960d41482",
+    "scope": "Fresh worker process, envelope compilation, and search",
+    "rows": [
+      {
+        "case": "complete-game-hanu-forgotten_island-progress-41",
+        "operation": "search_sampled_planning",
+        "nodes": 4096,
+        "score": 0,
+        "depth": null,
+        "median_ms": 267.953
+      },
+      {
+        "case": "complete-game-hanu-forgotten_island-progress-41",
+        "operation": "search_resolution",
+        "nodes": 4096,
+        "score": 0,
+        "depth": 3,
+        "median_ms": 304.33
+      },
+      {
+        "case": "complete-game-hanu-magma_and_ice-progress-43",
+        "operation": "search_sampled_planning",
+        "nodes": 4096,
+        "score": 0,
+        "depth": null,
+        "median_ms": 276.603
+      },
+      {
+        "case": "complete-game-hanu-magma_and_ice-progress-43",
+        "operation": "search_resolution",
+        "nodes": 4096,
+        "score": 0,
+        "depth": 3,
+        "median_ms": 322.233
+      }
+    ]
   }
 }

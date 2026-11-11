@@ -13,7 +13,8 @@ import json
 
 from oracle import ROOT, digest, verify_sources
 from primary_builders import CARD, OWNER
-from primary_templates import PRIMARY, RADIUS, RANGE
+from primary_operand_wire import encode_primary_operands
+from primary_templates import PRIMARY, PRIMARY_PLUS_TWO, RADIUS, RANGE
 
 EFFECTS = (
     "shocking_grasp",
@@ -92,11 +93,14 @@ def catalog():
             recipes["wish_counted"] = freeze(impl.get_steps_with_stats(state, hero, card, stats))
             state.execution_context.clear()
     source = dict(
-        schema_version=1,
+        schema_version=2,
         source_sha256=verify_sources()["source_sha256"],
         effects=list(EFFECTS),
         recipes=recipes,
         operands=dict(owner=OWNER, card=CARD, primary=PRIMARY, range=RANGE, radius=RADIUS),
+    )
+    source = encode_primary_operands(
+        source, primary=PRIMARY, range_=RANGE, radius=RADIUS, primary_plus_two=PRIMARY_PLUS_TWO
     )
     return {**source, "catalog_sha256": digest(source)}
 

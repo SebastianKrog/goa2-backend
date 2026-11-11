@@ -91,18 +91,6 @@ pub(super) fn catalog() -> Result<&'static Value> {
     .as_ref()
     .map_err(|error| unsupported(error.clone()))
 }
-fn compile_primary_recipe(
-    row: &Value,
-    steps: &mut Vec<CompiledStep>,
-    symbols: &mut Symbols,
-) -> Result<Recipe> {
-    let mut row = row.clone();
-    let operands = super::primary_operands::extract(&mut row["fields"], symbols)?;
-    let mut recipe = Recipe::compile(&row, steps, symbols)?;
-    recipe.primary_operands = operands;
-    Ok(recipe)
-}
-
 fn attach_raw_bindings(recipe: &mut Recipe, paths: &Value, symbols: &mut Symbols) -> Result<()> {
     for path in paths
         .as_array()
@@ -192,7 +180,7 @@ impl PrimaryRules {
                     .iter()
                     .enumerate()
                     .map(|(index, row)| {
-                        let mut recipe = compile_primary_recipe(row, steps, symbols)?;
+                        let mut recipe = Recipe::compile_primary(row, steps, symbols)?;
                         attach_raw_bindings(
                             &mut recipe,
                             &data["raw_card_bindings"][effect][index],
@@ -215,7 +203,7 @@ impl PrimaryRules {
                         .iter()
                         .enumerate()
                         .map(|(index, row)| {
-                            let mut recipe = compile_primary_recipe(row, steps, symbols)?;
+                            let mut recipe = Recipe::compile_primary(row, steps, symbols)?;
                             attach_raw_bindings(
                                 &mut recipe,
                                 &body["raw_card_bindings"][name][index],

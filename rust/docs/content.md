@@ -77,7 +77,8 @@ distribution route.
 ## Primary recipe operands
 
 The primary effect catalog uses schema version 3. The live primary builder
-catalog uses schema version 4. Generated numeric operands use a single-key
+catalog uses schema version 4, and the spell builder catalog uses schema version
+2. Generated numeric operands use a single-key
 object with a `$operand` property, for example
 `{"$operand":{"kind":"primary_add","amount":2}}`. Plain numbers represent
 literal values. The operand object is restricted to recipe generation and

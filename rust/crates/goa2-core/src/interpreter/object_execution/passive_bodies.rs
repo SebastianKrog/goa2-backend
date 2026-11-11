@@ -67,6 +67,18 @@ pub(super) struct Recipe {
     programs: Vec<(Vec<ObjectSlot>, usize)>,
 }
 impl Recipe {
+    pub(super) fn compile_primary(
+        row: &Value,
+        steps: &mut Vec<CompiledStep>,
+        symbols: &mut Symbols,
+    ) -> Result<Self> {
+        let mut row = row.clone();
+        let operands = super::primary_operands::extract(&mut row["fields"], symbols)?;
+        let mut recipe = Self::compile(&row, steps, symbols)?;
+        recipe.primary_operands = operands;
+        Ok(recipe)
+    }
+
     pub(super) fn compile(
         row: &Value,
         steps: &mut Vec<CompiledStep>,

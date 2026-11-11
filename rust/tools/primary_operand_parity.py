@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 
-CATALOG_VERSIONS = {"primary-effects.json": 2, "primary-builders.json": 3}
+CATALOG_VERSIONS = {"primary-effects.json": 2, "primary-builders.json": 3, "spell-builders.json": 1}
 LEGACY_OPERANDS = {
     1234567891: {"kind": "primary"},
     1234567892: {"kind": "range"},
@@ -34,7 +34,7 @@ def compare(old, new, name):
     validate_digest(new, f"{name} candidate")
     operands = LEGACY_OPERANDS.copy()
     for kind in ("radius", "range"):
-        for slot, default in old[f"{kind}_fallbacks"].items():
+        for slot, default in old.get(f"{kind}_fallbacks", {}).items():
             slot = int(slot)
             if slot in operands or type(default) is not int:
                 raise ValueError(f"{name}: invalid legacy {kind} fallback {slot}")

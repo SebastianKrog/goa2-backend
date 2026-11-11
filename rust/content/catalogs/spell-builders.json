@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
   "effects": [
     "shocking_grasp",
@@ -144,7 +144,11 @@
           "is_mandatory": true,
           "active_if_key": null,
           "skip_if_key": null,
-          "damage": 1234567891,
+          "damage": {
+            "$operand": {
+              "kind": "primary"
+            }
+          },
           "range_val": 1,
           "is_ranged": false,
           "target_id_key": "shocking_grasp_target",
@@ -340,15 +344,27 @@
           "is_mandatory": true,
           "active_if_key": null,
           "skip_if_key": null,
-          "damage": 1234567891,
-          "range_val": 1234567892,
+          "damage": {
+            "$operand": {
+              "kind": "primary"
+            }
+          },
+          "range_val": {
+            "$operand": {
+              "kind": "range"
+            }
+          },
           "is_ranged": true,
           "target_id_key": null,
           "target_output_key": null,
           "target_filters": [
             {
               "type": "range_filter",
-              "max_range": 1234567892,
+              "max_range": {
+                "$operand": {
+                  "kind": "range"
+                }
+              },
               "min_range": 2,
               "origin_id": null,
               "origin_key": null,
@@ -402,7 +418,11 @@
           "active_if_key": null,
           "skip_if_key": null,
           "unit_id": "template-passive-owner",
-          "range_val": 1234567891,
+          "range_val": {
+            "$operand": {
+              "kind": "primary"
+            }
+          },
           "range_stat_type": null,
           "destination_key": "target_hex",
           "pass_through_obstacles": false,
@@ -681,7 +701,11 @@
           "is_mandatory": true,
           "active_if_key": null,
           "skip_if_key": null,
-          "damage": 1234567891,
+          "damage": {
+            "$operand": {
+              "kind": "primary"
+            }
+          },
           "range_val": 1,
           "is_ranged": false,
           "target_id_key": "burning_hands_target",
@@ -736,7 +760,11 @@
             },
             {
               "type": "range_filter",
-              "max_range": 1234567893,
+              "max_range": {
+                "$operand": {
+                  "kind": "radius"
+                }
+              },
               "min_range": 0,
               "origin_id": null,
               "origin_key": null,
@@ -1158,7 +1186,11 @@
           "is_mandatory": true,
           "active_if_key": null,
           "skip_if_key": null,
-          "damage": 1234567891,
+          "damage": {
+            "$operand": {
+              "kind": "primary"
+            }
+          },
           "range_val": 1,
           "is_ranged": false,
           "target_id_key": null,
@@ -1294,15 +1326,27 @@
           "is_mandatory": true,
           "active_if_key": null,
           "skip_if_key": null,
-          "damage": 1234567891,
-          "range_val": 1234567892,
+          "damage": {
+            "$operand": {
+              "kind": "primary"
+            }
+          },
+          "range_val": {
+            "$operand": {
+              "kind": "range"
+            }
+          },
           "is_ranged": true,
           "target_id_key": null,
           "target_output_key": null,
           "target_filters": [
             {
               "type": "range_filter",
-              "max_range": 1234567892,
+              "max_range": {
+                "$operand": {
+                  "kind": "range"
+                }
+              },
               "min_range": 2,
               "origin_id": null,
               "origin_key": null,
@@ -1438,7 +1482,11 @@
             },
             {
               "type": "range_filter",
-              "max_range": 1234567892,
+              "max_range": {
+                "$operand": {
+                  "kind": "range"
+                }
+              },
               "min_range": 0,
               "origin_id": null,
               "origin_key": null,
@@ -1891,7 +1939,11 @@
             },
             {
               "type": "range_filter",
-              "max_range": 1234567893,
+              "max_range": {
+                "$operand": {
+                  "kind": "radius"
+                }
+              },
               "min_range": 0,
               "origin_id": null,
               "origin_key": null,
@@ -2012,7 +2064,11 @@
             },
             {
               "type": "range_filter",
-              "max_range": 1234567893,
+              "max_range": {
+                "$operand": {
+                  "kind": "radius"
+                }
+              },
               "min_range": 0,
               "origin_id": null,
               "origin_key": null,
@@ -2163,7 +2219,11 @@
           "filters": [
             {
               "type": "range_filter",
-              "max_range": 1234567893,
+              "max_range": {
+                "$operand": {
+                  "kind": "radius"
+                }
+              },
               "min_range": 0,
               "origin_id": null,
               "origin_key": null,
@@ -2332,8 +2392,16 @@
           "filters": [
             {
               "type": "range_filter",
-              "max_range": 1234567893,
-              "min_range": 1234567893,
+              "max_range": {
+                "$operand": {
+                  "kind": "radius"
+                }
+              },
+              "min_range": {
+                "$operand": {
+                  "kind": "radius"
+                }
+              },
               "origin_id": null,
               "origin_key": null,
               "origin_hex_key": null,
@@ -2574,7 +2642,11 @@
           "filters": [
             {
               "type": "range_filter",
-              "max_range": 1234567893,
+              "max_range": {
+                "$operand": {
+                  "kind": "radius"
+                }
+              },
               "min_range": 0,
               "origin_id": null,
               "origin_key": null,
@@ -2702,16 +2774,32 @@
           "is_mandatory": true,
           "active_if_key": null,
           "skip_if_key": null,
-          "damage": 1234567891,
-          "range_val": 1234567892,
+          "damage": {
+            "$operand": {
+              "kind": "primary"
+            }
+          },
+          "range_val": {
+            "$operand": {
+              "kind": "range"
+            }
+          },
           "is_ranged": true,
           "target_id_key": null,
           "target_output_key": null,
           "target_filters": [
             {
               "type": "range_filter",
-              "max_range": 1234567892,
-              "min_range": 1234567892,
+              "max_range": {
+                "$operand": {
+                  "kind": "range"
+                }
+              },
+              "min_range": {
+                "$operand": {
+                  "kind": "range"
+                }
+              },
               "origin_id": null,
               "origin_key": null,
               "origin_hex_key": null,
@@ -2778,7 +2866,11 @@
             },
             {
               "type": "range_filter",
-              "max_range": 1234567892,
+              "max_range": {
+                "$operand": {
+                  "kind": "range"
+                }
+              },
               "min_range": 0,
               "origin_id": null,
               "origin_key": null,
@@ -2946,7 +3038,11 @@
             },
             {
               "type": "range_filter",
-              "max_range": 1234567893,
+              "max_range": {
+                "$operand": {
+                  "kind": "radius"
+                }
+              },
               "min_range": 0,
               "origin_id": null,
               "origin_key": null,
@@ -3221,7 +3317,11 @@
             },
             {
               "type": "range_filter",
-              "max_range": 1234567893,
+              "max_range": {
+                "$operand": {
+                  "kind": "radius"
+                }
+              },
               "min_range": 0,
               "origin_id": null,
               "origin_key": null,
@@ -3383,7 +3483,11 @@
             },
             {
               "type": "range_filter",
-              "max_range": 1234567893,
+              "max_range": {
+                "$operand": {
+                  "kind": "radius"
+                }
+              },
               "min_range": 0,
               "origin_id": null,
               "origin_key": null,
@@ -3496,7 +3600,11 @@
           "filters": [
             {
               "type": "range_filter",
-              "max_range": 1234567893,
+              "max_range": {
+                "$operand": {
+                  "kind": "radius"
+                }
+              },
               "min_range": 0,
               "origin_id": null,
               "origin_key": null,
@@ -3783,9 +3891,21 @@
   "operands": {
     "owner": "template-passive-owner",
     "card": "template-primary-card",
-    "primary": 1234567891,
-    "range": 1234567892,
-    "radius": 1234567893
+    "primary": {
+      "$operand": {
+        "kind": "primary"
+      }
+    },
+    "range": {
+      "$operand": {
+        "kind": "range"
+      }
+    },
+    "radius": {
+      "$operand": {
+        "kind": "radius"
+      }
+    }
   },
-  "catalog_sha256": "068b514a7a034ffdb8b037473d797f060c40202b55204f6ae2602d8794fbea6c"
+  "catalog_sha256": "e2b1f3020a674bfe3968a2b48bb9bfe0c36210bf8aad632b315352b99c9c32ce"
 }

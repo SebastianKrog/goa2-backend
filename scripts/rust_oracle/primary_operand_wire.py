@@ -13,7 +13,7 @@ def encode_primary_operands(source, *, primary, range_, radius, primary_plus_two
     if primary_plus_three is not None:
         operands[primary_plus_three] = ("primary_add", {"amount": 3})
     for kind in ("radius", "range"):
-        for slot, default in source[f"{kind}_fallbacks"].items():
+        for slot, default in source.get(f"{kind}_fallbacks", {}).items():
             slot = int(slot)
             if slot in operands:
                 raise ValueError(f"duplicate primary probe value {slot}")

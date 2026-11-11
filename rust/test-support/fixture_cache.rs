@@ -1,7 +1,7 @@
 //! Test-only, case-at-a-time reader. Plain files remain useful for authoring.
 use std::{
     fs::File,
-    io::{self, Read},
+    io::{self, BufReader, Read},
     path::{Path, PathBuf},
 };
 
@@ -31,7 +31,7 @@ pub fn open(path: impl AsRef<Path>) -> io::Result<Box<dyn Read>> {
     }
     for candidate in candidates {
         match local(&candidate) {
-            Ok(reader) => return Ok(reader),
+            Ok(reader) => return Ok(Box::new(BufReader::new(reader))),
             Err(error) if error.kind() == io::ErrorKind::NotFound => {}
             Err(error) => return Err(error),
         }

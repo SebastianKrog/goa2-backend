@@ -2593,5 +2593,21 @@
       }
     },
     "scope": "Release example executed on both retained content packs. The first and warm intervals add to the preserved 100-call aggregate. These two validation runs establish report behavior."
+  },
+  "updated_benchmark_candidate_static_extraction": {
+    "source_commit": "a457892142e4416aeded5510a4c69e5be515cef2",
+    "mapped_files": 1202,
+    "generated_root_files": 3,
+    "source_map_sha256": "ebe76694d4c7d177532a7e4f1bb0f4bd281e2a1d8e5a66b08d38c302147879fe",
+    "documentation_links": 192,
+    "embedded_inputs": 46,
+    "cargo_path_dependencies": 2,
+    "findings": 0,
+    "report_sha256": {
+      "payload": "3ad325698d241eb4e6cff4055354b4dbc6d4ed363b89ba4c8b6afe8b792d1aff",
+      "documentation": "5165b6e28b0dfcb430bd1cc55984c79c83c8337aa5079973fd14e0c3a380007d",
+      "dependency": "a546f683fad019e379a1aea643620735ba20fac145fe36f497b3eca4be780189"
+    },
+    "scope": "Local history-free extraction with every mapped file hash checked. The audits cover the selected payload, local links, and embedded dependencies. Final payload approval, remote links, and public rights review remain open."
   }
 }

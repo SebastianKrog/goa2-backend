@@ -758,5 +758,37 @@
       "audits/api-boundaries.md",
       "audits/concurrency-and-panics.md"
     ]
+  },
+  "local_full_content_startup": {
+    "date": "2026-11-11",
+    "health": {
+      "engine": "rust",
+      "server_version": "0.1.0",
+      "rules_version": 9,
+      "target_arch": "x86_64",
+      "target_os": "linux",
+      "binary_sha256": "1375dd34e70839f67b21b94f6baf9e3bff95e52677d72777c95d3ba787b36628",
+      "content_sha256": "4b7520f058d68dda93efb15837d0b657332a1a3132d37148c14a9bb2968ff651",
+      "content": {
+        "version": 1,
+        "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+        "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+        "map_count": 6,
+        "hero_count": 33
+      },
+      "ok": true
+    },
+    "creation_status": 201,
+    "empty_home_and_database": true,
+    "content_source": "Locally reproduced pinned pack installed by the standalone extraction's installer",
+    "server_environment": [
+      "GOA2_GAME_BIND",
+      "GOA2_GAME_CONTENT",
+      "GOA2_GAME_DATABASE",
+      "HOME",
+      "XDG_CACHE_HOME"
+    ],
+    "distribution_route_exercised": false,
+    "scope": "Native process started in a disposable directory with an empty home, fresh database and minimal environment. The local pack passed the standalone installer using its pinned hash. C02-04 still requires the approved distribution route."
   }
 }

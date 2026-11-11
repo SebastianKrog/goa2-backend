@@ -64,3 +64,12 @@ Generated candidates must match the admitted registry/index fingerprints before
 installation. The generator recipe alone does not establish that today's
 exporter reproduces a historical frozen case. Retain the original artifact
 when fingerprints differ.
+
+## Local full-content startup rehearsal
+
+The standalone installer admitted the locally reproduced full pack by SHA256.
+A native server then started with an empty home and fresh database. Its health
+response identified all 33 heroes and six maps, and a game creation request
+returned HTTP 201. The binary and pack identities are recorded in the
+[cleanup evidence](cleanup-evidence.json). C02-04 remains open for the approved
+distribution route.

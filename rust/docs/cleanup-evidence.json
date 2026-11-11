@@ -2047,5 +2047,58 @@
     "complete_games": 4,
     "full_result_sha256": "a9be2e865086a3d2d7dbea84086af192a70c8f929b7c7c39396d0ae58def03bd",
     "full_log_sha256": "f261333dbcc8426d112bc42a082573a9e85092e3fdfb80b4ca3cc8a40211e153"
+  },
+  "merged_import_refactor_exhaustive_restore": {
+    "source_commit": "ed24857c0fd4474a65d4f7268f2a767a42a32e28",
+    "exit_code": 0,
+    "source_identity_unchanged": true,
+    "source_identity": "12aa41e017f07bd6d0cbf92f8c2c79b8f2a5321ce2edf97a6061efb1bc5607b2",
+    "cases": 17347,
+    "shards": 8,
+    "finished_utc": "2026-11-11T18:20:42.295023+00:00",
+    "result_sha256": "858a7184bcdc848f87b0593257212e2b6e13a1dbc3b381c8b57fd19163b9c78f",
+    "shard_results": [
+      {
+        "shard": 1,
+        "cases": 2169,
+        "log_sha256": "62f0080c5f13d8b0a60c08d0f4794d0df261652aa395a1bb43ccea870a3a5769"
+      },
+      {
+        "shard": 2,
+        "cases": 2169,
+        "log_sha256": "cf4294a1b48d91dfdb5c820bafcc58b57615c4bdf7cda6cef84c9f98f6940566"
+      },
+      {
+        "shard": 3,
+        "cases": 2169,
+        "log_sha256": "e185f755e0c8b5dd2e71c91332804a2adb582e605d7e8ca6d4f7987a46ce3b1e"
+      },
+      {
+        "shard": 4,
+        "cases": 2168,
+        "log_sha256": "4eb2a0f70991b767dc5f10c29474a03e8bb4d41c724d0fe82bdf3fc98fb46de5"
+      },
+      {
+        "shard": 5,
+        "cases": 2168,
+        "log_sha256": "79874c817f80fa70f88c5d7c09304e32384d02b3b23c3ba3259fb1e674e93049"
+      },
+      {
+        "shard": 6,
+        "cases": 2168,
+        "log_sha256": "189b38a1deb8acfb83f5b250587a18900e2923b154b16e118e8e9c079fb27209"
+      },
+      {
+        "shard": 7,
+        "cases": 2168,
+        "log_sha256": "b97b2d43f307bcba08fc32f00096f5095a9fb8c478291650e01134e735e51fd0"
+      },
+      {
+        "shard": 8,
+        "cases": 2168,
+        "log_sha256": "38b03d5fe16bb1afb2baab3490a827ec00230894a343072425da588d770fef78"
+      }
+    ],
+    "scope": "Exhaustive restoration on the local frozen corpus, including restored values, aliases, and request generations."
   }
 }

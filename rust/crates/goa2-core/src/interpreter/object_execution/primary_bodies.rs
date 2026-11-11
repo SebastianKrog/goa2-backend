@@ -372,7 +372,7 @@ impl PrimaryRules {
                     .as_array()
                     .ok_or_else(|| unsupported("primary fallback missing"))?
                     .iter()
-                    .map(|row| Recipe::compile(row, steps, symbols))
+                    .map(|row| Recipe::compile_primary(row, steps, symbols))
                     .collect::<Result<Vec<_>>>()?,
             );
         }

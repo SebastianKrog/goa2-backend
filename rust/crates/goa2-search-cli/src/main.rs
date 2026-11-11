@@ -1525,14 +1525,25 @@ mod trace_tests {
     #[test]
     #[ignore = "exhaustive Python trace replay"]
     fn live_shared_steps_and_context_match_python_values_requests_and_identity() {
-        verify_index("object-execution.json", Some(17347));
+        verify_index("object-execution.json", Some(17347), |_| true);
     }
     #[test]
     #[ignore = "exhaustive Python trace replay"]
     fn every_native_transition_matches_python_full_state_request_and_event_order() {
-        verify_index("stack-traces.json", None);
+        verify_index("stack-traces.json", None, |_| true);
     }
-    fn verify_index(filename: &str, expected_count: Option<usize>) {
+    #[test]
+    #[ignore = "requires the live object-execution oracle fixtures"]
+    fn primary_text_fallback_movement_and_attack_match_python() {
+        verify_index("object-execution.json", Some(2), |name| {
+            matches!(
+                name,
+                "object-execution-primary-text-fallback-movement"
+                    | "object-execution-primary-text-fallback-attack"
+            )
+        });
+    }
+    fn verify_index(filename: &str, expected_count: Option<usize>, include: impl Fn(&str) -> bool) {
         #[derive(Deserialize)]
         struct Entry {
             name: String,
@@ -1550,14 +1561,19 @@ mod trace_tests {
         ))
         .unwrap();
         assert_eq!(index.schema_version, 2);
-        assert!(!index.cases.is_empty());
+        let cases: Vec<_> = index
+            .cases
+            .into_iter()
+            .filter(|entry| include(&entry.name))
+            .collect();
+        assert!(!cases.is_empty());
         if let Some(count) = expected_count {
-            assert_eq!(index.cases.len(), count);
+            assert_eq!(cases.len(), count);
         }
-        let total = index.cases.len();
+        let total = cases.len();
         let report_progress = std::env::var_os("GOA2_ORACLE_PROGRESS").is_some();
         let finished = std::sync::atomic::AtomicUsize::new(0);
-        let checked = fixture_parallel::for_each_case(index.cases.into_iter(), |entry| {
+        let checked = fixture_parallel::for_each_case(cases.into_iter(), |entry| {
             let case: TraceCase = serde_json::from_reader(std::io::BufReader::new(
                 crate::fixture_cache::open(base.join(entry.path)).unwrap(),
             ))

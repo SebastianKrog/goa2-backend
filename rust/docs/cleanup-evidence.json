@@ -1522,5 +1522,35 @@
     "failed": 0,
     "log_sha256": "b2ffe2e02075e0eeb09ca5da58f8e6917a2586b8f1481980d85cf4777817d88f",
     "scope": "Frontend consumer tests. The 2D browser walkthrough against the extracted server remains pending."
+  },
+  "combined_candidate_full_differential": {
+    "candidate": "ebd520350dba4e4ba73e18f6d192115791fc28db",
+    "source_identity": "cd56d7f827fc145c86bc825ee20d3d4007be17883e803c33f86a2f932ffdb07c",
+    "fixture_counts": {
+      "expected": 24197,
+      "executed": 24197,
+      "missing": 0,
+      "failed": 0,
+      "skipped": 0
+    },
+    "native_tests": {
+      "tier": "native",
+      "executed": 638,
+      "failed": 0,
+      "ignored": 9,
+      "full_parity": true
+    },
+    "oracle_tests": {
+      "tier": "native",
+      "executed": 5,
+      "failed": 0,
+      "ignored": 0,
+      "full_parity": true
+    },
+    "canonical_transition_cases": 6592,
+    "object_execution_cases": 17347,
+    "log_sha256": "da8a819977c82d42943c282f7f319866d85a98d8e5027a8d0c554eca4ea19db5",
+    "result_sha256": "e77f7346af5a680a0ebd6d0b668afda55b9448b71008ea4767cfd0586f98f7f0",
+    "scope": "Full differential parity. Exhaustive boundary restore is a separate run."
   }
 }

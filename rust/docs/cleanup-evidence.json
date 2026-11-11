@@ -1426,5 +1426,19 @@
       "corrected-dependency-audit.json": "38438a9022717085b68c6c6edb093e93cb62ad550edfaea62949e285feac49ac"
     },
     "scope": "Local static and compilation checks; full parity, exhaustive restore, and release authorization are separate."
+  },
+  "typed_fallback_operand_regression": {
+    "failed_candidate": "930606bf86e8d6882dc43ddbf211fc45e4ee299e",
+    "failed_full_log_sha256": "18584993aa30edc0eb1eadf196f7350b6259aa642fbbdb2c9498f08f5ea278e1",
+    "failed_result_sha256": "c47035fd693a9fee5f9aa431b8d4b3fdf200ef841a0a679122c15e681c546188",
+    "failure": "Fallback movement and attack recipes bypassed typed operand binding. Full replay found a mismatch at operation zero in the fallback movement fixture.",
+    "corrected_candidate": "67a852ed01996a378fc0248fdeb7f7ac1817df1b",
+    "corrected_search_candidate": "d284805c19b018a28682531b826c9a8fa129ab0d",
+    "corrected_combined_candidate": "ebd520350dba4e4ba73e18f6d192115791fc28db",
+    "focused_test": "primary_text_fallback_movement_and_attack_match_python",
+    "focused_cases": 2,
+    "focused_result": "passed",
+    "focused_log_sha256": "f81ee1d85c0ee0fdd0014cff494d8af71a338a2e0f855ad6c841ff2c241dfb94",
+    "scope": "Focused Python oracle replay. Full differential and exhaustive restore evidence remain separate."
   }
 }

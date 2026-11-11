@@ -1,0 +1,36 @@
+{
+  "revisions": {
+    "typed": "67a852ed01996a378fc0248fdeb7f7ac1817df1b",
+    "structure": "d284805c19b018a28682531b826c9a8fa129ab0d"
+  },
+  "workloads": [
+    {
+      "case": "complete-game-hanu-forgotten_island-progress-41",
+      "operation": "search_sampled_planning",
+      "nodes": 4096,
+      "typed_median_ns": 384835139,
+      "structure_median_ns": 384028137
+    },
+    {
+      "case": "complete-game-hanu-forgotten_island-progress-41",
+      "operation": "search_resolution",
+      "nodes": 4096,
+      "typed_median_ns": 428727743,
+      "structure_median_ns": 426312041
+    },
+    {
+      "case": "complete-game-hanu-magma_and_ice-progress-43",
+      "operation": "search_sampled_planning",
+      "nodes": 4096,
+      "typed_median_ns": 395069539,
+      "structure_median_ns": 394989037
+    },
+    {
+      "case": "complete-game-hanu-magma_and_ice-progress-43",
+      "operation": "search_resolution",
+      "nodes": 4096,
+      "typed_median_ns": 451674745,
+      "structure_median_ns": 439230841
+    }
+  ]
+}

@@ -1466,5 +1466,47 @@
     },
     "log_sha256": "e9f0de85d07920eeb4285a2dccb2fe5f5d1807a1a89b9e11b98b7d2c868652b7",
     "result_sha256": "ffbfc78a7d3530b7ed4133d1e33ef6590b6fade9cf4f594cd1793f6c6f4c8312"
+  },
+  "search_structure_fixed_work": {
+    "revisions": {
+      "typed": "67a852ed01996a378fc0248fdeb7f7ac1817df1b",
+      "structure": "d284805c19b018a28682531b826c9a8fa129ab0d"
+    },
+    "workloads": [
+      {
+        "case": "complete-game-hanu-forgotten_island-progress-41",
+        "operation": "search_sampled_planning",
+        "nodes": 4096,
+        "typed_median_ns": 384835139,
+        "structure_median_ns": 384028137
+      },
+      {
+        "case": "complete-game-hanu-forgotten_island-progress-41",
+        "operation": "search_resolution",
+        "nodes": 4096,
+        "typed_median_ns": 428727743,
+        "structure_median_ns": 426312041
+      },
+      {
+        "case": "complete-game-hanu-magma_and_ice-progress-43",
+        "operation": "search_sampled_planning",
+        "nodes": 4096,
+        "typed_median_ns": 395069539,
+        "structure_median_ns": 394989037
+      },
+      {
+        "case": "complete-game-hanu-magma_and_ice-progress-43",
+        "operation": "search_resolution",
+        "nodes": 4096,
+        "typed_median_ns": 451674745,
+        "structure_median_ns": 439230841
+      }
+    ],
+    "report_sha256": {
+      "search-four-turn-typed-wsl-results.json": "77a92af22905057eb3e65195d903f8bd1a22613f46813c21d1bcb7cbaf41bbb0",
+      "search-four-turn-structure-wsl-results.json": "01ed3867a41542c63c1b8442d93e6b670c0eb0b3547c0f4d5fe3dd864971a2a6",
+      "search-four-turn-structure-comparison.json": "b4ac279de0e1bd221373c75055620848d3924098c52f0bceae2e1e3a6f976f0e"
+    },
+    "scope": "Four fixed-node planning and resolution comparisons. Requests, decisions, scores and other result fields matched across revisions."
   }
 }

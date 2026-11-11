@@ -151,7 +151,7 @@ full differential/restore coverage before semantic or representation changes.
 - [ ] **C10-03** Continue object-execution/live-game modularization and replace broad `use super::*` coupling with explicit dependencies where it clarifies ownership.
 - [ ] **C10-04** Separate search orchestration, evaluation, hidden-world sampling, generation/order, rollout, reuse, diagnostics and result types; introduce meaningful options/context types for repeated argument groups.
 - [x] **C10-05** Inventory dense versus object-aware execution for every live, worker, search and restore caller. Migrate consumers and preserve unique dense/protocol regressions before retiring any implementation; record justified retention where needed.
-- [ ] **C10-06** Replace recipe operand sentinels such as `1234568103`/`1234568104` with a documented typed representation through a coordinated, versioned generator/catalog change and independent old/new semantic comparison.
+- [x] **C10-06** Replace recipe operand sentinels such as `1234568103`/`1234568104` with a documented typed representation through a coordinated, versioned generator/catalog change and independent old/new semantic comparison. Catalog schema versions are 3/4/2. The [evidence](cleanup-evidence.json) records 1,943 old/new bindings and 24,197 admitted fixtures. Commit `48828dd9` pins the migrated catalog schemas and checksums.
 - [x] **C10-07** Centralize version constants and identity metadata while retaining disagreement checks at the supported boundaries.
 - [ ] **C10-08** After each separately reviewable change, verify equivalent state, requests, ordered events, aliases/restoration and fixed-work performance, including tie breaks, random draws, cancellation, deadlines, node accounting and fallback semantics.
 

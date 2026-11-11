@@ -2013,5 +2013,39 @@
       "dependency": "a546f683fad019e379a1aea643620735ba20fac145fe36f497b3eca4be780189"
     },
     "scope": "Static audit of the local extraction selection. Remote links and external boundaries require their own verification. Rights and final public payload approval remain separate."
+  },
+  "merged_import_refactor_full_differential": {
+    "stage": "full",
+    "command": [
+      "python3",
+      "tools/check.py",
+      "full",
+      "--profile",
+      "iterate"
+    ],
+    "started_utc": "2026-11-11T16:26:49.774018+00:00",
+    "boot_id": "9268e384-40c1-406e-8fe0-5076d87d4505",
+    "source_commit": "ed24857c0fd4474a65d4f7268f2a767a42a32e28",
+    "source_identity": "12aa41e017f07bd6d0cbf92f8c2c79b8f2a5321ce2edf97a6061efb1bc5607b2",
+    "test_threads": "2",
+    "oracle_workers": "1",
+    "memory_max_bytes": 2147483648,
+    "finished_utc": "2026-11-11T17:34:55.603950+00:00",
+    "exit_code": 0,
+    "source_identity_unchanged": true,
+    "fixtures": {
+      "expected": 24197,
+      "executed": 24197,
+      "missing": 0,
+      "failed": 0,
+      "skipped": 0
+    },
+    "native_passed": 638,
+    "trace_tests_passed": 5,
+    "canonical_cases": 6592,
+    "live_cases": 17347,
+    "complete_games": 4,
+    "full_result_sha256": "a9be2e865086a3d2d7dbea84086af192a70c8f929b7c7c39396d0ae58def03bd",
+    "full_log_sha256": "f261333dbcc8426d112bc42a082573a9e85092e3fdfb80b4ca3cc8a40211e153"
   }
 }

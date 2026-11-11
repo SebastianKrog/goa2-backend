@@ -2277,5 +2277,136 @@
     },
     "report_sha256": "a692ce9cd9e27f5e756127cc83bdb7cebc2b3c15bc8c2b915256ed9ab66cead8",
     "scope": "Eight alternating fresh-process pairs per content pack using both originally measured executables. Fixed search results matched within each pair. Preparation slowdown reproduced and requires attribution."
+  },
+  "submission_preparation_regression_attribution": {
+    "reports": {
+      "maintenance-midpoint.json": {
+        "report_sha256": "b905a80609ebf1b8d80f0493ba0fa2ba42dc3140f2a2bd8a2d73927ced44450c",
+        "revision": "d284805c19b018a28682531b826c9a8fa129ab0d",
+        "binary_sha256": {
+          "midpoint": "e2838a6d5a4b7cb77d831f9bed2275f2eae783a09c1e5d67afa893525314beba",
+          "merged": "5ae76d9c0e97b570442668c7e2a6a6b3334dd158d4eed41a6cecdd5ea20d805a"
+        },
+        "paired_prepare_ns": {
+          "smoke-game.json": [
+            {
+              "midpoint": 33380.98,
+              "merged": 40790.97
+            },
+            {
+              "merged": 41487.97,
+              "midpoint": 40119.98
+            },
+            {
+              "midpoint": 37779.98,
+              "merged": 42686.97
+            },
+            {
+              "merged": 41775.97,
+              "midpoint": 38681.98
+            }
+          ],
+          "live-game-content.json": [
+            {
+              "midpoint": 36577.98,
+              "merged": 40465.98
+            },
+            {
+              "merged": 40266.97,
+              "midpoint": 41082.97
+            },
+            {
+              "midpoint": 38547.98,
+              "merged": 41431.98
+            },
+            {
+              "merged": 37860.98,
+              "midpoint": 36853.98
+            }
+          ]
+        }
+      },
+      "maintenance-first-typed-diagnostic.json": {
+        "report_sha256": "4eff73ec58a6e917b49ecae468a579775abd391e6bda32ac66a48b0d421c56b5",
+        "revision": "7e87efd76ff7e0ba7aa53524f0bd33debcd98eb7",
+        "binary_sha256": {
+          "midpoint": "2cc896269fca88c13aad6ab0f12058dbf490032b5540fbed4bf7a4005470cfe7",
+          "baseline": "0fc851d312251519ab816533664e5d3b76071760121a48ec3a082ce6f58ec1a2"
+        },
+        "paired_prepare_ns": {
+          "smoke-game.json": [
+            {
+              "midpoint": 38942.98,
+              "baseline": 15906.0
+            },
+            {
+              "baseline": 14604.01,
+              "midpoint": 37470.02
+            },
+            {
+              "midpoint": 38395.98,
+              "baseline": 14388.99
+            },
+            {
+              "baseline": 14138.99,
+              "midpoint": 38540.98
+            }
+          ],
+          "live-game-content.json": [
+            {
+              "midpoint": 41346.97,
+              "baseline": 14182.99
+            },
+            {
+              "baseline": 14930.99,
+              "midpoint": 37282.98
+            },
+            {
+              "midpoint": 38617.98,
+              "baseline": 14288.99
+            },
+            {
+              "baseline": 14994.0,
+              "midpoint": 38746.97
+            }
+          ]
+        },
+        "raw_search_results": {
+          "smoke-game.json": {
+            "midpoint": {
+              "commitment": "PlanningCommitment { hero: Symbol(3402), first: Some(CardId(12)), second: None }",
+              "score": 0,
+              "nodes": 24,
+              "evaluated_cells": 4,
+              "completed_rows": 2
+            },
+            "baseline": {
+              "commitment": "PlanningCommitment { hero: Symbol(3399), first: Some(CardId(12)), second: None }",
+              "score": 0,
+              "nodes": 24,
+              "evaluated_cells": 4,
+              "completed_rows": 2
+            }
+          },
+          "live-game-content.json": {
+            "midpoint": {
+              "commitment": "PlanningCommitment { hero: Symbol(3402), first: Some(CardId(12)), second: None }",
+              "score": 0,
+              "nodes": 24,
+              "evaluated_cells": 4,
+              "completed_rows": 2
+            },
+            "baseline": {
+              "commitment": "PlanningCommitment { hero: Symbol(3399), first: Some(CardId(12)), second: None }",
+              "score": 0,
+              "nodes": 24,
+              "evaluated_cells": 4,
+              "completed_rows": 2
+            }
+          }
+        }
+      }
+    },
+    "scope": "The first typed-operand commit reproduced the preparation slowdown on both pinned content packs. Its debug commitment changes an internal hero symbol number from 3399 to 3402 while the card index, score and work counters match in this diagnostic. The later midpoint matched the merged fixed-work output exactly. Neither result identifies the slow function."
   }
 }

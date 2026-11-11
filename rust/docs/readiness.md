@@ -38,8 +38,10 @@ record **45 completed and 39 open items**, with reproducible commands and limits
   `local_full_differential_verification` in `cleanup-evidence.json`.
 - Local exhaustive restoration passed for all 17,347 live cases across eight
   disjoint shards. See `local_exhaustive_restore_verification` in
-  `cleanup-evidence.json`. Independent archive installation and remote CI
-  remain separate verification gates.
+  `cleanup-evidence.json`.
+- The private fixture archive packed and installed all 24,197 files in a fresh
+  cache from standalone source. The approved remote acquisition route and CI
+  results are still pending.
 - Public redistribution rights, attribution and the full license text need the
   repository owner's decision. Cargo's existing MIT metadata is not that decision.
 - Destination repository, private security reporting contact and named ownership

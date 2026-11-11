@@ -68,6 +68,8 @@ runs its selected verification tier. Missing configuration, download failures,
 integrity failures and missing payloads fail the job.
 
 No public artifact location or redistribution approval has been established.
-The tool and synthetic roundtrip tests provide the acquisition mechanism.
-A real full-corpus archive roundtrip and configured remote CI result remain
-acceptance gates.
+A local full-corpus round trip packed and installed 24,197 files from a
+private archive into a fresh cache using the standalone source extraction.
+The archive checksum, file counts and verification reports are recorded in
+[cleanup evidence](cleanup-evidence.json). Configured remote CI remains an
+acceptance gate.

@@ -1039,5 +1039,196 @@
     "memory_max_bytes": 2147483648,
     "oracle_workers_per_shard": 2,
     "scope": "Complete disjoint coverage of the same exhaustive test and fixture preflight selected by tools/check.py restore. Per-operation state, board keys, object bindings, request tokens and replay equivalence. The full native suite separately exercises worker isolation."
+  },
+  "local_reference_archive_roundtrip": {
+    "status": "passed",
+    "finished_utc": "2026-11-11T07:02:45.736219+00:00",
+    "boot_id": "9268e384-40c1-406e-8fe0-5076d87d4505",
+    "archive_sha256": "8e858ce2a07d26efcf76d8b1fc5c0e890fa168471b38d16af88c5acef01f3385",
+    "reference-pack": {
+      "source_commit": "06bebd2123bdc14fae7cba266104a3b3b1350dcf",
+      "started_utc": "2026-11-11T06:36:27.843005+00:00",
+      "finished_utc": "2026-11-11T06:47:35.504901+00:00",
+      "log_sha256": "41cc2f0feda0aa47f1f839de26a423ba725dd2c0e6fd2182808f6b9b34ca0902"
+    },
+    "reference-install": {
+      "source_commit": "1da6968c57f9a6b75c1d969f69229c1c29effbbc",
+      "started_utc": "2026-11-11T06:47:35.552281+00:00",
+      "finished_utc": "2026-11-11T07:02:45.694559+00:00",
+      "log_sha256": "77c693321d807a39f94a34a6ba04e5ec7208e7f639e54a94f55cc9218bc817b6"
+    },
+    "files": 24197,
+    "archive_bytes": 2215987200,
+    "verified_reports": [
+      {
+        "family": "complete-games-hanu",
+        "unit": "snapshot-chunk",
+        "expected": 119,
+        "executed": 119,
+        "missing": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "complete-games-hanu",
+        "expected": 2,
+        "executed": 2,
+        "missing": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "complete-games",
+        "unit": "snapshot-chunk",
+        "expected": 111,
+        "executed": 111,
+        "missing": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "complete-games",
+        "expected": 2,
+        "executed": 2,
+        "missing": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "object-arena",
+        "expected": 12,
+        "executed": 12,
+        "missing": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "object-execution",
+        "expected": 17347,
+        "executed": 17347,
+        "missing": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "stack-traces",
+        "expected": 6592,
+        "executed": 6592,
+        "missing": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "action-validation",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 1,
+        "missing": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "actions",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 1,
+        "missing": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "card-equality",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 1,
+        "missing": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "displacement-validation",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 1,
+        "missing": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "effect-stats",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 1,
+        "missing": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "effects",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 1,
+        "missing": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "hex-filters",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 1,
+        "missing": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "mine-paths",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 1,
+        "missing": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "models",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 1,
+        "missing": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "planning",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 1,
+        "missing": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "targeting",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 1,
+        "missing": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "family": "terrain-validation",
+        "unit": "payload",
+        "expected": 1,
+        "executed": 1,
+        "missing": 0,
+        "failed": 0,
+        "skipped": 0
+      }
+    ],
+    "local_archive_hardlinked": true,
+    "memory_max_bytes": 1073741824,
+    "scope": "Private local tar packed from admitted corpus and installed into an empty destination using the manifest-based standalone source extraction. Remote acquisition and redistribution approval are separate."
   }
 }

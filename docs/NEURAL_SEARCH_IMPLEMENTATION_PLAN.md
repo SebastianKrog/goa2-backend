@@ -536,10 +536,42 @@ later. Prioritize original decision-hash capture before large collection; mark
 missing hashes honestly. Search scores are not automatically MCTS visit targets,
 and deferred-plan diagnostics cannot replace valid concrete-action labels.
 
-Vary rosters, maps, sides, upgrades and controlled exploration around plausible
-moves. Measure unique starts/trajectories and tactical/card/upgrade exposure;
-different seeds alone do not establish diversity. Freeze lineage/start-family
-splits before training and keep related variants together.
+#### Coverage-guided generation
+
+Generate the initial 1,000 games with a fixed balanced baseline distribution.
+Then generate batches of 100: **50 unweighted and 50 weighted**. Enforce the
+1:1 ratio among completed/admitted games too; replenish baseline games or
+withhold excess weighted admissions after failures/filtering. Preserve raw
+records and exclusion reasons. At least half the corpus remains unweighted.
+
+Both cohorts cover valid, fully mixed 2v2–5v5 rosters, maps and team sides.
+Unweighted games use fixed setup sampling and the normal teacher policy.
+Weighted games may modestly favor underrepresented heroes, allied/opposing
+pairs and setups; **no adaptive gameplay bonuses apply during round 1**.
+Use separate opening/later-round coverage.
+
+From round 2, apply a small capped novelty multiplier (initial proposal: at most
+1.2×) only within comparably scored near-best legal choices. Keep scoring
+horizons/budgets comparable; rarity cannot admit a clearly inferior/unscored
+move or justify an otherwise invalid action. This is a search-quality guard,
+not a guarantee against every tactical error.
+
+Count opportunities as well as usage: cards available/in hand and legally
+usable, offered upgrades, ability-trigger opportunities, selections and actual
+resolution. There are no card draws. Unreachable or consistently poor spaces/
+actions must not accumulate an unlimited bonus.
+
+Track map/team heatmaps, with movement/targets/ability use separated.
+Hero-specific maps are smoothed toward broader map/team/phase counts.
+Keep baseline/weighted statistics distinct; learn coverage weights only from
+training-generation data and freeze them for each batch. Record coverage
+snapshot, weighting recipe/caps and behavior versus original teacher scores.
+Measure unique starts/trajectories and keep related variants in one split.
+
+Keep validation/promotion cohorts fixed and unweighted. Preserve at least 50%
+baseline contribution in training episode sampling/weights as well: equal game
+counts alone do not balance decision rows when game lengths differ.
+
 
 Train comparable small models on nested 1k/3k/10k subsets with a fixed held-out
 cohort and declared initialization/update budgets. Compare prediction quality

@@ -1616,5 +1616,82 @@
       }
     ],
     "result_sha256": "4e9bd4c975decad36d986b2397f3919bf3a9ab5dfb316cdf621c005645150c4a"
+  },
+  "merged_candidate_cold_build": {
+    "candidate": "33e7e8bdb0a1d7cb2d4d10c6d8f4b2f0d9c78bbe",
+    "source_map_sha256": "bceea8dd4fb84e6c1ab504f444ab587e6d897ed1c44b495276848fce4bdc2f23",
+    "report_sha256": "d4316dc5f592154523c7eebb43657ddc9b1efbf0e1445a2fca0351ab23486469",
+    "command_log_sha256": {
+      "command-0.log": "0e8e4b3afcde64cb87967cc828d88cd2fda97a922d3e2f0b8cfb36dddb36f743",
+      "command-1.log": "8870cb79afb83b9014e463847f1d02c9b96cf0971a82d5674ad9147f3b738f88",
+      "command-2.log": "8843c0e5afecbb962f4fece56392502d483533b0e0919ac23c5434f0f37905cf",
+      "command-3.log": "3406dab107ea7a4ad03a6403228890c7f4a8aca46a1379844e269bdbf5d35223",
+      "command-4.log": "857ebdb6b93ca7133a32a3cd9826021f5e9810f3c8ff50e69dda7499be07f8cb"
+    },
+    "schema_version": 1,
+    "scope": "Native project dependency acquisition/build; full corpus/content distribution still requires its independent route.",
+    "source_files": 1202,
+    "initial_cargo_home_empty": true,
+    "initial_target_empty": true,
+    "original_git_history_in_snapshot": false,
+    "shared_project_caches_used": false,
+    "installed_compiler_reused": true,
+    "registry_archives": 96,
+    "registry_archive_bytes": 10422362,
+    "commands": [
+      {
+        "argv": [
+          "cargo",
+          "fetch",
+          "--locked",
+          "--target",
+          "x86_64-unknown-linux-gnu"
+        ],
+        "exit_code": 0,
+        "seconds": 82.33904763699684
+      },
+      {
+        "argv": [
+          "cargo",
+          "build",
+          "--locked",
+          "--workspace"
+        ],
+        "exit_code": 0,
+        "seconds": 130.8986481880056
+      },
+      {
+        "argv": [
+          "/usr/bin/python3",
+          "tools/check.py",
+          "quality"
+        ],
+        "exit_code": 0,
+        "seconds": 141.3039636110043
+      },
+      {
+        "argv": [
+          "/usr/bin/python3",
+          "tools/check.py",
+          "quick"
+        ],
+        "exit_code": 0,
+        "seconds": 501.46696049500315,
+        "native_tests": 413
+      },
+      {
+        "argv": [
+          "cargo",
+          "run",
+          "--locked",
+          "-p",
+          "goa2-core",
+          "--example",
+          "local_game"
+        ],
+        "exit_code": 0,
+        "seconds": 42.11977036099415
+      }
+    ]
   }
 }

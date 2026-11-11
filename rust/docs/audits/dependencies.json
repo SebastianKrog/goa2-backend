@@ -1,13 +1,13 @@
 {
   "schema_version": 1,
   "manifest": "rust/extraction-manifest.json",
-  "selected_files": 1141,
+  "selected_files": 1173,
   "group_counts": {
     "deployment": 11,
-    "development": 691,
+    "development": 719,
     "historical": 2,
-    "reference-verification": 249,
-    "runtime": 188
+    "reference-verification": 251,
+    "runtime": 190
   },
   "embedded_inputs": [
     {
@@ -26,7 +26,7 @@
     },
     {
       "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-      "line": 8611,
+      "line": 8643,
       "input": "rust/content/catalogs/spell-builders.json",
       "kind": "rust-embed",
       "status": "included"
@@ -40,7 +40,7 @@
     },
     {
       "consumer": "rust/crates/goa2-core/src/interpreter/loadout.rs",
-      "line": 1393,
+      "line": 1468,
       "input": "rust/content/catalogs/loadout-provenance.json",
       "kind": "rust-embed",
       "status": "included"
@@ -264,7 +264,7 @@
     },
     {
       "consumer": "rust/crates/goa2-game-server/src/game.rs",
-      "line": 845,
+      "line": 849,
       "input": "rust/content/smoke-game.json",
       "kind": "rust-embed",
       "status": "included"
@@ -285,7 +285,14 @@
     },
     {
       "consumer": "rust/crates/goa2-game-server/src/replay.rs",
-      "line": 382,
+      "line": 392,
+      "input": "rust/content/smoke-game.json",
+      "kind": "rust-embed",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/crates/goa2-game-server/src/replay.rs",
+      "line": 450,
       "input": "rust/content/smoke-game.json",
       "kind": "rust-embed",
       "status": "included"
@@ -299,7 +306,7 @@
     },
     {
       "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-      "line": 1569,
+      "line": 1580,
       "input": "rust/docs/worker-protocol-examples.json",
       "kind": "rust-embed",
       "status": "included"
@@ -313,7 +320,7 @@
     },
     {
       "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-      "line": 1560,
+      "line": 1571,
       "input": "rust/test-support/fixture_cache.rs",
       "kind": "rust-module",
       "status": "included"
@@ -342,11 +349,11 @@
   ],
   "python_import_counts": {
     "compatible-python-service": 5,
-    "included-module": 1389,
+    "included-module": 1395,
     "optional-layout-lab": 4,
     "pinned-oracle-source": 1405,
-    "python-stdlib": 775,
-    "third-party-runtime": 74
+    "python-stdlib": 809,
+    "third-party-runtime": 78
   },
   "python_imports": [
     {
@@ -363,7 +370,7 @@
     },
     {
       "consumer": "rust/tests/tooling/test_acquisition.py",
-      "line": 117,
+      "line": 160,
       "input": "scripts/rust_oracle/fixture_cache.py",
       "category": "included-module"
     },
@@ -375,27 +382,39 @@
     },
     {
       "consumer": "rust/tests/tooling/test_cleanup_audits.py",
-      "line": 11,
+      "line": 12,
       "input": "pytest",
       "category": "third-party-runtime"
     },
     {
       "consumer": "rust/tests/tooling/test_cleanup_audits.py",
-      "line": 114,
+      "line": 115,
       "input": "scripts/rust_oracle/fixture_cache.py",
       "category": "included-module"
     },
     {
       "consumer": "rust/tests/tooling/test_cleanup_audits.py",
-      "line": 139,
+      "line": 140,
       "input": "scripts/rust_verification/baselines.py",
       "category": "included-module"
     },
     {
       "consumer": "rust/tests/tooling/test_cleanup_audits.py",
-      "line": 227,
+      "line": 247,
       "input": "scripts/rust_oracle/run_pinned.py",
       "category": "included-module"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_documentation_audit.py",
+      "line": 8,
+      "input": "pytest",
+      "category": "third-party-runtime"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_fixture_archive.py",
+      "line": 14,
+      "input": "pytest",
+      "category": "third-party-runtime"
     },
     {
       "consumer": "rust/tests/tooling/test_historical_archive.py",
@@ -408,6 +427,12 @@
       "line": 14,
       "input": "scripts/rust_verification/history.py",
       "category": "included-module"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_payload_audit.py",
+      "line": 8,
+      "input": "pytest",
+      "category": "third-party-runtime"
     },
     {
       "consumer": "rust/tools/baseline_games.py",
@@ -440,6 +465,12 @@
       "category": "included-module"
     },
     {
+      "consumer": "rust/tools/fixture_archive.py",
+      "line": 18,
+      "input": "rust/tools/fixtures.py",
+      "category": "included-module"
+    },
+    {
       "consumer": "rust/tools/historical_compatibility.py",
       "line": 11,
       "input": "scripts/rust_verification/history.py",
@@ -455,6 +486,12 @@
       "consumer": "rust/tools/oracle_source.py",
       "line": 16,
       "input": "scripts/rust_oracle/pinned_source.py",
+      "category": "included-module"
+    },
+    {
+      "consumer": "rust/tools/payload_audit.py",
+      "line": 12,
+      "input": "rust/tools/dependency_audit.py",
       "category": "included-module"
     },
     {
@@ -981,37 +1018,37 @@
     },
     {
       "consumer": "scripts/rust_oracle/arena_calibrate.py",
-      "line": 34,
+      "line": 35,
       "input": "scripts/rust_oracle/model_traces.py",
       "category": "included-module"
     },
     {
       "consumer": "scripts/rust_oracle/arena_calibrate.py",
-      "line": 35,
+      "line": 36,
       "input": "scripts/rust_oracle/shared_objects.py",
       "category": "included-module"
     },
     {
       "consumer": "scripts/rust_oracle/arena_calibrate.py",
-      "line": 37,
+      "line": 38,
       "input": "goa2.domain.input",
       "category": "pinned-oracle-source"
     },
     {
       "consumer": "scripts/rust_oracle/arena_calibrate.py",
-      "line": 38,
+      "line": 39,
       "input": "goa2.engine.handler",
       "category": "pinned-oracle-source"
     },
     {
       "consumer": "scripts/rust_oracle/arena_calibrate.py",
-      "line": 39,
+      "line": 40,
       "input": "goa2.engine.phases",
       "category": "pinned-oracle-source"
     },
     {
       "consumer": "scripts/rust_oracle/arena_calibrate.py",
-      "line": 40,
+      "line": 41,
       "input": "goa2.engine.setup",
       "category": "pinned-oracle-source"
     },
@@ -1066,12 +1103,18 @@
     {
       "consumer": "scripts/rust_oracle/arena_match.py",
       "line": 13,
-      "input": "scripts/rust_oracle/arena_reports.py",
+      "input": "scripts/rust_oracle/arena_progress.py",
       "category": "included-module"
     },
     {
       "consumer": "scripts/rust_oracle/arena_match.py",
       "line": 14,
+      "input": "scripts/rust_oracle/arena_reports.py",
+      "category": "included-module"
+    },
+    {
+      "consumer": "scripts/rust_oracle/arena_match.py",
+      "line": 15,
       "input": "scripts/rust_oracle/oracle.py",
       "category": "included-module"
     },
@@ -1161,13 +1204,13 @@
     },
     {
       "consumer": "scripts/rust_oracle/arena_queue.py",
-      "line": 405,
+      "line": 444,
       "input": "scripts/rust_oracle/arena_verify.py",
       "category": "included-module"
     },
     {
       "consumer": "scripts/rust_oracle/arena_queue.py",
-      "line": 786,
+      "line": 908,
       "input": "scripts/rust_oracle/arena_verify.py",
       "category": "included-module"
     },
@@ -14595,8 +14638,32 @@
     },
     {
       "consumer": "tests/rust_oracle/test_arena_profiles.py",
-      "line": 1,
+      "line": 3,
       "input": "scripts/rust_oracle/arena_profiles.py",
+      "category": "included-module"
+    },
+    {
+      "consumer": "tests/rust_oracle/test_arena_progress.py",
+      "line": 1,
+      "input": "pytest",
+      "category": "third-party-runtime"
+    },
+    {
+      "consumer": "tests/rust_oracle/test_arena_progress.py",
+      "line": 3,
+      "input": "scripts/rust_oracle/arena_match.py",
+      "category": "included-module"
+    },
+    {
+      "consumer": "tests/rust_oracle/test_arena_progress.py",
+      "line": 4,
+      "input": "scripts/rust_oracle/arena_policy.py",
+      "category": "included-module"
+    },
+    {
+      "consumer": "tests/rust_oracle/test_arena_progress.py",
+      "line": 5,
+      "input": "scripts/rust_oracle/arena_progress.py",
       "category": "included-module"
     },
     {
@@ -17633,14 +17700,26 @@
     },
     {
       "consumer": "rust/tests/tooling/test_cleanup_audits.py",
-      "line": 19,
+      "line": 20,
       "expression": "importlib.util.spec_from_file_location(name, ROOT / 'rust/tools' / (name + '.py'))",
       "disposition": "Resolve literal/local modules using included scripts; variable imports are caller-controlled or pinned source discovery. No ambient source checkout is admitted for native execution."
     },
     {
       "consumer": "rust/tests/tooling/test_documentation_audit.py",
-      "line": 10,
+      "line": 12,
       "expression": "importlib.util.spec_from_file_location('documentation_audit', TOOLS / 'documentation_audit.py')",
+      "disposition": "Resolve literal/local modules using included scripts; variable imports are caller-controlled or pinned source discovery. No ambient source checkout is admitted for native execution."
+    },
+    {
+      "consumer": "rust/tests/tooling/test_fixture_archive.py",
+      "line": 22,
+      "expression": "importlib.util.spec_from_file_location('fixture_archive', ROOT / 'rust/tools/fixture_archive.py')",
+      "disposition": "Resolve literal/local modules using included scripts; variable imports are caller-controlled or pinned source discovery. No ambient source checkout is admitted for native execution."
+    },
+    {
+      "consumer": "rust/tests/tooling/test_payload_audit.py",
+      "line": 16,
+      "expression": "importlib.util.spec_from_file_location('payload_audit', ROOT / 'rust/tools/payload_audit.py')",
       "disposition": "Resolve literal/local modules using included scripts; variable imports are caller-controlled or pinned source discovery. No ambient source checkout is admitted for native execution."
     },
     {
@@ -17679,17 +17758,27 @@
     },
     {
       "consumer": "rust/tests/tooling/test_cleanup_audits.py",
-      "line": 13,
+      "line": 14,
       "expression": "Path(__file__).resolve().parents[3]"
     },
     {
       "consumer": "rust/tests/tooling/test_documentation_audit.py",
-      "line": 8,
+      "line": 10,
       "expression": "Path(__file__).resolve().parents[2] / 'tools'"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_fixture_archive.py",
+      "line": 16,
+      "expression": "Path(__file__).resolve().parents[3]"
     },
     {
       "consumer": "rust/tests/tooling/test_historical_archive.py",
       "line": 12,
+      "expression": "Path(__file__).resolve().parents[3]"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_payload_audit.py",
+      "line": 10,
       "expression": "Path(__file__).resolve().parents[3]"
     },
     {
@@ -17765,6 +17854,11 @@
     {
       "consumer": "rust/tools/oracle_source.py",
       "line": 11,
+      "expression": "Path(__file__).resolve().parents[2]"
+    },
+    {
+      "consumer": "rust/tools/payload_audit.py",
+      "line": 14,
       "expression": "Path(__file__).resolve().parents[2]"
     },
     {
@@ -17857,13 +17951,25 @@
     },
     {
       "consumer": "rust/tests/tooling/test_acquisition.py",
-      "line": 119,
+      "line": 162,
       "input": "rust/tests/fixtures/registry.json",
       "disposition": "included"
     },
     {
       "consumer": "rust/tests/tooling/test_acquisition.py",
-      "line": 126,
+      "line": 163,
+      "input": "rust/oracle-manifest.json",
+      "disposition": "included"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_acquisition.py",
+      "line": 169,
+      "input": "scripts/rust_oracle/run_pinned.py",
+      "disposition": "included"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_acquisition.py",
+      "line": 178,
       "input": "rust/.gitignore",
       "disposition": "included"
     },
@@ -17965,117 +18071,135 @@
     },
     {
       "consumer": "rust/tests/tooling/test_cleanup_audits.py",
-      "line": 28,
-      "input": "docs/guide.md",
-      "disposition": "original Python/history documentation; not an ordinary native build dependency"
-    },
-    {
-      "consumer": "rust/tests/tooling/test_cleanup_audits.py",
       "line": 29,
-      "input": "docs/.env.local",
+      "input": "docs/guide.md",
       "disposition": "original Python/history documentation; not an ordinary native build dependency"
     },
     {
       "consumer": "rust/tests/tooling/test_cleanup_audits.py",
       "line": 30,
-      "input": "docs/match.sqlite",
+      "input": "docs/.env.local",
       "disposition": "original Python/history documentation; not an ordinary native build dependency"
     },
     {
       "consumer": "rust/tests/tooling/test_cleanup_audits.py",
       "line": 31,
+      "input": "docs/match.sqlite",
+      "disposition": "original Python/history documentation; not an ordinary native build dependency"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_cleanup_audits.py",
+      "line": 32,
       "input": "rust/tests/fixtures/smoke/a.json.gz",
       "disposition": "registered optional parity/cache input or generator destination"
     },
     {
       "consumer": "rust/tests/tooling/test_cleanup_audits.py",
-      "line": 32,
+      "line": 33,
       "input": "rust/tests/fixtures/cache/a.json.gz",
       "disposition": "registered optional parity/cache input or generator destination"
     },
     {
       "consumer": "rust/tests/tooling/test_cleanup_audits.py",
-      "line": 231,
+      "line": 251,
       "input": "rust/tests/fixtures",
       "disposition": "registered optional parity/cache input or generator destination"
     },
     {
       "consumer": "rust/tests/tooling/test_cleanup_audits.py",
-      "line": 14,
+      "line": 15,
       "input": "rust/tools",
       "disposition": "directory resolved by included tool"
     },
     {
       "consumer": "rust/tests/tooling/test_cleanup_audits.py",
-      "line": 42,
+      "line": 43,
       "input": "docs/guide.md",
       "disposition": "original Python/history documentation; not an ordinary native build dependency"
     },
     {
       "consumer": "rust/tests/tooling/test_cleanup_audits.py",
-      "line": 42,
+      "line": 43,
       "input": "rust/tests/fixtures/smoke/a.json.gz",
       "disposition": "registered optional parity/cache input or generator destination"
     },
     {
       "consumer": "rust/tests/tooling/test_cleanup_audits.py",
-      "line": 19,
+      "line": 20,
       "input": "rust/tools",
       "disposition": "directory resolved by included tool"
     },
     {
       "consumer": "rust/tests/tooling/test_cleanup_audits.py",
-      "line": 113,
+      "line": 114,
       "input": "scripts/rust_oracle",
       "disposition": "directory resolved by included tool"
     },
     {
       "consumer": "rust/tests/tooling/test_cleanup_audits.py",
-      "line": 226,
+      "line": 246,
       "input": "scripts/rust_oracle",
       "disposition": "directory resolved by included tool"
     },
     {
       "consumer": "rust/tests/tooling/test_cleanup_audits.py",
-      "line": 38,
+      "line": 39,
       "input": "docs/**/*",
       "disposition": "original Python/history documentation; not an ordinary native build dependency"
     },
     {
       "consumer": "rust/tests/tooling/test_cleanup_audits.py",
-      "line": 38,
+      "line": 39,
       "input": "rust/tests/fixtures/**/*",
       "disposition": "registered optional parity/cache input or generator destination"
     },
     {
       "consumer": "rust/tests/tooling/test_cleanup_audits.py",
-      "line": 39,
+      "line": 40,
       "input": "rust/tests/fixtures/*/*.json.gz",
       "disposition": "registered optional parity/cache input or generator destination"
     },
     {
       "consumer": "rust/tests/tooling/test_cleanup_audits.py",
-      "line": 246,
+      "line": 266,
       "input": "rust/Cargo.toml",
       "disposition": "included"
     },
     {
       "consumer": "rust/tests/tooling/test_cleanup_audits.py",
-      "line": 248,
+      "line": 268,
       "input": "rust/crates",
       "disposition": "directory resolved by included tool"
     },
     {
       "consumer": "rust/tests/tooling/test_cleanup_audits.py",
-      "line": 240,
+      "line": 260,
       "input": "rust/tests/fixtures",
       "disposition": "registered optional parity/cache input or generator destination"
     },
     {
       "consumer": "rust/tests/tooling/test_documentation_audit.py",
-      "line": 21,
+      "line": 23,
       "input": "rust/*.md",
       "disposition": "review"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_fixture_archive.py",
+      "line": 17,
+      "input": "rust/tools",
+      "disposition": "directory resolved by included tool"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_fixture_archive.py",
+      "line": 23,
+      "input": "rust/tools/fixture_archive.py",
+      "disposition": "included"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_fixture_archive.py",
+      "line": 275,
+      "input": "rust/tools/fixture_archive.py",
+      "disposition": "included"
     },
     {
       "consumer": "rust/tests/tooling/test_historical_archive.py",
@@ -18088,6 +18212,54 @@
       "line": 17,
       "input": "rust/content/smoke-game.json",
       "disposition": "included"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_payload_audit.py",
+      "line": 17,
+      "input": "rust/tools/payload_audit.py",
+      "disposition": "included"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_payload_audit.py",
+      "line": 15,
+      "input": "rust/tools",
+      "disposition": "directory resolved by included tool"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_payload_audit.py",
+      "line": 23,
+      "input": "rust/extraction-manifest.json",
+      "disposition": "included"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_payload_audit.py",
+      "line": 54,
+      "input": "docs/examples.md",
+      "disposition": "original Python/history documentation; not an ordinary native build dependency"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_payload_audit.py",
+      "line": 64,
+      "input": "docs/binary",
+      "disposition": "original Python/history documentation; not an ordinary native build dependency"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_payload_audit.py",
+      "line": 65,
+      "input": "docs/large.gz",
+      "disposition": "original Python/history documentation; not an ordinary native build dependency"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_payload_audit.py",
+      "line": 46,
+      "input": "docs/",
+      "disposition": "original Python/history documentation; not an ordinary native build dependency"
+    },
+    {
+      "consumer": "rust/tests/tooling/test_payload_audit.py",
+      "line": 24,
+      "input": "docs/**/*",
+      "disposition": "original Python/history documentation; not an ordinary native build dependency"
     },
     {
       "consumer": "rust/tools/baseline_games.py",
@@ -18319,25 +18491,25 @@
     },
     {
       "consumer": "rust/tools/documentation_audit.py",
-      "line": 116,
+      "line": 132,
       "input": "rust/README.md",
       "disposition": "included"
     },
     {
       "consumer": "rust/tools/documentation_audit.py",
-      "line": 117,
+      "line": 133,
       "input": "rust/tests/fixtures/README.md",
       "disposition": "included"
     },
     {
       "consumer": "rust/tools/documentation_audit.py",
-      "line": 38,
+      "line": 54,
       "input": "rust/extraction-manifest.json",
       "disposition": "included"
     },
     {
       "consumer": "rust/tools/documentation_audit.py",
-      "line": 127,
+      "line": 143,
       "input": "rust/docs/archive/",
       "disposition": "directory resolved by included tool"
     },
@@ -18373,31 +18545,31 @@
     },
     {
       "consumer": "rust/tools/maintenance_measurements.py",
-      "line": 145,
-      "input": "rust/crates/goa2-core/examples/maintenance_bench.rs",
-      "disposition": "included"
-    },
-    {
-      "consumer": "rust/tools/maintenance_measurements.py",
-      "line": 146,
-      "input": "rust/crates/goa2-core/examples/maintenance_bench.rs",
-      "disposition": "included"
-    },
-    {
-      "consumer": "rust/tools/maintenance_measurements.py",
       "line": 154,
+      "input": "rust/crates/goa2-core/examples/maintenance_bench.rs",
+      "disposition": "included"
+    },
+    {
+      "consumer": "rust/tools/maintenance_measurements.py",
+      "line": 155,
+      "input": "rust/crates/goa2-core/examples/maintenance_bench.rs",
+      "disposition": "included"
+    },
+    {
+      "consumer": "rust/tools/maintenance_measurements.py",
+      "line": 163,
       "input": "rust/content/manifest.json",
       "disposition": "included"
     },
     {
       "consumer": "rust/tools/maintenance_measurements.py",
-      "line": 65,
+      "line": 75,
       "input": "rust/oracle-manifest.json",
       "disposition": "included"
     },
     {
       "consumer": "rust/tools/maintenance_measurements.py",
-      "line": 131,
+      "line": 140,
       "input": "rust/content/manifest.json",
       "disposition": "included"
     },
@@ -18447,6 +18619,12 @@
       "consumer": "rust/tools/oracle_source.py",
       "line": 27,
       "input": "rust/oracle-manifest.json",
+      "disposition": "included"
+    },
+    {
+      "consumer": "rust/tools/payload_audit.py",
+      "line": 33,
+      "input": "rust/extraction-manifest.json",
       "disposition": "included"
     },
     {
@@ -18505,19 +18683,19 @@
     },
     {
       "consumer": "scripts/rust_oracle/arena_calibrate.py",
-      "line": 45,
+      "line": 46,
       "input": "src/goa2/data/maps",
       "disposition": "optional pinned/reference Python source; explicitly acquired outside native snapshot"
     },
     {
       "consumer": "scripts/rust_oracle/arena_profiles.py",
-      "line": 62,
+      "line": 79,
       "input": "src/goa2/data/maps",
       "disposition": "optional pinned/reference Python source; explicitly acquired outside native snapshot"
     },
     {
       "consumer": "scripts/rust_oracle/arena_queue.py",
-      "line": 135,
+      "line": 142,
       "input": "rust/cargo-wsl.sh",
       "disposition": "included"
     },
@@ -18961,7 +19139,7 @@
     },
     {
       "consumer": "scripts/rust_oracle/run_pinned.py",
-      "line": 69,
+      "line": 87,
       "input": "rust/artifacts",
       "disposition": "generated diagnostic/cache destination; excluded from snapshot"
     },
@@ -19331,10 +19509,14 @@
     "rust/tools/dependency_audit.py": [
       "rust/tools/boundary_inventory.py",
       "rust/tools/documentation_audit.py",
-      "rust/tools/extract.py"
+      "rust/tools/extract.py",
+      "rust/tools/payload_audit.py"
     ],
     "rust/tools/extract.py": [
       "rust/tools/cold_build.py"
+    ],
+    "rust/tools/fixtures.py": [
+      "rust/tools/fixture_archive.py"
     ],
     "scripts/rust_oracle/action_builders.py": [
       "tests/rust_oracle/test_live_card_actions.py"
@@ -19369,15 +19551,21 @@
     ],
     "scripts/rust_oracle/arena_match.py": [
       "scripts/rust_oracle/arena_calibrate.py",
-      "scripts/rust_oracle/arena_queue.py"
+      "scripts/rust_oracle/arena_queue.py",
+      "tests/rust_oracle/test_arena_progress.py"
     ],
     "scripts/rust_oracle/arena_policy.py": [
       "scripts/rust_oracle/arena_match.py",
       "scripts/rust_oracle/arena_queue.py",
-      "tests/rust_oracle/test_arena_policy.py"
+      "tests/rust_oracle/test_arena_policy.py",
+      "tests/rust_oracle/test_arena_progress.py"
     ],
     "scripts/rust_oracle/arena_profiles.py": [
       "tests/rust_oracle/test_arena_profiles.py"
+    ],
+    "scripts/rust_oracle/arena_progress.py": [
+      "scripts/rust_oracle/arena_match.py",
+      "tests/rust_oracle/test_arena_progress.py"
     ],
     "scripts/rust_oracle/arena_queue.py": [
       "tests/rust_oracle/test_arena_queue.py"

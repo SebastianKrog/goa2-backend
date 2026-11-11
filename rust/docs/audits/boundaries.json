@@ -59,11 +59,6 @@
           "kind": "use-tree"
         },
         {
-          "consumer": "rust/crates/goa2-game-server/src/bots.rs",
-          "line": 106,
-          "kind": "qualified-use"
-        },
-        {
           "consumer": "rust/crates/goa2-game-server/src/game.rs",
           "line": 12,
           "kind": "use-tree"
@@ -75,7 +70,7 @@
         },
         {
           "consumer": "rust/crates/goa2-game-server/src/game.rs",
-          "line": 852,
+          "line": 856,
           "kind": "qualified-use"
         },
         {
@@ -135,7 +130,12 @@
         },
         {
           "consumer": "rust/crates/goa2-game-server/src/replay.rs",
-          "line": 380,
+          "line": 390,
+          "kind": "qualified-use"
+        },
+        {
+          "consumer": "rust/crates/goa2-game-server/src/replay.rs",
+          "line": 445,
           "kind": "qualified-use"
         },
         {
@@ -180,77 +180,72 @@
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 138,
+          "line": 139,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 141,
+          "line": 142,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 153,
+          "line": 154,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 163,
+          "line": 164,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 165,
+          "line": 166,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 170,
+          "line": 171,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 177,
+          "line": 178,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 214,
+          "line": 215,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 268,
+          "line": 269,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 272,
+          "line": 273,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 277,
+          "line": 278,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 316,
+          "line": 317,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 363,
+          "line": 364,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 423,
-          "kind": "qualified-use"
-        },
-        {
-          "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 453,
+          "line": 425,
           "kind": "qualified-use"
         },
         {
@@ -260,27 +255,37 @@
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 467,
+          "line": 471,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 501,
+          "line": 476,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 516,
+          "line": 510,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 529,
+          "line": 525,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 533,
+          "line": 526,
+          "kind": "qualified-use"
+        },
+        {
+          "consumer": "rust/crates/goa2-search-cli/src/main.rs",
+          "line": 539,
+          "kind": "qualified-use"
+        },
+        {
+          "consumer": "rust/crates/goa2-search-cli/src/main.rs",
+          "line": 543,
           "kind": "qualified-use"
         },
         {
@@ -424,67 +429,67 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 666,
+          "line": 667,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 672,
+          "line": 673,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 5594,
+          "line": 5626,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 5597,
+          "line": 5629,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 5598,
+          "line": 5630,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 5628,
+          "line": 5660,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 6217,
+          "line": 6249,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 8026,
+          "line": 8058,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 8028,
+          "line": 8060,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 8029,
+          "line": 8061,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 9042,
+          "line": 9074,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 10672,
+          "line": 10704,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 10681,
+          "line": 10713,
           "kind": "qualified-use"
         },
         {
@@ -504,7 +509,7 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-          "line": 4243,
+          "line": 4263,
           "kind": "qualified-use"
         },
         {
@@ -569,22 +574,22 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution/planning_commands.rs",
-          "line": 1748,
+          "line": 1844,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution/planning_commands.rs",
-          "line": 1827,
+          "line": 1923,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution/planning_commands.rs",
-          "line": 1828,
+          "line": 1924,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution/planning_commands.rs",
-          "line": 2784,
+          "line": 2942,
           "kind": "qualified-use"
         },
         {
@@ -674,22 +679,22 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/search.rs",
-          "line": 129,
+          "line": 146,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/search.rs",
-          "line": 3466,
+          "line": 4117,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/search.rs",
-          "line": 3467,
+          "line": 4118,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/search.rs",
-          "line": 3980,
+          "line": 4636,
           "kind": "qualified-use"
         },
         {
@@ -704,12 +709,12 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/objects.rs",
-          "line": 1929,
+          "line": 1951,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/objects.rs",
-          "line": 1929,
+          "line": 1951,
           "kind": "qualified-use"
         },
         {
@@ -799,7 +804,7 @@
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 789,
+          "line": 799,
           "kind": "qualified-use"
         },
         {
@@ -859,17 +864,17 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 5742,
+          "line": 5774,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 5758,
+          "line": 5790,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 8646,
+          "line": 8678,
           "kind": "qualified-use"
         },
         {
@@ -884,42 +889,42 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/greedy.rs",
-          "line": 652,
+          "line": 663,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/greedy.rs",
-          "line": 733,
+          "line": 744,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/greedy.rs",
-          "line": 785,
+          "line": 796,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/greedy.rs",
-          "line": 1113,
+          "line": 1126,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/greedy.rs",
-          "line": 1345,
+          "line": 1363,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/greedy.rs",
-          "line": 1547,
+          "line": 1565,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/greedy.rs",
-          "line": 1901,
+          "line": 1919,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/greedy.rs",
-          "line": 2976,
+          "line": 2994,
           "kind": "qualified-use"
         },
         {
@@ -929,7 +934,7 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/live_game/bot.rs",
-          "line": 3,
+          "line": 4,
           "kind": "use-tree"
         },
         {
@@ -1004,27 +1009,32 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/loadout.rs",
-          "line": 548,
+          "line": 467,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/loadout.rs",
-          "line": 954,
+          "line": 570,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/loadout.rs",
-          "line": 963,
+          "line": 1018,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/loadout.rs",
-          "line": 989,
+          "line": 1027,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/loadout.rs",
-          "line": 1113,
+          "line": 1053,
+          "kind": "qualified-use"
+        },
+        {
+          "consumer": "rust/crates/goa2-core/src/interpreter/loadout.rs",
+          "line": 1188,
           "kind": "qualified-use"
         },
         {
@@ -1139,17 +1149,17 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/objects.rs",
-          "line": 1765,
+          "line": 1787,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/objects.rs",
-          "line": 1776,
+          "line": 1798,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/objects.rs",
-          "line": 1781,
+          "line": 1803,
           "kind": "qualified-use"
         },
         {
@@ -1419,7 +1429,7 @@
         },
         {
           "consumer": "rust/crates/goa2-game-server/src/game.rs",
-          "line": 582,
+          "line": 586,
           "kind": "qualified-use"
         },
         {
@@ -1449,22 +1459,12 @@
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 849,
+          "line": 859,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 1308,
-          "kind": "qualified-use"
-        },
-        {
-          "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 1312,
-          "kind": "qualified-use"
-        },
-        {
-          "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 1315,
+          "line": 1319,
           "kind": "qualified-use"
         },
         {
@@ -1474,12 +1474,22 @@
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 1325,
+          "line": 1326,
+          "kind": "qualified-use"
+        },
+        {
+          "consumer": "rust/crates/goa2-search-cli/src/main.rs",
+          "line": 1334,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
           "line": 1336,
+          "kind": "qualified-use"
+        },
+        {
+          "consumer": "rust/crates/goa2-search-cli/src/main.rs",
+          "line": 1347,
           "kind": "qualified-use"
         },
         {
@@ -1666,12 +1676,12 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 1036,
+          "line": 1068,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 1747,
+          "line": 1779,
           "kind": "qualified-use"
         },
         {
@@ -1696,8 +1706,18 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/live_game/bot.rs",
+          "line": 4,
+          "kind": "use-tree"
+        },
+        {
+          "consumer": "rust/crates/goa2-core/src/interpreter/live_game/lane_progress.rs",
           "line": 3,
           "kind": "use-tree"
+        },
+        {
+          "consumer": "rust/crates/goa2-core/src/interpreter/live_game/lane_progress.rs",
+          "line": 3,
+          "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/live_game/rollback.rs",
@@ -1786,7 +1806,7 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/offline_match.rs",
-          "line": 249,
+          "line": 254,
           "kind": "qualified-use"
         },
         {
@@ -1796,7 +1816,7 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/search.rs",
-          "line": 5072,
+          "line": 5996,
           "kind": "qualified-use"
         },
         {
@@ -2051,17 +2071,17 @@
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 777,
+          "line": 787,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 836,
+          "line": 846,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 859,
+          "line": 869,
           "kind": "qualified-use"
         },
         {
@@ -2194,47 +2214,37 @@
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 651,
+          "line": 661,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 654,
+          "line": 664,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 657,
+          "line": 667,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 660,
+          "line": 670,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 663,
+          "line": 673,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 666,
+          "line": 676,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 669,
-          "kind": "qualified-use"
-        },
-        {
-          "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 672,
-          "kind": "qualified-use"
-        },
-        {
-          "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 677,
+          "line": 679,
           "kind": "qualified-use"
         },
         {
@@ -2244,12 +2254,7 @@
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 686,
-          "kind": "qualified-use"
-        },
-        {
-          "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 690,
+          "line": 687,
           "kind": "qualified-use"
         },
         {
@@ -2259,12 +2264,27 @@
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 697,
+          "line": 696,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 1282,
+          "line": 700,
+          "kind": "qualified-use"
+        },
+        {
+          "consumer": "rust/crates/goa2-search-cli/src/main.rs",
+          "line": 702,
+          "kind": "qualified-use"
+        },
+        {
+          "consumer": "rust/crates/goa2-search-cli/src/main.rs",
+          "line": 707,
+          "kind": "qualified-use"
+        },
+        {
+          "consumer": "rust/crates/goa2-search-cli/src/main.rs",
+          "line": 1293,
           "kind": "qualified-use"
         }
       ],
@@ -2369,37 +2389,37 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 5217,
+          "line": 5249,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 9009,
+          "line": 9041,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 9014,
+          "line": 9046,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 10342,
+          "line": 10374,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/greedy.rs",
-          "line": 596,
+          "line": 599,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/greedy.rs",
-          "line": 609,
+          "line": 612,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/greedy.rs",
-          "line": 2455,
+          "line": 2473,
           "kind": "qualified-use"
         },
         {
@@ -2409,7 +2429,7 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/live_game.rs",
-          "line": 64,
+          "line": 65,
           "kind": "qualified-use"
         },
         {
@@ -2604,7 +2624,7 @@
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 288,
+          "line": 289,
           "kind": "qualified-use"
         }
       ],
@@ -2638,6 +2658,7 @@
         "NativeSession",
         "RequestChoices",
         "RequestToken",
+        "SearchNodeBudget",
         "WorkBudget"
       ],
       "reexports": [
@@ -2688,13 +2709,33 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/greedy.rs",
-          "line": 2364,
+          "line": 2382,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/live_game/bot.rs",
           "line": 3,
           "kind": "use-tree"
+        },
+        {
+          "consumer": "rust/crates/goa2-core/src/interpreter/live_game/bot.rs",
+          "line": 4,
+          "kind": "use-tree"
+        },
+        {
+          "consumer": "rust/crates/goa2-core/src/interpreter/live_game/bot.rs",
+          "line": 3,
+          "kind": "qualified-use"
+        },
+        {
+          "consumer": "rust/crates/goa2-core/src/interpreter/live_game/bot.rs",
+          "line": 330,
+          "kind": "qualified-use"
+        },
+        {
+          "consumer": "rust/crates/goa2-core/src/interpreter/live_game/bot.rs",
+          "line": 428,
+          "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/live_game/upgrade_preview.rs",
@@ -2713,17 +2754,17 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution/planning_commands.rs",
-          "line": 2521,
+          "line": 2617,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution/planning_commands.rs",
-          "line": 2620,
+          "line": 2738,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution/planning_commands.rs",
-          "line": 2626,
+          "line": 2784,
           "kind": "qualified-use"
         },
         {
@@ -2748,7 +2789,7 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/search.rs",
-          "line": 3900,
+          "line": 4556,
           "kind": "qualified-use"
         },
         {
@@ -2774,6 +2815,11 @@
         {
           "consumer": "rust/crates/goa2-core/tests/object_execution.rs",
           "line": 4050,
+          "kind": "qualified-use"
+        },
+        {
+          "consumer": "rust/crates/goa2-search-cli/src/main.rs",
+          "line": 448,
           "kind": "qualified-use"
         }
       ],
@@ -2809,42 +2855,42 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 191,
+          "line": 192,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 1056,
+          "line": 1088,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 1189,
+          "line": 1221,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 1191,
+          "line": 1223,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 1873,
+          "line": 1905,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 8069,
+          "line": 8101,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 8084,
+          "line": 8116,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 8085,
+          "line": 8117,
           "kind": "qualified-use"
         },
         {
@@ -3073,7 +3119,7 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 767,
+          "line": 768,
           "kind": "qualified-use"
         },
         {
@@ -3168,7 +3214,7 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/search.rs",
-          "line": 2322,
+          "line": 2745,
           "kind": "qualified-use"
         },
         {
@@ -3271,17 +3317,17 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 5759,
+          "line": 5791,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/live_game.rs",
-          "line": 31,
+          "line": 32,
           "kind": "use-tree"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/live_game.rs",
-          "line": 31,
+          "line": 32,
           "kind": "qualified-use"
         },
         {
@@ -3321,57 +3367,57 @@
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 291,
+          "line": 292,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 946,
+          "line": 956,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 952,
+          "line": 962,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 955,
+          "line": 965,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 969,
+          "line": 979,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 981,
+          "line": 991,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 999,
+          "line": 1009,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 1002,
+          "line": 1012,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 1007,
+          "line": 1017,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 1141,
+          "line": 1152,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 1147,
+          "line": 1158,
           "kind": "qualified-use"
         }
       ],
@@ -3486,12 +3532,7 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 671,
-          "kind": "qualified-use"
-        },
-        {
-          "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 724,
+          "line": 672,
           "kind": "qualified-use"
         },
         {
@@ -3501,42 +3542,47 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 3366,
+          "line": 726,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 3378,
+          "line": 3398,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 3399,
+          "line": 3410,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 3400,
+          "line": 3431,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 6106,
+          "line": 3432,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 6106,
+          "line": 6138,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 6106,
+          "line": 6138,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 10212,
+          "line": 6138,
+          "kind": "qualified-use"
+        },
+        {
+          "consumer": "rust/crates/goa2-core/src/interpreter.rs",
+          "line": 10244,
           "kind": "qualified-use"
         },
         {
@@ -3551,17 +3597,17 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/greedy.rs",
-          "line": 1621,
+          "line": 1639,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/greedy.rs",
-          "line": 1724,
+          "line": 1742,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/greedy.rs",
-          "line": 2239,
+          "line": 2257,
           "kind": "qualified-use"
         },
         {
@@ -3586,7 +3632,7 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-          "line": 4025,
+          "line": 4045,
           "kind": "qualified-use"
         },
         {
@@ -3681,12 +3727,12 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution/planning_commands.rs",
-          "line": 1220,
+          "line": 1316,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution/planning_commands.rs",
-          "line": 1313,
+          "line": 1409,
           "kind": "qualified-use"
         },
         {
@@ -3821,7 +3867,7 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/objects.rs",
-          "line": 1926,
+          "line": 1948,
           "kind": "qualified-use"
         },
         {
@@ -4126,7 +4172,7 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 7759,
+          "line": 7791,
           "kind": "qualified-use"
         },
         {
@@ -4245,12 +4291,12 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/search.rs",
-          "line": 5259,
+          "line": 6183,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/search.rs",
-          "line": 5280,
+          "line": 6204,
           "kind": "qualified-use"
         },
         {
@@ -4428,12 +4474,12 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution/planning_commands.rs",
-          "line": 205,
+          "line": 296,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution/planning_commands.rs",
-          "line": 998,
+          "line": 1094,
           "kind": "qualified-use"
         },
         {
@@ -4474,12 +4520,7 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 1078,
-          "kind": "qualified-use"
-        },
-        {
-          "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 6773,
+          "line": 1110,
           "kind": "qualified-use"
         },
         {
@@ -4489,37 +4530,42 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 6806,
+          "line": 6837,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 6810,
+          "line": 6838,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 6811,
+          "line": 6842,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 6816,
+          "line": 6843,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 6818,
+          "line": 6848,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 11507,
+          "line": 6850,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 11508,
+          "line": 11539,
+          "kind": "qualified-use"
+        },
+        {
+          "consumer": "rust/crates/goa2-core/src/interpreter.rs",
+          "line": 11540,
           "kind": "qualified-use"
         },
         {
@@ -4599,22 +4645,22 @@
       "consumers": [
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 340,
+          "line": 341,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 3075,
+          "line": 3107,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 3137,
+          "line": 3169,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 7291,
+          "line": 7323,
           "kind": "qualified-use"
         },
         {
@@ -4672,52 +4718,52 @@
       "consumers": [
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 189,
+          "line": 190,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 1046,
+          "line": 1078,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 1636,
+          "line": 1668,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 1986,
+          "line": 2018,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 3027,
+          "line": 3059,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 3038,
+          "line": 3070,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 5813,
+          "line": 5845,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 5816,
+          "line": 5848,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 7971,
+          "line": 8003,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 7973,
+          "line": 8005,
           "kind": "qualified-use"
         },
         {
@@ -4757,97 +4803,97 @@
       "consumers": [
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 190,
+          "line": 191,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 333,
+          "line": 334,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 1047,
+          "line": 1079,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 1635,
+          "line": 1667,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 1962,
+          "line": 1994,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 1963,
+          "line": 1995,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 2950,
+          "line": 2982,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 2951,
+          "line": 2983,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 2954,
+          "line": 2986,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 2955,
+          "line": 2987,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 2967,
+          "line": 2999,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 2976,
+          "line": 3008,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 7315,
+          "line": 7347,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 7317,
+          "line": 7349,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 7321,
+          "line": 7353,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 7321,
+          "line": 7353,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 7328,
+          "line": 7360,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 7329,
+          "line": 7361,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 7355,
+          "line": 7387,
           "kind": "qualified-use"
         },
         {
@@ -4895,227 +4941,227 @@
       "consumers": [
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 332,
+          "line": 333,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 1057,
+          "line": 1089,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 1060,
+          "line": 1092,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 1265,
+          "line": 1297,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 1265,
+          "line": 1297,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 1283,
+          "line": 1315,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 1625,
+          "line": 1657,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 1920,
+          "line": 1952,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 1920,
+          "line": 1952,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 2269,
+          "line": 2301,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 2270,
+          "line": 2302,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 2271,
+          "line": 2303,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 2642,
+          "line": 2674,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 2793,
+          "line": 2825,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 5681,
+          "line": 5713,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 7161,
+          "line": 7193,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 7162,
+          "line": 7194,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 7165,
+          "line": 7197,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 7168,
+          "line": 7200,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 7171,
+          "line": 7203,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 7183,
+          "line": 7215,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 7184,
+          "line": 7216,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 7185,
+          "line": 7217,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 7186,
+          "line": 7218,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 7187,
+          "line": 7219,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-          "line": 1870,
+          "line": 1890,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-          "line": 2279,
+          "line": 2299,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-          "line": 2292,
+          "line": 2312,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-          "line": 2308,
+          "line": 2328,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-          "line": 2308,
+          "line": 2328,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-          "line": 2314,
+          "line": 2334,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-          "line": 2612,
+          "line": 2632,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-          "line": 2621,
+          "line": 2641,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-          "line": 2630,
+          "line": 2650,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-          "line": 3255,
+          "line": 3275,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-          "line": 3261,
+          "line": 3281,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-          "line": 3267,
+          "line": 3287,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-          "line": 3270,
+          "line": 3290,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-          "line": 3274,
+          "line": 3294,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-          "line": 3305,
+          "line": 3325,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-          "line": 3675,
+          "line": 3695,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-          "line": 3675,
+          "line": 3695,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-          "line": 3710,
+          "line": 3730,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-          "line": 3710,
+          "line": 3730,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-          "line": 3953,
+          "line": 3973,
           "kind": "qualified-use"
         },
         {
@@ -5140,7 +5186,12 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution/planning_commands.rs",
-          "line": 191,
+          "line": 282,
+          "kind": "qualified-use"
+        },
+        {
+          "consumer": "rust/crates/goa2-core/src/interpreter/search.rs",
+          "line": 3871,
           "kind": "qualified-use"
         }
       ],
@@ -5161,32 +5212,32 @@
       "consumers": [
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 701,
+          "line": 702,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 867,
+          "line": 868,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 1058,
+          "line": 1090,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 1059,
+          "line": 1091,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 1285,
+          "line": 1317,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 1288,
+          "line": 1320,
           "kind": "qualified-use"
         },
         {
@@ -5222,12 +5273,12 @@
       "consumers": [
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 8906,
+          "line": 8938,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 8907,
+          "line": 8939,
           "kind": "qualified-use"
         },
         {
@@ -5264,32 +5315,32 @@
       "consumers": [
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 179,
+          "line": 180,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 440,
+          "line": 441,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 1050,
+          "line": 1082,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 1578,
+          "line": 1610,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 4037,
+          "line": 4069,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 7530,
+          "line": 7562,
           "kind": "qualified-use"
         },
         {
@@ -5323,27 +5374,27 @@
       "consumers": [
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 606,
+          "line": 607,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 612,
+          "line": 613,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 7837,
+          "line": 7869,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 7848,
+          "line": 7880,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 10766,
+          "line": 10798,
           "kind": "qualified-use"
         },
         {
@@ -5455,7 +5506,7 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 2628,
+          "line": 2660,
           "kind": "qualified-use"
         },
         {
@@ -5465,12 +5516,12 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-          "line": 3758,
+          "line": 3778,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-          "line": 3765,
+          "line": 3785,
           "kind": "qualified-use"
         },
         {
@@ -5500,57 +5551,57 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution/planning_commands.rs",
-          "line": 565,
+          "line": 661,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution/planning_commands.rs",
-          "line": 570,
+          "line": 666,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution/planning_commands.rs",
-          "line": 582,
+          "line": 678,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution/planning_commands.rs",
-          "line": 589,
+          "line": 685,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution/planning_commands.rs",
-          "line": 600,
+          "line": 696,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution/planning_commands.rs",
-          "line": 612,
+          "line": 708,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution/planning_commands.rs",
-          "line": 619,
+          "line": 715,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution/planning_commands.rs",
-          "line": 626,
+          "line": 722,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution/planning_commands.rs",
-          "line": 633,
+          "line": 729,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution/planning_commands.rs",
-          "line": 640,
+          "line": 736,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution/planning_commands.rs",
-          "line": 1086,
+          "line": 1182,
           "kind": "qualified-use"
         },
         {
@@ -5610,7 +5661,7 @@
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 826,
+          "line": 836,
           "kind": "qualified-use"
         }
       ],
@@ -5627,17 +5678,17 @@
       "consumers": [
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 314,
+          "line": 315,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 847,
+          "line": 848,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 7409,
+          "line": 7441,
           "kind": "qualified-use"
         },
         {
@@ -5684,22 +5735,22 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 3517,
+          "line": 3549,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 3583,
+          "line": 3615,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 3596,
+          "line": 3628,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 5181,
+          "line": 5213,
           "kind": "qualified-use"
         },
         {
@@ -5799,7 +5850,7 @@
       "consumers": [
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 673,
+          "line": 674,
           "kind": "qualified-use"
         },
         {
@@ -5836,12 +5887,12 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 163,
+          "line": 164,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 1066,
+          "line": 1098,
           "kind": "qualified-use"
         },
         {
@@ -5926,42 +5977,42 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution/planning_commands.rs",
-          "line": 1203,
+          "line": 1299,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution/planning_commands.rs",
-          "line": 1204,
+          "line": 1300,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution/planning_commands.rs",
-          "line": 1753,
+          "line": 1849,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution/planning_commands.rs",
-          "line": 1754,
+          "line": 1850,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution/planning_commands.rs",
-          "line": 1817,
+          "line": 1913,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution/planning_commands.rs",
-          "line": 1818,
+          "line": 1914,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution/planning_commands.rs",
-          "line": 1859,
+          "line": 1955,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution/planning_commands.rs",
-          "line": 1860,
+          "line": 1956,
           "kind": "qualified-use"
         },
         {
@@ -6051,7 +6102,7 @@
         },
         {
           "consumer": "rust/crates/goa2-search-cli/src/main.rs",
-          "line": 649,
+          "line": 659,
           "kind": "qualified-use"
         }
       ],
@@ -6078,32 +6129,32 @@
       "consumers": [
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 289,
+          "line": 290,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 855,
+          "line": 856,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 7139,
+          "line": 7171,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 7140,
+          "line": 7172,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 7141,
+          "line": 7173,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter.rs",
-          "line": 7142,
+          "line": 7174,
           "kind": "qualified-use"
         },
         {
@@ -6128,12 +6179,12 @@
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-          "line": 3674,
+          "line": 3694,
           "kind": "qualified-use"
         },
         {
           "consumer": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-          "line": 3707,
+          "line": 3727,
           "kind": "qualified-use"
         },
         {
@@ -6576,6 +6627,11 @@
         {
           "name": "resolution_sample_workers",
           "type": "Option<usize>",
+          "optional": true
+        },
+        {
+          "name": "arena_bot_ids",
+          "type": "Option<Vec<String>>",
           "optional": true
         },
         {
@@ -7063,7 +7119,7 @@
     "capabilities": [
       {
         "consumer": "scripts/rust_oracle/arena_queue.py",
-        "line": 391,
+        "line": 430,
         "expression": "worker.request"
       },
       {
@@ -7075,7 +7131,7 @@
     "prepare_search": [
       {
         "consumer": "scripts/rust_oracle/arena_calibrate.py",
-        "line": 173,
+        "line": 210,
         "expression": "policy.request"
       },
       {
@@ -7374,7 +7430,7 @@
     "check_sequences": [
       {
         "consumer": "scripts/rust_oracle/arena_queue.py",
-        "line": 400,
+        "line": 439,
         "expression": "worker.request"
       },
       {
@@ -7401,14 +7457,14 @@
     "arena_start": [
       {
         "consumer": "scripts/rust_oracle/arena_match.py",
-        "line": 32,
+        "line": 43,
         "expression": "referee.request"
       }
     ],
     "arena_submit": [
       {
         "consumer": "scripts/rust_oracle/arena_match.py",
-        "line": 113,
+        "line": 134,
         "expression": "referee.request"
       }
     ],
@@ -7508,7 +7564,7 @@
   "dynamic_request_sites": [
     {
       "consumer": "scripts/rust_oracle/arena_calibrate.py",
-      "line": 103,
+      "line": 108,
       "expression": "worker.request",
       "transport": "worker/dynamic adapter",
       "operation_expression": "operation",
@@ -7516,7 +7572,7 @@
     },
     {
       "consumer": "scripts/rust_oracle/arena_match.py",
-      "line": 43,
+      "line": 60,
       "expression": "workers[team].request",
       "transport": "worker/dynamic adapter",
       "operation_expression": "operation",
@@ -7619,6 +7675,14 @@
         "NativeSession::compile",
         "export_envelope",
         "prepare_submission"
+      ],
+      "decision": "Retain dense and object-aware implementations; selection is determined by admitted state/bindings, not a caller filename. Full unique regression migration required before retirement."
+    },
+    {
+      "consumer": "rust/crates/goa2-core/src/interpreter/live_game/bot.rs",
+      "entrypoints_or_representation_terms": [
+        "LiveGame::import",
+        "LiveGame::restore"
       ],
       "decision": "Retain dense and object-aware implementations; selection is determined by admitted state/bindings, not a caller filename. Full unique regression migration required before retirement."
     },
@@ -8803,133 +8867,133 @@
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter.rs",
-      "line": 2093,
+      "line": 2125,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "let frame = self.stack.last().unwrap();"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter.rs",
-      "line": 2170,
+      "line": 2202,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "let mut frame = self.stack.pop().unwrap();"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter.rs",
-      "line": 2369,
+      "line": 2401,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "[self.world.card(*card).unwrap().definition]"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter.rs",
-      "line": 2379,
+      "line": 2411,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "[self.world.card(card).unwrap().definition]"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter.rs",
-      "line": 2799,
+      "line": 2831,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": ".unwrap();"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter.rs",
-      "line": 3225,
+      "line": 3257,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "owner: self.normalized_owner(self.planning.actor.unwrap()),"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter.rs",
-      "line": 3643,
+      "line": 3675,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "let c = self.world.card(choices[0]).unwrap();"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter.rs",
-      "line": 3676,
+      "line": 3708,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "[self.world.card(*id).unwrap().definition]"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter.rs",
-      "line": 3739,
+      "line": 3771,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "[self.world.card(*id).unwrap().definition]"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter.rs",
-      "line": 3980,
+      "line": 4012,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "let c = self.world.card(card).unwrap();"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter.rs",
-      "line": 4656,
+      "line": 4688,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "let name = self.world.entity(h.id).unwrap().name;"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter.rs",
-      "line": 5020,
+      "line": 5052,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "let to = to.unwrap();"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter.rs",
-      "line": 5769,
+      "line": 5801,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "let state = source.state.as_object_mut().unwrap();"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter.rs",
-      "line": 5903,
+      "line": 5935,
       "expression": ".expect(",
       "category": "validated-native-invariant-review",
       "context": "for filter in wire[\"filters\"].as_array_mut().expect(\"compiled pre-action movement filters\") {"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter.rs",
-      "line": 6117,
+      "line": 6149,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "\"options\":values.iter().map(|id|{let d=&self.world.definitions.cards[self.world.card(*id).unwrap().definition];json!({\"id\":self.symbols.name(d.printed_id),\"text\":self.symbols.name(d.name),\"metadata\":{}})}).collect::<Vec<_>>(),"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter.rs",
-      "line": 6123,
+      "line": 6155,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "\"options\":cards.iter().map(|id| {let d=&self.world.definitions.cards[self.world.card(*id).unwrap().definition]; json!({\"id\":self.symbols.name(d.printed_id),\"text\":self.symbols.name(d.name),\"metadata\":{\"card_id\":self.symbols.name(d.printed_id),\"color\":d.color.map(|id| self.symbols.name(id))}})}).collect::<Vec<_>>(),"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter.rs",
-      "line": 6216,
+      "line": 6248,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "\"pair\":option.pair.iter().map(|id|self.symbols.name(self.world.definitions.cards[self.world.card(*id).unwrap().definition].printed_id)).collect::<Vec<_>>(),"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter.rs",
-      "line": 6217,
+      "line": 6249,
       "expression": ".expect(",
       "category": "validated-native-invariant-review",
       "context": "\"card_details\":option.pair.iter().map(|id|envelope.expand(&crate::cards::wire(Some(*id))).expect(\"compiled card record\")).collect::<Vec<_>>() })).collect::<Vec<_>>();"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter.rs",
-      "line": 6225,
+      "line": 6257,
       "expression": "unreachable!",
       "category": "validated-native-invariant-review",
       "context": "RequestChoices::Minions(_) | RequestChoices::SpellCards { .. } | RequestChoices::PrimaryReplacement { .. } | RequestChoices::Runes(_) | RequestChoices::CardColors(_) | RequestChoices::RuneInscription { .. } | RequestChoices::Protection(_) | RequestChoices::Mines(_) | RequestChoices::Defense(_) | RequestChoices::Action(_)|RequestChoices::Actors{..}|RequestChoices::Respawn{..}|RequestChoices::Upgrades(_)=>unreachable!(),"
@@ -8971,182 +9035,196 @@
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/greedy.rs",
-      "line": 767,
+      "line": 778,
       "expression": "unreachable!",
       "category": "validated-native-invariant-review",
       "context": "unreachable!(\"fixed choices are issued inputs\");"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/greedy.rs",
-      "line": 872,
+      "line": 883,
       "expression": "unreachable!",
       "category": "validated-native-invariant-review",
       "context": "GreedyStep::Input(_) => unreachable!(\"resolution choices are issued inputs\"),"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/greedy.rs",
-      "line": 1076,
+      "line": 1087,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "batch.push(group.next().unwrap());"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/greedy.rs",
-      "line": 1262,
+      "line": 1280,
       "expression": "unreachable!",
       "category": "validated-native-invariant-review",
       "context": "unreachable!(\"position routes contain issued inputs\")"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/greedy.rs",
-      "line": 1306,
+      "line": 1324,
       "expression": "unreachable!",
       "category": "validated-native-invariant-review",
       "context": "unreachable!(\"position choices are issued inputs\");"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/greedy.rs",
-      "line": 1441,
+      "line": 1459,
       "expression": "unreachable!",
       "category": "validated-native-invariant-review",
       "context": "unreachable!(\"position choices are issued inputs\");"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/greedy.rs",
-      "line": 1493,
+      "line": 1511,
       "expression": "unreachable!",
       "category": "validated-native-invariant-review",
       "context": "unreachable!(\"token swaps are issued inputs\");"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/greedy.rs",
-      "line": 1588,
+      "line": 1606,
       "expression": "unreachable!",
       "category": "validated-native-invariant-review",
       "context": "unreachable!(\"upgrade choices are issued inputs\");"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/greedy.rs",
-      "line": 1699,
+      "line": 1717,
       "expression": ".expect(",
       "category": "validated-native-invariant-review",
       "context": ".expect(\"validated search player\");"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/greedy.rs",
-      "line": 1907,
+      "line": 1925,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "let mut world = worlds.into_iter().next().unwrap();"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/greedy.rs",
-      "line": 1968,
+      "line": 1986,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "let mut menu = world.worker.last_request.as_ref().unwrap().clone();"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/greedy.rs",
-      "line": 1980,
+      "line": 1998,
       "expression": "unreachable!",
       "category": "validated-native-invariant-review",
       "context": "unreachable!(\"route choices are issued inputs\");"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/greedy.rs",
-      "line": 2031,
+      "line": 2049,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": ".unwrap()"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/greedy.rs",
-      "line": 2068,
+      "line": 2086,
       "expression": "unreachable!",
       "category": "validated-native-invariant-review",
       "context": "unreachable!(\"route choices are issued inputs\");"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/greedy.rs",
-      "line": 2075,
+      "line": 2093,
       "expression": ".expect(",
       "category": "validated-native-invariant-review",
       "context": "let mut child = source.take().expect(\"last use owns its world\");"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/greedy.rs",
-      "line": 2080,
+      "line": 2098,
       "expression": ".expect(",
       "category": "validated-native-invariant-review",
       "context": "let source = source.as_mut().expect(\"earlier use keeps its world\");"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/greedy.rs",
-      "line": 2208,
+      "line": 2226,
       "expression": "unreachable!",
       "category": "validated-native-invariant-review",
       "context": "unreachable!(\"attack choices are issued inputs\");"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/greedy.rs",
-      "line": 2295,
+      "line": 2313,
       "expression": "unreachable!",
       "category": "validated-native-invariant-review",
       "context": "unreachable!(\"attack targets are issued inputs\");"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/live_game.rs",
-      "line": 517,
+      "line": 559,
       "expression": "unreachable!",
       "category": "validated-native-invariant-review",
       "context": "unreachable!(\"resolution commands handled above\")"
     },
     {
+      "source": "rust/crates/goa2-core/src/interpreter/live_game/bot.rs",
+      "line": 31,
+      "expression": ".unwrap(",
+      "category": "validated-native-invariant-review",
+      "context": "let team = self.session.world.hero(hero).unwrap().team;"
+    },
+    {
+      "source": "rust/crates/goa2-core/src/interpreter/live_game/bot.rs",
+      "line": 46,
+      "expression": ".unwrap(",
+      "category": "validated-native-invariant-review",
+      "context": "let team = self.session.world.hero(self.hero(first)?).unwrap().team;"
+    },
+    {
       "source": "rust/crates/goa2-core/src/interpreter/live_game/clock.rs",
-      "line": 509,
+      "line": 510,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "let clock = &mut next.clock.as_mut().unwrap().clock;"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/live_game/clock.rs",
-      "line": 689,
+      "line": 690,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "let timed = self.clock.as_mut().unwrap();"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/live_game/clock.rs",
-      "line": 827,
+      "line": 829,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "let clock = &mut next.clock.as_mut().unwrap().clock;"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/live_game/clock.rs",
-      "line": 863,
+      "line": 865,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": ".unwrap()"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/live_game/clock.rs",
-      "line": 887,
+      "line": 889,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "let command = commands.into_iter().nth(index).unwrap();"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/live_game/rollback.rs",
-      "line": 97,
+      "line": 110,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": ".request_token(target.session.last_request.as_ref().unwrap().id);"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/live_game/rollback.rs",
-      "line": 132,
+      "line": 146,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "let next_id = restored.request_token(restored.last_request.as_ref().unwrap().id);"
@@ -9167,7 +9245,7 @@
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/loadout.rs",
-      "line": 756,
+      "line": 820,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": ".unwrap();"
@@ -9209,455 +9287,455 @@
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 1795,
+      "line": 1807,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "let top_instruction = self.stack.last().unwrap().instruction;"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 1805,
+      "line": 1817,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "let top_object = self.stack.last().unwrap().object;"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2048,
+      "line": 2068,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "self.preflight_move_toward_bound(objects, top_object.unwrap())?"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2136,
+      "line": 2156,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "Some(self.preflight_move_bound(objects, top_object.unwrap())?)"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2145,
+      "line": 2165,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "Some(self.preflight_mine_choice_bound(objects, top_object.unwrap())?)"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2154,
+      "line": 2174,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "Some(self.preflight_mine_trigger_bound(objects, top_object.unwrap())?)"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2163,
+      "line": 2183,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "Some(self.preflight_move_sequence_bound(objects, top_object.unwrap())?)"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2172,
+      "line": 2192,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "self.preflight_force_defense_movement_bound(objects, top_object.unwrap())?"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2183,
+      "line": 2203,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "top_object.unwrap(),"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2194,
+      "line": 2214,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "Some(self.preflight_token_place_bound(objects, top_object.unwrap())?)"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2202,
+      "line": 2222,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "Some(self.preflight_token_path_bound(objects, top_object.unwrap(), trail)?)"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2211,
+      "line": 2231,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "Some(self.preflight_token_batch_bound(objects, top_object.unwrap())?)"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2218,
+      "line": 2238,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "Some(self.preflight_turret_bound(objects, top_object.unwrap(), remove)?)"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2227,
+      "line": 2247,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "self.preflight_rock_ultimate_bound(objects, top_object.unwrap())?"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2236,
+      "line": 2256,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "self.preflight_token_remove_bound(objects, top_object.unwrap())?"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2245,
+      "line": 2265,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "self.preflight_convert_item_bound(objects, top_object.unwrap())?"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2254,
+      "line": 2274,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "self.preflight_after_attack_bound(objects, top_object.unwrap())?"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2263,
+      "line": 2283,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "self.preflight_retrieve_bound(objects, top_object.unwrap())?"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2272,
+      "line": 2292,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "Some(self.preflight_minion_respawn_bound(objects, top_object.unwrap())?)"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2325,
+      "line": 2345,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "Some(self.preflight_battle_bound(objects, top_object.unwrap(), family)?)"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2334,
+      "line": 2354,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "Some(self.preflight_spell_bound(objects, top_object.unwrap(), op)?)"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2344,
+      "line": 2364,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "Some(self.preflight_query_bound(objects, top_object.unwrap(), collect)?)"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2347,
+      "line": 2367,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "Some(self.preflight_unit_filters_query_bound(objects, top_object.unwrap())?)"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2350,
+      "line": 2370,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "Some(self.preflight_unit_on_board_bound(objects, top_object.unwrap())?)"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2353,
+      "line": 2373,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "Some(self.preflight_unit_type_check_bound(objects, top_object.unwrap())?)"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2356,
+      "line": 2376,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "Some(self.preflight_boolean_combine_bound(objects, top_object.unwrap())?)"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2359,
+      "line": 2379,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "Some(self.preflight_distance_check_bound(objects, top_object.unwrap())?)"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2362,
+      "line": 2382,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "Some(self.preflight_zone_change_bound(objects, top_object.unwrap())?)"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2365,
+      "line": 2385,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "Some(self.preflight_adjacent_enemies_bound(objects, top_object.unwrap())?)"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2368,
+      "line": 2388,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "Some(self.preflight_card_count_bound(objects, top_object.unwrap())?)"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2371,
+      "line": 2391,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "Some(self.preflight_round_defeat_bound(objects, top_object.unwrap())?)"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2374,
+      "line": 2394,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "Some(self.preflight_context_condition_bound(objects, top_object.unwrap())?)"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2388,
+      "line": 2408,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "top_object.unwrap(),"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2399,
+      "line": 2419,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "Some(self.preflight_attack_sequence_bound(objects, top_object.unwrap())?)"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2408,
+      "line": 2428,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "Some(self.preflight_actor_bound(objects, top_object.unwrap())?)"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2417,
+      "line": 2437,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "self.preflight_pre_movement_bound(objects, top_object.unwrap())?"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2426,
+      "line": 2446,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "Some(self.preflight_pre_discard_bound(objects, top_object.unwrap())?)"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2435,
+      "line": 2455,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "Some(self.preflight_reaction_bound(objects, top_object.unwrap())?)"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2444,
+      "line": 2464,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "Some(self.preflight_combat_resolution_bound(objects, top_object.unwrap())?)"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2453,
+      "line": 2473,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "Some(self.preflight_adjacent_snapshot_bound(objects, top_object.unwrap())?)"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2462,
+      "line": 2482,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "Some(self.preflight_target_defeated_bound(objects, top_object.unwrap())?)"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2471,
+      "line": 2491,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "self.preflight_defeat_bound(objects, top_object.unwrap())?"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2480,
+      "line": 2500,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "self.preflight_remove_unit_bound(objects, top_object.unwrap())?"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2489,
+      "line": 2509,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "self.preflight_solo_win_bound(objects, top_object.unwrap())?"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2498,
+      "line": 2518,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "Some(self.preflight_game_over_bound(objects, top_object.unwrap())?)"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2507,
+      "line": 2527,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "Some(self.preflight_protection_bound(objects, top_object.unwrap())?)"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2518,
+      "line": 2538,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "top_object.unwrap(),"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2529,
+      "line": 2549,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "Some(self.preflight_rune_bound(objects, top_object.unwrap())?)"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2538,
+      "line": 2558,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "Some(self.preflight_passive_bound(objects, top_object.unwrap())?)"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2547,
+      "line": 2567,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "Some(self.preflight_offer_bound(objects, top_object.unwrap())?)"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2556,
+      "line": 2576,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "Some(self.preflight_mark_bound(objects, top_object.unwrap())?)"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2565,
+      "line": 2585,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "Some(self.preflight_discard_bound(objects, top_object.unwrap())?)"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2574,
+      "line": 2594,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "self.preflight_discard_or_defeat_bound(objects, top_object.unwrap())?"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2583,
+      "line": 2603,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "self.preflight_color_discard_bound(objects, top_object.unwrap())?"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2592,
+      "line": 2612,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "Some(self.preflight_forced_discard_bound(objects, top_object.unwrap())?)"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2603,
+      "line": 2623,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "top_object.unwrap(),"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 2657,
+      "line": 2677,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "let mut frame = self.stack.pop().unwrap();"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 3388,
+      "line": 3408,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": ".append(objects.stack, ObjectValue::Object(child.object.unwrap()))"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 3995,
+      "line": 4015,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "crate::fixture_cache::open(base.join(\"object-execution.json\")).unwrap(),"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 3997,
+      "line": 4017,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": ".unwrap();"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 4000,
+      "line": 4020,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": ".unwrap()"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 4003,
+      "line": 4023,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": ".unwrap();"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 4005,
+      "line": 4025,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "crate::fixture_cache::open(base.join(entry[\"path\"].as_str().unwrap())).unwrap(),"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 4005,
+      "line": 4025,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "crate::fixture_cache::open(base.join(entry[\"path\"].as_str().unwrap())).unwrap(),"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution.rs",
-      "line": 4007,
+      "line": 4027,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": ".unwrap()"
@@ -10784,14 +10862,14 @@
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution/planning_commands.rs",
-      "line": 1270,
+      "line": 1366,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "let chosen_card = self.world.card(chosen).unwrap();"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/object_execution/planning_commands.rs",
-      "line": 1372,
+      "line": 1468,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "let row = self.world.card_mut(card).unwrap();"
@@ -11519,35 +11597,56 @@
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/search.rs",
-      "line": 728,
+      "line": 784,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "let best = scores.iter().map(|(_, score)| *score).max().unwrap();"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/search.rs",
-      "line": 998,
+      "line": 1054,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "let mut first = weights.last().unwrap().0;"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/search.rs",
-      "line": 2185,
+      "line": 2585,
       "expression": ".expect(",
       "category": "validated-native-invariant-review",
       "context": "let (index, sum) = best_sum.expect(\"root has legal choices\");"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/search.rs",
-      "line": 3649,
+      "line": 3562,
+      "expression": ".unwrap(",
+      "category": "validated-native-invariant-review",
+      "context": "let best = scores.next().unwrap();"
+    },
+    {
+      "source": "rust/crates/goa2-core/src/interpreter/search.rs",
+      "line": 3913,
+      "expression": ".expect(",
+      "category": "validated-native-invariant-review",
+      "context": ".expect(\"a hand branch requires a belief\");"
+    },
+    {
+      "source": "rust/crates/goa2-core/src/interpreter/search.rs",
+      "line": 4009,
+      "expression": ".expect(",
+      "category": "validated-native-invariant-review",
+      "context": "let mut leaf = witness.expect(\"scored hand branch has an endpoint\");"
+    },
+    {
+      "source": "rust/crates/goa2-core/src/interpreter/search.rs",
+      "line": 4300,
       "expression": ".unwrap(",
       "category": "validated-native-invariant-review",
       "context": "let team = worker.world.hero(choice.hero).unwrap().team;"
     },
     {
       "source": "rust/crates/goa2-core/src/interpreter/search.rs",
-      "line": 3778,
+      "line": 4434,
       "expression": ".expect(",
       "category": "validated-native-invariant-review",
       "context": ".expect(\"live request has a search owner\");"
@@ -11701,77 +11800,77 @@
     },
     {
       "source": "rust/crates/goa2-core/src/objects.rs",
-      "line": 464,
+      "line": 486,
       "expression": "unreachable!",
       "category": "validated-native-invariant-review",
       "context": "unreachable!(\"validated list binding\");"
     },
     {
       "source": "rust/crates/goa2-core/src/objects.rs",
-      "line": 569,
+      "line": 591,
       "expression": "unreachable!",
       "category": "validated-native-invariant-review",
       "context": "unreachable!()"
     },
     {
       "source": "rust/crates/goa2-core/src/objects.rs",
-      "line": 649,
+      "line": 671,
       "expression": "unreachable!",
       "category": "validated-native-invariant-review",
       "context": "_ => unreachable!(),"
     },
     {
       "source": "rust/crates/goa2-core/src/objects.rs",
-      "line": 1109,
+      "line": 1131,
       "expression": "unreachable!",
       "category": "validated-native-invariant-review",
       "context": "unreachable!()"
     },
     {
       "source": "rust/crates/goa2-core/src/objects.rs",
-      "line": 1120,
+      "line": 1142,
       "expression": "unreachable!",
       "category": "validated-native-invariant-review",
       "context": "unreachable!()"
     },
     {
       "source": "rust/crates/goa2-core/src/objects.rs",
-      "line": 1133,
+      "line": 1155,
       "expression": "unreachable!",
       "category": "validated-native-invariant-review",
       "context": "unreachable!()"
     },
     {
       "source": "rust/crates/goa2-core/src/objects.rs",
-      "line": 1249,
+      "line": 1271,
       "expression": "unreachable!",
       "category": "validated-native-invariant-review",
       "context": "unreachable!()"
     },
     {
       "source": "rust/crates/goa2-core/src/objects.rs",
-      "line": 1496,
+      "line": 1518,
       "expression": "unreachable!",
       "category": "validated-native-invariant-review",
       "context": "unreachable!()"
     },
     {
       "source": "rust/crates/goa2-core/src/objects.rs",
-      "line": 1510,
+      "line": 1532,
       "expression": "unreachable!",
       "category": "validated-native-invariant-review",
       "context": "unreachable!()"
     },
     {
       "source": "rust/crates/goa2-core/src/objects.rs",
-      "line": 1545,
+      "line": 1567,
       "expression": "unreachable!",
       "category": "validated-native-invariant-review",
       "context": "unreachable!()"
     },
     {
       "source": "rust/crates/goa2-core/src/objects.rs",
-      "line": 1635,
+      "line": 1657,
       "expression": "unreachable!",
       "category": "validated-native-invariant-review",
       "context": "_ => unreachable!(),"
@@ -11988,7 +12087,7 @@
     },
     {
       "source": "rust/crates/goa2-search-cli/src/main.rs",
-      "line": 794,
+      "line": 804,
       "expression": "unreachable!",
       "category": "worker-boundary-review",
       "context": "_ => unreachable!(),"
@@ -12090,7 +12189,8 @@
     "rust/crates/goa2-core/src/interpreter.rs": 1722,
     "rust/crates/goa2-core/src/interpreter/arena_match.rs": 44,
     "rust/crates/goa2-core/src/interpreter/greedy.rs": 185,
-    "rust/crates/goa2-core/src/interpreter/loadout.rs": 145,
+    "rust/crates/goa2-core/src/interpreter/live_game/bot.rs": 15,
+    "rust/crates/goa2-core/src/interpreter/loadout.rs": 149,
     "rust/crates/goa2-core/src/interpreter/object_execution.rs": 144,
     "rust/crates/goa2-core/src/interpreter/object_execution/action_control.rs": 43,
     "rust/crates/goa2-core/src/interpreter/object_execution/arien_tests.rs": 39,
@@ -12121,7 +12221,7 @@
     "rust/crates/goa2-core/src/interpreter/object_execution/perform_primary.rs": 33,
     "rust/crates/goa2-core/src/interpreter/object_execution/phase_closure_tests.rs": 7,
     "rust/crates/goa2-core/src/interpreter/object_execution/placement.rs": 62,
-    "rust/crates/goa2-core/src/interpreter/object_execution/planning_commands.rs": 271,
+    "rust/crates/goa2-core/src/interpreter/object_execution/planning_commands.rs": 292,
     "rust/crates/goa2-core/src/interpreter/object_execution/pre_action.rs": 7,
     "rust/crates/goa2-core/src/interpreter/object_execution/primary_bodies.rs": 65,
     "rust/crates/goa2-core/src/interpreter/object_execution/push.rs": 30,
@@ -12137,8 +12237,8 @@
     "rust/crates/goa2-core/src/interpreter/object_execution/utility_tests.rs": 71,
     "rust/crates/goa2-core/src/interpreter/object_execution/wasp_tests.rs": 35,
     "rust/crates/goa2-core/src/interpreter/observation.rs": 122,
-    "rust/crates/goa2-core/src/interpreter/search.rs": 586,
-    "rust/crates/goa2-core/src/objects.rs": 101,
+    "rust/crates/goa2-core/src/interpreter/search.rs": 656,
+    "rust/crates/goa2-core/src/objects.rs": 109,
     "rust/crates/goa2-core/src/versions.rs": 6,
     "rust/crates/goa2-core/src/world.rs": 66,
     "rust/crates/goa2-core/tests/actions.rs": 33,
@@ -12160,7 +12260,7 @@
     "rust/crates/goa2-core/tests/validation.rs": 61,
     "rust/crates/goa2-game-server/src/game.rs": 11,
     "rust/crates/goa2-game-server/src/main.rs": 7,
-    "rust/crates/goa2-game-server/src/replay.rs": 23,
+    "rust/crates/goa2-game-server/src/replay.rs": 39,
     "rust/crates/goa2-game-server/src/store.rs": 8,
     "rust/crates/goa2-game-server/src/store/migrations.rs": 40,
     "rust/crates/goa2-game-server/src/store/unsigned.rs": 13,

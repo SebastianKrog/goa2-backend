@@ -696,7 +696,12 @@
       "memory.swap.max": "0"
     },
     "benchmark_executed": false,
-    "new_refactor_performance_baseline_claimed": false
+    "new_refactor_performance_baseline_claimed": false,
+    "scoped_process_helpers": {
+      "child_memory_access": "passed",
+      "wait4_exit_and_usage_accounting": "passed",
+      "scope": "Lightweight Python child processes only; no native benchmark or strength workload"
+    }
   },
   "verification_interruption": {
     "date": "2026-11-11",
@@ -733,5 +738,25 @@
       }
     },
     "status": "Full verification restarted; no full/restore/real-archive pass claimed"
+  },
+  "arena_v2_inventory_reconciliation": {
+    "date": "2026-11-11",
+    "core_exports": 44,
+    "worker_variants": 39,
+    "dynamic_request_sites": 4,
+    "dense_object_consumers": 116,
+    "panic_assumptions": 519,
+    "new_guarded_assumptions_reviewed": 5,
+    "selected_files": 1173,
+    "embedded_inputs": 46,
+    "unresolved_embeds": 0,
+    "cargo_path_dependencies": 2,
+    "scope": "Static source inventories and guarded-call review; not a new gameplay or full-regression pass.",
+    "evidence": [
+      "audits/boundaries.json",
+      "audits/dependencies.json",
+      "audits/api-boundaries.md",
+      "audits/concurrency-and-panics.md"
+    ]
   }
 }

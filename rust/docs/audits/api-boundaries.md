@@ -71,7 +71,7 @@ deprecated/removed without moving callers and preserving unique tests.
 ## Internal diagnostics without a wire migration
 
 `goa2_core::diagnostic` supplies stable category codes by `EngineError` variant:
-`unsupported`, `invalid_input`, `rule`, `cancelled`, `deadline`, `step_limit`, plus
+`unsupported`, `invalid_input`, `rule`, `cancelled`, `deadline`, `node_limit`, `step_limit`, plus
 adapter-owned `internal`. A `Diagnostic` carries only category and a bounded
 boundary enum; it never copies arbitrary private payloads or error strings.
 Service errors retain the category/context for logs and preserve the existing
@@ -96,3 +96,11 @@ restore, live/search or representation entrypoints. Selection is based on admitt
 state/bindings, not filename or whether the caller is Python. No dense execution,
 plain/gzip reader, public alias or fixture family is retired. C10 structural work
 and full performance/differential acceptance remain separate gates.
+
+## Arena v2 reconciliation
+
+Rechecked on 11 November 2026 after the Arena v2 merge. The current inventory
+contains 44 public root exports, 39 worker variants, four dynamic request sites
+and 116 execution/representation consumers. The added live-bot consumer imports
+and restores private live games. The operation set and caller-retention decisions
+above still apply. The diagnostic inventory includes fixed-node exhaustion.

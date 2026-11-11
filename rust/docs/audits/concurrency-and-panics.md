@@ -69,3 +69,26 @@ No input-facing panic was normalized into a successful result. Native/property
 and process checks protect actual rejected-input nonmutation/isolation, not an
 assertion that all possible trusted-state corruption is recoverable. Full corpus,
 load/latency measurements and release acceptance are still reported separately.
+
+## Arena v2 invariant review
+
+Rechecked on 11 November 2026. The refreshed machine inventory has 519 textual
+panic assumptions. Five additions remain guarded internal invariants:
+
+- Both bot-team hero lookups follow the checked LiveGame hero lookup, which
+  verifies the symbol is an actual world hero. The immutable borrow prevents
+  removal between that check and the team read.
+- Live-root ranking reads its first score only after the exact-size iterator
+  reports at least two elements. Production calls use a standard iterator over
+  an immutable ranked-score slice.
+- Weighted hand branching is entered only through the pending-hand check with
+  an active belief. The belief is temporarily removed for recursive work and
+  restored before returning the result.
+- A scored weighted-hand rollout has a captured endpoint. Every successful
+  continuation captures a leaf before returning its score. A missing result,
+  exhausted budget or error cannot reach the endpoint unwrap.
+
+The hand-hypothesis producer returns a populated list or no hypothesis, assigns
+positive integer mass to every row and admits at most 16 combinations. These
+preconditions also protect the weighted average's positive divisor. This review
+records the merged implementation's guards; no rule or search behavior changed.

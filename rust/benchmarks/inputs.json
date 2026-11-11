@@ -28,7 +28,7 @@
         "scripts/rust_oracle/simulation_bench.py",
         "scripts/rust_oracle/rollout_parity.py --recorded-rollouts"
       ],
-      "availability": "indexed payloads missing; do not replace with smoke or regenerate changed hashes",
+      "availability": "Both pinned Hanu games passed full differential verification in the private WSL fixture cache. See docs/cleanup-evidence.json. External acquisition remains pending.",
       "owner": "search maintainers",
       "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
       "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",

@@ -31,3 +31,10 @@ credentials use repository secrets and are only passed to the explicitly selecte
 read-only verifier. Missing artifact distribution still prevents full jobs from
 passing (C04-01); local selector checks do not establish a remote workflow result
 (C04-09), cold acquisition (C04-08), hosted compatibility or release readiness.
+
+The full and restore jobs now call the
+[reference archive installer](../fixture-archives.md) with explicit artifact URL
+and SHA256 variables before running their tier. Download integrity, isolated
+staging admission and nonzero full counts are enforced. The distribution
+location, real archive acceptance and remote run still require evidence;
+C04-01 and C04-09 remain open until those are available.

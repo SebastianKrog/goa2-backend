@@ -80,19 +80,36 @@ jobs:
     needs: [scope, native]
     if: needs.scope.outputs.full == 'true'
     runs-on: ubuntu-latest
+    env:
+      GOA2_FIXTURE_ARCHIVE_URL: ${{ vars.GOA2_FIXTURE_ARCHIVE_URL }}
+      GOA2_FIXTURE_ARCHIVE_SHA256: ${{ vars.GOA2_FIXTURE_ARCHIVE_SHA256 }}
+      GOA2_FIXTURE_CACHE: ${{ github.workspace }}/.reference-fixtures
     steps:
       - uses: actions/checkout@v4
+      - name: Acquire and verify the complete admitted reference archive
+        run: |
+          : "${GOA2_FIXTURE_ARCHIVE_URL:?Configure the admitted reference archive URL}"
+          : "${GOA2_FIXTURE_ARCHIVE_SHA256:?Configure its independently trusted SHA256}"
+          python3 rust/tools/fixture_archive.py install "$GOA2_FIXTURE_ARCHIVE_URL" --sha256 "$GOA2_FIXTURE_ARCHIVE_SHA256" --output "$GOA2_FIXTURE_CACHE"
       - name: Require complete admitted artifacts and run full differential tier
         working-directory: rust
         run: python3 tools/check.py full
-      # This job deliberately fails with counted missing artifacts until a verified
-      # artifact distribution is configured. Never silently run only the smoke set.
+      # Missing configuration, failed integrity or missing payloads fail the job.
   restore:
     needs: [scope, native]
     if: needs.scope.outputs.restore == 'true'
     runs-on: ubuntu-latest
+    env:
+      GOA2_FIXTURE_ARCHIVE_URL: ${{ vars.GOA2_FIXTURE_ARCHIVE_URL }}
+      GOA2_FIXTURE_ARCHIVE_SHA256: ${{ vars.GOA2_FIXTURE_ARCHIVE_SHA256 }}
+      GOA2_FIXTURE_CACHE: ${{ github.workspace }}/.reference-fixtures
     steps:
       - uses: actions/checkout@v4
+      - name: Acquire and verify the complete admitted reference archive
+        run: |
+          : "${GOA2_FIXTURE_ARCHIVE_URL:?Configure the admitted reference archive URL}"
+          : "${GOA2_FIXTURE_ARCHIVE_SHA256:?Configure its independently trusted SHA256}"
+          python3 rust/tools/fixture_archive.py install "$GOA2_FIXTURE_ARCHIVE_URL" --sha256 "$GOA2_FIXTURE_ARCHIVE_SHA256" --output "$GOA2_FIXTURE_CACHE"
       - name: Require complete admitted artifacts and run exhaustive restoration
         working-directory: rust
         run: python3 tools/check.py restore

@@ -614,5 +614,49 @@
     "oracle_archive_sha256": "863351ef82d3027424da1e9d3bf04be4fae4e5c809759d84785fc50cb487945f",
     "source_history_required": false,
     "public_distribution_approved": false
+  },
+  "reference_archive_acquisition": {
+    "date": "2026-11-11",
+    "summary": "fixture-archives.md",
+    "tool_sha256": "e646012063fd3448f3186f1cd55db51be015b46f26a5bcb051e15ae1446cd7e5",
+    "tooling_tests": {
+      "expected": 66,
+      "passed": 66,
+      "failed": 0
+    },
+    "tested": [
+      "Deterministic archive roundtrip with plain and gzip payloads",
+      "Complete-game manifest and snapshot-chunk roundtrip",
+      "Missing or changed payload rejection with a fully populated original checkout",
+      "Wrong archive checksum, traversal, links, duplicate logical files and unreferenced chunks",
+      "Existing destination preservation and process-lock release/retry",
+      "Both actual CI acquisition shell blocks with spaces in cache paths and missing checksum input",
+      "Bounded decompression before JSON parsing"
+    ],
+    "ci_jobs": [
+      "full-parity",
+      "restore"
+    ],
+    "ci_variables": [
+      "GOA2_FIXTURE_ARCHIVE_URL",
+      "GOA2_FIXTURE_ARCHIVE_SHA256"
+    ],
+    "full_corpus_archive_roundtrip": "Queued after successful full/restore, with MemoryMax=1G and a host disk-space guard for archive, staging and installed data",
+    "distribution_configured": false,
+    "remote_ci_result_claimed": false,
+    "completed_additional_checklist_tasks": [],
+    "standalone_tooling": {
+      "extracted_files": 1169,
+      "expected_tests": 66,
+      "passed": 66,
+      "original_history_present": false,
+      "fixture_payloads_required": false,
+      "source_map_sha256": "4710ea9c094f6b12f2996c973b911c8c5e1427503beb7d3cf94c963b7f78a28d",
+      "cli_help": [
+        "install",
+        "pack"
+      ]
+    },
+    "fixture_reader_sha256": "231fbe74a938d8e71c48a916433d09e2321358eab6f341855fbebae67a26a40f"
   }
 }

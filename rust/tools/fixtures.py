@@ -13,6 +13,7 @@ from pathlib import Path
 
 WORKSPACE = Path(__file__).resolve().parents[1]
 FIXTURES = WORKSPACE / "tests/fixtures"
+MAX_REFERENCE_BYTES = 256 * 1024 * 1024
 
 
 def canonical(value):
@@ -30,18 +31,26 @@ def checked_path(base, relative):
     return base / path
 
 
-def raw(path):
+def raw(path, *, limit=None):
     try:
-        return path.read_bytes()
+        stream = path.open("rb")
     except FileNotFoundError:
-        with gzip.open(str(path) + ".gz", "rb") as stream:
-            return stream.read()
+        stream = gzip.open(str(path) + ".gz", "rb")
+    with stream:
+        data = stream.read() if limit is None else stream.read(limit + 1)
+    if limit is not None and len(data) > limit:
+        raise ValueError(f"Reference payload exceeds its expanded size limit: {path.name}")
+    return data
 
 
-def read_fixture(relative, cache):
-    for base in [FIXTURES, *([cache] if cache else [])]:
+def read_fixture(relative, cache, *, payload_root=None):
+    bases = [payload_root] if payload_root is not None else [FIXTURES, *([cache] if cache else [])]
+    for base in bases:
         try:
-            return raw(checked_path(base, relative))
+            return raw(
+                checked_path(base, relative),
+                limit=MAX_REFERENCE_BYTES if payload_root is not None else None,
+            )
         except FileNotFoundError:
             continue
     return None
@@ -98,7 +107,7 @@ def quick(workspace=WORKSPACE):
     return {"tier": "quick-data", "expected": count, "executed": count, "missing": 0, "failed": 0}
 
 
-def full(families, cache=None):
+def full(families, cache=None, *, payload_root=None):
     """Do not use smoke fallback: selected parity means every admitted case."""
     result = []
     oracle = json.loads((WORKSPACE / "oracle-manifest.json").read_text())
@@ -114,7 +123,7 @@ def full(families, cache=None):
             if row["family"] == family
         )
         if record.get("category") == "external-parity":
-            data = read_fixture(record["path"], cache)
+            data = read_fixture(record["path"], cache, payload_root=payload_root)
             valid = data is not None and hashlib.sha256(data).hexdigest() == record["raw_sha256"]
             result.append(
                 dict(
@@ -161,7 +170,7 @@ def full(families, cache=None):
             seen.add(row["name"])
             if row["path"] != f"{family}/{row['case_sha256']}.json":
                 raise ValueError(f"Case path mismatch: {row['path']}")
-            data = read_fixture(row["path"], cache)
+            data = read_fixture(row["path"], cache, payload_root=payload_root)
             if data is None:
                 missing += 1
                 continue
@@ -180,7 +189,7 @@ def full(families, cache=None):
                         continue
                     for chunk in references:
                         chunks["expected"] += 1
-                        payload = read_fixture(chunk["path"], cache)
+                        payload = read_fixture(chunk["path"], cache, payload_root=payload_root)
                         if payload is None:
                             chunks["missing"] += 1
                         elif (

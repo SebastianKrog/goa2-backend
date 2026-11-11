@@ -25,6 +25,8 @@ The quick command reports ignores rather than hiding them behind a filter.
 
 ## Full differential and exhaustive restore
 
+Acquire a complete cache with the [verified archive workflow](fixture-archives.md).
+
 ```sh
 export GOA2_FIXTURE_CACHE=/absolute/path/to/verified/payloads
 python3 tools/fixtures.py verify --full

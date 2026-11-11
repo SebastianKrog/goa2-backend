@@ -658,5 +658,27 @@
       ]
     },
     "fixture_reader_sha256": "231fbe74a938d8e71c48a916433d09e2321358eab6f341855fbebae67a26a40f"
+  },
+  "preliminary_payload_review": {
+    "date": "2026-11-11",
+    "evidence": "audits/payload-review.json",
+    "summary": "audits/payload-review.md",
+    "findings_after_redaction": 0,
+    "full_public_payload_approval": false,
+    "tooling_tests": {
+      "expected": 72,
+      "passed": 72
+    },
+    "standalone_tooling_tests": {
+      "expected": 70,
+      "passed": 70
+    }
+  },
+  "reference_registry_detail": {
+    "date": "2026-11-11",
+    "monolithic_payloads": 12,
+    "schema_version": 1,
+    "raw_bytes_and_corpus_hashes": "Verified by bounded streaming of the admitted raw payloads; raw SHA256 values were retained.",
+    "rights_and_final_acquisition_metadata": "Pending owner decisions and actual distribution route; C03-05 remains open."
   }
 }

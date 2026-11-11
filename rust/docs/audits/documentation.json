@@ -435,9 +435,21 @@
       "status": "included"
     },
     {
+      "consumer": "rust/docs/audits/ci-gates.md",
+      "link": "../fixture-archives.md",
+      "target": "rust/docs/fixture-archives.md",
+      "status": "included"
+    },
+    {
       "consumer": "rust/docs/audits/concurrency-and-panics.md",
       "link": "boundaries.json",
       "target": "rust/docs/audits/boundaries.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/corpus-recovery.md",
+      "link": "corpus-recovery.json",
+      "target": "rust/docs/audits/corpus-recovery.json",
       "status": "included"
     },
     {
@@ -603,6 +615,18 @@
       "status": "included"
     },
     {
+      "consumer": "rust/docs/audits/payload-review.md",
+      "link": "payload-review.json",
+      "target": "rust/docs/audits/payload-review.json",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/audits/payload-review.md",
+      "link": "documentation.json",
+      "target": "rust/docs/audits/documentation.json",
+      "status": "included"
+    },
+    {
       "consumer": "rust/docs/audits/performance-baseline.md",
       "link": "../../benchmarks/maintenance-v1-results.json",
       "target": "rust/benchmarks/maintenance-v1-results.json",
@@ -765,6 +789,12 @@
       "status": "included"
     },
     {
+      "consumer": "rust/docs/cleanup-checklist.md",
+      "link": "audits/corpus-recovery.md",
+      "target": "rust/docs/audits/corpus-recovery.md",
+      "status": "included"
+    },
+    {
       "consumer": "rust/docs/compatibility.md",
       "link": "worker-operations.json",
       "target": "rust/docs/worker-operations.json",
@@ -867,6 +897,12 @@
       "status": "included"
     },
     {
+      "consumer": "rust/docs/platform-and-packaging.md",
+      "link": "audits/payload-review.md",
+      "target": "rust/docs/audits/payload-review.md",
+      "status": "included"
+    },
+    {
       "consumer": "rust/docs/readiness.md",
       "link": "cleanup-checklist.md",
       "target": "rust/docs/cleanup-checklist.md",
@@ -894,6 +930,12 @@
       "consumer": "rust/docs/readiness.md",
       "link": "audits/fourth-ten.md",
       "target": "rust/docs/audits/fourth-ten.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/readiness.md",
+      "link": "audits/corpus-recovery.md",
+      "target": "rust/docs/audits/corpus-recovery.md",
       "status": "included"
     },
     {
@@ -951,6 +993,12 @@
       "status": "included"
     },
     {
+      "consumer": "rust/docs/search.md",
+      "link": "../arena/v2-node-tiers.json",
+      "target": "rust/arena/v2-node-tiers.json",
+      "status": "included"
+    },
+    {
       "consumer": "rust/docs/testing.md",
       "link": "../test-tiers.json",
       "target": "rust/test-tiers.json",
@@ -960,6 +1008,12 @@
       "consumer": "rust/docs/testing.md",
       "link": "verification-gates.md",
       "target": "rust/docs/verification-gates.md",
+      "status": "included"
+    },
+    {
+      "consumer": "rust/docs/testing.md",
+      "link": "fixture-archives.md",
+      "target": "rust/docs/fixture-archives.md",
       "status": "included"
     },
     {
@@ -1071,7 +1125,7 @@
     {
       "path": "docs/AI_STACK_CLEANUP.md",
       "sha256": "f02c9e123526d965184dcafb934376ee6a25dc9f58e3d953991ad969601dbbcc",
-      "last_change_commit": "90a3e78cd36138cdf23bec547b5606a88b06aa74",
+      "last_change_commit": "18dac669c95001f88f079a6143a3c6af13fe8fd4",
       "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
     },
     {
@@ -1131,13 +1185,13 @@
     {
       "path": "docs/MAINTAINABILIY_ROADMAP.md",
       "sha256": "6002d3bbe3eaec5dbec54a4b029f5d790efe812117979c0f5f20fab56b4292f3",
-      "last_change_commit": "90a3e78cd36138cdf23bec547b5606a88b06aa74",
+      "last_change_commit": "18dac669c95001f88f079a6143a3c6af13fe8fd4",
       "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
     },
     {
       "path": "docs/RUST_ENGINE_CLEANUP_PLAN.md",
       "sha256": "1ed7d8316b7e18f2fd9f553f7187a2f771ce0bb6dc83cfc63bb0b5ddf059807a",
-      "last_change_commit": "ea1e2b0a04ff43f6416ff3561b83a78a9b359fca",
+      "last_change_commit": "2014d0360120983734ea6b4f0382bd9415befb03",
       "disposition": "Retain source-repository plans/status, including original Rust and Python/training/hero records, for provenance; exclude from standalone onboarding. The cleanup checklist and current native guides supply maintained status/instructions."
     },
     {
@@ -1424,7 +1478,7 @@
       "baseline_commit": "f0fb93e117f358266ef522e6d5f23d3452e83e97",
       "original_sha256": "6911af654fd9f38af83d43b1625da61e17ef9e91191c8e1a44fcca31df378bac",
       "original_last_change_commit_and_date": "f0fb93e117f358266ef522e6d5f23d3452e83e97 2026-11-08T08:51:40+01:00",
-      "edit_scope": "Historical body retained; stale link targets annotated/redirected to retained inventory or current build section. Original source remains in Git."
+      "edit_scope": "Historical body retained; stale links redirect to retained inventory or current build instructions. Personal machine paths in development-history.md use generic user placeholders. Original source and its byte hash remain available in Git."
     },
     {
       "archive": "rust/docs/archive/fixture-history.md",
@@ -1432,7 +1486,7 @@
       "baseline_commit": "f0fb93e117f358266ef522e6d5f23d3452e83e97",
       "original_sha256": "26718755132bd22b5f048b8ddd39d685127c5119a05bbc4129dc2bebc4aa9e2e",
       "original_last_change_commit_and_date": "9f7d080fc74138c50f82eee34ca6d31ed0fdd55b 2026-11-04T19:16:08+01:00",
-      "edit_scope": "Historical body retained; stale link targets annotated/redirected to retained inventory or current build section. Original source remains in Git."
+      "edit_scope": "Historical body retained; stale links redirect to retained inventory or current build instructions. Personal machine paths in development-history.md use generic user placeholders. Original source and its byte hash remain available in Git."
     }
   ]
 }

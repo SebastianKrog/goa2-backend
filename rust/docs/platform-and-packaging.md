@@ -36,3 +36,8 @@ crate independently. No crate names, public registry grant or publishing token
 is assumed. Enabling crates.io needs a separately reviewed API/naming/data-path
 and metadata design, `cargo package` contents verification, rights clearance and
 a deliberate release decision; it is not part of source extraction acceptance.
+
+The [preliminary payload review](audits/payload-review.md) records the portable
+historical examples and repeatable extraction scan. Run the payload and
+documentation audit commands before selecting a release snapshot; the final
+rights and payload decisions remain in the cleanup checklist.

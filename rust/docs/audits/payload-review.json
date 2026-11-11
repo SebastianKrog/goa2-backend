@@ -1,0 +1,77 @@
+{
+  "date": "2026-11-11",
+  "reviewed_baseline": "29c3ee4e",
+  "previous_archive_sha256": "ad2eac2e0b77e483fc37676f01768063cf3881df06e5c598396b69b19c0417de",
+  "personal_path_findings_resolved": [
+    {
+      "path": "rust/docs/archive/development-history.md",
+      "line": 964,
+      "kind": "personal-unix-path"
+    },
+    {
+      "path": "rust/docs/archive/development-history.md",
+      "line": 1066,
+      "kind": "personal-unix-path"
+    },
+    {
+      "path": "rust/docs/archive/development-history.md",
+      "line": 1066,
+      "kind": "personal-windows-path"
+    },
+    {
+      "path": "rust/docs/archive/development-history.md",
+      "line": 1067,
+      "kind": "personal-wsl-share"
+    },
+    {
+      "path": "rust/docs/archive/development-history.md",
+      "line": 1068,
+      "kind": "personal-unix-path"
+    },
+    {
+      "path": "rust/docs/archive/development-history.md",
+      "line": 1069,
+      "kind": "personal-unix-path"
+    },
+    {
+      "path": "rust/docs/archive/development-history.md",
+      "line": 1070,
+      "kind": "personal-unix-path"
+    },
+    {
+      "path": "rust/docs/archive/development-history.md",
+      "line": 1071,
+      "kind": "personal-unix-path"
+    },
+    {
+      "path": "rust/docs/archive/development-history.md",
+      "line": 1072,
+      "kind": "personal-unix-path"
+    },
+    {
+      "path": "rust/docs/archive/development-history.md",
+      "line": 1073,
+      "kind": "personal-unix-path"
+    }
+  ],
+  "current_scan": {
+    "schema_version": 1,
+    "files": 1173,
+    "findings": [],
+    "scope": "Current extraction selection, including historical guides and compressed text. Reports contain paths/categories/line numbers only. Pattern checks do not establish redistribution rights, baseline provenance or a complete credential/history review."
+  },
+  "original_source_provenance": "rust/docs/audits/documentation.json",
+  "scope": "Preliminary technical review of the current extraction selection. Final payload, license/content rights, release history strategy and named-owner acceptance remain open under C01/C07/C12.",
+  "tool_sha256": "f62e73ac4049e5150a34f209f2d56c0f2cc5dc173490bc9e107f4e03db5c351b",
+  "tooling_tests": {
+    "expected": 72,
+    "passed": 72
+  },
+  "standalone_checks": {
+    "tooling_tests": 70,
+    "passed": 70,
+    "payload_findings": 0,
+    "documentation_failures": 0,
+    "source_map_sha256": "5abe258bfd0cf001fc061db4c190dbcb903e84f4797596d35dc6286c62679bb6"
+  }
+}

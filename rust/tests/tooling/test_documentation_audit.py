@@ -5,6 +5,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 TOOLS = Path(__file__).resolve().parents[2] / "tools"
 sys.path.insert(0, str(TOOLS))
 SPEC = importlib.util.spec_from_file_location(
@@ -37,3 +39,21 @@ def test_retained_documentation_has_no_unresolved_local_links():
     result = docs.audit(TOOLS.parents[1])
     assert result["links"]
     assert result["failures"] == []
+
+
+@pytest.mark.parametrize("marker", [chr(96), "~"])
+def test_documentation_links_and_headings_respect_fence_kind_and_length(marker):
+    text = (
+        "# Visible\n"
+        + marker * 4
+        + "md\n"
+        + "[example](missing.md)\n# Hidden\n"
+        + marker * 3
+        + "\n"
+        + "[still code](also-missing.md)\n"
+        + marker * 5
+        + "\n"
+        + "[real](guide.md)\n"
+    )
+    assert docs.links(text) == ["guide.md"]
+    assert docs.headings(text) == {"visible"}

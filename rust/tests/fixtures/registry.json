@@ -321,7 +321,11 @@
         "--corpus",
         "OUTPUT",
         "export"
-      ]
+      ],
+      "schema_version": 1,
+      "payload_count": 1,
+      "raw_bytes": 75451379,
+      "corpus_sha256": "bd8ceee56244fc816ca6bf24abfd67dfe885d2def968fd352299e0e56fde4c6c"
     },
     {
       "family": "actions",
@@ -349,7 +353,11 @@
         "--corpus",
         "OUTPUT",
         "export"
-      ]
+      ],
+      "schema_version": 1,
+      "payload_count": 1,
+      "raw_bytes": 8309968,
+      "corpus_sha256": "3a5cd33c3ebd9c322db064bab90fcc9f9e472615eefbff7ab063e81987445841"
     },
     {
       "family": "card-equality",
@@ -378,7 +386,11 @@
         "--corpus",
         "OUTPUT",
         "export"
-      ]
+      ],
+      "schema_version": 1,
+      "payload_count": 1,
+      "raw_bytes": 9602982,
+      "corpus_sha256": "c879e9d86ff93cf9cd0bd276a0f3f47e43d3ac4b8be2bae2b75a736511ab2e37"
     },
     {
       "family": "displacement-validation",
@@ -406,7 +418,11 @@
         "--corpus",
         "OUTPUT",
         "export"
-      ]
+      ],
+      "schema_version": 1,
+      "payload_count": 1,
+      "raw_bytes": 27700641,
+      "corpus_sha256": "b77bcc19d464633b0922593fdb2a2d3f38a6b07d99a79d64a99f5007890e7f9d"
     },
     {
       "family": "effect-stats",
@@ -434,7 +450,11 @@
         "--corpus",
         "OUTPUT",
         "export"
-      ]
+      ],
+      "schema_version": 1,
+      "payload_count": 1,
+      "raw_bytes": 10928662,
+      "corpus_sha256": "f1fa19af6b73f2f6b28535f9e3641bc623f9f2206ff867ad72545c33da01ebe5"
     },
     {
       "family": "effects",
@@ -463,7 +483,11 @@
         "--corpus",
         "OUTPUT",
         "export"
-      ]
+      ],
+      "schema_version": 1,
+      "payload_count": 1,
+      "raw_bytes": 103016652,
+      "corpus_sha256": "2bf2b9710289ace3059421167fff98522f9043b91b84fc5754603ead30b7cfd7"
     },
     {
       "family": "hex-filters",
@@ -491,7 +515,11 @@
         "--corpus",
         "OUTPUT",
         "export"
-      ]
+      ],
+      "schema_version": 1,
+      "payload_count": 1,
+      "raw_bytes": 48725448,
+      "corpus_sha256": "b19d529d1d577aab8194dbdf6dc47f199c5da07d3cd359c7a96bfc673ee932aa"
     },
     {
       "family": "mine-paths",
@@ -519,7 +547,11 @@
         "--corpus",
         "OUTPUT",
         "export"
-      ]
+      ],
+      "schema_version": 1,
+      "payload_count": 1,
+      "raw_bytes": 2579972,
+      "corpus_sha256": "9b84beec381b4e0954665ca15c4274a565d3a30a44d44d063e9d7857cd63a4fd"
     },
     {
       "family": "models",
@@ -548,7 +580,11 @@
         "--corpus",
         "OUTPUT",
         "export"
-      ]
+      ],
+      "schema_version": 1,
+      "payload_count": 1,
+      "raw_bytes": 11885659,
+      "corpus_sha256": "f656209f7297a5f80f65ed0ce9adb01d90b610702ad3b2c25d67b120ed0cdb2e"
     },
     {
       "family": "planning",
@@ -576,7 +612,11 @@
         "--corpus",
         "OUTPUT",
         "export"
-      ]
+      ],
+      "schema_version": 1,
+      "payload_count": 1,
+      "raw_bytes": 17428045,
+      "corpus_sha256": "fde32c5dbdc1605e92212fcfcbcb9e722fa0c87927ffa8aa1c65a300c4537757"
     },
     {
       "family": "targeting",
@@ -604,7 +644,11 @@
         "--corpus",
         "OUTPUT",
         "export"
-      ]
+      ],
+      "schema_version": 1,
+      "payload_count": 1,
+      "raw_bytes": 10381759,
+      "corpus_sha256": "a12410da81f268fdce8c63b7138c0ad51861714e82a823e415449dea2853e4e3"
     },
     {
       "family": "terrain-validation",
@@ -632,7 +676,11 @@
         "--corpus",
         "OUTPUT",
         "export"
-      ]
+      ],
+      "schema_version": 1,
+      "payload_count": 1,
+      "raw_bytes": 23580467,
+      "corpus_sha256": "0c3ab5625215eccff4d9c38b347105a54de2a764ba0b1d7a545c3bfc76a094da"
     }
   ],
   "generation_policy": "Use the manifest-pinned Python runtime and verified source archive. Commands write only to a disposable absolute OUTPUT path. Native WORKER must be the candidate being validated. Current exporter recipes are recorded for investigation, not permission to replace frozen indexes: verify every regenerated fingerprint against this registry and retain admitted artifacts when regeneration differs."

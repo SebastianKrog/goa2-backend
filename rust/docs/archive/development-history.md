@@ -1,4 +1,4 @@
-> Historical record from `rust/README.md` at backend `f0fb93e1` (before cleanup). Milestone counts and local paths describe their original runs, not current acceptance. Start with [the current README](../../README.md).
+> Historical record from `rust/README.md` at backend `f0fb93e1` (before cleanup). Milestone counts and local paths describe their original runs, not current acceptance. Start with [the current README](../../README.md). Personal machine paths use generic user placeholders; original paths remain in the source repository history.
 
 # Native search engine
 
@@ -1064,7 +1064,7 @@ checkout (do not edit the Windows backup):
 
 ```powershell
 $oraclePython = 'C:/Users/user/Documents/GitHub/goa2-backend-bots/.venv/Scripts/python.exe'
-$engineRoot = '\\wsl.localhost\Ubuntu\home\sebastian\projects\goa2-backend-bots'
+$engineRoot = '\\wsl.localhost\Ubuntu\home\user\projects\goa2-backend-bots'
 & $oraclePython "$engineRoot/scripts/rust_oracle/oracle.py" verify-movement -- wsl.exe --exec /home/user/.cache/goa2-rust/target/release/goa2-search-cli
 & $oraclePython "$engineRoot/scripts/rust_oracle/state_codec.py" verify -- wsl.exe --exec /home/user/.cache/goa2-rust/target/release/goa2-search-cli
 & $oraclePython "$engineRoot/scripts/rust_oracle/stack_traces.py" verify -- wsl.exe --exec /home/user/.cache/goa2-rust/target/release/goa2-search-cli

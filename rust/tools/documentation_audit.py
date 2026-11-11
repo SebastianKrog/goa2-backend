@@ -15,7 +15,23 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def prose(text):
-    return re.sub(r"^```[^\n]*\n.*?^```[^\n]*$", "", text, flags=re.M | re.S)
+    lines = []
+    fence = None
+    for line in text.splitlines(keepends=True):
+        match = re.match(r" {0,3}(`{3,}|~{3,})(.*)$", line.rstrip("\r\n"))
+        if fence is None:
+            if match and (match[1][0] != "`" or "`" not in match[2]):
+                fence = match[1]
+            else:
+                lines.append(line)
+        elif (
+            match
+            and match[1][0] == fence[0]
+            and len(match[1]) >= len(fence)
+            and not match[2].strip()
+        ):
+            fence = None
+    return "".join(lines)
 
 
 def links(text):
@@ -129,7 +145,7 @@ def main():
                         "baseline_commit": "f0fb93e117f358266ef522e6d5f23d3452e83e97",
                         "original_sha256": hashlib.sha256(original).hexdigest(),
                         "original_last_change_commit_and_date": provenance,
-                        "edit_scope": "Historical body retained; stale link targets annotated/redirected to retained inventory or current build section. Original source remains in Git.",
+                        "edit_scope": "Historical body retained; stale links redirect to retained inventory or current build instructions. Personal machine paths in development-history.md use generic user placeholders. Original source and its byte hash remain available in Git.",
                     }
                 )
     encoded = json.dumps(result, indent=2) + "\n"

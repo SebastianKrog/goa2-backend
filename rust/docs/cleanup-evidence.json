@@ -1758,5 +1758,76 @@
     "staff_share_status": 503,
     "log_sha256": "bfc71788964f531a5a3191065f03582d248e8b582b0328cafbb2a3aa10c186cb",
     "scope": "Debug-profile service. The staff bridge masks native busy responses and transport errors. The test output does not establish the cause. Release-profile verification is tracked separately."
+  },
+  "merged_candidate_release_service": {
+    "candidate": "33e7e8bdb0a1d7cb2d4d10c6d8f4b2f0d9c78bbe",
+    "server_sha256": "6aedaa7f4504196b0ec32c9a009c89f29dfc4cf91161257ce791ce4abe51bd4f",
+    "content_sha256": "4b7520f058d68dda93efb15837d0b657332a1a3132d37148c14a9bb2968ff651",
+    "fixture_sha256": "b00607b166ce883edd9155910c43729bdeffefddef240c937806b0f1d1e2d1cf",
+    "arena_report": "a43db66c7e010345b1c125d23b77916141f8860c731d68caab4ac15194edbfa7",
+    "suites": [
+      {
+        "name": "game-server",
+        "exit_code": 0
+      },
+      {
+        "name": "replay-share",
+        "exit_code": 0
+      }
+    ],
+    "debug_server_sha256": "2b3e85ad346977ed754e6ba899c5cc1caaa758eef4ffdf6e12de1cdb00096df1",
+    "native_scenarios": [
+      {
+        "suite": "auth",
+        "expected": 2,
+        "executed": 2,
+        "failed": 0,
+        "missing": 0
+      },
+      {
+        "suite": "bots",
+        "expected": 3,
+        "executed": 3,
+        "failed": 0,
+        "missing": 0
+      },
+      {
+        "suite": "clocks",
+        "expected": 2,
+        "executed": 2,
+        "failed": 0,
+        "missing": 0
+      },
+      {
+        "suite": "votes",
+        "expected": 6,
+        "executed": 6,
+        "failed": 0,
+        "missing": 0
+      },
+      {
+        "suite": "shutdown",
+        "expected": 1,
+        "executed": 1,
+        "failed": 0,
+        "missing": 0
+      },
+      {
+        "suite": "backup",
+        "expected": 1,
+        "executed": 1,
+        "failed": 0,
+        "missing": 0
+      }
+    ],
+    "replay_log": [
+      "Verified 24 live revisions during replay bake in 1.75s",
+      "Published replay in 10.27s",
+      "Verified hosted replay share across 193 commands and 194 frames"
+    ],
+    "log_sha256": {
+      "release-profile-game-server.log": "d3fefacf64e1797c206ecffef31161b36e348eb0f1da0592d52eebf5477ee6ea",
+      "release-profile-replay-share.log": "1bb8d9f9a67d3d0562488e4dd5dc7039b2a5211e99e99f20230ec0de4f9c5079"
+    }
   }
 }

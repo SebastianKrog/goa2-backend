@@ -1916,5 +1916,26 @@
     },
     "historical_verifier_commit": "1d7c1d39",
     "scope": "Local deterministic Linux release packaging and loopback startup from that archive. Public acquisition, release promotion and binary rollback are separate."
+  },
+  "merged_candidate_frontend_browser_walkthrough": {
+    "frontend_commit": "a3c5e0a46b35a42cd6e054512ce3dbc6a61a579c",
+    "backend_commit": "33e7e8bdb0a1d7cb2d4d10c6d8f4b2f0d9c78bbe",
+    "binary_sha256": "6aedaa7f4504196b0ec32c9a009c89f29dfc4cf91161257ce791ce4abe51bd4f",
+    "content_sha256": "4b7520f058d68dda93efb15837d0b657332a1a3132d37148c14a9bb2968ff651",
+    "browser": "Installed WSL Chromium headless shell, isolated profile, 2D frontend",
+    "map": "Forgotten Island",
+    "seats": [
+      "Arien",
+      "Brogan"
+    ],
+    "checks": [
+      "Manual creation through pinned frontend and local Worker",
+      "Both scoped player links rendered the 2D game with only their own planning hand",
+      "Brogan received a WebSocket STATE_UPDATE after Arien committed",
+      "Brogan reloaded the scoped view, committed and advanced the game to resolution",
+      "Arien selected and confirmed Hold; Brogan became active",
+      "Authenticated REST from both browser tabs returned HTTP 200 at revision 4"
+    ],
+    "scope": "Local browser walkthrough using the exact tested release binary. Hosted frontend, production routing and deployment are separate."
   }
 }

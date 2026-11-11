@@ -104,7 +104,24 @@ def hero(response, hero_id):
     )
 
 
-def verify_replay(server, game, *, credentials=(), operations=(), tamper=False):
+def with_legacy_lane_progress(checkpoint):
+    """Predict the lane clock fields added when restoring a historical checkpoint."""
+    if "lane_progress" in checkpoint:
+        return checkpoint
+
+    def turn_index(envelope):
+        state = envelope["state"]
+        return state["round"] * 4 + state["turn"]
+
+    lane = {"quiet_since": turn_index(checkpoint["envelope"])}
+    if checkpoint.get("rollback") is not None:
+        lane["rollback_quiet_since"] = turn_index(checkpoint["rollback"])
+    return {**checkpoint, "lane_progress": lane}
+
+
+def verify_replay(
+    server, game, *, credentials=(), operations=(), tamper=False, legacy_lane_progress=False
+):
     lab_game = "/__lab" + game
     exported = request(server, lab_game + "/replay", lab=True)
     archive_text = exported["replay_json"]
@@ -131,7 +148,10 @@ def verify_replay(server, game, *, credentials=(), operations=(), tamper=False):
         },
     )
     assert opening["revision"] == start
-    assert json.loads(opening["checkpoint"]["native_checkpoint_json"]) == archive["start"]
+    expected_opening = archive["start"]
+    if legacy_lane_progress:
+        expected_opening = with_legacy_lane_progress(expected_opening)
+    assert json.loads(opening["checkpoint"]["native_checkpoint_json"]) == expected_opening
     if tamper:
         request(server, lab_game + "/replay", token=credentials[0], expect=401)
         request(server, "/__lab/replay", body={"replay_json": archive_text}, expect=401)

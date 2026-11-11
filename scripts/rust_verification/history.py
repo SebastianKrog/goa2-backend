@@ -12,7 +12,9 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from .process import backup_database, packet, request, serve, sockets, verify_replay
+from .process import (
+    backup_database, packet, request, serve, sockets, verify_replay, with_legacy_lane_progress,
+)
 
 TABLES = (
     "games",
@@ -267,7 +269,7 @@ def load(fixtures, pack):
     return manifest, payload
 
 
-def check_open(server, expected):
+def check_open(server, expected, *, legacy_lane_progress=False):
     game = expected["game"]
     for token, view in expected["views"].items():
         assert request(server, game, token=token) == view
@@ -277,11 +279,13 @@ def check_open(server, expected):
         )
         == expected["receipt"]
     )
-    assert (
-        request(server, "/__lab" + game + "/checkpoint", lab=True)["checkpoint"]
-        == expected["checkpoint"]
-    )
-    assert verify_replay(server, game, operations=("command",)) == expected["archive"]
+    checkpoint = expected["checkpoint"]
+    if legacy_lane_progress:
+        checkpoint = with_legacy_lane_progress(checkpoint)
+    assert request(server, "/__lab" + game + "/checkpoint", lab=True)["checkpoint"] == checkpoint
+    assert verify_replay(
+        server, game, operations=("command",), legacy_lane_progress=legacy_lane_progress
+    ) == expected["archive"]
     assert request(server, expected["share"]["url"]) == expected["share_metadata"]
     assert request(server, expected["share"]["url"] + "/state") == expected["share_state"]
 
@@ -296,7 +300,7 @@ def verify(binary, pack, fixtures, producer=None):
             database = root / f"v{version}.sqlite"
             restore_database(payload["database"], database, version)
             with serve(binary, pack, database) as server:
-                check_open(server, expected)
+                check_open(server, expected, legacy_lane_progress=True)
                 game = expected["game"]
                 actor = expected["actor"]
                 token = expected["seats"][actor]
@@ -307,7 +311,7 @@ def verify(binary, pack, fixtures, producer=None):
                     )
                     assert reply == expected["next_reply"]
                     packet(socket, "STATE_UPDATE", 3)
-                verify_replay(server, game, operations=("command",))
+                verify_replay(server, game, operations=("command",), legacy_lane_progress=True)
             with serve(binary, pack, database) as server:
                 assert (
                     request(server, game + "/input", token=token, body=expected["next_body"])
@@ -323,7 +327,7 @@ def verify(binary, pack, fixtures, producer=None):
                 assert (
                     rollback["input_request"]["request_id"] != expected["next_body"]["request_id"]
                 )
-                verify_replay(server, game, operations=("command",))
+                verify_replay(server, game, operations=("command",), legacy_lane_progress=True)
             with sqlite3.connect(database) as db:
                 assert db.execute("PRAGMA user_version").fetchone() == (3,)
                 assert db.execute("PRAGMA quick_check").fetchone() == ("ok",)
@@ -358,7 +362,7 @@ def verify(binary, pack, fixtures, producer=None):
                 check_open(server, expected)
                 backup_database(producer, database, backup)
             with serve(binary, pack, database) as server:
-                check_open(server, expected)
+                check_open(server, expected, legacy_lane_progress=True)
                 request(
                     server,
                     expected["game"] + "/input",

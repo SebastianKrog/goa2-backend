@@ -1508,5 +1508,19 @@
       "search-four-turn-structure-comparison.json": "b4ac279de0e1bd221373c75055620848d3924098c52f0bceae2e1e3a6f976f0e"
     },
     "scope": "Four fixed-node planning and resolution comparisons. Requests, decisions, scores and other result fields matched across revisions."
+  },
+  "reference_frontend_contract_tests": {
+    "frontend_commit": "a3c5e0a46b35a42cd6e054512ce3dbc6a61a579c",
+    "dependency_install": "npm ci --offline --no-audit --no-fund",
+    "lockfile_sha256": "810f46873778a55d41ace2a49e74dec9598a2b0efe73b9741b5406ec2bf371ed",
+    "test_files": [
+      "src/api/rest.test.ts",
+      "src/api/socket.test.ts",
+      "src/api/sharedReplaySource.test.ts"
+    ],
+    "passed": 20,
+    "failed": 0,
+    "log_sha256": "b2ffe2e02075e0eeb09ca5da58f8e6917a2586b8f1481980d85cf4777817d88f",
+    "scope": "Frontend consumer tests. The 2D browser walkthrough against the extracted server remains pending."
   }
 }

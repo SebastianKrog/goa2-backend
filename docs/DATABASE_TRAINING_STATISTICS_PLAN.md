@@ -770,11 +770,11 @@ Writing this plan does not certify ranked play or authorize production migration
 
 ## 14. Planning sequence and references
 
-Plan 3 is this document. Next write plan 4 for neural-search preparation,
-including full-model/export/runtime deliverables and the interfaces that consume
-these admitted datasets. After the first four planning documents are finished,
-remind the user to write plan 5: rules/oracle/Python updates and the policy for
-current games and data/model identities during those updates. This remains
+Plan 3 is this document. The [neural-search plan](NEURAL_SEARCH_IMPLEMENTATION_PLAN.md)
+is now written, including full-model/export/runtime deliverables and interfaces
+that consume these admitted datasets. All four planning documents are complete;
+the reminder is now due to write plan 5: rules/oracle/Python updates and the policy
+for current games and data/model identities during those updates. This remains
 a sequence reminder, not a scheduled task.
 
 References: [shared foundation](SHARED_RUST_FOUNDATION_PLAN.md),

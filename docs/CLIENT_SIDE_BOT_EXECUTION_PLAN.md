@@ -590,15 +590,16 @@ interface stubs have already been written.
 
 This document supplies plan 2's three-stage execution path. The
 [database, training data, statistics and Elo plan](DATABASE_TRAINING_STATISTICS_PLAN.md)
-is now recorded. Next write plan 4 for neural-search preparation.
-The neural plan must include the eventual full implementation/model-admission
-deliverables needed to unblock this plan's stage 3; preparation alone is
-insufficient.
+is now recorded. The [neural-search plan](NEURAL_SEARCH_IMPLEMENTATION_PLAN.md)
+defines feature/evaluation points, model frameworks, architecture exploration and
+incremental implementation. Its section 9 specifies actual model-admission
+deliverables needed to unblock this plan's stage 3; writing the plan or providing
+an interface/smoke network is insufficient.
 
-After the first four planning documents are finished, remind the user to write
-plan 5: the rule/oracle/Python update procedure, including current-game transition
+All four planning documents are now written. The reminder is due to write plan 5:
+the rules/oracle/Python update procedure, including current-game transition
 policy. This remains the sequence reminder from the foundation, not a scheduled
-job and not a prerequisite to drafting the remaining plans.
+job.
 
 Implementation references: [shared foundation](SHARED_RUST_FOUNDATION_PLAN.md),
 [current bot coordinator](../rust/crates/goa2-game-server/src/bots.rs),

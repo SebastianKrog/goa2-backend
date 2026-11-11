@@ -464,11 +464,12 @@ the foundation implementation only when its evidence exists.
 | 1 | Shared foundation — this document | Current identity, observation/decision/command, transitions, features, budgets and harness | Implement F01–F08 |
 | 2 | [Player-run bot client](CLIENT_SIDE_BOT_EXECUTION_PLAN.md) — plan written; implementation pending | Observation-only native agent, transport and host contracts | Three stages: native Rust client, browser WASM, then local neural inference gated on the full NN implementation |
 | 3 | [Database, training data, statistics and Elo](DATABASE_TRAINING_STATISTICS_PLAN.md) — plan written; implementation pending | Private checkpoint and transactional acceptance/recovery contract | Operational PostgreSQL, derived statistics/rating database, immutable training datasets, purpose/lineage and isolated testing sessions |
-| 4 | Neural-search preparation — pending | Features, geometry, value/policy seam, sampled worlds and measured search boundaries | Data structures/optimization, NNUE versus hex convolution/graph experiments, incremental evaluation, search/training objectives and promotion evidence |
-| 5 | Rules/oracle/Python updates — reminder after plans 1–4 are written | Artifact/version identities and current-game compatibility boundary | Source-of-truth changes, rule corrections, oracle/runtime updates, regeneration, current-game transition policy and release validation |
+| 4 | [Neural search](NEURAL_SEARCH_IMPLEMENTATION_PLAN.md) — plan written; implementation pending | Features, geometry, value/policy seam, sampled worlds and measured search boundaries | Four stages: features/simple evaluation points, inference/evaluation framework, NN designs, incremental implementation and scaling |
+| 5 | Rules/oracle/Python updates — next plan; reminder now due | Artifact/version identities and current-game compatibility boundary | Source-of-truth changes, rule corrections, oracle/runtime updates, regeneration, current-game transition policy and release validation |
 
-**Reminder trigger:** after finishing the first four planning documents, remind
-the user to write plan 5. This is a sequence reminder, not a scheduled job.
+**Reminder now due:** the first four planning documents are written. Remind
+the user to write plan 5 for rules/oracle/Python updates. This is a sequence
+reminder, not a scheduled job.
 Do not fold that update procedure into the foundation or silently repin rules/
 oracle/Python while implementing it.
 

@@ -144,7 +144,9 @@ services alone do not keep a WSL instance alive. See the
 
 A clean WSL shutdown interrupts an unfinished verification stage. Retain its
 partial log and require a completed successful result before closing a gate.
-The local bounded workflow uses a separate foreground keepalive, one build/test
-worker and explicit cgroup memory limits. Current verification was reduced from
+The local bounded workflow uses a separate foreground keepalive, one compiler
+job and explicit cgroup memory limits. The retry uses two test threads with one
+case worker for full verification, then one test thread with two case workers
+for exhaustive restore. Current verification was reduced from
 3 GiB to 2 GiB when Windows commit headroom became small. Resource settings
 belong in the run evidence rather than changing game/search semantics.

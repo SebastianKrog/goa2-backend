@@ -707,5 +707,31 @@
     "completed_full_or_restore_gate_claimed": false,
     "recovery": "Retain original logs; retry with a foreground non-systemd WSL keepalive and a 2 GiB job cap",
     "reference": "https://learn.microsoft.com/en-us/windows/wsl/systemd"
+  },
+  "verification_recovery": {
+    "date": "2026-11-11",
+    "source_commit": "616f52d4",
+    "foreground_keepalive": true,
+    "memory_max_bytes": 2147483648,
+    "memory_high_bytes": 1879048192,
+    "build_jobs": 1,
+    "full": {
+      "test_threads": 2,
+      "case_workers": 1
+    },
+    "restore": {
+      "test_threads": 1,
+      "case_workers": 2
+    },
+    "archive_roundtrip": {
+      "memory_max_bytes": 1073741824,
+      "windows_disk_reserve_bytes": 2147483648,
+      "source_map_sha256": "dc369c6d6eb615501355b6c6b1d7498d45b706ad0e274815d47242ab8fe5e019",
+      "standalone_tooling": {
+        "expected": 75,
+        "passed": 75
+      }
+    },
+    "status": "Full verification restarted; no full/restore/real-archive pass claimed"
   }
 }

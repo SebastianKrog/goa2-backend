@@ -588,8 +588,9 @@ interface stubs have already been written.
 
 ## 10. Planning sequence and handoff
 
-This document supplies plan 2's three-stage execution path. Next write plan 3
-for live-server database integration, then plan 4 for neural-search preparation.
+This document supplies plan 2's three-stage execution path. The
+[database, training data, statistics and Elo plan](DATABASE_TRAINING_STATISTICS_PLAN.md)
+is now recorded. Next write plan 4 for neural-search preparation.
 The neural plan must include the eventual full implementation/model-admission
 deliverables needed to unblock this plan's stage 3; preparation alone is
 insufficient.

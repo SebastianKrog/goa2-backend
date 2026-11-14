@@ -909,7 +909,17 @@ fn session_record(
     error: Value,
 ) -> Result<Value, String> {
     let envelope = session.export_envelope().map_err(|e| e.to_string())?;
-    let mut record = json!({"semantic_state":envelope.materialize()?,"request":request,"events":events,"error":error});
+    let mut record = Value::Object(
+        [
+            ("semantic_state", envelope.materialize()?),
+            ("request", request),
+            ("events", Value::Array(events)),
+            ("error", error),
+        ]
+        .into_iter()
+        .map(|(key, value)| (key.to_owned(), value))
+        .collect(),
+    );
     if !envelope.object_bindings.is_empty() {
         record["context_keys"] = json!(
             envelope.state["execution_context"]
@@ -1571,15 +1581,27 @@ mod trace_tests {
             assert_eq!(cases.len(), count);
         }
         let total = cases.len();
+        let coverage = crate::fixture_replay::ReplayCoverage::from_environment();
         let report_progress = std::env::var_os("GOA2_ORACLE_PROGRESS").is_some();
         let finished = std::sync::atomic::AtomicUsize::new(0);
         let checked = fixture_parallel::for_each_case(cases.into_iter(), |entry| {
-            let case: TraceCase = serde_json::from_reader(std::io::BufReader::new(
-                crate::fixture_cache::open(base.join(entry.path)).unwrap(),
-            ))
-            .unwrap();
-            assert_eq!(case.name, entry.name);
-            verify_case(case);
+            let mut reader = crate::fixture_cache::open(base.join(entry.path)).unwrap();
+            if coverage.enabled() {
+                let mut data = Vec::new();
+                std::io::Read::read_to_end(&mut reader, &mut data).unwrap();
+                coverage.verify(entry.name.clone(), &data, || {
+                    let case: TraceCase = serde_json::from_slice(&data).unwrap();
+                    assert_eq!(case.name, entry.name);
+                    let operations = case.operations.len();
+                    verify_case(case);
+                    operations
+                });
+            } else {
+                let case: TraceCase =
+                    serde_json::from_reader(std::io::BufReader::new(reader)).unwrap();
+                assert_eq!(case.name, entry.name);
+                verify_case(case);
+            }
             if report_progress {
                 let done = finished.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
                 if done.is_multiple_of(512) || done == total {
@@ -1587,13 +1609,40 @@ mod trace_tests {
                 }
             }
         });
-        assert_eq!(checked, total, "every oracle case must run");
+        assert_eq!(checked, total, "every named oracle case must be checked");
+        coverage.finish(filename, checked);
+    }
+
+    #[test]
+    fn trace_replay_key_excludes_only_the_exact_leading_name() {
+        let original = br#"{"name":"first","expected":[1,2],"unordered_mine_keys":[]}"#;
+        let renamed = br#"{"name":"second","expected":[1,2],"unordered_mine_keys":[]}"#;
+        let changed = br#"{"name":"second","expected":[2,1],"unordered_mine_keys":[]}"#;
+        let changed_options =
+            br#"{"name":"second","expected":[1,2],"unordered_mine_keys":["mine"]}"#;
+        assert_eq!(
+            crate::fixture_replay::payload_key(original, "first"),
+            crate::fixture_replay::payload_key(renamed, "second")
+        );
+        assert_ne!(
+            crate::fixture_replay::payload_key(original, "first"),
+            crate::fixture_replay::payload_key(changed, "second")
+        );
+        assert_ne!(
+            crate::fixture_replay::payload_key(original, "first"),
+            crate::fixture_replay::payload_key(changed_options, "second")
+        );
+        assert!(crate::fixture_replay::payload_key(original, "second").is_none());
     }
 }
 
 #[cfg(test)]
 #[path = "../../../test-support/fixture_cache.rs"]
 mod fixture_cache;
+
+#[cfg(test)]
+#[path = "../../../test-support/fixture_replay.rs"]
+mod fixture_replay;
 
 #[cfg(test)]
 mod protocol_examples_tests {

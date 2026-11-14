@@ -4,13 +4,23 @@ from __future__ import annotations
 
 import argparse
 import copy
+import hashlib
 import json
 from pathlib import Path
 
+from admitted_step_labels import OBJECT_EXECUTION_STEP_IDS
 from fixture_cache import write_text
 from oracle import ROOT, Worker, verify_sources
 from shared_objects import export_state_with_shared_objects, instance_bindings
-from stack_traces import TraceNormalizer, read_case, read_index, write_corpus_stream
+from stack_traces import (
+    TraceNormalizer,
+    canonical,
+    match_admitted_cases,
+    read_case,
+    read_index,
+    restore_admitted_step_ids,
+    write_corpus_stream,
+)
 
 
 class ObjectTraceNormalizer(TraceNormalizer):
@@ -84,7 +94,7 @@ class ObjectTraceNormalizer(TraceNormalizer):
         return record
 
 
-def scenes():
+def scenes(*, admitted_card_menus=False):
     from cutter_primary_traces import scenes as cutter_scenes
 
     yield from cutter_scenes()
@@ -349,7 +359,7 @@ def scenes():
     yield from arien_primary_scenes()
     from live_perform_card_traces import scenes as perform_card_scenes
 
-    yield from perform_card_scenes()
+    yield from perform_card_scenes(admitted_card_menus=admitted_card_menus)
     from live_mind_grip_traces import scenes as mind_grip_scenes
 
     yield from mind_grip_scenes()
@@ -3852,6 +3862,60 @@ def iter_reference(state, operations, unordered_keys=(), *, inplace_records=Fals
         )
 
 
+# The admitted Journey snapshots used this serialization order for zone sets.
+# Each index refers to the position of a hex in coordinate-sorted order.
+_ADMITTED_ISLAND_ZONE_ORDER = {
+    "Mid": (
+        6, 59, 41, 18, 8, 1, 5, 15, 26, 31, 58, 53, 4, 36, 56, 57, 13, 14, 3, 40, 0, 21, 47, 28,
+        51, 52, 54, 37, 38, 39, 10, 25, 30, 27, 50, 12, 35, 9, 11, 46, 24, 19, 49, 34, 7, 20,
+        23, 43, 17, 44, 48, 22, 55, 42, 2, 45, 29, 32, 33, 16,
+    ),
+    "RedBeach": (
+        20, 9, 28, 34, 19, 18, 27, 2, 3, 40, 26, 32, 0, 17, 1, 14, 24, 8, 13, 31, 15, 29, 12, 7,
+        38, 39, 22, 6, 33, 11, 37, 5, 4, 23, 21, 25, 10, 30, 35, 16, 36,
+    ),
+    "BlueBeach": (
+        28, 30, 16, 37, 5, 25, 4, 38, 27, 24, 36, 26, 14, 15, 3, 22, 12, 40, 9, 32, 13, 2, 33,
+        35, 34, 21, 23, 39, 11, 0, 31, 19, 20, 10, 29, 17, 1, 18, 7, 6, 8,
+    ),
+    "RedBase": (
+        17, 16, 13, 12, 3, 11, 6, 1, 5, 10, 9, 4, 7, 8, 15, 0, 18, 2, 14,
+    ),
+    "BlueBase": (
+        11, 10, 9, 16, 15, 8, 18, 7, 17, 14, 1, 13, 5, 12, 3, 4, 0, 2, 6,
+    ),
+    "RedJungle": (
+        6, 2, 7, 11, 4, 0, 8, 3, 9, 1, 10, 12, 13, 14, 5,
+    ),
+    "BlueJungle": (
+        0, 7, 11, 1, 2, 12, 9, 3, 8, 13, 4, 10, 5, 6, 14,
+    ),
+}
+
+
+def _order_plank_landing_zone(case):
+    # Zone membership is a set in the oracle. Preserve the admitted JSON
+    # order at export time without changing how the oracle offers choices.
+    states = [case["envelope"]["state"]]
+    states.extend(record["semantic_state"] for record in case["expected"])
+    for state in states:
+        landing = state["board"]["zones"].get("landing")
+        if landing is not None:
+            landing["hexes"].sort(key=lambda h: (h["q"], h["r"], h["s"]), reverse=True)
+
+
+def _order_island_zones(case):
+    states = [case["envelope"]["state"]]
+    states.extend(record["semantic_state"] for record in case["expected"])
+    for state in states:
+        zones = state["board"]["zones"]
+        for name, order in _ADMITTED_ISLAND_ZONE_ORDER.items():
+            hexes = sorted(zones[name]["hexes"], key=lambda h: (h["q"], h["r"], h["s"]))
+            if len(hexes) != len(order):
+                raise ValueError(f"Unexpected size for admitted Island zone {name}")
+            zones[name]["hexes"] = [hexes[index] for index in order]
+
+
 def _export_scene_case(item):
     name, state, operations = item
     envelope, _ = export_state_with_shared_objects(state)
@@ -3864,6 +3928,10 @@ def _export_scene_case(item):
     }
     if keys:
         case["unordered_mine_keys"] = list(keys)
+    if name.startswith("plank-"):
+        _order_plank_landing_zone(case)
+    elif name.startswith("journey-"):
+        _order_island_zones(case)
     return case
 
 
@@ -3898,22 +3966,126 @@ def _export_cases(items, workers):
                 pending.append(pool.submit(_export_scene_case, item))
 
 
-def export(path, *, workers=1):
+# Process-local step labels captured by the admitted snapshot exporter.
+# New labels are matched in first-occurrence order and must reproduce the full case hash.
+
+def _restore_admitted_object_encoding(case):
+    from admitted_object_encoding import STEP_LABELS, STEP_OCCURRENCES, ZONE_ORDERS
+    from stack_traces import _address_step_ids
+
+    name = case["name"].removeprefix("object-execution-")
+    orders = next((orders for names, orders in ZONE_ORDERS if name in names), ())
+    occurrences = STEP_OCCURRENCES.get(name)
+    if not orders and occurrences is None:
+        return False
+    if orders:
+        states = [case["envelope"]["state"]]
+        states.extend(record["semantic_state"] for record in case["expected"])
+        for state in states:
+            zones = state["board"]["zones"]
+            for zone, coords in orders:
+                if zone not in zones:
+                    continue
+                rank = {hex_coords: index for index, hex_coords in enumerate(coords)}
+                hexes = zones[zone]["hexes"]
+                keys = [(hex_["q"], hex_["r"], hex_["s"]) for hex_ in hexes]
+                if len(keys) == len(rank) and set(keys) == rank.keys():
+                    zones[zone]["hexes"] = [
+                        hexes[index]
+                        for index in sorted(range(len(keys)), key=lambda index: rank[keys[index]])
+                    ]
+    if occurrences is not None:
+        references = list(_address_step_ids(case))
+        if len(references) != len(occurrences):
+            raise ValueError(f"Unexpected step occurrence count for {case['name']}")
+        for (value, _), label in zip(references, occurrences, strict=True):
+            value["step_id"] = STEP_LABELS[int(label, 36)]
+    return True
+
+
+def _admitted_case(case, expected_sha256):
+    """Select a known historical encoding using only the admitted case hash."""
+
+    def matches(value):
+        return hashlib.sha256(canonical(value).encode()).hexdigest() == expected_sha256
+
+    if matches(case):
+        return case
+    if _restore_admitted_object_encoding(case) and matches(case):
+        return case
+    if labels := OBJECT_EXECUTION_STEP_IDS.get(case["name"]):
+        restore_admitted_step_ids(case, labels)
+        if matches(case):
+            return case
+    envelope = case["envelope"]
+    old_envelope = {key: value for key, value in envelope.items() if key != "board_keys"}
+    if matches(without_board_keys := {**case, "envelope": old_envelope}):
+        return without_board_keys
+    old_envelope["instances"] = [
+        {key: value for key, value in instance.items() if key != "equality"}
+        for instance in envelope["instances"]
+    ]
+    if matches(legacy := {**case, "envelope": old_envelope}):
+        return legacy
+
+    zones = envelope["state"]["board"]["zones"]
+    if {name: len(zone["hexes"]) for name, zone in zones.items()} == {
+        name: len(order) for name, order in _ADMITTED_ISLAND_ZONE_ORDER.items()
+    }:
+        # The zone ordering is representational. Do not reorder any choices,
+        # operations, or events to match the old hash.
+        ordered = copy.deepcopy(case)
+        _order_island_zones(ordered)
+        if matches(ordered):
+            return ordered
+        ordered["envelope"].pop("board_keys", None)
+        if matches(ordered):
+            return ordered
+        for instance in ordered["envelope"]["instances"]:
+            instance.pop("equality", None)
+        if matches(ordered):
+            return ordered
+    raise ValueError(f"Cannot reproduce admitted fixture hash for {case['name']}")
+
+
+def _admitted_cases(cases):
+    index, _ = read_index(ROOT / "rust/tests/fixtures/object-execution.json")
+    return match_admitted_cases(cases, index, _admitted_case)
+
+
+def export(path, *, workers=1, admitted_encoding=False):
     """Stream ordered goldens; optional workers cap CPU and in-flight snapshots.
 
     A caller using process workers must use the normal __main__ guard on spawn
     platforms. The default serial path supports every existing source fixture.
     """
     manifest = verify_sources()
-    return write_corpus_stream(
+    items = scenes(admitted_card_menus=True) if admitted_encoding else scenes()
+    case_order = None
+    admitted_index = ROOT / "rust/tests/fixtures/object-execution.json"
+    if admitted_encoding:
+        if path.name != admitted_index.name or path.resolve() == admitted_index.resolve():
+            raise ValueError("Write admitted fixtures to object-execution.json in a separate directory")
+        index, _ = read_index(admitted_index)
+        case_order = [entry["name"] for entry in index["cases"]]
+        selected = set(case_order)
+        items = (item for item in items if f"object-execution-{item[0]}" in selected)
+    cases = _export_cases(items, workers)
+    if admitted_encoding:
+        cases = _admitted_cases(cases)
+    result = write_corpus_stream(
         path,
         {
             "schema_version": 1,
             "oracle_revision": manifest["oracle_revision"],
             "source_sha256": manifest["source_sha256"],
         },
-        _export_cases(scenes(), workers),
+        cases,
+        case_order=case_order,
     )
+    if admitted_encoding and path.read_bytes() != admitted_index.read_bytes():
+        raise ValueError("Regenerated object-execution index differs from the admitted index")
+    return result
 
 
 def verify(path, command):
@@ -3953,10 +4125,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "--corpus", type=Path, default=ROOT / "rust/tests/fixtures/object-execution.json"
     )
+    parser.add_argument("--admitted-encoding", action="store_true")
+    parser.add_argument("--workers", type=int, choices=range(1, 5), default=1)
     parser.add_argument("worker", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     if args.mode == "export":
-        data = export(args.corpus)
+        data = export(args.corpus, workers=args.workers, admitted_encoding=args.admitted_encoding)
         print(json.dumps({"cases": len(data["cases"]), "corpus_sha256": data["corpus_sha256"]}))
     else:
         command = args.worker[1:] if args.worker[:1] == ["--"] else args.worker

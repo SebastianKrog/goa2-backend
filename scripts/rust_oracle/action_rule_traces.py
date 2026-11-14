@@ -6,13 +6,12 @@ its restriction must never become a general negative-value legality test.
 
 from __future__ import annotations
 
-from fixture_cache import read_text, write_text
-
 import argparse
 import copy
 import json
 from pathlib import Path
 
+from fixture_cache import read_text, write_text
 from oracle import ROOT, Worker, digest, verify_sources
 from state_codec import export_state_with_instances
 
@@ -488,7 +487,7 @@ def export_transitions(path):
     return write_corpus(path, data)
 
 
-def export(path):
+def export(path, *, admitted_envelope=False):
     manifest = verify_sources()
     cases, menus = [], []
     menu_names = {
@@ -511,6 +510,10 @@ def export(path):
         "cases": cases,
         "menus": menus,
     }
+    if admitted_envelope:
+        from state_codec import omit_instance_equality
+
+        omit_instance_equality([*cases, *menus])
     data["corpus_sha256"] = digest(data)
     write_text(path, json.dumps(data, separators=(",", ":")) + "\n")
     return data
@@ -572,6 +575,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument("mode", choices=["export", "verify", "export-transitions"])
     parser.add_argument("--corpus", type=Path, default=None)
+    parser.add_argument("--admitted-envelope", action="store_true")
     parser.add_argument("worker", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     args.corpus = args.corpus or ROOT / (
@@ -583,7 +587,7 @@ if __name__ == "__main__":
         data = export_transitions(args.corpus)
         print(json.dumps({"cases": len(data["cases"]), "corpus_sha256": data["corpus_sha256"]}))
     elif args.mode == "export":
-        data = export(args.corpus)
+        data = export(args.corpus, admitted_envelope=args.admitted_envelope)
         print(
             json.dumps(
                 {

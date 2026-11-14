@@ -99,3 +99,26 @@ def test_offline_migration_verifies_and_preserves_hard_links(cache, monkeypatch)
     )
     manifest = json.loads((cache / "cache-identities.json").read_text())
     assert manifest["payload.json"]["raw_bytes"] == len(fixture_cache.read_bytes(original))
+
+def test_identity_generation_reads_fresh_family_directories(tmp_path):
+    admitted = Path(__file__).resolve().parents[2] / "rust/tests/fixtures/cache-identities.json"
+    names = json.loads(admitted.read_bytes())
+    flat = tmp_path / "flat"
+    generated = tmp_path / "generated"
+    flat.mkdir()
+    for index, name in enumerate(names):
+        payload = json.dumps({"fixture": name}).encode()
+        (flat / name).write_bytes(payload)
+        family = generated / Path(name).stem
+        family.mkdir(parents=True)
+        if index % 2:
+            (family / name).write_bytes(payload)
+        else:
+            (family / f"{name}.gz").write_bytes(gzip.compress(payload))
+
+    expected = tmp_path / "flat-identities.json"
+    actual = tmp_path / "generated-identities.json"
+    fixture_cache.write_cache_identities(expected, flat)
+    fixture_cache.write_cache_identities(actual, generated, family_directories=True)
+    assert actual.read_bytes() == expected.read_bytes()
+    assert list(json.loads(actual.read_bytes())) == list(names)

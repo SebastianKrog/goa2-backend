@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from fixture_cache import read_text, write_text
-
 import json
 
+from fixture_cache import read_text, write_text
 from oracle import ROOT, digest, verify_sources
 
 
@@ -376,9 +375,13 @@ def cases():
     return result
 
 
-def export(path=None):
+def export(path=None, *, admitted_envelope=False):
     manifest = verify_sources()
     data = {"schema_version": 1, "source_sha256": manifest["source_sha256"], "cases": cases()}
+    if admitted_envelope:
+        from state_codec import omit_instance_equality
+
+        omit_instance_equality(data["cases"])
     data["corpus_sha256"] = digest(data)
     target = path or ROOT / "rust/tests/fixtures/effect-stats.json"
     write_text(target, json.dumps(data, separators=(",", ":")) + "\n")
@@ -427,10 +430,11 @@ if __name__ == "__main__":
     parser.add_argument(
         "--corpus", type=Path, default=ROOT / "rust/tests/fixtures/effect-stats.json"
     )
+    parser.add_argument("--admitted-envelope", action="store_true")
     parser.add_argument("worker", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     if args.mode == "export":
-        data = export(args.corpus)
+        data = export(args.corpus, admitted_envelope=args.admitted_envelope)
         print(
             len(data["cases"]), sum(len(c["queries"]) for c in data["cases"]), data["corpus_sha256"]
         )

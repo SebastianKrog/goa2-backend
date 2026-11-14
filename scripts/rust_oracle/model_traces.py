@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from fixture_cache import read_text, write_text
-
 import argparse
 import json
 import sys
 from pathlib import Path
 
+from fixture_cache import read_text, write_text
 from oracle import ROOT, Worker, digest, verify_sources
 from state_codec import export_state_with_instances
 
@@ -227,7 +226,7 @@ def lifecycle_cases():
     return result
 
 
-def corpus():
+def corpus(*, admitted_envelope=False):
     from aura_traces import aura_stats_cases
 
     manifest = verify_sources()
@@ -237,6 +236,10 @@ def corpus():
         "stats": stats_cases() + aura_stats_cases(),
         "cards": lifecycle_cases(),
     }
+    if admitted_envelope:
+        from state_codec import omit_instance_equality
+
+        omit_instance_equality([*payload["stats"], *payload["cards"]])
     return {**payload, "corpus_sha256": digest(payload)}
 
 
@@ -283,10 +286,11 @@ def main():
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument("mode", choices=["export", "verify"])
     parser.add_argument("--corpus", type=Path, default=ROOT / "rust/tests/fixtures/models.json")
+    parser.add_argument("--admitted-envelope", action="store_true")
     parser.add_argument("worker", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     if args.mode == "export":
-        data = corpus()
+        data = corpus(admitted_envelope=args.admitted_envelope)
         write_text(args.corpus, json.dumps(data, separators=(",", ":")) + "\n")
         print(
             json.dumps(

@@ -50,6 +50,12 @@ def read_bytes(path):
     except ValueError:
         pass
     else:
+        if (pack := os.environ.get("GOA2_FIXTURE_PACK")) and (
+            relative.parent != Path(".") or relative.name not in COMMITTED
+        ):
+            from fixture_pack import open_pack
+
+            return open_pack(pack).read(relative.as_posix())
         if cache := os.environ.get("GOA2_FIXTURE_CACHE"):
             candidates.append(Path(cache) / relative)
         candidates.append(FIXTURES / "smoke" / relative)
@@ -256,16 +262,61 @@ def compress_existing(*, untrack=False, workers=2):
     return summary
 
 
+def write_cache_identities(output, source=FIXTURES, *, family_directories=False):
+    """Rebuild the admitted metadata from the top-level fixture bytes."""
+    import hashlib
+    import json
+
+    # Preserve the historical order of the admitted metadata.
+    families = (
+        "actions",
+        "terrain-validation",
+        "action-validation",
+        "models",
+        "hex-filters",
+        "effects",
+        "mine-paths",
+        "effect-stats",
+        "targeting",
+        "card-equality",
+        "displacement-validation",
+        "planning",
+    )
+    identities = {}
+    for family in families:
+        name = f"{family}.json"
+        directory = source / family if family_directories else source
+        path = directory / name
+        digest = hashlib.sha256()
+        length = 0
+        open_stream = open if path.exists() else gzip.open
+        source_path = path if open_stream is open else path.with_suffix(".json.gz")
+        with open_stream(source_path, "rb") as stream:
+            while chunk := stream.read(1024 * 1024):
+                digest.update(chunk)
+                length += len(chunk)
+        identities[name] = {"raw_sha256": digest.hexdigest(), "raw_bytes": length}
+    output.write_bytes((json.dumps(identities, indent=2) + chr(10)).encode("utf-8"))
+
+
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=["compress"])
+    parser.add_argument("command", choices=["compress", "identities"])
     parser.add_argument(
         "--untrack",
         action="store_true",
         help="Remove verified payloads from the current Git index (no history rewrite)",
     )
     parser.add_argument("--workers", type=int, choices=range(1, 5), default=2)
+    parser.add_argument("--output", type=Path)
+    parser.add_argument("--source", type=Path, default=FIXTURES)
+    parser.add_argument("--family-directories", action="store_true")
     args = parser.parse_args()
-    compress_existing(untrack=args.untrack, workers=args.workers)
+    if args.command == "identities":
+        if args.output is None:
+            parser.error("identities requires --output")
+        write_cache_identities(args.output, args.source, family_directories=args.family_directories)
+    else:
+        compress_existing(untrack=args.untrack, workers=args.workers)

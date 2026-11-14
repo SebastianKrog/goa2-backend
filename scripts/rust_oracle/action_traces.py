@@ -7,13 +7,12 @@ change; execution_context, request and complete child records are compared.
 
 from __future__ import annotations
 
-from fixture_cache import read_text, write_text
-
 import argparse
 import copy
 import json
 from pathlib import Path
 
+from fixture_cache import read_text, write_text
 from model_traces import setup
 from oracle import ROOT, Worker, digest, verify_sources
 from stack_traces import TraceNormalizer
@@ -32,7 +31,7 @@ def normalize(record, live=None):
     return result
 
 
-def corpus():
+def corpus(*, admitted_envelope=False):
     from goa2.data.heroes.registry import HeroRegistry
     from goa2.domain.models import StatType
     from goa2.engine.steps import ResolveCardStep
@@ -122,6 +121,10 @@ def corpus():
         "cases": cases,
         "travel": travel_cases(),
     }
+    if admitted_envelope:
+        from state_codec import omit_instance_equality
+
+        omit_instance_equality([*data["cases"], *data["travel"]])
     return {**data, "corpus_sha256": digest(data)}
 
 
@@ -246,10 +249,11 @@ def main():
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument("mode", choices=["export", "verify"])
     parser.add_argument("--corpus", type=Path, default=ROOT / "rust/tests/fixtures/actions.json")
+    parser.add_argument("--admitted-envelope", action="store_true")
     parser.add_argument("worker", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     if args.mode == "export":
-        data = corpus()
+        data = corpus(admitted_envelope=args.admitted_envelope)
         write_text(args.corpus, json.dumps(data, separators=(",", ":")) + "\n")
         print(
             json.dumps(

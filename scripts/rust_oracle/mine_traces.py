@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from fixture_cache import read_text, write_text
-
 import argparse
 import copy
 import json
@@ -11,6 +9,7 @@ import os
 import subprocess
 from pathlib import Path
 
+from fixture_cache import read_text, write_text
 from oracle import ROOT, Worker, digest, verify_sources
 from state_codec import export_state
 
@@ -547,7 +546,7 @@ def verify_errors(path):
     return {"reference_errors": len(data["errors"]), "corpus_sha256": identity, "reproduced": True}
 
 
-def export(path):
+def export(path, *, admitted_envelope=False):
     m = verify_sources()
     data = {
         "schema_version": 1,
@@ -555,6 +554,10 @@ def export(path):
         "mine_identity_contract": "unordered-set; path/option order preserved",
         "cases": path_cases(),
     }
+    if admitted_envelope:
+        from state_codec import omit_instance_equality
+
+        omit_instance_equality(data["cases"])
     data["corpus_sha256"] = digest(data)
     write_text(path, json.dumps(data, separators=(",", ":")) + "\n")
     return data
@@ -610,6 +613,7 @@ if __name__ == "__main__":
         "mode", choices=["export", "verify", "export-transitions", "export-errors", "verify-errors"]
     )
     parser.add_argument("--corpus", type=Path)
+    parser.add_argument("--admitted-envelope", action="store_true")
     parser.add_argument("worker", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     args.corpus = args.corpus or ROOT / (
@@ -630,7 +634,7 @@ if __name__ == "__main__":
         d = export_transitions(args.corpus)
         print(len(d["cases"]), d["corpus_sha256"])
     elif args.mode == "export":
-        d = export(args.corpus)
+        d = export(args.corpus, admitted_envelope=args.admitted_envelope)
         print(len(d["cases"]), sum(len(c["queries"]) for c in d["cases"]), d["corpus_sha256"])
     else:
         command = args.worker[1:] if args.worker[:1] == ["--"] else args.worker

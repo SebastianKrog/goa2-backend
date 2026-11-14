@@ -1231,6 +1231,30 @@
     "memory_max_bytes": 1073741824,
     "scope": "Private local tar packed from admitted corpus and installed into an empty destination using the manifest-based standalone source extraction. Remote acquisition and redistribution approval are separate."
   },
+  "baseline_restore_source_comparison": {
+    "baseline_revisions": [
+      "616f52d4d38d770f6ff6e3665431de395e767376",
+      "ff8ffed534ef190fa507399492a5db4c361c2c14"
+    ],
+    "recorded_restore_revision": "06bebd2123bdc14fae7cba266104a3b3b1350dcf",
+    "identical_committed_input_paths": [
+      "rust/crates",
+      "rust/test-support",
+      "rust/content",
+      "rust/Cargo.toml",
+      "rust/Cargo.lock",
+      "rust/rust-toolchain.toml",
+      "rust/tests/fixtures",
+      "rust/tools/check.py",
+      "rust/tools/fixtures.py",
+      "rust/oracle-manifest.json",
+      "scripts/rust_oracle",
+      "scripts/rust_verification"
+    ],
+    "cases_in_saved_report": 17347,
+    "scope": "Git comparison of committed inputs and independent reproduction of the original restore runner source fingerprint for all three revisions. All eight saved shard logs match their recorded checksums.",
+    "reproduced_restore_source_identity": "1c677a33fa407aa3842fe1d8f4eba1c7e0fcd38c852915d9de5e7334a138ea02"
+  },
   "wsl_fixed_work_baseline": {
     "source_commit": "ff8ffed534ef190fa507399492a5db4c361c2c14",
     "report": "../benchmarks/maintenance-v1-wsl-results.json",
@@ -2634,5 +2658,3104 @@
       "example": "edd61a0460c6b58d42ab264155c89a074c771ba7754f3ad1f258d47864a88b57"
     },
     "scope": "History-free local extraction with new build and project caches and an offline Cargo dependency cache. This does not establish the final approved public payload or the remote acquisition route."
+  },
+  "private_seekable_fixture_pack_builds": {
+    "baseline": {
+      "manifest": {
+        "schema": 1,
+        "source_archive_sha256": "8e858ce2a07d26efcf76d8b1fc5c0e890fa168471b38d16af88c5acef01f3385",
+        "files": 24197,
+        "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+        "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+        "fixtures-4MiB.tar.zst": "4d917b067f8a86f03facdc5026c664b258ac898eced90c58a6608aa1408dc021",
+        "fixtures.index.json": "dfd3d2147ec2dbac7e406c32b19cce55adf2f372723f9055925051035e8f0ea7"
+      },
+      "manifest_sha256": "3ffa605610ad8847454c189325f2fcad5881b6d5cc37192a88062ec143cbc993",
+      "file_bytes": {
+        "fixtures-4MiB.tar.zst": 110625297,
+        "fixtures.index.json": 4250914,
+        "manifest.json": 471
+      },
+      "fixture_verification_log_sha256": "0a5e1c08ae64adf34e2805083f9d4913cdea599b2fc31c428a4677545b7b7765"
+    },
+    "deduplicated": {
+      "manifest": {
+        "schema": 1,
+        "source_archive_sha256": "8e858ce2a07d26efcf76d8b1fc5c0e890fa168471b38d16af88c5acef01f3385",
+        "files": 24197,
+        "shared_payloads": 1818,
+        "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+        "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+        "fixtures-4MiB.tar.zst": "114fbf212334497877049b9434f70a51ecbe35c9ec5a50f377b688c38ec2611d",
+        "fixtures.index.json": "cd66fdd8a4b602dd00a9d1cff108c8974e0ff0f47ae7542c61dfff24d6fc7106"
+      },
+      "manifest_sha256": "914eedaea61fa9ba0e50449e7c9c22c1812fe97fbd6573e6b8443f813639291e",
+      "file_bytes": {
+        "fixtures-4MiB.tar.zst": 100602930,
+        "fixtures.index.json": 4837846,
+        "manifest.json": 498
+      },
+      "fixture_verification_log_sha256": "8254e9e15681feb4424b7b1499610976c90fd971eeaa46ad98a230167e0dd4d1"
+    },
+    "native_restore_smoke": {
+      "manifest_sha256": "914eedaea61fa9ba0e50449e7c9c22c1812fe97fbd6573e6b8443f813639291e",
+      "shard": "20/128",
+      "workers": 2,
+      "profile": "iterate",
+      "coverage": {
+        "named_cases": 136,
+        "named_operation_checks": 516,
+        "shared_replays": 55,
+        "shared_operation_checks": 206
+      },
+      "modes": {
+        "baseline": {
+          "seconds": 19.7,
+          "decode": {
+            "frame_hits": 145,
+            "frame_misses": 9,
+            "compressed_bytes": 147352,
+            "decoded_bytes": 37748736
+          },
+          "log_sha256": "1d36dacf3585d763cd6e70483e5245fc56439018f4775bd159c40825f3c208ab"
+        },
+        "shared": {
+          "seconds": 12.74,
+          "decode": {
+            "frame_hits": 145,
+            "frame_misses": 9,
+            "compressed_bytes": 147352,
+            "decoded_bytes": 37748736
+          },
+          "log_sha256": "e63e161127978c82f1b79d8e89b95cfd43c2c4e1fab59a610b404cb6a58c0d3a"
+        }
+      },
+      "scope": "Duplicate-heavy shard. Both logs matched the tracked case list and exact hashes from the pinned pack. Full parity and performance verification is tracked separately."
+    },
+    "standalone_tooling_smoke": {
+      "source_map_sha256": "0a59dc1af39a66987cefb7b3856ce0e6a7ba8136fb6a4eadede72fb2fe91d605",
+      "source_files": 1209,
+      "fixture_tooling_tests_passed": 29,
+      "strict_gzip_fallback_cases": 2,
+      "empty_gzip_cache_rejected": true,
+      "empty_gzip_cache_log_sha256": "88f6c706f3b4ffcdbef1d74d328e4cdee091a6f887abc92cef0a05505bdf1079",
+      "scope": "Local history-free extraction and native cache selection smoke. Final standalone native verification and the full parity run are separate."
+    },
+    "restore_comparisons": [
+      {
+        "gate": "restore-1-of-8",
+        "coverage": {
+          "named_cases": 2169,
+          "named_operation_checks": 8313,
+          "shared_replays": 2124,
+          "shared_operation_checks": 8215
+        },
+        "command_seconds": {
+          "legacy": 329.176,
+          "baseline": 328.767,
+          "shared": 333.58
+        },
+        "test_seconds": {
+          "legacy": 328.26,
+          "baseline": 327.87,
+          "shared": 332.61
+        },
+        "peak_rss_kib": {
+          "legacy": 183408,
+          "baseline": 324904,
+          "shared": 324932
+        },
+        "pack_decode": {
+          "baseline": {
+            "frame_hits": 2166,
+            "frame_misses": 296,
+            "compressed_bytes": 5830849,
+            "decoded_bytes": 1241513984
+          },
+          "shared": {
+            "frame_hits": 2166,
+            "frame_misses": 296,
+            "compressed_bytes": 5830849,
+            "decoded_bytes": 1241513984
+          }
+        }
+      },
+      {
+        "gate": "restore-2-of-8",
+        "coverage": {
+          "named_cases": 2169,
+          "named_operation_checks": 8727,
+          "shared_replays": 1993,
+          "shared_operation_checks": 8055
+        },
+        "command_seconds": {
+          "legacy": 295.014,
+          "baseline": 297.933,
+          "shared": 282.87
+        },
+        "test_seconds": {
+          "legacy": 294.14,
+          "baseline": 297.06,
+          "shared": 281.99
+        },
+        "peak_rss_kib": {
+          "legacy": 160212,
+          "baseline": 301048,
+          "shared": 300124
+        },
+        "pack_decode": {
+          "baseline": {
+            "frame_hits": 2184,
+            "frame_misses": 242,
+            "compressed_bytes": 3930562,
+            "decoded_bytes": 1015021568
+          },
+          "shared": {
+            "frame_hits": 2184,
+            "frame_misses": 242,
+            "compressed_bytes": 3930562,
+            "decoded_bytes": 1015021568
+          }
+        }
+      },
+      {
+        "gate": "restore-3-of-8",
+        "coverage": {
+          "named_cases": 2169,
+          "named_operation_checks": 12422,
+          "shared_replays": 2068,
+          "shared_operation_checks": 12016
+        },
+        "command_seconds": {
+          "legacy": 384.624,
+          "baseline": 386.563,
+          "shared": 385.282
+        },
+        "test_seconds": {
+          "legacy": 383.77,
+          "baseline": 385.63,
+          "shared": 384.26
+        },
+        "peak_rss_kib": {
+          "legacy": 186596,
+          "baseline": 328280,
+          "shared": 332268
+        },
+        "pack_decode": {
+          "baseline": {
+            "frame_hits": 2181,
+            "frame_misses": 342,
+            "compressed_bytes": 5536720,
+            "decoded_bytes": 1434451968
+          },
+          "shared": {
+            "frame_hits": 2181,
+            "frame_misses": 342,
+            "compressed_bytes": 5536720,
+            "decoded_bytes": 1434451968
+          }
+        }
+      },
+      {
+        "gate": "restore-4-of-8",
+        "coverage": {
+          "named_cases": 2168,
+          "named_operation_checks": 12940,
+          "shared_replays": 2020,
+          "shared_operation_checks": 11917
+        },
+        "command_seconds": {
+          "legacy": 530.982,
+          "baseline": 532.252,
+          "shared": 520.442
+        },
+        "test_seconds": {
+          "legacy": 529.64,
+          "baseline": 531.33,
+          "shared": 519.54
+        },
+        "peak_rss_kib": {
+          "legacy": 199748,
+          "baseline": 353220,
+          "shared": 353184
+        },
+        "pack_decode": {
+          "baseline": {
+            "frame_hits": 2196,
+            "frame_misses": 509,
+            "compressed_bytes": 12312532,
+            "decoded_bytes": 2134900736
+          },
+          "shared": {
+            "frame_hits": 2196,
+            "frame_misses": 509,
+            "compressed_bytes": 12312532,
+            "decoded_bytes": 2134900736
+          }
+        }
+      },
+      {
+        "gate": "restore-5-of-8",
+        "coverage": {
+          "named_cases": 2168,
+          "named_operation_checks": 20899,
+          "shared_replays": 2047,
+          "shared_operation_checks": 19864
+        },
+        "command_seconds": {
+          "legacy": 576.893,
+          "baseline": 576.579,
+          "shared": 578.113
+        },
+        "test_seconds": {
+          "legacy": 575.98,
+          "baseline": 575.66,
+          "shared": 577.25
+        },
+        "peak_rss_kib": {
+          "legacy": 185208,
+          "baseline": 335068,
+          "shared": 334732
+        },
+        "pack_decode": {
+          "baseline": {
+            "frame_hits": 2189,
+            "frame_misses": 627,
+            "compressed_bytes": 10503732,
+            "decoded_bytes": 2629828608
+          },
+          "shared": {
+            "frame_hits": 2189,
+            "frame_misses": 627,
+            "compressed_bytes": 10503732,
+            "decoded_bytes": 2629828608
+          }
+        }
+      },
+      {
+        "gate": "restore-6-of-8",
+        "coverage": {
+          "named_cases": 2168,
+          "named_operation_checks": 33622,
+          "shared_replays": 1759,
+          "shared_operation_checks": 26102
+        },
+        "command_seconds": {
+          "legacy": 950.227,
+          "baseline": 996.174,
+          "shared": 764.005
+        },
+        "test_seconds": {
+          "legacy": 949.24,
+          "baseline": 994.0,
+          "shared": 763.13
+        },
+        "peak_rss_kib": {
+          "legacy": 176008,
+          "baseline": 342524,
+          "shared": 337068
+        },
+        "pack_decode": {
+          "baseline": {
+            "frame_hits": 2453,
+            "frame_misses": 965,
+            "compressed_bytes": 16076757,
+            "decoded_bytes": 4047503360
+          },
+          "shared": {
+            "frame_hits": 2453,
+            "frame_misses": 965,
+            "compressed_bytes": 16076757,
+            "decoded_bytes": 4047503360
+          }
+        }
+      },
+      {
+        "gate": "restore-7-of-8",
+        "coverage": {
+          "named_cases": 2168,
+          "named_operation_checks": 23380,
+          "shared_replays": 1848,
+          "shared_operation_checks": 20063
+        },
+        "command_seconds": {
+          "legacy": 738.023,
+          "baseline": 749.626,
+          "shared": 657.585
+        },
+        "test_seconds": {
+          "legacy": 737.19,
+          "baseline": 748.77,
+          "shared": 656.07
+        },
+        "peak_rss_kib": {
+          "legacy": 229492,
+          "baseline": 410848,
+          "shared": 414024
+        },
+        "pack_decode": {
+          "baseline": {
+            "frame_hits": 2276,
+            "frame_misses": 794,
+            "compressed_bytes": 17071734,
+            "decoded_bytes": 3330277376
+          },
+          "shared": {
+            "frame_hits": 2276,
+            "frame_misses": 794,
+            "compressed_bytes": 17071734,
+            "decoded_bytes": 3330277376
+          }
+        }
+      },
+      {
+        "gate": "restore-8-of-8",
+        "coverage": {
+          "named_cases": 2168,
+          "named_operation_checks": 29839,
+          "shared_replays": 1762,
+          "shared_operation_checks": 24827
+        },
+        "command_seconds": {
+          "legacy": 757.099,
+          "baseline": 754.404,
+          "shared": 663.091
+        },
+        "test_seconds": {
+          "legacy": 756.25,
+          "baseline": 753.55,
+          "shared": 662.25
+        },
+        "peak_rss_kib": {
+          "legacy": 176732,
+          "baseline": 330272,
+          "shared": 334604
+        },
+        "pack_decode": {
+          "baseline": {
+            "frame_hits": 2304,
+            "frame_misses": 765,
+            "compressed_bytes": 13854511,
+            "decoded_bytes": 3208642560
+          },
+          "shared": {
+            "frame_hits": 2304,
+            "frame_misses": 765,
+            "compressed_bytes": 13854511,
+            "decoded_bytes": 3208642560
+          }
+        }
+      }
+    ],
+    "live_comparison": {
+      "gate": "live",
+      "coverage": {
+        "named_cases": 17347,
+        "named_operation_checks": 150142,
+        "shared_replays": 15620,
+        "shared_operation_checks": 131049
+      },
+      "command_seconds": {
+        "legacy": 2465.026,
+        "baseline": 2549.709,
+        "shared": 2302.536
+      },
+      "test_seconds": {
+        "legacy": 2464.13,
+        "baseline": 2548.74,
+        "shared": 2301.59
+      },
+      "peak_rss_kib": {
+        "legacy": 571996,
+        "baseline": 735288,
+        "shared": 737744
+      },
+      "pack_decode": {
+        "baseline": {
+          "frame_hits": 17957,
+          "frame_misses": 4532,
+          "compressed_bytes": 84979932,
+          "decoded_bytes": 19008585728
+        },
+        "shared": {
+          "frame_hits": 17957,
+          "frame_misses": 4532,
+          "compressed_bytes": 84979932,
+          "decoded_bytes": 19008585728
+        }
+      }
+    },
+    "live_unshared_comparison": {
+      "named_cases": 17347,
+      "named_operation_checks": 150142,
+      "test_seconds": {
+        "legacy": 2464.13,
+        "packed": 2548.74
+      },
+      "peak_rss_kib": {
+        "legacy": 571996,
+        "packed": 735288
+      },
+      "scope": "Both unshared runners passed against the tracked fixture names and pinned exact payload hashes. Legacy gzip files were on the WSL filesystem and the seekable pack was on the Windows E drive. Shared live replay and exhaustive restore are separate measurements."
+    },
+    "canonical_comparison": {
+      "gate": "canonical",
+      "coverage": {
+        "named_cases": 6592,
+        "named_operation_checks": 27145,
+        "shared_replays": 6501,
+        "shared_operation_checks": 26966
+      },
+      "command_seconds": {
+        "legacy": 450.022,
+        "baseline": 446.803,
+        "shared": 452.67
+      },
+      "test_seconds": {
+        "legacy": 448.89,
+        "baseline": 445.92,
+        "shared": 451.8
+      },
+      "peak_rss_kib": {
+        "legacy": 407376,
+        "baseline": 565448,
+        "shared": 565880
+      },
+      "pack_decode": {
+        "baseline": {
+          "frame_hits": 6591,
+          "frame_misses": 747,
+          "compressed_bytes": 13565605,
+          "decoded_bytes": 3133145088
+        },
+        "shared": {
+          "frame_hits": 6591,
+          "frame_misses": 747,
+          "compressed_bytes": 13565605,
+          "decoded_bytes": 3133145088
+        }
+      },
+      "profile": "iterate",
+      "log_sha256": {
+        "legacy": "19fcbad3b59fd6e4c250034087f06f3fe8283c8cfc7cb499352254890173def6",
+        "baseline": "a908ebc77cd7d124a02a68c573929acd15d19bf38d4716bdbe6028e71b7318bc",
+        "shared": "41f66cbf742b63a29272454fbc3a2025f94de50c5e29bf3d25b363bc54327c17"
+      },
+      "scope": "All canonical cases matched the tracked index and pinned exact payload hashes. Legacy reads came from WSL checkout gzip files. Packed modes read the private pack on E:. Peak command RSS includes Cargo. These timings measure canonical parity only. The WSL service CPU quota was 100%, so the harness clamped the requested worker count to one.",
+      "requested_workers": 2,
+      "effective_workers": 1
+    }
+  },
+  "object_execution_regeneration_checks": {
+    "fresh_journey_fixture_hashes_matched": 77,
+    "fresh_journey_log_sha256": "f3d431233a4dcc2d9530572efd4c7ade14cda2cec275cfbde7b98cf4e74745d7",
+    "changed_hashes_recovered_from_independent_outputs": 712,
+    "unresolved_in_checked_batch": 0,
+    "encoding_check_log_sha256": "375c3fd3e8a36925fb8661622120bd9970d2831a33231d08404f89160d4e2e59",
+    "scope": "The Journey subset was freshly exported with the verified oracle. The historical encoding check applied known serialization variants to independently regenerated object-execution payloads. Full corpus and index verification remain open.",
+    "board_key_and_step_label_probe": {
+      "board_key_check_log_sha256": "183dc398fa433b9e8e5392df1fc6dba84e12888d2bb31b3f2c9be3e1ae0ddc92",
+      "hashes_matched_before_step_relabeling": 1578,
+      "hashes_matched_after_step_relabeling": 44,
+      "label_table_sha256": "4b60ca1d090f988b98ced2ba5fdfc0462926d09d9af01b6f8803735aec675523",
+      "scope": "Applies frozen labels only to numeric step IDs with a one-to-one map. Each recovered case matched the admitted hash, including all repeated references. This covers the audited batch only."
+    }
+  },
+  "fixture_checkpoint_overlap_sample": {
+    "log_sha256": "5e32eed77c5ccd5877059020d5e7515325bc8d5b20954c62c5e042e4b5565791",
+    "selection": "Eight evenly spaced blocks of 24 index entries per family.",
+    "rows": [
+      {
+        "family": "stack-traces",
+        "named_cases": 192,
+        "unique_traces": 192,
+        "unique_initial_states": 192,
+        "duplicate_initial_compiles": 0,
+        "operations": 1403,
+        "duplicate_exact_prefixes": 0
+      },
+      {
+        "family": "object-execution",
+        "named_cases": 192,
+        "unique_traces": 180,
+        "unique_initial_states": 167,
+        "duplicate_initial_compiles": 13,
+        "operations": 1064,
+        "duplicate_exact_prefixes": 39
+      }
+    ],
+    "scope": "Counted candidate overlap after name-only deduplication using sorted JSON keys. This is an upper bound on safe reuse and does not prove restored boundaries are equivalent.",
+    "ordered_restore_candidates": {
+      "log_sha256": "50a24592ab4ef76237f80571864247db909d4867f40671d35eff87ff977113e9",
+      "named_cases": 192,
+      "unique_traces": 180,
+      "initial_boundaries": 180,
+      "initial_repeats": 13,
+      "later_boundaries": 884,
+      "repeated_record_and_operation": 87,
+      "repeated_record_operation_and_next_record": 86,
+      "scope": "Ordered serialized oracle records only. Reusing a restore requires equality of native envelope, request/generation state, and operation, plus a successful representative check."
+    },
+    "compiled_start_smoke": {
+      "shard": "20/128",
+      "named_cases": 136,
+      "representatives": 55,
+      "cache_hits": 0,
+      "cached": 55,
+      "test_seconds": {
+        "baseline": 21.22,
+        "cached": 21.45
+      },
+      "log_sha256": {
+        "paired": "9d459336e3665f9f29d7214bde0715c3b3da8f1cc468e8aa26ada1c1482fb566",
+        "isolation": "1d346b8c21a322378e47f688d41e75a873b966e1758edc6f3f6bacac866a26e2"
+      },
+      "scope": "One worker. Both modes used exact-trace sharing and verified identical named hashes and operation counts. The cache is opt-in and preserves all per-operation restore checks."
+    },
+    "compiled_start_repeat_shard": {
+      "shard": "81/128",
+      "effective_workers": 1,
+      "cache_hits": 76,
+      "cached": 55,
+      "test_seconds": {
+        "baseline": 184.28,
+        "cached": 202.96
+      },
+      "log_sha256": "e959aa1f27fd880e2a6d0e109b7d3cc1e5ed043832d4c2cc2dbecf414bb209c1",
+      "scope": "Both modes shared byte-identical traces and checked the same named fixture hashes and operation counts. Concurrent WSL jobs were active. This comparison does not establish a speedup."
+    }
+  },
+  "canonical_fixture_regeneration": {
+    "matched": {
+      "exact": 234,
+      "historical": 6358
+    },
+    "missing": [],
+    "extra": [],
+    "unresolved": [],
+    "exact_index": true,
+    "index_sha256": "325972050946e1937ef9f48bbe062ee78a2b13a7f5c58f59e2a13d5d0b44f594"
+  },
+  "replay_sharing_mutation_test": {
+    "test": "fixture_replay::tests::name_only_reuse_preserves_order_and_alias_assertions",
+    "modes": [
+      "baseline",
+      "shared"
+    ],
+    "duplicate_reuses_verified_representative": true,
+    "detected_changes": [
+      "event order",
+      "physical alias groups"
+    ],
+    "scope": "Synthetic fixture payloads exercised the same replay-sharing code as the native parity gates."
+  },
+  "restore_owned_record_smoke": {
+    "shard": "20/128",
+    "named_cases": 136,
+    "test_seconds": 15.21,
+    "scope": "All existing restore assertions passed after moving the expanded state into its comparison record. This single run does not isolate timing from concurrent WSL jobs."
+  },
+  "regenerated_cache_identities": {
+    "fresh_input_families": 12,
+    "sha256": "c50f255ec405d9433619c1ca4b45118d9a0f6289f6b0d1b61bf9df2f2a8096e6",
+    "scope": "Regenerated using only fresh Python fixture outputs, verified individually against admitted hashes."
+  },
+  "object_card_menu_regeneration": {
+    "matched": 422,
+    "unresolved": [],
+    "missing": [],
+    "scope": "The pinned Python generator replayed every affected copied-card case from its historical branch selections and verified the complete frozen payload hash."
+  },
+  "object_fixture_regeneration": {
+    "exact_index": true,
+    "cases": 17347,
+    "sha256": "c7596d5d31cd15b0970d512d2128bab0601c0bdcaf78765a99076663050026f5",
+    "corrected_card_menu_cases": 422,
+    "additional_historical_encodings": 606,
+    "diagnostic_only_cases": 3789,
+    "scope": "Combined verified independent Python generation and the production historical encoding path, checked all case hashes, and rebuilt the admitted index byte-for-byte."
+  },
+  "regenerated_fixture_family_hashes": {
+    "states": "a73d3e4dd13e67a020a3406caaaeddb9aee26bf5e558f1a09502c259afccb82f",
+    "actions": "e56d1401b1528c8cb231ad042a98e97c5d1520bda1bd1b4da7020d37bf4ebf0d",
+    "mine-paths": "d2032e0fc76f8e96255d596529f8ebb28ab26c0c29d2c9a36cfa30a2d37d772f",
+    "card-equality": "f5805a07c262e5c6c32b3f3c13a72c903892ca6f041a532dc602235bb1aec56e",
+    "cache-identities": "c50f255ec405d9433619c1ca4b45118d9a0f6289f6b0d1b61bf9df2f2a8096e6",
+    "action-validation": "17fe7a73de239d19ea32e9108e9ea2fd2be7254da7905162acabd4acd2a2caba",
+    "displacement-validation": "0169ea6b7ca1eca59362894e86685da892002719450587e87bdc4664148e40c5",
+    "effect-stats": "fd2390280ac5f9b2010cb35905aaab31ba9da1e5af1ad33cadb828a386dad8a2",
+    "effects": "71cac5a0cb1dff0cd0d180f7dc5320e463285abc678e047b8608876bc793048d",
+    "hex-filters": "5c7419ef60244962a13d2bb219ab61eb82b4c550e46f7e9b06d2e170d2572ce6",
+    "models": "be80a1b1900a8aeb30fd01fb1d0223b5fa46aeacd43c63138b8608fa5d260e5e",
+    "planning": "800d68731c339c711ac9c1139dbecf541c8f3128a7a2bce409eef86274d8c634",
+    "targeting": "10dd13c877fdfb51201732f53a3e0bf9b0c1833b5fdfd35d83be761dcdc18010",
+    "effect-errors": "65cf7f235539fbce24fc79cf37a9511f27f408ca6b5983aba8add6c6ccd0a37d",
+    "mine-reference-errors": "f812fe99bbdae685875a66b187db9fb7c49acde90c7b8226ea35254c10244f4d",
+    "movement": "ea66feeb03a6f3be357cf8bc576221cef5b4f9ce223e017a8d412df19e2ea981",
+    "object-arena": "d2d7dd3f7af4efb88edd4d0e33abdc84578661a479ff0226a9a55921e71bae47",
+    "terrain-validation": "78de54b483a84ff5aacc669c1085e8ffbe2d5383240cd63221ed6cb5acb2986b",
+    "complete-games": "dd0324823fe1a0987f5cbd28253fb77a1191040bc45ea86dba6217041b49ed4b",
+    "stack-traces": "325972050946e1937ef9f48bbe062ee78a2b13a7f5c58f59e2a13d5d0b44f594",
+    "complete-games-hanu": "98629b81fbfee0723a1f13bb33997a6118f5d997284e1510b978d4b7cc4e8d9b",
+    "object-execution": "c7596d5d31cd15b0970d512d2128bab0601c0bdcaf78765a99076663050026f5"
+  },
+  "fixture_cleanup_extraction_audits": {
+    "selected_files": 1210,
+    "unresolved_embeds": 0,
+    "payload_findings": 0,
+    "report_sha256": {
+      "dependency": "a029ac29fc4bcac05dd1b536917a5b636930bf6f9d74c82c1404a9afdc392bd7",
+      "payload": "e0d68286115d43fe0ce242ab1112a35d82612326e1ceb47d56a3a758048cea96"
+    },
+    "scope": "Static audits of the private working-tree extraction. The final build and approval are separate checklist gates."
+  },
+  "fixture_alias_replay_cross_check": {
+    "source": "Pinned seekable pack alias table and tracked object-execution index",
+    "named_cases": 17347,
+    "unique_live_replays": 15620,
+    "expected_restore_replays_by_contiguous_shard": [
+      2124,
+      1993,
+      2068,
+      2020,
+      2047,
+      1759,
+      1848,
+      1762
+    ],
+    "matched_completed_restore_shards": 8
+  },
+  "final_fixture_candidate_local_startup": {
+    "source_map_sha256": "5a193b0bf0f4e1b6be7ba3738ca5f14ec9f2add735031cffbde0d03a16e1996a",
+    "mapped_files_verified": 1213,
+    "git_history_present": false,
+    "locked_build_passed": true,
+    "startup": {
+      "health": {
+        "engine": "rust",
+        "server_version": "0.1.0",
+        "rules_version": 9,
+        "target_arch": "x86_64",
+        "target_os": "linux",
+        "binary_sha256": "2bb907ce81044d9f1ceb6dc0674abc571a48db5c91d8fb4e08e54840485ff6d7",
+        "content_sha256": "4b7520f058d68dda93efb15837d0b657332a1a3132d37148c14a9bb2968ff651",
+        "content": {
+          "version": 1,
+          "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+          "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+          "map_count": 6,
+          "hero_count": 33
+        },
+        "ok": true
+      },
+      "creation_status": 201,
+      "fresh_home_cache_and_database": true,
+      "check_content_passed": true,
+      "launch_scope": "Disposable localhost native server, private installed pack"
+    },
+    "first_startup_attempt": "The short readiness window expired. The retry used a longer deadline and direct loopback.",
+    "distribution_route_exercised": false,
+    "passed_quality": [
+      "workspace formatting",
+      "strict all-target all-feature Clippy",
+      "strict workspace rustdoc"
+    ],
+    "log_sha256": {
+      "build": "9f819a17eeec798c49579a505236300164e2cae062155b07f38d4232cc6d8615",
+      "quality": "71139e36ee65e7f0dfb9f5e958570f8b6b8547efd52f51693f37e4d16538018b",
+      "quick": "3fc36d706aec9db675e4762881a750a2b0196eefc5fb7ab25cf0d6b66fdc7292",
+      "example": "7b7dae545a841e1aba3c9b41d39281e2dff1d9ec59aa354ca083e89b40e997cd"
+    },
+    "local_contributor_walkthrough": {
+      "guide": "Rust README -> contributor and architecture guides",
+      "rule_entry_points": [
+        "goa2_core::api",
+        "LiveGame",
+        "NativeSession",
+        "content/catalogs"
+      ],
+      "compatibility_guide_reviewed": true
+    },
+    "quick_native": {
+      "tier": "native",
+      "executed": 415,
+      "failed": 0,
+      "ignored": 65,
+      "full_parity": false
+    },
+    "quick_data_checks": 574,
+    "example_passed": "goa2-core local_game",
+    "python_fixture_cache_and_streaming_tests_passed": 13,
+    "python_fixture_archive_tooling_tests_passed": 29,
+    "content_install_rejections_verified": [
+      "wrong checksum leaves destination absent",
+      "existing destination is preserved"
+    ]
+  },
+  "final_fixture_candidate_pack_preflight": {
+    "pack_manifest_sha256": "914eedaea61fa9ba0e50449e7c9c22c1812fe97fbd6573e6b8443f813639291e",
+    "payload_checks": 24197,
+    "missing": 0,
+    "failed": 0,
+    "skipped": 0,
+    "registry_report_sha256": "c2039f548a2a9f8629fe6b7d5b080cb53d53f2f94a8723cb0d138595b3a4c5a1",
+    "complete_game_cases": 4,
+    "complete_game_snapshot_chunks": 230,
+    "native_full_feature_tests": {"tier": "native", "executed": 643, "failed": 0, "ignored": 9, "full_parity": true}
+  },
+  "final_fixture_candidate_completed_trace_groups": {
+    "complete_games_match_python_at_every_operation_using_lossless_snapshot_deltas": 2,
+    "every_native_transition_matches_python_full_state_request_and_event_order": 6592,
+    "hanu_complete_games_match_python_at_every_operation_with_shared_models_and_turns": 2
+  },
+  "final_fixture_candidate_full_differential": {
+    "canonical_cases": 6592,
+    "live_cases": 17347,
+    "complete_games": 4,
+    "fallback_cases": 2,
+    "trace_tests_passed": 5,
+    "log_sha256": "b8857f94d6b26948a736194cdf90b0f3fc7dc12796dd16bd7f950734004c5219",
+    "scope": "Private final standalone extraction, pinned seekable pack, exact duplicate replay sharing enabled"
+  },
+  "clone_free_restore_experiment": {
+    "baseline_sha256": "c2f532d698c314c47a33890956787aed35854da6254be0b80c373c6a912cd3f5",
+    "profile": "iterate",
+    "workers": 1,
+    "pack": "pinned deduplicated 4 MiB",
+    "rows": [
+      {
+        "shard": 20,
+        "seconds": {
+          "baseline": 18.1,
+          "candidate": 17.98
+        },
+        "coverage": {
+          "named_cases": 136,
+          "named_operation_checks": 516,
+          "shared_replays": 136,
+          "shared_operation_checks": 516
+        }
+      },
+      {
+        "shard": 81,
+        "seconds": {
+          "candidate": 72.34,
+          "baseline": 73.77
+        },
+        "coverage": {
+          "named_cases": 135,
+          "named_operation_checks": 3134,
+          "shared_replays": 135,
+          "shared_operation_checks": 3134
+        }
+      }
+    ],
+    "adopted": false
+  },
+  "fallback_checkpoint_full_differential": {
+    "source_commit": "d284805c19b018a28682531b826c9a8fa129ab0d",
+    "source_identity": "82e4aaac3921ffb44215290f94ca2399cc044569f3279ba96afed8a6fa59bbbc",
+    "started_utc": "2026-11-12T07:46:10.277516+00:00",
+    "finished_utc": "2026-11-12T08:42:20.841549+00:00",
+    "test_threads": "2",
+    "oracle_workers": "2",
+    "memory_max_bytes": 2147483648,
+    "payload_checks": 24197,
+    "native_tests": 638,
+    "trace_tests": 5,
+    "canonical_cases": 6592,
+    "live_cases": 17347,
+    "complete_games": 4,
+    "fallback_cases": 2,
+    "trace_seconds": 920.36,
+    "log_sha256": "26d04969204abd3a721d340c632bebf16febb423f015dc0638a513520e912ba0"
+  },
+  "final_fixture_candidate_payload_audit": {
+    "files": 1213,
+    "findings": 0,
+    "report_sha256": "29a0807c0ace3350cc1c2f5e0aa7c68f8a1cd9b47c3c1098a4c0d674bb262017",
+    "scope": "Automated scan of the exact private standalone extraction. Rights and release payload review remain separate."
+  },
+  "final_fixture_candidate_private_release": {
+    "archive_sha256": "dfbb21845a1403f12cb26ee3336cb9da4c03c3e3f0c68af918f86a5857aef636",
+    "deterministic": true,
+    "service": {
+      "engine": "rust",
+      "server_version": "0.1.0",
+      "rules_version": 9,
+      "target_arch": "x86_64",
+      "target_os": "linux",
+      "binary_sha256": "90114ef9b4a6dbc1c0ce09dcc8f6d04cf1242f7391b8af302514b47e2b452f9f",
+      "content_sha256": "4b7520f058d68dda93efb15837d0b657332a1a3132d37148c14a9bb2968ff651",
+      "content": {
+        "version": 1,
+        "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
+        "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
+        "map_count": 6,
+        "hero_count": 33
+      }
+    },
+    "fixture_sha256": "b00607b166ce883edd9155910c43729bdeffefddef240c937806b0f1d1e2d1cf",
+    "passed": [
+      "game-server",
+      "replay-share"
+    ],
+    "archive_bytes": 5698392,
+    "native_service_scenarios": [
+      {
+        "suite": "auth",
+        "expected": 2,
+        "executed": 2,
+        "failed": 0,
+        "missing": 0
+      },
+      {
+        "suite": "bots",
+        "expected": 3,
+        "executed": 3,
+        "failed": 0,
+        "missing": 0
+      },
+      {
+        "suite": "clocks",
+        "expected": 2,
+        "executed": 2,
+        "failed": 0,
+        "missing": 0
+      },
+      {
+        "suite": "votes",
+        "expected": 6,
+        "executed": 6,
+        "failed": 0,
+        "missing": 0
+      },
+      {
+        "suite": "shutdown",
+        "expected": 1,
+        "executed": 1,
+        "failed": 0,
+        "missing": 0
+      },
+      {
+        "suite": "backup",
+        "expected": 1,
+        "executed": 1,
+        "failed": 0,
+        "missing": 0
+      }
+    ],
+    "replay_commands": 193,
+    "replay_frames": 194,
+    "source_map_sha256": "5a193b0bf0f4e1b6be7ba3738ca5f14ec9f2add735031cffbde0d03a16e1996a",
+    "published": false
+  },
+  "fallback_checkpoint_exhaustive_restore": {
+    "exit_code": 0,
+    "source_identity_unchanged": true,
+    "source_identity": "82e4aaac3921ffb44215290f94ca2399cc044569f3279ba96afed8a6fa59bbbc",
+    "cases": 17347,
+    "shards": 8,
+    "finished_utc": "2026-11-12T09:29:05.438992+00:00",
+    "source_commit": "d284805c19b018a28682531b826c9a8fa129ab0d",
+    "test_seconds": 2004.23,
+    "rows": [
+      {
+        "shard": 1,
+        "cases": 2169,
+        "test_seconds": 257.45,
+        "log_sha256": "7d527d172a5794631d24857d55629438657f361bb93506d7de70be0424bf5447"
+      },
+      {
+        "shard": 2,
+        "cases": 2169,
+        "test_seconds": 251.14,
+        "log_sha256": "3ba466465b25cab9f1b028cd21c36658aea7ce1032bf51d7c25862f84f2d4bf9"
+      },
+      {
+        "shard": 3,
+        "cases": 2169,
+        "test_seconds": 248.57,
+        "log_sha256": "2ff3c4c71715a3baffd35bde5c32befe441988e6a529b52da2e5c9f300421088"
+      },
+      {
+        "shard": 4,
+        "cases": 2168,
+        "test_seconds": 245.98,
+        "log_sha256": "e8750a0f55526acf79103242e296585bea338a3abbd820a8c53b73e1a7cd6fb6"
+      },
+      {
+        "shard": 5,
+        "cases": 2168,
+        "test_seconds": 272.41,
+        "log_sha256": "e02a9a5779e449b79b3f936ce878fe97e8940c34cb00bc52e4f765ab75015776"
+      },
+      {
+        "shard": 6,
+        "cases": 2168,
+        "test_seconds": 243.24,
+        "log_sha256": "b69d5a5a0e5d7bec86d70bbf90e2debe25cb7b136f00b46b1a975799b58aa3e3"
+      },
+      {
+        "shard": 7,
+        "cases": 2168,
+        "test_seconds": 244.57,
+        "log_sha256": "5fffaf3e317fb38f5768d367007dea0f50e61071f6c2f91ff0785de53ff30e8c"
+      },
+      {
+        "shard": 8,
+        "cases": 2168,
+        "test_seconds": 240.87,
+        "log_sha256": "5d28a8f110723bae106b028a642195f1321372a8719ae0840714a0d0e05387c1"
+      }
+    ]
+  },
+  "compiled_start_full_restore": {
+    "named_cases": 17347,
+    "named_operation_checks": 150142,
+    "reused_starts": 2092,
+    "distinct_trace_reuses_lower_bound": 543,
+    "rows": [
+      {
+        "named_cases": 2169,
+        "named_operation_checks": 8313,
+        "shared_replays": 2169,
+        "shared_operation_checks": 8313,
+        "shard": 1,
+        "reused_starts": 72,
+        "cached_starts": 2097,
+        "log_sha256": "45d500448538cf9886333d2ecacca728825d55b8ad7fb8e865505ebf1823a384"
+      },
+      {
+        "named_cases": 2169,
+        "named_operation_checks": 8727,
+        "shared_replays": 2169,
+        "shared_operation_checks": 8727,
+        "shard": 2,
+        "reused_starts": 0,
+        "cached_starts": 2169,
+        "log_sha256": "5459d7ea286046e8dd88133cc329b38078d1434de4a69df3099e667e2fa41f29"
+      },
+      {
+        "named_cases": 2169,
+        "named_operation_checks": 12422,
+        "shared_replays": 2169,
+        "shared_operation_checks": 12422,
+        "shard": 3,
+        "reused_starts": 100,
+        "cached_starts": 2069,
+        "log_sha256": "c56791f054e7075c3c6e79d483695a50c4a4f35c3f8fa3f299e6527d6c7f7e5e"
+      },
+      {
+        "named_cases": 2168,
+        "named_operation_checks": 12940,
+        "shared_replays": 2168,
+        "shared_operation_checks": 12940,
+        "shard": 4,
+        "reused_starts": 200,
+        "cached_starts": 1968,
+        "log_sha256": "28f126fba7026c43c2ee0cf2846357c2825e2a554b1bce56f31b91a54049017a"
+      },
+      {
+        "named_cases": 2168,
+        "named_operation_checks": 20899,
+        "shared_replays": 2168,
+        "shared_operation_checks": 20899,
+        "shard": 5,
+        "reused_starts": 200,
+        "cached_starts": 1968,
+        "log_sha256": "b505d3010c95bd7a856a318b8048a189d8427cfbba2edf16408b12041de8d327"
+      },
+      {
+        "named_cases": 2168,
+        "named_operation_checks": 33622,
+        "shared_replays": 2168,
+        "shared_operation_checks": 33622,
+        "shard": 6,
+        "reused_starts": 608,
+        "cached_starts": 1560,
+        "log_sha256": "497b319cb04c41e3b214789e43350116e03bb69d48bdd9d02973f244668f73cc"
+      },
+      {
+        "named_cases": 2168,
+        "named_operation_checks": 23380,
+        "shared_replays": 2168,
+        "shared_operation_checks": 23380,
+        "shard": 7,
+        "reused_starts": 439,
+        "cached_starts": 1729,
+        "log_sha256": "76db42284d80f672d87dbb7e12252338c9d274cf52770e69e98da127dbef3cf0"
+      },
+      {
+        "named_cases": 2168,
+        "named_operation_checks": 29839,
+        "shared_replays": 2168,
+        "shared_operation_checks": 29839,
+        "shard": 8,
+        "reused_starts": 473,
+        "cached_starts": 1695,
+        "log_sha256": "19b6f636fb3fb7e8912de9ff74ab03fdecf666a2fb43a1205d1fb11564094696"
+      }
+    ]
+  },
+  "historical_spell_restore_failure": {
+    "source_commit": "a5e313a3c7ce65e8c2c042ae32f2716ced795af6",
+    "source_identity": "5b61c689ed84d41401ee9a66b28375d076d4821ca3cccc0fc67a85367770a1c5",
+    "exit_code": 101,
+    "finished_utc": "2026-11-13T03:08:17.148592+00:00",
+    "log_sha256": "b769354dbb09ebbfdf6ebb6328d0392920deda2593f0d132bcb1f821420bcf4a",
+    "test": "spell_bodies_restore_each_boundary_with_private_cards_filters_and_respawns",
+    "native_object_passed": 125,
+    "native_object_failed": 1,
+    "scope": "Historical source with successful fixture preflight. Native failure stopped the runner before differential replay or exhaustive restore."
+  },
+  "historical_spell_restore_migration_check": {
+    "revision": "b3ca2ffcab1fb0281470b3df1e4ce716ff82aba1",
+    "exit_code": 0,
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--profile",
+      "iterate",
+      "-p",
+      "goa2-core",
+      "--features",
+      "full-parity",
+      "--test",
+      "object_execution",
+      "spell_bodies_restore_each_boundary_with_private_cards_filters_and_respawns",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "log_sha256": "c6a0d76f683411d01c37e441904cbeae7f0e1d6fb41fad6e5c4331e374104198",
+    "scope": "Focused replay of the complete native spell-body and spell-primitive restore test at the typed spell migration."
+  },
+  "historical_spell_restore_migration_parent": {
+    "revision": "5f81b93a1a01503d62caea4c65fd1c657a6d2082",
+    "exit_code": 101,
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--profile",
+      "iterate",
+      "-p",
+      "goa2-core",
+      "--features",
+      "full-parity",
+      "--test",
+      "object_execution",
+      "spell_bodies_restore_each_boundary_with_private_cards_filters_and_respawns",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "log_sha256": "069de64fdf4f0110fb9c7e235a9c9bc66edc9e935f8ba3551b338ac5b46387ec",
+    "scope": "Fresh build of the immediate migration parent. The focused test reproduces the missing-request panic.",
+    "diagnostic_log_sha256": "2626ee23ab84b45b9824c2768c049d951c7c434c9966df77eb9643e7f2d62978",
+    "diagnostic_missing_requests": [
+      {
+        "case": "object-execution-spell-body-shocking_grasp-defend-first",
+        "operation_index": 31
+      },
+      {
+        "case": "object-execution-spell-body-shocking_grasp-defend-skip",
+        "operation_index": 31
+      }
+    ],
+    "diagnostic_scope": "The disposable checkout added case and operation logging to the test harness. Production sources and fixtures were unchanged.",
+    "shocking_grasp_damage_operand": {
+      "before": 1234567891,
+      "after": {
+        "$operand": {
+          "kind": "primary"
+        }
+      }
+    }
+  },
+  "interpreter_split_benchmark_source_comparison": {
+    "differential_revision": "3356c5da63a28ecdc455d6fbe1dd5e4c0a7a3741",
+    "benchmark_revision": "832ea43ee14ba32f1610baf846ecd43a75c52260",
+    "identical_committed_input_paths": [
+      "rust/crates",
+      "rust/content",
+      "rust/test-support",
+      "rust/Cargo.toml",
+      "rust/Cargo.lock",
+      "rust/rust-toolchain.toml",
+      "rust/tests/fixtures"
+    ],
+    "verified_report_checksums": {
+      "wsl_interpreter_split_maintenance": "aa8a361e47549d5fb4ca3d49f450b0287c7c9a59f8211fdf45127f8129e8b551",
+      "wsl_interpreter_split_four_turn_search": "8e77ba3320d26777b7ceb439420c4a3ec00472983473445f63370540dc44cd91",
+      "wsl_interpreter_four_turn_comparison": "52b9a173dc0ad3e6d94078a652ea499bf893a82fa4e2fcb4f0627761c5051c0b"
+    }
+  },
+  "interpreter_split_restore_preflight": {
+    "source_commit": "3356c5da63a28ecdc455d6fbe1dd5e4c0a7a3741",
+    "source_identity": "7448ed4df04c66d924ddc29b47923b9525186f2b69db8bc68be7e8ebf557052e",
+    "finished_utc": "2026-11-13T03:30:56.208450+00:00",
+    "verified_entries": 24197,
+    "complete_game_entries": 4,
+    "snapshot_chunks": 230,
+    "log_sha256": "ab7a222efb82d335d29d811260064ce4f2a742344add2edd96974c0abcbed2a1",
+    "scope": "Fixture validation for the exhaustive restore run. Replay results are recorded separately."
+  },
+  "interpreter_split_exhaustive_restore": {
+    "exit_code": 0,
+    "source_identity_unchanged": true,
+    "source_identity": "7448ed4df04c66d924ddc29b47923b9525186f2b69db8bc68be7e8ebf557052e",
+    "cases": 17347,
+    "shards": 8,
+    "finished_utc": "2026-11-13T04:06:17.062344+00:00",
+    "source_commit": "3356c5da63a28ecdc455d6fbe1dd5e4c0a7a3741",
+    "result_sha256": "162679e428abee75760758ac8fb1a98a3dcc39fe9f0321b0f1ee8d137a3465e1",
+    "shard_results": [
+      {
+        "shard": 1,
+        "cases": 2169,
+        "log_sha256": "5abe06daa12f5515ac8ad76648deb7b9fd50171c5bcbfb1da79ce6e0c9f872b2"
+      },
+      {
+        "shard": 2,
+        "cases": 2169,
+        "log_sha256": "a1c6e8ab24bcebc3d651b9c46a3132207ecf0f954450a9f9850b96bf6d6c895a"
+      },
+      {
+        "shard": 3,
+        "cases": 2169,
+        "log_sha256": "52faca7a879f5e209ba71d7e54d1a18b2acf14cd211302d9fba041bf87d855c5"
+      },
+      {
+        "shard": 4,
+        "cases": 2168,
+        "log_sha256": "ee10c22fea1015612dc94fc6016534164192949d840b616f27b438dbe5e04581"
+      },
+      {
+        "shard": 5,
+        "cases": 2168,
+        "log_sha256": "80551d79664f65f1373599f62b31cb1a2c2c45a4b728a4c267ac7fe531981b0d"
+      },
+      {
+        "shard": 6,
+        "cases": 2168,
+        "log_sha256": "7aa9386133d7ac658fb15ef521c40f9b951629450a28bdd8940d749db8b75214"
+      },
+      {
+        "shard": 7,
+        "cases": 2168,
+        "log_sha256": "0ff54f83a9fff710226dec3eb997c8950bca683d509e8c130f1d6fa61cbddae6"
+      },
+      {
+        "shard": 8,
+        "cases": 2168,
+        "log_sha256": "4eea1fb5b4c975395d968fcd9cab6581544d6a89f5122e4a40c82ae364a6ab48"
+      }
+    ]
+  },
+  "typed_operand_exhaustive_restore": {
+    "exit_code": 0,
+    "source_identity_unchanged": true,
+    "source_identity": "af4136e2a26b312544cad6534b94f65142f69e1c8e60e095d79f2f730904456c",
+    "cases": 17347,
+    "shards": 8,
+    "binary_sha256": "8f90894bf3ae6742cdef22b6e575fd2c25120213c85c52529ae020b0754dbb94",
+    "finished_utc": "2026-11-13T04:50:02.047377+00:00",
+    "source_commit": "67a852ed01996a378fc0248fdeb7f7ac1817df1b",
+    "result_sha256": "721262611a39aa735fb7a482a4243f43db5e6e234a18a46546043d6401867568",
+    "shard_results": [
+      {
+        "shard": 1,
+        "cases": 2169,
+        "log_sha256": "de89f535916abcf2e8edab9538f771b3da39b8d3f76cfa10e460195d5769d77c"
+      },
+      {
+        "shard": 2,
+        "cases": 2169,
+        "log_sha256": "92ac3ae743d12621dfb4a4840a9be125931a0f6f672816806882cfd49f357e12"
+      },
+      {
+        "shard": 3,
+        "cases": 2169,
+        "log_sha256": "33fffca5bbe6f65e70a0f89068291b8c256bca41b602aeb1d09ab55156cb5b25"
+      },
+      {
+        "shard": 4,
+        "cases": 2168,
+        "log_sha256": "ac9056b202c15d89fb14bb6e92c5a578710b90b0a228e1ae68a42d9580dfc28b"
+      },
+      {
+        "shard": 5,
+        "cases": 2168,
+        "log_sha256": "7945e9eaeeca8d3bc251244dda4e9a2af12c08a02ed8d6be77deabc74e35776e"
+      },
+      {
+        "shard": 6,
+        "cases": 2168,
+        "log_sha256": "0b24d43a3d5d791462b19ab9aa3c4eef97e391603b22add442bf2e4a539165b3"
+      },
+      {
+        "shard": 7,
+        "cases": 2168,
+        "log_sha256": "a57c54ef9599818d4c52c581098bb43707d4c23d58a36fc33723ceb3fcc1e86f"
+      },
+      {
+        "shard": 8,
+        "cases": 2168,
+        "log_sha256": "5a9290936dec15c38672aad6f79649d25d567c60b6672477d6673352f3549abe"
+      }
+    ]
+  },
+  "historical_spell_restore_first_typed_revision": {
+    "revision": "7e87efd76ff7e0ba7aa53524f0bd33debcd98eb7",
+    "exit_code": 101,
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--profile",
+      "iterate",
+      "-p",
+      "goa2-core",
+      "--features",
+      "full-parity",
+      "--test",
+      "object_execution",
+      "spell_bodies_restore_each_boundary_with_private_cards_filters_and_respawns",
+      "--",
+      "--exact",
+      "--nocapture"
+    ],
+    "log_sha256": "b711fbc1e173fdcdd695819c89fb3db468b664c2297b01cfa5aab6b8499fb15e",
+    "scope": "Fresh focused spell restore build at the first typed primary recipe migration. The test reproduces the missing-request panic.",
+    "passing_parent_revision": "832ea43ee14ba32f1610baf846ecd43a75c52260",
+    "passing_test_source_revision": "3356c5da63a28ecdc455d6fbe1dd5e4c0a7a3741",
+    "passing_test_log_sha256": "1ec2cdc0867eaef1e0510657a57713e9e9cbc8a57e20ad60ec3a3baadade9248"
+  },
+  "first_import_refactor_full_differential": {
+    "stage": "full",
+    "command": [
+      "python3",
+      "tools/check.py",
+      "full",
+      "--profile",
+      "iterate"
+    ],
+    "started_utc": "2026-11-13T04:55:53.543974+00:00",
+    "boot_id": "e68f58a9-b62b-4371-b004-93ec459b80d9",
+    "source_commit": "4ae20a584dd6c900bca3e7adff966b78748cfb57",
+    "source_identity": "a3f07ccc730c10347cf45acd9db897611cf347434c229eaed3871775c6d550e8",
+    "test_threads": "2",
+    "oracle_workers": "2",
+    "memory_max_bytes": 2147483648,
+    "finished_utc": "2026-11-13T05:56:20.262738+00:00",
+    "exit_code": 0,
+    "source_identity_unchanged": true,
+    "native_tests": 638,
+    "differential_tests": 5,
+    "canonical_cases": 6592,
+    "live_cases": 17347,
+    "complete_games": 4,
+    "fallback_cases": 2,
+    "log_sha256": "7bc979360a8c130a252c728c64a194df4e127d745cb3dc098dca4311ac1b6b10",
+    "result_sha256": "f31043b3ec2e03b0b5d9c95feafa25c40a050aacf251e2e494249d0b4ad8127c"
+  },
+  "first_import_refactor_exhaustive_restore": {
+    "exit_code": 0,
+    "source_identity_unchanged": true,
+    "source_identity": "a3f07ccc730c10347cf45acd9db897611cf347434c229eaed3871775c6d550e8",
+    "cases": 17347,
+    "shards": 8,
+    "binary_sha256": "c4337ddb39acba82ef60a5c5a4ae8657a323b02761adc1c7bdbd6e698e1cd7f3",
+    "finished_utc": "2026-11-13T06:40:24.909486+00:00",
+    "source_commit": "4ae20a584dd6c900bca3e7adff966b78748cfb57",
+    "result_sha256": "452bb905733efe53f43c8d1b69f01c37fef9d6147b1700add9334ec075c4b0d5",
+    "shard_results": [
+      {
+        "shard": 1,
+        "cases": 2169,
+        "log_sha256": "67efddca88b3a893524e62963103616919e681d3e656fe1e34d9d1dbec6eecd0"
+      },
+      {
+        "shard": 2,
+        "cases": 2169,
+        "log_sha256": "8a413ab4ecb6a335c745415bea2ece416807fbdb41f81e9b9a206aa426f968f6"
+      },
+      {
+        "shard": 3,
+        "cases": 2169,
+        "log_sha256": "7cd61ec77ad0669ed1843e280a4285c85d3c5673d703a45f0eb28718617ae65a"
+      },
+      {
+        "shard": 4,
+        "cases": 2168,
+        "log_sha256": "766876467d7a675e9c1e5ab5992687a829d3a0e5d2c4cd2779f64a88ab40ed39"
+      },
+      {
+        "shard": 5,
+        "cases": 2168,
+        "log_sha256": "15a68e98c971d515aee401ac690015c8fc9c309d3c471a478e51a076207c2fe0"
+      },
+      {
+        "shard": 6,
+        "cases": 2168,
+        "log_sha256": "07519a1c54e16686711236679de0cb4c078d13869dc3846bdf19a04ad4b5b37b"
+      },
+      {
+        "shard": 7,
+        "cases": 2168,
+        "log_sha256": "18619499485b4f6673d8216a5c6abd915c29d5256b072f2d71e2117c62b13e6a"
+      },
+      {
+        "shard": 8,
+        "cases": 2168,
+        "log_sha256": "4ce2d1ec5700ca7b9a6b534b7d44fd89f5184d8d685b97b572c62dfdc05541a4"
+      }
+    ]
+  },
+  "second_import_refactor_full_differential": {
+    "stage": "full",
+    "command": [
+      "python3",
+      "tools/check.py",
+      "full",
+      "--profile",
+      "iterate"
+    ],
+    "started_utc": "2026-11-13T06:40:59.323263+00:00",
+    "boot_id": "e68f58a9-b62b-4371-b004-93ec459b80d9",
+    "source_commit": "40bad5ea51a6fb6d5fccc73e0be9f73a7b5bdc01",
+    "source_identity": "de1dd6c12122f188390ba9e7d869dbe4ffb2a25983c6e5ae4f8b700f15852903",
+    "test_threads": "2",
+    "oracle_workers": "2",
+    "memory_max_bytes": 2147483648,
+    "finished_utc": "2026-11-13T07:42:19.114187+00:00",
+    "exit_code": 0,
+    "source_identity_unchanged": true,
+    "native_tests": 638,
+    "differential_tests": 5,
+    "canonical_cases": 6592,
+    "live_cases": 17347,
+    "complete_games": 4,
+    "fallback_cases": 2,
+    "log_sha256": "3ac1c1db18ece80806a80d408f41f78fbbe74cdd76c8bd86e396641270ed7b79",
+    "result_sha256": "ed5f2326f347d058f94b544c3691ba98d9d4d2d7cf374a285cf04f5a26c08078"
+  },
+  "second_import_refactor_exhaustive_restore": {
+    "exit_code": 0,
+    "source_identity_unchanged": true,
+    "source_identity": "de1dd6c12122f188390ba9e7d869dbe4ffb2a25983c6e5ae4f8b700f15852903",
+    "cases": 17347,
+    "shards": 8,
+    "binary_sha256": "ced8489baedc09779ac540bbbe8320fd3c4a5bdd6e829339b560341cda981268",
+    "finished_utc": "2026-11-13T10:35:40.305665+00:00",
+    "source_commit": "40bad5ea51a6fb6d5fccc73e0be9f73a7b5bdc01",
+    "result_sha256": "4c1810b0e9dc6787cebf28df5d937b8ab2df203cda8913ef941548d1da7a95da",
+    "shard_results": [
+      {
+        "shard": 1,
+        "cases": 2169,
+        "log_sha256": "87588946151f392daef34b4030650b189b08a4756cda2b0f0350084cd47bd45d"
+      },
+      {
+        "shard": 2,
+        "cases": 2169,
+        "log_sha256": "dc316fea916cb7e6ced84ac9dce2c6ae4edb0622d96db6b1632ce0fd21419258"
+      },
+      {
+        "shard": 3,
+        "cases": 2169,
+        "log_sha256": "bd3ede3f2ed421c9c53920b71845ca9c5335f257ced7b0f47c436a7e4b4f4a02"
+      },
+      {
+        "shard": 4,
+        "cases": 2168,
+        "log_sha256": "569a1312589459eff60e1e2234b0ba8fede24766bd7e254d83d880502398378c"
+      },
+      {
+        "shard": 5,
+        "cases": 2168,
+        "log_sha256": "f190dfc08e24ad3453e53331da2d9b597bc67092b5540549d88f74aee7d21219"
+      },
+      {
+        "shard": 6,
+        "cases": 2168,
+        "log_sha256": "50d56072c768875182e76330800f68e53d33d387b2eef0a9eecbfc8bbc9f9c2c"
+      },
+      {
+        "shard": 7,
+        "cases": 2168,
+        "log_sha256": "3ac20f8ead5d256e547b8896f2d379033f412cddb5c6acbfec6b811d738ef9b3"
+      },
+      {
+        "shard": 8,
+        "cases": 2168,
+        "log_sha256": "14b9875dafc3ad07a72fde2d522bfeb4e903fbf759999fd828cb56cc2b051336"
+      }
+    ]
+  },
+  "object_execution_import_diff_audit": {
+    "scope": "All added and removed lines in the zero-context patches belong to Rust use declarations. This checks patch scope and does not establish equivalent name resolution or runtime behavior.",
+    "revisions": [
+      {
+        "source_commit": "4ae20a584dd6c900bca3e7adff966b78748cfb57",
+        "patch_sha256": "558240f8176b7ee60d0fcf3eb3878e2b472f2fee534434b585619bfd1cca3020",
+        "hunks": 6
+      },
+      {
+        "source_commit": "40bad5ea51a6fb6d5fccc73e0be9f73a7b5bdc01",
+        "patch_sha256": "8bcdc7e9573e83e00e3ae8749e57b53a5dba94265ca111894d2e9091649e0efb",
+        "hunks": 21
+      },
+      {
+        "source_commit": "5996fe3295289630a0fb23baf599b78f23e438a2",
+        "patch_sha256": "535d2da40f7393faee4c7f90c5795a235b29fde321597fb92afd5b657205687a",
+        "hunks": 66
+      }
+    ]
+  },
+  "sampled_planning_documentation_diff_audit": {
+    "source_commit": "f654aa5a983a95b403f33d1577c42e4fafed2bb8",
+    "parent": "a5e313a3c7ce65e8c2c042ae32f2716ced795af6",
+    "patch_sha256": "c802e35e78f1f1fd917ad70a936b5e6e37d2a77f651ad06f325ef2c51199fbca",
+    "files": [
+      "rust/crates/goa2-core/src/interpreter/search.rs",
+      "rust/crates/goa2-core/src/interpreter/search/generation.rs"
+    ],
+    "scope": "Only Rust documentation comments and a blank line moved. The parent native-suite spell restore failure is not addressed by this patch."
+  },
+  "verification_tooling_diff_audit": [
+    {
+      "source_commit": "5f81b93a1a01503d62caea4c65fd1c657a6d2082",
+      "files": [
+        "rust/crates/goa2-search-cli/src/main.rs",
+        "rust/docs/testing.md"
+      ],
+      "patch_sha256": "adb8885429f74e2457d23159c2ef724c686dec82658c64c2532bfd689031bb91",
+      "scope": "Adds opt-in completion logging after verify_case in the indexed oracle test module. Case traversal, assertions and production engine inputs are unchanged."
+    },
+    {
+      "source_commit": "33e7e8bdb0a1d7cb2d4d10c6d8f4b2f0d9c78bbe",
+      "files": [
+        "rust/test-support/fixture_cache.rs"
+      ],
+      "patch_sha256": "8159250d41ef609719f70f15885f21cb5bc690f90bb0994534691956b1cfe149",
+      "scope": "Adds BufReader around successfully opened fixture readers in shared test support. Fixture selection and the engine under test are unchanged; read buffering can affect suite runtime."
+    }
+  ],
+  "third_import_refactor_full_differential": {
+    "stage": "full",
+    "command": [
+      "python3",
+      "tools/check.py",
+      "full",
+      "--profile",
+      "iterate"
+    ],
+    "started_utc": "2026-11-14T02:01:27.327858+00:00",
+    "boot_id": "4b9bf66b-4f90-434c-b9a2-d7c53e9fbf7a",
+    "source_commit": "5996fe3295289630a0fb23baf599b78f23e438a2",
+    "source_identity": "229f425225c29f9f02c2120df20ed3c9ff3fca191d8155e605591b0a89fc43a2",
+    "test_threads": "2",
+    "oracle_workers": "2",
+    "memory_max_bytes": 2147483648,
+    "finished_utc": "2026-11-14T03:02:24.032506+00:00",
+    "exit_code": 0,
+    "source_identity_unchanged": true,
+    "log_sha256": "c85ce636209ad4906ec26a57ed6a315fc66c266ebd9885eb1b779e8722eec94e",
+    "native_tests": 638,
+    "differential_tests": 5,
+    "canonical_cases": 6592,
+    "live_cases": 17347
+  },
+  "third_import_refactor_exhaustive_restore": {
+    "exit_code": 0,
+    "source_identity_unchanged": true,
+    "source_identity": "229f425225c29f9f02c2120df20ed3c9ff3fca191d8155e605591b0a89fc43a2",
+    "cases": 17347,
+    "shards": 8,
+    "binary_sha256": "658ab67834fcc22291d3d00240c0a5d202348d1b5c043d5071d7a5aa90ab7e37",
+    "finished_utc": "2026-11-14T03:36:24.678331+00:00",
+    "source_commit": "5996fe3295289630a0fb23baf599b78f23e438a2",
+    "result_sha256": "53a1c1b4550b319351affdd9c48b334cc7470e213b29ba18467f1941db107bcc",
+    "shard_results": [
+      {
+        "shard": 1,
+        "cases": 2169,
+        "log_sha256": "60cd567dc66fdf0c8d67c6a8bee194db4c6d63e10085ea57bc24646f4b5e59bf"
+      },
+      {
+        "shard": 2,
+        "cases": 2169,
+        "log_sha256": "64937f7a07f6213da4769f9dfb23f66937331d1737d4291836b24ba67bc8a91b"
+      },
+      {
+        "shard": 3,
+        "cases": 2169,
+        "log_sha256": "121f16ccb8dbc47df3720d9b7da59091326a7fd9e1bcb69f927b9a681b9173c4"
+      },
+      {
+        "shard": 4,
+        "cases": 2168,
+        "log_sha256": "c381f65ef3e47dfc46a852e82f56cc87cd5c274f12815827a20d1468f7f28874"
+      },
+      {
+        "shard": 5,
+        "cases": 2168,
+        "log_sha256": "31465a3797b6114ef8deefabfba67d07556dbb2b5a9be4d98df2ec3a1fbad0d6"
+      },
+      {
+        "shard": 6,
+        "cases": 2168,
+        "log_sha256": "d6860f001ad297d973014405fded478a327f4c1b3c7b2453b09584cd9d872f01"
+      },
+      {
+        "shard": 7,
+        "cases": 2168,
+        "log_sha256": "36d3e6f00cd2fe7afc17ae03777561feece558741ddd560fbbcd6139d02f428d"
+      },
+      {
+        "shard": 8,
+        "cases": 2168,
+        "log_sha256": "3ce57fa2edd91ad0eaf07b26b248b147ca415daa5cca49207c63fb539534c6a4"
+      }
+    ]
+  },
+  "third_import_refactor_regression_test_results": {
+    "source_commit": "5996fe3295289630a0fb23baf599b78f23e438a2",
+    "log_sha256": "c85ce636209ad4906ec26a57ed6a315fc66c266ebd9885eb1b779e8722eec94e",
+    "passed_tests": [
+      "interpreter::tests::deadlines_and_cancellation_preserve_waiting_state",
+      "cancelled_expired_and_zero_prefix_leave_live_object_state_untouched",
+      "live_game_bot_uses_legal_fallback_at_deadline_and_honors_cancel",
+      "interpreter::search::tests::mandatory_upgrade_search_retains_a_scored_legal_choice_at_the_node_limit",
+      "trace_tests::primary_text_fallback_movement_and_attack_match_python"
+    ],
+    "scope": "Named checks from the full run. Earlier structural comparisons measured four fixed-node workloads and sampled restore coverage; these named passes apply to this revision."
+  },
+  "historical_spell_fix_preimage_audit": {
+    "fix_commit": "b3ca2ffcab1fb0281470b3df1e4ce716ff82aba1",
+    "fix_parent": "5f81b93a1a01503d62caea4c65fd1c657a6d2082",
+    "unchanged_preimage_blobs": {
+      "rust/content/catalogs/spell-builders.json": "31ea497980e8ba226ee1f2bf4774b45fd5d14b2c",
+      "rust/crates/goa2-core/src/interpreter/object_execution/passive_bodies.rs": "b3e240853d7fd9e16998a1d0aedfa240cb8f99b1",
+      "rust/crates/goa2-core/src/interpreter/object_execution/primary_bodies.rs": "8cf7b01ef4024d4e1d4c6a48b023fe6e4218fb8d",
+      "rust/crates/goa2-core/src/interpreter/object_execution/spell_bodies.rs": "05d2fd9066c12655263f16440a2d92865e67de93",
+      "rust/docs/content.md": "e121275afe46f650af3660826520d33854e9644a",
+      "rust/tools/primary_operand_parity.py": "6c1dcbaaf07232d6a524affe1db9b8c5ac0b657d",
+      "scripts/rust_oracle/primary_operand_wire.py": "29c5a09934f0993a593f5a07a16fe7b8d34f7e8b",
+      "scripts/rust_oracle/spell_builders.py": "e142b9e2573dfcddc9ee2b70374e7e539731cbe2"
+    },
+    "revisions": [
+      "7e87efd76ff7e0ba7aa53524f0bd33debcd98eb7",
+      "dea9cc390d86205d50942d0c9980cb4cdaeaede9",
+      "360f42632ed9b374962c22e75c48d4e9109d7a9a",
+      "e105a24bd3b70cd910c96981652734c896a48e0e",
+      "75329f77c0afa01a2624460f639f5d2c3782aa4d",
+      "15eea30cc570843ff82952b6b2cf71b32a494f4c",
+      "f52b9889f58bd529f2c55980dca84d86949f3e0c",
+      "c309705939db768670b05aa376703c51557b0705",
+      "43a825876ec27478601e735254aba4fed3f7987e",
+      "28ee2dff5dee944c8a88abe59e03e1841f1fe4d0",
+      "b43eec268a3aee96b2065013f909f0be87d90540",
+      "a5e313a3c7ce65e8c2c042ae32f2716ced795af6"
+    ],
+    "scope": "All files modified by the spell fix have identical pre-fix contents across the listed revisions. This permits applying the same fix to both sides of a behavioral comparison without modifying the refactor diffs in this range. Runtime comparisons on those corrected revisions remain pending."
+  },
+  "historical_spell_fix_controlled_comparison_inputs": {
+    "fix_patch_sha256": "0b5f9f03ac7580590ceb8ad73ff4bf239b868a7489ff2a8099c996c0a1ff1da4",
+    "corrected_git_trees": {
+      "7e87efd76ff7e0ba7aa53524f0bd33debcd98eb7": "9e4e5da9553f558adb5c109513680404da4782eb",
+      "dea9cc390d86205d50942d0c9980cb4cdaeaede9": "0bb64c1874219bb0b05d1add76dd4a97a350405f",
+      "360f42632ed9b374962c22e75c48d4e9109d7a9a": "f8588c1054d0cc17fa2606dd6f1fbea26558cd6b",
+      "e105a24bd3b70cd910c96981652734c896a48e0e": "9964740760c9d241cca7b8b4c3992e0495079de0",
+      "75329f77c0afa01a2624460f639f5d2c3782aa4d": "23a0df73b53e8807b10f5bb34083e0f020e297de",
+      "15eea30cc570843ff82952b6b2cf71b32a494f4c": "814a418bbf237b1e91fdab0f7ceb952ef825b870",
+      "f52b9889f58bd529f2c55980dca84d86949f3e0c": "b77fb5fbe652c031f9e044eab41c4542b3dc07ca",
+      "c309705939db768670b05aa376703c51557b0705": "72d4663df889fb18b6b923b32b44a2ad7a4d245a",
+      "43a825876ec27478601e735254aba4fed3f7987e": "5548975eb70ea677cde3e1ff2a15eb0d4e2ff42b",
+      "28ee2dff5dee944c8a88abe59e03e1841f1fe4d0": "a53275dfd69c1e7a496e385aab3e009e515253c4",
+      "b43eec268a3aee96b2065013f909f0be87d90540": "5c6dbcd9d0f666e9e8c57e3a1e1502689b08ae8d",
+      "a5e313a3c7ce65e8c2c042ae32f2716ced795af6": "c9d3d6e97bdaed465a170a2d4d7619b656f763f0"
+    },
+    "unchanged_refactor_diffs": [
+      {
+        "parent": "7e87efd76ff7e0ba7aa53524f0bd33debcd98eb7",
+        "child": "dea9cc390d86205d50942d0c9980cb4cdaeaede9",
+        "patch_sha256": "e6e2a721fea029172a95988a8bc4044c8cf7a1b075c10fd3dfd20b7290923568"
+      },
+      {
+        "parent": "dea9cc390d86205d50942d0c9980cb4cdaeaede9",
+        "child": "360f42632ed9b374962c22e75c48d4e9109d7a9a",
+        "patch_sha256": "bf558252792b4a41fe071ac12b9c15808d38b612447c43c553e749062c938d33"
+      },
+      {
+        "parent": "360f42632ed9b374962c22e75c48d4e9109d7a9a",
+        "child": "e105a24bd3b70cd910c96981652734c896a48e0e",
+        "patch_sha256": "6d5bd8da4db1fb00c40e41a58e3d235c338adc105b5cd131d9ba65531f0e9fb1"
+      },
+      {
+        "parent": "e105a24bd3b70cd910c96981652734c896a48e0e",
+        "child": "75329f77c0afa01a2624460f639f5d2c3782aa4d",
+        "patch_sha256": "cf56271675545127166a4c59d1d6829e01b356a16100b372340370d5d9a3bdfc"
+      },
+      {
+        "parent": "75329f77c0afa01a2624460f639f5d2c3782aa4d",
+        "child": "15eea30cc570843ff82952b6b2cf71b32a494f4c",
+        "patch_sha256": "1d277b32139025add0ecd5c76249b882b1f43be84dbd3f1522a733e03f118572"
+      },
+      {
+        "parent": "15eea30cc570843ff82952b6b2cf71b32a494f4c",
+        "child": "f52b9889f58bd529f2c55980dca84d86949f3e0c",
+        "patch_sha256": "845d33e463002dc1a3802cefede6c94385b75f6ba97b6d5f5d14b340ec89faaa"
+      },
+      {
+        "parent": "f52b9889f58bd529f2c55980dca84d86949f3e0c",
+        "child": "c309705939db768670b05aa376703c51557b0705",
+        "patch_sha256": "b19b33572016b06d3182c96d193ddd08c6ef51fb730388de894af6502290320b"
+      },
+      {
+        "parent": "c309705939db768670b05aa376703c51557b0705",
+        "child": "43a825876ec27478601e735254aba4fed3f7987e",
+        "patch_sha256": "be8fe85cd6f07795c0be002e56f9b6ee9a10d585ada76bcf548c18d8e9d14e5c"
+      },
+      {
+        "parent": "43a825876ec27478601e735254aba4fed3f7987e",
+        "child": "28ee2dff5dee944c8a88abe59e03e1841f1fe4d0",
+        "patch_sha256": "6faee1df53e437e4ff2a48fa2cfbb254ce0546c74cd945ffe91f3c8c905040f5"
+      },
+      {
+        "parent": "28ee2dff5dee944c8a88abe59e03e1841f1fe4d0",
+        "child": "b43eec268a3aee96b2065013f909f0be87d90540",
+        "patch_sha256": "9384bc3e8e3f07cec67b76702b4ebf70d2c452c858f867807d8518b040f12bc9"
+      },
+      {
+        "parent": "b43eec268a3aee96b2065013f909f0be87d90540",
+        "child": "a5e313a3c7ce65e8c2c042ae32f2716ced795af6",
+        "patch_sha256": "181f8d1b9eb0ce9a7902e2e3ebad0ba3d544dd6595058073cf4d7af44c09b4a3"
+      }
+    ]
+  },
+  "historical_spell_fix_shared_verification_inputs": {
+    "revision_count": 12,
+    "matching_spell_fix_commit": "b3ca2ffcab1fb0281470b3df1e4ce716ff82aba1",
+    "git_objects": {
+      "rust/content": "adcb6f30d13c06b6d8286da16c38135d021c4a3c",
+      "rust/tests/fixtures": "9f27674db9007d752d2cb1947e0ecfb7fa971db0",
+      "rust/tools/fixtures.py": "5f30b8101b4ff8b74b5921072bd4580f92f99907",
+      "rust/tools/check.py": "7901161af0ce45c3cc1fff842b0590a13e08b112",
+      "rust/oracle-manifest.json": "bbe91a87493a3dd18d200ee88b0daa97d7c84193",
+      "rust/Cargo.lock": "ab2c079a28456f729f56e9f4bfdd125777feee25",
+      "rust/Cargo.toml": "41843dcfbd64fce52243a31b663668dc64298986",
+      "rust/rust-toolchain.toml": "58eef2ccd48f957feeada49b17ad1e3fd667bf8c"
+    },
+    "scope": "These tracked inputs are identical across the corrected revisions. Shared fixture preflight also requires a stable external cache and does not replace per-revision test execution."
+  },
+  "historical_corrected_tip_source_comparison": {
+    "original_revision": "a5e313a3c7ce65e8c2c042ae32f2716ced795af6",
+    "corrected_tree": "c9d3d6e97bdaed465a170a2d4d7619b656f763f0",
+    "verified_subject": "b3ca2ffcab1fb0281470b3df1e4ce716ff82aba1",
+    "patch_sha256": "ad0a384d9c47da574d779b428ade2b3c028e796dac36a339ad1abdbc27b89393",
+    "files": [
+      "rust/crates/goa2-core/src/interpreter/search.rs",
+      "rust/crates/goa2-core/src/interpreter/search/generation.rs",
+      "rust/crates/goa2-search-cli/src/main.rs",
+      "rust/docs/testing.md"
+    ],
+    "scope": "The corrected tip differs from the spell fix only by the previously audited documentation and test-progress logging changes. The full test executable is built from the spell-fix commit."
+  },
+  "historical_spell_fix_full_differential_failure": {
+    "stage": "full",
+    "command": [
+      "python3",
+      "tools/check.py",
+      "full",
+      "--profile",
+      "iterate"
+    ],
+    "started_utc": "2026-11-14T03:36:33.207715+00:00",
+    "boot_id": "4b9bf66b-4f90-434c-b9a2-d7c53e9fbf7a",
+    "source_commit": "b3ca2ffcab1fb0281470b3df1e4ce716ff82aba1",
+    "source_identity": "21119f9ae3fa8adabadca0c081ba6308fa30edf6c52dda2969e14769064a3abf",
+    "test_threads": "2",
+    "oracle_workers": "2",
+    "memory_max_bytes": 2147483648,
+    "finished_utc": "2026-11-14T04:29:30.232018+00:00",
+    "exit_code": 101,
+    "source_identity_unchanged": true,
+    "log_sha256": "5bfa6b1d33b0c643e3016d24e6553c4c2ecd1e74273d1b88075d440fd9b636f6",
+    "differential_failed_cases": [
+      "object-execution-primary-text-fallback-attack",
+      "object-execution-primary-text-fallback-movement"
+    ],
+    "spell_restore_passed": true,
+    "exhaustive_restore_started": false,
+    "later_fallback_fix": "ebd520350dba4e4ba73e18f6d192115791fc28db"
+  },
+  "historical_spell_and_fallback_controlled_comparison_inputs": {
+    "fallback_fix_commit": "ebd520350dba4e4ba73e18f6d192115791fc28db",
+    "fallback_engine_patch_sha256": "9947b0cb8d2b6d05b3cfdee01380819da96481686b2474c76d0550d3791e0202",
+    "corrected_git_trees": {
+      "7e87efd76ff7e0ba7aa53524f0bd33debcd98eb7": "14c707d84e786eaa0dbab984e666dfab86577012",
+      "dea9cc390d86205d50942d0c9980cb4cdaeaede9": "a1748acd54f23edafb9f9b2a7553127f1d3b6f29",
+      "360f42632ed9b374962c22e75c48d4e9109d7a9a": "8f3bf90e3d850ce20b9518f6b28c252c21615108",
+      "e105a24bd3b70cd910c96981652734c896a48e0e": "de0d3b6ce3fcb9de145498a2ba75220b145fce23",
+      "75329f77c0afa01a2624460f639f5d2c3782aa4d": "8dd9f1f509105c80452ce84b55627a7132a197ec",
+      "15eea30cc570843ff82952b6b2cf71b32a494f4c": "221e59457bf154f19eb635b6a432ce3941680066",
+      "f52b9889f58bd529f2c55980dca84d86949f3e0c": "29d12f2ce26ffdacb6f667adf97afa7f59f129cb",
+      "c309705939db768670b05aa376703c51557b0705": "ae32e26eadc6ad0d8ae5aad600de6cbb1cbbeb2b",
+      "43a825876ec27478601e735254aba4fed3f7987e": "ef8443ee3a9ae9c32cf96acb67930cd2d1613525",
+      "28ee2dff5dee944c8a88abe59e03e1841f1fe4d0": "0a07c7f52997c506a2435c67b81d38db5963f71d",
+      "b43eec268a3aee96b2065013f909f0be87d90540": "c2168224fafd461f67118e880039dd4621781110",
+      "a5e313a3c7ce65e8c2c042ae32f2716ced795af6": "51f43dd55b7b41689b0cd559a69c302200994ff6"
+    },
+    "preserved_refactor_diffs": 11
+  },
+  "historical_planning_world_options_review": {
+    "parent": "43a825876ec27478601e735254aba4fed3f7987e",
+    "child": "28ee2dff5dee944c8a88abe59e03e1841f1fe4d0",
+    "patch_sha256": "6faee1df53e437e4ff2a48fa2cfbb254ce0546c74cd945ffe91f3c8c905040f5",
+    "production_call_sites": 3,
+    "test_call_sites": 1,
+    "scope": "PlanningWorldOptions bundles the same five arguments at each call and immediately destructures them at function entry. Seed, deep, and shallow paths retain the existing limits, worker counts, partition overrides, budget references, and minimum live rows. Native runtime verification of the corrected revision remains pending."
+  },
+  "historical_both_fixes_fixture_preflight_inputs": {
+    "reference_commit": "b3ca2ffcab1fb0281470b3df1e4ce716ff82aba1",
+    "corrected_revisions": 12,
+    "tracked_inputs": {
+      "rust/content": "adcb6f30d13c06b6d8286da16c38135d021c4a3c",
+      "rust/tests/fixtures": "9f27674db9007d752d2cb1947e0ecfb7fa971db0",
+      "rust/oracle-manifest.json": "bbe91a87493a3dd18d200ee88b0daa97d7c84193",
+      "rust/tools/fixtures.py": "5f30b8101b4ff8b74b5921072bd4580f92f99907"
+    },
+    "scope": "The tracked inputs used by fixture preflight match across the historical comparisons with both engine fixes applied. The external fixture cache still needs verification."
+  },
+  "historical_corrected_verification_checkouts": [
+    {
+      "original_revision": "7e87efd76ff7e0ba7aa53524f0bd33debcd98eb7",
+      "verification_commit": "0949f86640511b70e74342d8f75b595a31a0e8e3",
+      "tree": "14c707d84e786eaa0dbab984e666dfab86577012",
+      "runner_sha256": "da81e38f183d553bc9d2024e60a4a6064a1193cf99027dbfac0cde001e0bce62"
+    },
+    {
+      "original_revision": "dea9cc390d86205d50942d0c9980cb4cdaeaede9",
+      "verification_commit": "7bedd0822a135d6f18c8264e09054d29154edadf",
+      "tree": "a1748acd54f23edafb9f9b2a7553127f1d3b6f29",
+      "runner_sha256": "c2209a266b71fb7c36335a577d5da0fdd5d021ae82700b0976839e2cf1fea9ee"
+    },
+    {
+      "original_revision": "360f42632ed9b374962c22e75c48d4e9109d7a9a",
+      "verification_commit": "8b027359f9f4683670968640cbbaeaf63b1ea49d",
+      "tree": "8f3bf90e3d850ce20b9518f6b28c252c21615108",
+      "runner_sha256": "9de207b678d478106a79c9abd0844c1a089d845a3149c1a11a56e799109de5ae"
+    },
+    {
+      "original_revision": "e105a24bd3b70cd910c96981652734c896a48e0e",
+      "verification_commit": "c371763d21fa9a8ef9eda8232d7f255b25fc9160",
+      "tree": "de0d3b6ce3fcb9de145498a2ba75220b145fce23",
+      "runner_sha256": "2bae917280bf635e9da8ec6c47612e2fdcb379e21f64ad01c2de16b3993679fa"
+    },
+    {
+      "original_revision": "75329f77c0afa01a2624460f639f5d2c3782aa4d",
+      "verification_commit": "98014a188b43370505c3150a461e7c6ab15fc442",
+      "tree": "8dd9f1f509105c80452ce84b55627a7132a197ec",
+      "runner_sha256": "02d16f4a2ace95ddaa237dfc6952537ca74ec8e8f77362ab14636c6ce5b676b4"
+    },
+    {
+      "original_revision": "15eea30cc570843ff82952b6b2cf71b32a494f4c",
+      "verification_commit": "a294d0e4a86ed368583b6292f5b8537142e53664",
+      "tree": "221e59457bf154f19eb635b6a432ce3941680066",
+      "runner_sha256": "2fd8050bfb0fd6c4dc398498c6cc1169a8a7122d63133f0dbb84c09e7b295931"
+    },
+    {
+      "original_revision": "f52b9889f58bd529f2c55980dca84d86949f3e0c",
+      "verification_commit": "383d09d0565b7abd6e6b7aa4c1b0fbaa5349bbea",
+      "tree": "29d12f2ce26ffdacb6f667adf97afa7f59f129cb",
+      "runner_sha256": "f159fbc9a4d580f73b250128fbd210ebe8cc812271565b4143244cb0f2d5431b"
+    },
+    {
+      "original_revision": "c309705939db768670b05aa376703c51557b0705",
+      "verification_commit": "81948567cc21010ab83376a866a81f29bd700c6d",
+      "tree": "ae32e26eadc6ad0d8ae5aad600de6cbb1cbbeb2b",
+      "runner_sha256": "7d3cbb13e86fd08b021329b53348d32abb3001c66c64c7a958685863166da390"
+    },
+    {
+      "original_revision": "43a825876ec27478601e735254aba4fed3f7987e",
+      "verification_commit": "c06a62623a6b94dfd8ddea47db8846dac96d9730",
+      "tree": "ef8443ee3a9ae9c32cf96acb67930cd2d1613525",
+      "runner_sha256": "b41d898f6ff1b9142e52c263df4820da6d37480b100392411c80ecb416563a57"
+    },
+    {
+      "original_revision": "28ee2dff5dee944c8a88abe59e03e1841f1fe4d0",
+      "verification_commit": "2777f226bf0fa3b297ae764f8b956bbdc3dbc6bb",
+      "tree": "0a07c7f52997c506a2435c67b81d38db5963f71d",
+      "runner_sha256": "f145abaa5794ffbe366d2bafaa29bbe80d66e31551591cbf26f3499ad8ea5651"
+    },
+    {
+      "original_revision": "b43eec268a3aee96b2065013f909f0be87d90540",
+      "verification_commit": "aa44667be544448f818bdbfe2bdf0cb2e74c22e4",
+      "tree": "c2168224fafd461f67118e880039dd4621781110",
+      "runner_sha256": "5e6ac6bbd56e1d52c54b8ac00d85af788a1fd5ed71e9994b5a770e5f06746cb0"
+    },
+    {
+      "original_revision": "a5e313a3c7ce65e8c2c042ae32f2716ced795af6",
+      "verification_commit": "26babe447a6bdb1be4e7e9448ebabc30042d4be0",
+      "tree": "51f43dd55b7b41689b0cd559a69c302200994ff6",
+      "runner_sha256": "2ddbdfa82598755dfcbd286cbf751043859c8c40faecb747117203b1f084e930"
+    }
+  ],
+  "historical_corrected_baseline_native_suite": {
+    "original_revision": "7e87efd76ff7e0ba7aa53524f0bd33debcd98eb7",
+    "verification_commit": "0949f86640511b70e74342d8f75b595a31a0e8e3",
+    "tree": "14c707d84e786eaa0dbab984e666dfab86577012",
+    "runner_sha256": "da81e38f183d553bc9d2024e60a4a6064a1193cf99027dbfac0cde001e0bce62",
+    "source_identity": "959738e7ff7607c6209e12f00a41384b8f6ac94e99f5c2aae1fb6e091a9e6b50",
+    "native_tests": 638,
+    "log_prefix_bytes": 79961,
+    "log_prefix_sha256": "76a88417df2098b6759df8e5c826000211c86b2314d2becec22bc60ca661823c",
+    "scope": "Native suite before the differential command. Final source identity and differential coverage require the completed full stage record."
+  },
+  "historical_corrected_baseline_full_differential": {
+    "stage": "full",
+    "command": [
+      "python3",
+      "tools/check.py",
+      "full",
+      "--profile",
+      "iterate"
+    ],
+    "started_utc": "2026-11-14T04:31:21.660666+00:00",
+    "boot_id": "4b9bf66b-4f90-434c-b9a2-d7c53e9fbf7a",
+    "source_commit": "0949f86640511b70e74342d8f75b595a31a0e8e3",
+    "source_identity": "959738e7ff7607c6209e12f00a41384b8f6ac94e99f5c2aae1fb6e091a9e6b50",
+    "test_threads": "2",
+    "oracle_workers": "2",
+    "memory_max_bytes": 2147483648,
+    "finished_utc": "2026-11-14T05:31:12.005776+00:00",
+    "exit_code": 0,
+    "source_identity_unchanged": true,
+    "log_sha256": "5c162583d786bbba9c959bf78bb04f92cea84474d3ee33afcb99bfd528476fb3",
+    "native_tests": 638,
+    "differential_tests": [
+      "trace_tests::every_native_transition_matches_python_full_state_request_and_event_order",
+      "trace_tests::complete_games_match_python_at_every_operation_using_lossless_snapshot_deltas",
+      "trace_tests::hanu_complete_games_match_python_at_every_operation_with_shared_models_and_turns",
+      "trace_tests::live_shared_steps_and_context_match_python_values_requests_and_identity"
+    ],
+    "canonical_cases": 6592,
+    "live_cases": 17347,
+    "original_revision": "7e87efd76ff7e0ba7aa53524f0bd33debcd98eb7",
+    "tree": "14c707d84e786eaa0dbab984e666dfab86577012"
+  },
+  "historical_corrected_baseline_exhaustive_restore": {
+    "exit_code": 0,
+    "source_identity_unchanged": true,
+    "source_identity": "959738e7ff7607c6209e12f00a41384b8f6ac94e99f5c2aae1fb6e091a9e6b50",
+    "cases": 17347,
+    "shards": 8,
+    "binary_sha256": "e9f57e07cb73bd93010ab6fc3b9221db69eb40d2168f1f090b053e48fc2d5892",
+    "finished_utc": "2026-11-14T06:05:07.721302+00:00",
+    "source_commit": "0949f86640511b70e74342d8f75b595a31a0e8e3",
+    "original_revision": "7e87efd76ff7e0ba7aa53524f0bd33debcd98eb7",
+    "tree": "14c707d84e786eaa0dbab984e666dfab86577012",
+    "result_sha256": "98194710143c68129f6fddd56609059057dcfb1d45e5309653ba83a7fb79cd2f",
+    "shard_results": [
+      {
+        "shard": 1,
+        "cases": 2169,
+        "log_sha256": "91899ecd37124917ea37d02b39ddd2ac85e56375aaaad91508420b56827d458c"
+      },
+      {
+        "shard": 2,
+        "cases": 2169,
+        "log_sha256": "6bdf2bbb048418ae2dff947074c6652b9a72eff3525739b7c11c37fc22d17301"
+      },
+      {
+        "shard": 3,
+        "cases": 2169,
+        "log_sha256": "bbd4bd947cc49e95aae858d2f359dd69507619179aac50d33317a0f7f2620559"
+      },
+      {
+        "shard": 4,
+        "cases": 2168,
+        "log_sha256": "07f344119e98a2a253c9af80ac7aee19426faf354a0889ff66dd3169f180f0ae"
+      },
+      {
+        "shard": 5,
+        "cases": 2168,
+        "log_sha256": "5989314387d7ad24b2021cdbb4f95ee2ea345d5bef04c424c23c96c6803f0a75"
+      },
+      {
+        "shard": 6,
+        "cases": 2168,
+        "log_sha256": "16bfd7469edefb1f05bb318db2aa60a8cb46e15c1988ee8573ce4e61a335b25c"
+      },
+      {
+        "shard": 7,
+        "cases": 2168,
+        "log_sha256": "ec3daf366883b9141fa845db1598986286e7e17ace8399f41a06de40dd1ecbd7"
+      },
+      {
+        "shard": 8,
+        "cases": 2168,
+        "log_sha256": "e91ee815773ab87c7242bc4a011028ca11f3eefae82b7be1b3f8080756c207d7"
+      }
+    ]
+  },
+  "historical_first_corrected_refactor_handoff": {
+    "baseline_finished_utc": "2026-11-14T06:05:07.721302+00:00",
+    "baseline_restore_result_sha256": "98194710143c68129f6fddd56609059057dcfb1d45e5309653ba83a7fb79cd2f",
+    "refactor_started_utc": "2026-11-14T06:05:17.355743+00:00",
+    "verification_commit": "7bedd0822a135d6f18c8264e09054d29154edadf",
+    "source_identity_at_start": "e21483f002d3c7bffd1406a54952d256d17aaeed4412798f02c4214f50e89074",
+    "runner_sha256": "c2209a266b71fb7c36335a577d5da0fdd5d021ae82700b0976839e2cf1fea9ee"
+  },
+  "historical_first_corrected_refactor_native_suite": {
+    "original_revision": "dea9cc390d86205d50942d0c9980cb4cdaeaede9",
+    "verification_commit": "7bedd0822a135d6f18c8264e09054d29154edadf",
+    "tree": "a1748acd54f23edafb9f9b2a7553127f1d3b6f29",
+    "runner_sha256": "c2209a266b71fb7c36335a577d5da0fdd5d021ae82700b0976839e2cf1fea9ee",
+    "source_identity": "e21483f002d3c7bffd1406a54952d256d17aaeed4412798f02c4214f50e89074",
+    "native_tests": 638,
+    "log_prefix_bytes": 77945,
+    "log_prefix_sha256": "f597ffd5e9e6b4a11a8c1425506be429f1d705cd9ab1742c16a7a921119cefb4",
+    "scope": "Completed native suite. The full stage record separately verifies final source identity and differential coverage."
+  },
+  "historical_first_corrected_refactor_full_differential": {
+    "stage": "full",
+    "command": [
+      "python3",
+      "tools/check.py",
+      "full",
+      "--profile",
+      "iterate"
+    ],
+    "started_utc": "2026-11-14T06:15:43.513706+00:00",
+    "boot_id": "b83cc236-37cc-445c-82ad-c57b1553853b",
+    "source_commit": "7bedd0822a135d6f18c8264e09054d29154edadf",
+    "source_identity": "e21483f002d3c7bffd1406a54952d256d17aaeed4412798f02c4214f50e89074",
+    "test_threads": "2",
+    "oracle_workers": "2",
+    "memory_max_bytes": 2147483648,
+    "finished_utc": "2026-11-14T07:13:50.975904+00:00",
+    "exit_code": 0,
+    "source_identity_unchanged": true,
+    "log_sha256": "6b84c9622909b7372599e94e475255cc1fe2539f931cac2105e1392d926db7f9",
+    "native_tests": 638,
+    "differential_tests": [
+      "trace_tests::every_native_transition_matches_python_full_state_request_and_event_order",
+      "trace_tests::complete_games_match_python_at_every_operation_using_lossless_snapshot_deltas",
+      "trace_tests::hanu_complete_games_match_python_at_every_operation_with_shared_models_and_turns",
+      "trace_tests::live_shared_steps_and_context_match_python_values_requests_and_identity"
+    ],
+    "canonical_cases": 6592,
+    "live_cases": 17347,
+    "original_revision": "dea9cc390d86205d50942d0c9980cb4cdaeaede9",
+    "tree": "a1748acd54f23edafb9f9b2a7553127f1d3b6f29"
+  },
+  "historical_first_corrected_refactor_exhaustive_restore": {
+    "exit_code": 0,
+    "source_identity_unchanged": true,
+    "source_identity": "e21483f002d3c7bffd1406a54952d256d17aaeed4412798f02c4214f50e89074",
+    "cases": 17347,
+    "shards": 8,
+    "binary_sha256": "e9f57e07cb73bd93010ab6fc3b9221db69eb40d2168f1f090b053e48fc2d5892",
+    "finished_utc": "2026-11-14T07:44:42.398154+00:00",
+    "source_commit": "7bedd0822a135d6f18c8264e09054d29154edadf",
+    "original_revision": "dea9cc390d86205d50942d0c9980cb4cdaeaede9",
+    "tree": "a1748acd54f23edafb9f9b2a7553127f1d3b6f29",
+    "result_sha256": "66e5d28b843c51333f0f102959229434c706d7c1a0b7cce3b7f4dd2ac194c09b",
+    "shard_results": [
+      {
+        "shard": 1,
+        "cases": 2169,
+        "log_sha256": "e3938d3be963c9ca05b58d0bd0bc56aeda882a2895bbefa2837205812479dc75"
+      },
+      {
+        "shard": 2,
+        "cases": 2169,
+        "log_sha256": "fb6a41f1b07b9357a4f4824ec87039b0a0674f1383613b8680cb47be45f92bbd"
+      },
+      {
+        "shard": 3,
+        "cases": 2169,
+        "log_sha256": "cdc64b7cacf0aa09fa6038ccff25a280e0ff18acf29615fa34b07aadd9025fa6"
+      },
+      {
+        "shard": 4,
+        "cases": 2168,
+        "log_sha256": "2925ef9b201e801174a5a0e260acbb255a9a65fd68a52a63b6bb5c03a2cc02ae"
+      },
+      {
+        "shard": 5,
+        "cases": 2168,
+        "log_sha256": "243c8eb3d691a5bb8ee19eb0b3835377d01dec1d5138aba839a743c632e446ab"
+      },
+      {
+        "shard": 6,
+        "cases": 2168,
+        "log_sha256": "f99ca24fe2ed8efce7addac9b480e1c65e9e6626ceae2918eb35875c0cfd3d6a"
+      },
+      {
+        "shard": 7,
+        "cases": 2168,
+        "log_sha256": "d988a4d96146d32270f7daec62b16f9c45975c35a24c09f673a26a069670e7d8"
+      },
+      {
+        "shard": 8,
+        "cases": 2168,
+        "log_sha256": "672aedb147e98c5d18275e493a702f76b4df99c5cbcc5c9f9507519e566887df"
+      }
+    ]
+  },
+  "historical_second_corrected_refactor_native_suite": {
+    "stage": "full-native",
+    "command": [
+      "python3",
+      "-c",
+      "import sys; sys.path.insert(0,\"tools\"); from check import run; run(sys.argv[2:], tests=True, full=True, minimum=int(sys.argv[1]))",
+      "638",
+      "cargo",
+      "test",
+      "--locked",
+      "--profile",
+      "iterate",
+      "--workspace",
+      "--features",
+      "full-parity"
+    ],
+    "started_utc": "2026-11-14T08:04:44.375542+00:00",
+    "boot_id": "0975cfcc-506c-4366-9190-6c7eab32358a",
+    "source_commit": "8b027359f9f4683670968640cbbaeaf63b1ea49d",
+    "source_identity": "ffef9d2485bc0f7d8625e1533ee6732ef995ca14cbb0602bf00d6155f928bd84",
+    "test_threads": "2",
+    "oracle_workers": "2",
+    "memory_max_bytes": 2147483648,
+    "finished_utc": "2026-11-14T08:28:38.534189+00:00",
+    "exit_code": 0,
+    "source_identity_unchanged": true,
+    "log_sha256": "7f662b8c8eea7ef346ef61a68eb11ed4c4cbb5c77808a093b77b66b1fe0a096e",
+    "original_revision": "360f42632ed9b374962c22e75c48d4e9109d7a9a",
+    "tree": "8f3bf90e3d850ce20b9518f6b28c252c21615108",
+    "native_tests": 638,
+    "staged_runner_sha256": "7c222e25b25d398dd9f748909b9a488bb8e701922abf1e51aca823840ad21185"
+  },
+  "historical_second_corrected_refactor_full_differential": {
+    "stage": "full",
+    "command": [
+      "python3",
+      "-c",
+      "import sys; sys.path.insert(0,\"tools\"); from check import run; run(sys.argv[2:], tests=True, full=True, minimum=int(sys.argv[1]))",
+      "4",
+      "cargo",
+      "test",
+      "--locked",
+      "--profile",
+      "iterate",
+      "-p",
+      "goa2-search-cli",
+      "--bin",
+      "goa2-search-cli",
+      "trace_tests::",
+      "--",
+      "--ignored"
+    ],
+    "started_utc": "2026-11-14T08:28:38.831541+00:00",
+    "boot_id": "0975cfcc-506c-4366-9190-6c7eab32358a",
+    "source_commit": "8b027359f9f4683670968640cbbaeaf63b1ea49d",
+    "source_identity": "ffef9d2485bc0f7d8625e1533ee6732ef995ca14cbb0602bf00d6155f928bd84",
+    "test_threads": "2",
+    "oracle_workers": "2",
+    "memory_max_bytes": 2147483648,
+    "finished_utc": "2026-11-14T08:43:02.857130+00:00",
+    "exit_code": 0,
+    "source_identity_unchanged": true,
+    "log_sha256": "f48aee6b49c24a5a0bde5db82f1d70075a4ff613f2fc90c1da5c88154b17338b",
+    "stages": {
+      "full-fixtures": "ab7a222efb82d335d29d811260064ce4f2a742344add2edd96974c0abcbed2a1",
+      "full-native": "7f662b8c8eea7ef346ef61a68eb11ed4c4cbb5c77808a093b77b66b1fe0a096e",
+      "full-differential": "8ddad4d72c06733212132e1ff362c13364c1491a1d2d2aa398474f58dd5d7a09"
+    },
+    "native_tests": 638,
+    "differential_tests": [
+      "trace_tests::every_native_transition_matches_python_full_state_request_and_event_order",
+      "trace_tests::complete_games_match_python_at_every_operation_using_lossless_snapshot_deltas",
+      "trace_tests::hanu_complete_games_match_python_at_every_operation_with_shared_models_and_turns",
+      "trace_tests::live_shared_steps_and_context_match_python_values_requests_and_identity"
+    ],
+    "canonical_cases": 6592,
+    "live_cases": 17347,
+    "original_revision": "360f42632ed9b374962c22e75c48d4e9109d7a9a",
+    "tree": "8f3bf90e3d850ce20b9518f6b28c252c21615108"
+  },
+  "historical_second_corrected_refactor_exhaustive_restore": {
+    "exit_code": 0,
+    "source_identity_unchanged": true,
+    "source_identity": "ffef9d2485bc0f7d8625e1533ee6732ef995ca14cbb0602bf00d6155f928bd84",
+    "cases": 17347,
+    "shards": 8,
+    "binary_sha256": "e9f57e07cb73bd93010ab6fc3b9221db69eb40d2168f1f090b053e48fc2d5892",
+    "finished_utc": "2026-11-14T09:14:01.621376+00:00",
+    "source_commit": "8b027359f9f4683670968640cbbaeaf63b1ea49d",
+    "original_revision": "360f42632ed9b374962c22e75c48d4e9109d7a9a",
+    "tree": "8f3bf90e3d850ce20b9518f6b28c252c21615108",
+    "result_sha256": "3f83c6ca6bd3e908190b2fc8605b8882453070829aedc83811b46e9648179dab",
+    "shard_results": [
+      {
+        "shard": 1,
+        "cases": 2169,
+        "log_sha256": "1597898a601494f5212b96520a5deaa305dbb6c1c705941861b98a416410514e"
+      },
+      {
+        "shard": 2,
+        "cases": 2169,
+        "log_sha256": "84883fccf84762445db69c8458e8abcd85d5b6167d359f72f9f1df61078f906b"
+      },
+      {
+        "shard": 3,
+        "cases": 2169,
+        "log_sha256": "2ea3cc1782aac63ac67745ed39501619d09522bb810fc07446390a9937742c12"
+      },
+      {
+        "shard": 4,
+        "cases": 2168,
+        "log_sha256": "a39e18bfe181b64cffe3af077b637f40813b0fc6892e6c76e0b6c8e9057384c5"
+      },
+      {
+        "shard": 5,
+        "cases": 2168,
+        "log_sha256": "d57000ee9cff11e10f88a78c2c3a75118d0bd3788448d34d7be11a228d012bbf"
+      },
+      {
+        "shard": 6,
+        "cases": 2168,
+        "log_sha256": "e3526ec44e1d502508beb28ff54eabb03d8be135bc05c3b6741a68838dc3ce80"
+      },
+      {
+        "shard": 7,
+        "cases": 2168,
+        "log_sha256": "76e2e3479cac48efdf533796adf02e6e6e5976fc61f44b42fba937c0e81ca306"
+      },
+      {
+        "shard": 8,
+        "cases": 2168,
+        "log_sha256": "c2d0380f9191afac68b759b5314be60376b16e497951d4a2a45baeed02c44a69"
+      }
+    ]
+  },
+  "historical_restart_safe_verification_runners": [
+    {
+      "original_revision": "360f42632ed9b374962c22e75c48d4e9109d7a9a",
+      "verification_commit": "8b027359f9f4683670968640cbbaeaf63b1ea49d",
+      "runner_sha256": "7c222e25b25d398dd9f748909b9a488bb8e701922abf1e51aca823840ad21185"
+    },
+    {
+      "original_revision": "e105a24bd3b70cd910c96981652734c896a48e0e",
+      "verification_commit": "c371763d21fa9a8ef9eda8232d7f255b25fc9160",
+      "runner_sha256": "aa9d75e96e7c36468bc994750707acd7ea13b8eb979b485d28740b037d30726a"
+    },
+    {
+      "original_revision": "75329f77c0afa01a2624460f639f5d2c3782aa4d",
+      "verification_commit": "98014a188b43370505c3150a461e7c6ab15fc442",
+      "runner_sha256": "4b72317c4e498c9a1d33581798503e80e916da8afe64f19f59afdb86b1ec0666"
+    }
+  ],
+  "historical_third_corrected_refactor_native_suite": {
+    "stage": "full-native",
+    "command": [
+      "python3",
+      "-c",
+      "import sys; sys.path.insert(0,\"tools\"); from check import run; run(sys.argv[2:], tests=True, full=True, minimum=int(sys.argv[1]))",
+      "638",
+      "cargo",
+      "test",
+      "--locked",
+      "--profile",
+      "iterate",
+      "--workspace",
+      "--features",
+      "full-parity"
+    ],
+    "started_utc": "2026-11-14T09:23:35.384529+00:00",
+    "boot_id": "0975cfcc-506c-4366-9190-6c7eab32358a",
+    "source_commit": "c371763d21fa9a8ef9eda8232d7f255b25fc9160",
+    "source_identity": "2e0129d04b6b34508f877f27059aca56ce6059d1b9845cdef155b59854573918",
+    "test_threads": "2",
+    "oracle_workers": "2",
+    "memory_max_bytes": 2147483648,
+    "finished_utc": "2026-11-14T09:47:49.159943+00:00",
+    "exit_code": 0,
+    "source_identity_unchanged": true,
+    "log_sha256": "f80d5cd24d0503ad59f3142eb792d914405fa199b86d7dda9d4e08e6597cd596",
+    "original_revision": "e105a24bd3b70cd910c96981652734c896a48e0e",
+    "tree": "de0d3b6ce3fcb9de145498a2ba75220b145fce23",
+    "native_tests": 638,
+    "staged_runner_sha256": "aa9d75e96e7c36468bc994750707acd7ea13b8eb979b485d28740b037d30726a"
+  },
+  "structural_commit_sample_audit": {
+    "revisions": 17,
+    "comparisons": [
+      {
+        "parent": "7e87efd76ff7e0ba7aa53524f0bd33debcd98eb7",
+        "child": "dea9cc390d86205d50942d0c9980cb4cdaeaede9",
+        "workloads": [
+          {
+            "case": "complete-game-hanu-forgotten_island-progress-41",
+            "operation": "search_sampled_planning",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 426778391,
+            "child_median_ns": 425413685
+          },
+          {
+            "case": "complete-game-hanu-forgotten_island-progress-41",
+            "operation": "search_resolution",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 469207269,
+            "child_median_ns": 470393074
+          },
+          {
+            "case": "complete-game-hanu-magma_and_ice-progress-43",
+            "operation": "search_sampled_planning",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 435493486,
+            "child_median_ns": 429521485
+          },
+          {
+            "case": "complete-game-hanu-magma_and_ice-progress-43",
+            "operation": "search_resolution",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 492502157,
+            "child_median_ns": 481390471
+          }
+        ]
+      },
+      {
+        "parent": "dea9cc390d86205d50942d0c9980cb4cdaeaede9",
+        "child": "360f42632ed9b374962c22e75c48d4e9109d7a9a",
+        "workloads": [
+          {
+            "case": "complete-game-hanu-forgotten_island-progress-41",
+            "operation": "search_sampled_planning",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 425413685,
+            "child_median_ns": 421260376
+          },
+          {
+            "case": "complete-game-hanu-forgotten_island-progress-41",
+            "operation": "search_resolution",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 470393074,
+            "child_median_ns": 461761164
+          },
+          {
+            "case": "complete-game-hanu-magma_and_ice-progress-43",
+            "operation": "search_sampled_planning",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 429521485,
+            "child_median_ns": 433102075
+          },
+          {
+            "case": "complete-game-hanu-magma_and_ice-progress-43",
+            "operation": "search_resolution",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 481390471,
+            "child_median_ns": 483213660
+          }
+        ]
+      },
+      {
+        "parent": "360f42632ed9b374962c22e75c48d4e9109d7a9a",
+        "child": "e105a24bd3b70cd910c96981652734c896a48e0e",
+        "workloads": [
+          {
+            "case": "complete-game-hanu-forgotten_island-progress-41",
+            "operation": "search_sampled_planning",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 421260376,
+            "child_median_ns": 417383295
+          },
+          {
+            "case": "complete-game-hanu-forgotten_island-progress-41",
+            "operation": "search_resolution",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 461761164,
+            "child_median_ns": 459175883
+          },
+          {
+            "case": "complete-game-hanu-magma_and_ice-progress-43",
+            "operation": "search_sampled_planning",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 433102075,
+            "child_median_ns": 427950663
+          },
+          {
+            "case": "complete-game-hanu-magma_and_ice-progress-43",
+            "operation": "search_resolution",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 483213660,
+            "child_median_ns": 479260447
+          }
+        ]
+      },
+      {
+        "parent": "e105a24bd3b70cd910c96981652734c896a48e0e",
+        "child": "75329f77c0afa01a2624460f639f5d2c3782aa4d",
+        "workloads": [
+          {
+            "case": "complete-game-hanu-forgotten_island-progress-41",
+            "operation": "search_sampled_planning",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 417383295,
+            "child_median_ns": 424173873
+          },
+          {
+            "case": "complete-game-hanu-forgotten_island-progress-41",
+            "operation": "search_resolution",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 459175883,
+            "child_median_ns": 470750260
+          },
+          {
+            "case": "complete-game-hanu-magma_and_ice-progress-43",
+            "operation": "search_sampled_planning",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 427950663,
+            "child_median_ns": 426921173
+          },
+          {
+            "case": "complete-game-hanu-magma_and_ice-progress-43",
+            "operation": "search_resolution",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 479260447,
+            "child_median_ns": 492178554
+          }
+        ]
+      },
+      {
+        "parent": "75329f77c0afa01a2624460f639f5d2c3782aa4d",
+        "child": "15eea30cc570843ff82952b6b2cf71b32a494f4c",
+        "workloads": [
+          {
+            "case": "complete-game-hanu-forgotten_island-progress-41",
+            "operation": "search_sampled_planning",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 424173873,
+            "child_median_ns": 426206816
+          },
+          {
+            "case": "complete-game-hanu-forgotten_island-progress-41",
+            "operation": "search_resolution",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 470750260,
+            "child_median_ns": 466735608
+          },
+          {
+            "case": "complete-game-hanu-magma_and_ice-progress-43",
+            "operation": "search_sampled_planning",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 426921173,
+            "child_median_ns": 428098415
+          },
+          {
+            "case": "complete-game-hanu-magma_and_ice-progress-43",
+            "operation": "search_resolution",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 492178554,
+            "child_median_ns": 481361305
+          }
+        ]
+      },
+      {
+        "parent": "15eea30cc570843ff82952b6b2cf71b32a494f4c",
+        "child": "f52b9889f58bd529f2c55980dca84d86949f3e0c",
+        "workloads": [
+          {
+            "case": "complete-game-hanu-forgotten_island-progress-41",
+            "operation": "search_sampled_planning",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 426206816,
+            "child_median_ns": 423966323
+          },
+          {
+            "case": "complete-game-hanu-forgotten_island-progress-41",
+            "operation": "search_resolution",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 466735608,
+            "child_median_ns": 500496210
+          },
+          {
+            "case": "complete-game-hanu-magma_and_ice-progress-43",
+            "operation": "search_sampled_planning",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 428098415,
+            "child_median_ns": 430535415
+          },
+          {
+            "case": "complete-game-hanu-magma_and_ice-progress-43",
+            "operation": "search_resolution",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 481361305,
+            "child_median_ns": 473778307
+          }
+        ]
+      },
+      {
+        "parent": "f52b9889f58bd529f2c55980dca84d86949f3e0c",
+        "child": "c309705939db768670b05aa376703c51557b0705",
+        "workloads": [
+          {
+            "case": "complete-game-hanu-forgotten_island-progress-41",
+            "operation": "search_sampled_planning",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 423966323,
+            "child_median_ns": 418788516
+          },
+          {
+            "case": "complete-game-hanu-forgotten_island-progress-41",
+            "operation": "search_resolution",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 500496210,
+            "child_median_ns": 462481807
+          },
+          {
+            "case": "complete-game-hanu-magma_and_ice-progress-43",
+            "operation": "search_sampled_planning",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 430535415,
+            "child_median_ns": 429016414
+          },
+          {
+            "case": "complete-game-hanu-magma_and_ice-progress-43",
+            "operation": "search_resolution",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 473778307,
+            "child_median_ns": 487323602
+          }
+        ]
+      },
+      {
+        "parent": "c309705939db768670b05aa376703c51557b0705",
+        "child": "43a825876ec27478601e735254aba4fed3f7987e",
+        "workloads": [
+          {
+            "case": "complete-game-hanu-forgotten_island-progress-41",
+            "operation": "search_sampled_planning",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 418788516,
+            "child_median_ns": 424286317
+          },
+          {
+            "case": "complete-game-hanu-forgotten_island-progress-41",
+            "operation": "search_resolution",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 462481807,
+            "child_median_ns": 460992709
+          },
+          {
+            "case": "complete-game-hanu-magma_and_ice-progress-43",
+            "operation": "search_sampled_planning",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 429016414,
+            "child_median_ns": 435313215
+          },
+          {
+            "case": "complete-game-hanu-magma_and_ice-progress-43",
+            "operation": "search_resolution",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 487323602,
+            "child_median_ns": 489573003
+          }
+        ]
+      },
+      {
+        "parent": "43a825876ec27478601e735254aba4fed3f7987e",
+        "child": "28ee2dff5dee944c8a88abe59e03e1841f1fe4d0",
+        "workloads": [
+          {
+            "case": "complete-game-hanu-forgotten_island-progress-41",
+            "operation": "search_sampled_planning",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 424286317,
+            "child_median_ns": 419575721
+          },
+          {
+            "case": "complete-game-hanu-forgotten_island-progress-41",
+            "operation": "search_resolution",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 460992709,
+            "child_median_ns": 466436612
+          },
+          {
+            "case": "complete-game-hanu-magma_and_ice-progress-43",
+            "operation": "search_sampled_planning",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 435313215,
+            "child_median_ns": 427006820
+          },
+          {
+            "case": "complete-game-hanu-magma_and_ice-progress-43",
+            "operation": "search_resolution",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 489573003,
+            "child_median_ns": 481508809
+          }
+        ]
+      },
+      {
+        "parent": "28ee2dff5dee944c8a88abe59e03e1841f1fe4d0",
+        "child": "b43eec268a3aee96b2065013f909f0be87d90540",
+        "workloads": [
+          {
+            "case": "complete-game-hanu-forgotten_island-progress-41",
+            "operation": "search_sampled_planning",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 419575721,
+            "child_median_ns": 419397809
+          },
+          {
+            "case": "complete-game-hanu-forgotten_island-progress-41",
+            "operation": "search_resolution",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 466436612,
+            "child_median_ns": 464795799
+          },
+          {
+            "case": "complete-game-hanu-magma_and_ice-progress-43",
+            "operation": "search_sampled_planning",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 427006820,
+            "child_median_ns": 426694907
+          },
+          {
+            "case": "complete-game-hanu-magma_and_ice-progress-43",
+            "operation": "search_resolution",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 481508809,
+            "child_median_ns": 475060096
+          }
+        ]
+      },
+      {
+        "parent": "b43eec268a3aee96b2065013f909f0be87d90540",
+        "child": "a5e313a3c7ce65e8c2c042ae32f2716ced795af6",
+        "workloads": [
+          {
+            "case": "complete-game-hanu-forgotten_island-progress-41",
+            "operation": "search_sampled_planning",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 419397809,
+            "child_median_ns": 424077440
+          },
+          {
+            "case": "complete-game-hanu-forgotten_island-progress-41",
+            "operation": "search_resolution",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 464795799,
+            "child_median_ns": 460313636
+          },
+          {
+            "case": "complete-game-hanu-magma_and_ice-progress-43",
+            "operation": "search_sampled_planning",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 426694907,
+            "child_median_ns": 440028038
+          },
+          {
+            "case": "complete-game-hanu-magma_and_ice-progress-43",
+            "operation": "search_resolution",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 475060096,
+            "child_median_ns": 490494488
+          }
+        ]
+      },
+      {
+        "parent": "8a97e939bc70dec09cb06d8cc5d063f567c77f3f",
+        "child": "4ae20a584dd6c900bca3e7adff966b78748cfb57",
+        "workloads": [
+          {
+            "case": "complete-game-hanu-forgotten_island-progress-41",
+            "operation": "search_sampled_planning",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 417692158,
+            "child_median_ns": 418909864
+          },
+          {
+            "case": "complete-game-hanu-forgotten_island-progress-41",
+            "operation": "search_resolution",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 460577753,
+            "child_median_ns": 461238160
+          },
+          {
+            "case": "complete-game-hanu-magma_and_ice-progress-43",
+            "operation": "search_sampled_planning",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 440087955,
+            "child_median_ns": 428440557
+          },
+          {
+            "case": "complete-game-hanu-magma_and_ice-progress-43",
+            "operation": "search_resolution",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 481911151,
+            "child_median_ns": 479501552
+          }
+        ]
+      },
+      {
+        "parent": "4ae20a584dd6c900bca3e7adff966b78748cfb57",
+        "child": "40bad5ea51a6fb6d5fccc73e0be9f73a7b5bdc01",
+        "workloads": [
+          {
+            "case": "complete-game-hanu-forgotten_island-progress-41",
+            "operation": "search_sampled_planning",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 418909864,
+            "child_median_ns": 423246958
+          },
+          {
+            "case": "complete-game-hanu-forgotten_island-progress-41",
+            "operation": "search_resolution",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 461238160,
+            "child_median_ns": 463257754
+          },
+          {
+            "case": "complete-game-hanu-magma_and_ice-progress-43",
+            "operation": "search_sampled_planning",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 428440557,
+            "child_median_ns": 437924756
+          },
+          {
+            "case": "complete-game-hanu-magma_and_ice-progress-43",
+            "operation": "search_resolution",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 479501552,
+            "child_median_ns": 486529652
+          }
+        ]
+      },
+      {
+        "parent": "40bad5ea51a6fb6d5fccc73e0be9f73a7b5bdc01",
+        "child": "5996fe3295289630a0fb23baf599b78f23e438a2",
+        "workloads": [
+          {
+            "case": "complete-game-hanu-forgotten_island-progress-41",
+            "operation": "search_sampled_planning",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 423246958,
+            "child_median_ns": 419491161
+          },
+          {
+            "case": "complete-game-hanu-forgotten_island-progress-41",
+            "operation": "search_resolution",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 463257754,
+            "child_median_ns": 458255057
+          },
+          {
+            "case": "complete-game-hanu-magma_and_ice-progress-43",
+            "operation": "search_sampled_planning",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 437924756,
+            "child_median_ns": 435243259
+          },
+          {
+            "case": "complete-game-hanu-magma_and_ice-progress-43",
+            "operation": "search_resolution",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 486529652,
+            "child_median_ns": 478457759
+          }
+        ]
+      },
+      {
+        "parent": "5996fe3295289630a0fb23baf599b78f23e438a2",
+        "child": "ed24857c0fd4474a65d4f7268f2a767a42a32e28",
+        "workloads": [
+          {
+            "case": "complete-game-hanu-forgotten_island-progress-41",
+            "operation": "search_sampled_planning",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 419491161,
+            "child_median_ns": 421070660
+          },
+          {
+            "case": "complete-game-hanu-forgotten_island-progress-41",
+            "operation": "search_resolution",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 458255057,
+            "child_median_ns": 462967157
+          },
+          {
+            "case": "complete-game-hanu-magma_and_ice-progress-43",
+            "operation": "search_sampled_planning",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 435243259,
+            "child_median_ns": 427411158
+          },
+          {
+            "case": "complete-game-hanu-magma_and_ice-progress-43",
+            "operation": "search_resolution",
+            "identical": true,
+            "different_fields": [],
+            "parent_median_ns": 478457759,
+            "child_median_ns": 473542453
+          }
+        ]
+      }
+    ],
+    "restore_cases_per_revision": 136,
+    "restore_boundaries_per_revision": 1274,
+    "comparison_sha256": "ffb93a6ccdd3c90e3ea95f828dc88597ac9d3b1da47e9e1c71abfba883ae420c"
+  },
+  "complete_game_regeneration_checks": {
+    "complete-game-live-magma_and_ice-progress-19": {
+      "operations": 1649,
+      "chunks": 26,
+      "game_over": true,
+      "record_sha256": "7dbbf5d8380ea6785b71a875e6f5b4e09133f2789533e686c8866ddd6ddcf940",
+      "scope": "Fresh case payload and all referenced chunks matched the frozen pack."
+    },
+    "complete-game-hanu-magma_and_ice-progress-43": {
+      "operations": 2090,
+      "chunks": 33,
+      "game_over": true,
+      "record_sha256": "816aca130dece503c1087c2a3054c4c6b038bc124c6ee669b3b1b5008a83e2a8",
+      "scope": "Fresh case payload and all referenced chunks matched the frozen pack."
+    },
+    "complete-game-hanu-forgotten_island-progress-41": {
+      "operations": 5475,
+      "chunks": 86,
+      "game_over": true,
+      "record_sha256": "ed097285aa5eaeb54a2eeb5ed23aacd7b8165ea6bf7457a03690d357945ea584",
+      "scope": "Fresh case payload and all referenced chunks matched the frozen pack."
+    },
+    "complete-game-live-forgotten_island-progress-11": {
+      "operations": 5410,
+      "phase": "GAME_OVER",
+      "case_payload_sha256": "b4f811ba809f509ae9a0aaa1f03bb2900827d53fb981a67cc47f83098036bae2",
+      "exact_chunks": 85,
+      "oracle_worker_record_sha256": "fd1b19b04d5ba56062b0757dc6069c4169aa9b2a51ee75e99b850da495f674b1"
+    },
+    "baseline_family": {
+      "fresh_cases_and_chunks_exact": 113,
+      "index_sha256": "dd0324823fe1a0987f5cbd28253fb77a1191040bc45ea86dba6217041b49ed4b",
+      "scope": "Fresh pinned Rust\u2013Python export followed by rebuilding its index with the historical metadata key order."
+    }
+  },
+  "private_package_content_acquisition": {
+    "date": "2026-11-14",
+    "package_sha256": "dfbb21845a1403f12cb26ee3336cb9da4c03c3e3f0c68af918f86a5857aef636",
+    "binary_sha256": "90114ef9b4a6dbc1c0ce09dcc8f6d04cf1242f7391b8af302514b47e2b452f9f",
+    "installed_content_sha256": "4b7520f058d68dda93efb15837d0b657332a1a3132d37148c14a9bb2968ff651",
+    "checked_package_members": 4,
+    "heroes": 33,
+    "maps": 6,
+    "fresh_home_cache_and_database": true,
+    "rejected_bad_checksum_without_installing": true,
+    "native_check_content_passed": true,
+    "native_loopback_health_passed": true,
+    "python_used_only_for_installer_and_test_driver": true
+  },
+  "hetzner_historical_corrected_verification": {
+    "scheduled_checkpoints": 9,
+    "completed_checkpoints": {
+      "both-fixes-e105a24b": {
+        "label": "both-fixes-e105a24b",
+        "commit": "c371763d21fa9a8ef9eda8232d7f255b25fc9160",
+        "tree": "de0d3b6ce3fcb9de145498a2ba75220b145fce23",
+        "archive_sha256": "ba9a3de951dc304eee5815ef363e7c014a8c7ce15f72a51270457f1aab16238d",
+        "full": {
+          "stage": "full",
+          "command": [
+            "python3",
+            "-c",
+            "import sys; sys.path.insert(0,\"tools\"); from check import run; run(sys.argv[2:], tests=True, full=True, minimum=int(sys.argv[1]))",
+            "4",
+            "cargo",
+            "test",
+            "--locked",
+            "--profile",
+            "iterate",
+            "-p",
+            "goa2-search-cli",
+            "--bin",
+            "goa2-search-cli",
+            "trace_tests::",
+            "--",
+            "--ignored"
+          ],
+          "started_utc": "2026-11-14T11:15:52.299730+00:00",
+          "boot_id": "94d496f6-7f88-44e5-a894-19841074401b",
+          "source_commit": "c371763d21fa9a8ef9eda8232d7f255b25fc9160",
+          "source_identity": "2e0129d04b6b34508f877f27059aca56ce6059d1b9845cdef155b59854573918",
+          "test_threads": "2",
+          "oracle_workers": "2",
+          "memory_max_bytes": 2147483648,
+          "finished_utc": "2026-11-14T11:41:08.977604+00:00",
+          "exit_code": 0,
+          "source_identity_unchanged": true,
+          "log_sha256": "d27bd20033a4d076913e790a830fe565b235b7fd4635aadd685993717570af46",
+          "stages": {
+            "full-fixtures": "ab7a222efb82d335d29d811260064ce4f2a742344add2edd96974c0abcbed2a1",
+            "full-native": "e0b25911c97d6e305d319c1e613507283b7858a17befc65ad1e50572fd398f24",
+            "full-differential": "fd01f1b35256c3057dad430e301d871b417291972860d32e3cfb93edcac309b8"
+          }
+        },
+        "restore": {
+          "exit_code": 0,
+          "source_identity_unchanged": true,
+          "source_identity": "2e0129d04b6b34508f877f27059aca56ce6059d1b9845cdef155b59854573918",
+          "cases": 17347,
+          "shards": 8,
+          "binary_sha256": "ee188e4beb4e97643c4533429695b6d404c981bce6cc19c0cf6d0fc02869d5bf",
+          "finished_utc": "2026-11-14T12:30:06.197491+00:00"
+        },
+        "stages": {
+          "full-fixtures": {
+            "log_sha256": "ab7a222efb82d335d29d811260064ce4f2a742344add2edd96974c0abcbed2a1",
+            "summary": null
+          },
+          "full-native": {
+            "log_sha256": "e0b25911c97d6e305d319c1e613507283b7858a17befc65ad1e50572fd398f24",
+            "summary": {
+              "tier": "native",
+              "executed": 638,
+              "failed": 0,
+              "ignored": 8,
+              "full_parity": true
+            }
+          },
+          "full-differential": {
+            "log_sha256": "fd01f1b35256c3057dad430e301d871b417291972860d32e3cfb93edcac309b8",
+            "summary": {
+              "tier": "native",
+              "executed": 4,
+              "failed": 0,
+              "ignored": 0,
+              "full_parity": true
+            }
+          },
+          "restore-01": {
+            "log_sha256": "1179e189858d60690544fab2162a8cb5b8b56a87d0f72fcf6c04824773fb8b39",
+            "summary": null
+          },
+          "restore-02": {
+            "log_sha256": "306297e165e0262e01d7cdc31f60504301ccfadef790a1d4900f49fdf6213bff",
+            "summary": null
+          },
+          "restore-03": {
+            "log_sha256": "18fa19ff479dbf4dce0ea5701c8316f4a9f3f146151e031ae7ed3addee9b9aab",
+            "summary": null
+          },
+          "restore-04": {
+            "log_sha256": "72d145adfefe263c8a9cee9f9b57dcddd02b12c50ebc6f9566eeaa5748d3d56f",
+            "summary": null
+          },
+          "restore-05": {
+            "log_sha256": "3d3a61a213465313d7319fd3da0b357f8b55dc950352e7ff491629e2e35936fd",
+            "summary": null
+          },
+          "restore-06": {
+            "log_sha256": "137e40c66e631f9ac05cfd375f80a955977c134d9fd5814369ed87f0fde1e0e4",
+            "summary": null
+          },
+          "restore-07": {
+            "log_sha256": "3aa4e823d41f82818e4b1ebe449d6b5a81551c5460fc0b19faec1d88dab125de",
+            "summary": null
+          },
+          "restore-08": {
+            "log_sha256": "54f2bc35f3f5a4dd77a4a575500857044efb1a58fd7a5e78eaa71ad13571a225",
+            "summary": null
+          }
+        }
+      },
+      "both-fixes-75329f77": {
+        "label": "both-fixes-75329f77",
+        "commit": "98014a188b43370505c3150a461e7c6ab15fc442",
+        "tree": "8dd9f1f509105c80452ce84b55627a7132a197ec",
+        "archive_sha256": "81f51d586177feb9ff6748c827db0104a7181e0470a9dffd2af0140d330ee4e3",
+        "full": {
+          "stage": "full",
+          "command": [
+            "python3",
+            "-c",
+            "import sys; sys.path.insert(0,\"tools\"); from check import run; run(sys.argv[2:], tests=True, full=True, minimum=int(sys.argv[1]))",
+            "4",
+            "cargo",
+            "test",
+            "--locked",
+            "--profile",
+            "iterate",
+            "-p",
+            "goa2-search-cli",
+            "--bin",
+            "goa2-search-cli",
+            "trace_tests::",
+            "--",
+            "--ignored"
+          ],
+          "started_utc": "2026-11-14T13:21:00.499321+00:00",
+          "boot_id": "94d496f6-7f88-44e5-a894-19841074401b",
+          "source_commit": "98014a188b43370505c3150a461e7c6ab15fc442",
+          "source_identity": "e80f5a2773f7a83ba04016468817403dfd05d6bcc3ae7a2b6908c932a34facc5",
+          "test_threads": "2",
+          "oracle_workers": "2",
+          "memory_max_bytes": 2147483648,
+          "finished_utc": "2026-11-14T13:42:45.503865+00:00",
+          "exit_code": 0,
+          "source_identity_unchanged": true,
+          "log_sha256": "3d1ff0d765c6b42ea49ae24bcd574e11df156dd7ba6d71a7d72508f4e5f43819",
+          "stages": {
+            "full-fixtures": "ab7a222efb82d335d29d811260064ce4f2a742344add2edd96974c0abcbed2a1",
+            "full-native": "77590f23fe1448320880f6d0798862344d5ebbe10698a3ca5449d2e618bad983",
+            "full-differential": "ebeb4e2f13fd6f90945aa9175e83a756a3e80fc27f964377672c1264242fd219"
+          }
+        },
+        "restore": {
+          "exit_code": 0,
+          "source_identity_unchanged": true,
+          "source_identity": "e80f5a2773f7a83ba04016468817403dfd05d6bcc3ae7a2b6908c932a34facc5",
+          "cases": 17347,
+          "shards": 8,
+          "binary_sha256": "ee188e4beb4e97643c4533429695b6d404c981bce6cc19c0cf6d0fc02869d5bf",
+          "finished_utc": "2026-11-14T14:28:10.895122+00:00"
+        },
+        "stages": {
+          "full-fixtures": {
+            "log_sha256": "ab7a222efb82d335d29d811260064ce4f2a742344add2edd96974c0abcbed2a1",
+            "summary": null
+          },
+          "full-native": {
+            "log_sha256": "77590f23fe1448320880f6d0798862344d5ebbe10698a3ca5449d2e618bad983",
+            "summary": {
+              "tier": "native",
+              "executed": 638,
+              "failed": 0,
+              "ignored": 8,
+              "full_parity": true
+            }
+          },
+          "full-differential": {
+            "log_sha256": "ebeb4e2f13fd6f90945aa9175e83a756a3e80fc27f964377672c1264242fd219",
+            "summary": {
+              "tier": "native",
+              "executed": 4,
+              "failed": 0,
+              "ignored": 0,
+              "full_parity": true
+            }
+          },
+          "restore-01": {
+            "log_sha256": "85aa0fe191ad176ca070096bbe14898a5022b76e2f7f4e88ffdff57cf4db55eb",
+            "summary": null
+          },
+          "restore-02": {
+            "log_sha256": "c06e394608423e935fd081b07578b06395b7ad5d0fa5a4195d2eca19d6db1142",
+            "summary": null
+          },
+          "restore-03": {
+            "log_sha256": "a073ce402ddc627fb1560be863f5fc6f72882a0ea2beb57ea222bdbf04ff4049",
+            "summary": null
+          },
+          "restore-04": {
+            "log_sha256": "a2a57285970320e57d842e1374e78105cbcaa7d9dbc9f6f49271b6ef8a903980",
+            "summary": null
+          },
+          "restore-05": {
+            "log_sha256": "68c05f8660225549fe292e217a8a6606920719381acf9b289e8041bd8bf7cd7b",
+            "summary": null
+          },
+          "restore-06": {
+            "log_sha256": "98051476f0e6c7ab8dcf664ddc256c7805c970f1f00341a75797207045dc118c",
+            "summary": null
+          },
+          "restore-07": {
+            "log_sha256": "c891c56fad411ab9439e48157c19566c707da5ea6677692a708de971beab9fab",
+            "summary": null
+          },
+          "restore-08": {
+            "log_sha256": "26e8a65da46df513b9dfd710403487144b018b93968d27f7d6ae43b0a2f9fbb2",
+            "summary": null
+          }
+        }
+      }
+    },
+    "fixed_work_follows_successful_verification": true
+  },
+  "private_handoff_export_audit": {
+    "date": "2026-11-14",
+    "source_map_sha256": "1dd4e9a652a2b71f73ff61851f3f5541e9e62541eb3fdb9f2e2a8b6c7fba6ca0",
+    "mapped_file_hashes_verified": 1214,
+    "git_history_present": false,
+    "documentation_links_checked": 203,
+    "documentation_link_failures": 0,
+    "payload_files_scanned": 1214,
+    "payload_scan_findings": 0,
+    "scope": "Disposable post-handoff source export audit; build and runtime results belong to the earlier verified private candidate."
   }
 }

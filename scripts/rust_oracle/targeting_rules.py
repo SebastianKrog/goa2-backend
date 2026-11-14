@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from fixture_cache import read_text, write_text
-
 import argparse
 import json
 from pathlib import Path
 
 from combat_effect_traces import effect
+from fixture_cache import read_text, write_text
 from oracle import ROOT, Worker, digest, verify_sources
 from reaction_effect_traces import illusion_state
 from state_codec import export_state
@@ -364,7 +363,7 @@ def evaluate(state, query):
     return context["result"]
 
 
-def corpus():
+def corpus(*, admitted_envelope=False):
     manifest = verify_sources()
     data = {
         "schema_version": 1,
@@ -382,6 +381,10 @@ def corpus():
                 "expected": [evaluate(state, q) for q in queries],
             }
         )
+    if admitted_envelope:
+        from state_codec import omit_instance_equality
+
+        omit_instance_equality(data["states"])
     return {**data, "corpus_sha256": digest(data)}
 
 
@@ -416,10 +419,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument("mode", choices=["export", "verify"])
     parser.add_argument("--corpus", type=Path, default=ROOT / "rust/tests/fixtures/targeting.json")
+    parser.add_argument("--admitted-envelope", action="store_true")
     parser.add_argument("worker", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     if args.mode == "export":
-        data = corpus()
+        data = corpus(admitted_envelope=args.admitted_envelope)
         write_text(args.corpus, json.dumps(data, separators=(",", ":")) + "\n")
         print(
             json.dumps(

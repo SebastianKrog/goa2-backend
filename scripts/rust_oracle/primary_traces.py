@@ -5,7 +5,7 @@ from __future__ import annotations
 from state_codec import export_state
 
 
-def cases(advance, answer, *, effects=None, include_common=True):
+def iter_cases(advance, answer, *, effects=None, include_common=True):
     from model_traces import setup
     from primary_templates import DENSE_EFFECTS as EFFECTS
     from stack_traces import reference_trace
@@ -14,8 +14,6 @@ def cases(advance, answer, *, effects=None, include_common=True):
     from goa2.domain.models import ActionType, CardState, GamePhase, StatType, TeamColor
     from goa2.engine.handler import process_stack, push_steps, submit_input
     from goa2.engine.steps import ResolveCardStep, ResolveCardTextStep, SetContextFlagStep
-
-    result = []
 
     def build(effect, name, variant, map_path=None):
         other = "Brogan" if name != "Brogan" else "Arien"
@@ -209,14 +207,12 @@ def cases(advance, answer, *, effects=None, include_common=True):
         if kind == "DEFENSE_SKILL":
             kind = "SKILL"
         ops = run(state, kind, variant, target)
-        result.append(
-            {
-                "name": f"primary-{name}",
-                "envelope": export_state(state),
-                "operations": ops,
-                "expected": reference_trace(state, ops),
-            }
-        )
+        case = {
+            "name": f"primary-{name}",
+            "envelope": export_state(state),
+            "operations": ops,
+            "expected": reference_trace(state, ops),
+        }
 
         if variant in ("ordinary", "action", "items") and card.effect_id in (
             "noble_blade",
@@ -228,7 +224,7 @@ def cases(advance, answer, *, effects=None, include_common=True):
         ):
             assert any(
                 event["event_type"] == "UNIT_DEFEATED" and event["target_id"] == target
-                for record in result[-1]["expected"]
+                for record in case["expected"]
                 for event in record["events"]
             ), f"{name}: positive attack must defeat its intended victim"
 
@@ -242,7 +238,7 @@ def cases(advance, answer, *, effects=None, include_common=True):
             assert any(
                 event["event_type"] in ("UNIT_PUSHED", "TOKEN_PUSHED")
                 and event["metadata"]["distance"] > 0
-                for record in result[-1]["expected"]
+                for record in case["expected"]
                 for event in record["events"]
             ), f"{name}: positive push must move its victim"
 
@@ -254,7 +250,7 @@ def cases(advance, answer, *, effects=None, include_common=True):
         }:
             assert any(
                 event["event_type"] == "UNITS_SWAPPED"
-                for record in result[-1]["expected"]
+                for record in case["expected"]
                 for event in record["events"]
             ), name
         if variant in ("ordinary", "action", "items") and card.effect_id in {
@@ -264,7 +260,7 @@ def cases(advance, answer, *, effects=None, include_common=True):
         }:
             count = sum(
                 event["event_type"] == "UNIT_MOVED"
-                for record in result[-1]["expected"]
+                for record in case["expected"]
                 for event in record["events"]
             )
             assert count == (3 if card.effect_id == "path_to_victory" else 2), (name, count)
@@ -272,7 +268,7 @@ def cases(advance, answer, *, effects=None, include_common=True):
             "close_support",
             "covering_fire",
         }:
-            final = result[-1]["expected"][-1]["semantic_state"]
+            final = case["expected"][-1]["semantic_state"]
             context = final["execution_context"]
             assert context["discard_source"] == "HAND", name
             assert final["turn_discard_log"][context["discarded_card_owner_id"]] == [
@@ -284,11 +280,13 @@ def cases(advance, answer, *, effects=None, include_common=True):
         }:
             removed = [
                 event
-                for record in result[-1]["expected"]
+                for record in case["expected"]
                 for event in record["events"]
                 if event["event_type"] == "UNIT_REMOVED" and "minion" in str(event["target_id"])
             ]
             assert len(removed) == (2 if card.effect_id == "bullet_hell" else 1), (name, removed)
+
+        return case
 
     for effect, name in (EFFECTS if effects is None else effects).items():
         for variant in [
@@ -324,7 +322,7 @@ def cases(advance, answer, *, effects=None, include_common=True):
             ),
         ]:
             state, hero, card, target = build(effect, name, variant)
-            add(
+            yield add(
                 f"{effect}-{variant}",
                 state,
                 hero,
@@ -334,7 +332,7 @@ def cases(advance, answer, *, effects=None, include_common=True):
                 action=variant == "action",
             )
     if not include_common:
-        return result
+        return
 
     for kind in [
         ActionType.MOVEMENT,
@@ -350,14 +348,14 @@ def cases(advance, answer, *, effects=None, include_common=True):
             card.primary_action = kind
             if variant == "hidden":
                 card.is_facedown = True
-            add(f"fallback-{kind.value}-{variant}", state, hero, card, target, variant)
+            yield add(f"fallback-{kind.value}-{variant}", state, hero, card, target, variant)
 
     from oracle import ROOT
 
     for path in sorted((ROOT / "src/goa2/data/maps").glob("*.json")):
         for effect in ["liquid_leap", "stranger_tide"]:
             state, hero, card, target = build(effect, "Arien", "ordinary", map_path=path)
-            add(f"{effect}-map-{path.stem}", state, hero, card, target, "ordinary")
+            yield add(f"{effect}-map-{path.stem}", state, hero, card, target, "ordinary")
 
     from goa2.domain.hex import Hex
     from goa2.domain.models import TargetType, Token, TokenType
@@ -368,14 +366,12 @@ def cases(advance, answer, *, effects=None, include_common=True):
         for i, step in enumerate(steps):
             step.step_id = f"fixture/primary/{name}/{i}"
         push_steps(state, steps)
-        result.append(
-            {
-                "name": f"primary-primitive-{name}",
-                "envelope": export_state(state),
-                "operations": [advance],
-                "expected": reference_trace(state, [advance]),
-            }
-        )
+        return {
+            "name": f"primary-primitive-{name}",
+            "envelope": export_state(state),
+            "operations": [advance],
+            "expected": reference_trace(state, [advance]),
+        }
 
     for variant in [
         "literal",
@@ -448,7 +444,7 @@ def cases(advance, answer, *, effects=None, include_common=True):
                 )
         if variant == "piece":
             unit = state.get_piece_ids("hero_razzle")[0]
-        direct(
+        yield direct(
             f"place-{variant}",
             state,
             [PlaceUnitStep(unit_id=unit, unit_key=key, destination_key="dest")],
@@ -495,7 +491,7 @@ def cases(advance, answer, *, effects=None, include_common=True):
             b = "ghost"
         if variant == "piece":
             b = state.get_piece_ids("hero_razzle")[0]
-        direct(
+        yield direct(
             f"swap-{variant}",
             state,
             [
@@ -525,9 +521,12 @@ def cases(advance, answer, *, effects=None, include_common=True):
             state.remove_entity(hero.id)
         if variant == "no-unit":
             unit = None
-        direct(
+        yield direct(
             f"record-{variant}",
             state,
             [RecordHexStep(unit_id=unit, unit_key=key, output_key="recorded")],
         )
-    return result
+
+
+def cases(advance, answer, *, effects=None, include_common=True):
+    return list(iter_cases(advance, answer, effects=effects, include_common=include_common))

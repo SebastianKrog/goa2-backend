@@ -6,6 +6,7 @@ import importlib.util
 import io
 import json
 import os
+import struct
 import subprocess
 import sys
 import tarfile
@@ -75,6 +76,125 @@ def reference(tmp_path, monkeypatch):
         ("external.json", external),
     ]
     return archive, members
+
+
+@pytest.mark.parametrize(
+    "encoding,valid", [("canonical", True), ("pretty", True), ("changed", False)]
+)
+def test_indexed_trace_preflight_preserves_frozen_identity(reference, encoding, valid):
+    archive, _ = reference
+    fixtures = archive.fixtures
+    base = fixtures.FIXTURES
+    index = json.loads((base / "frozen.json").read_bytes())
+    row = index["cases"][0]
+    payload = json.loads((base / row["path"]).read_bytes())
+    row["path"] = f"stack-traces/{row['case_sha256']}.json"
+    del index["corpus_sha256"]
+    index["corpus_sha256"] = fixtures.digest(index)
+    encoded = fixtures.canonical(index)
+    (base / "stack-traces.json").write_bytes(encoded)
+    registry = json.loads((base / "registry.json").read_text())
+    registry["families"][0].update(
+        family="stack-traces", path="stack-traces.json", sha256=hashlib.sha256(encoded).hexdigest()
+    )
+    (base / "registry.json").write_text(json.dumps(registry))
+    target = base / row["path"]
+    target.parent.mkdir()
+    if encoding == "changed":
+        payload["expected"] = [2]
+    target.write_text(
+        json.dumps(payload, indent=2)
+        if encoding == "pretty"
+        else fixtures.canonical(payload).decode() + chr(10)
+    )
+    (result,) = fixtures.full(["stack-traces"])
+    assert (result["executed"], result["failed"], result["missing"]) == (
+        int(valid),
+        int(not valid),
+        0,
+    )
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="seekable pack uses Linux libzstd")
+@pytest.mark.parametrize("variant", ["valid", "bad-seek-table", "bad-range", "bad-frame"])
+def test_explicit_seekable_pack_rejects_invalid_payloads(tmp_path, reference, monkeypatch, variant):
+    archive, _ = reference
+    fixtures = archive.fixtures
+    pack = tmp_path / "seekable"
+    pack.mkdir()
+    # A checksummed zstd frame containing the two bytes b"{}".
+    frame = bytes.fromhex("28b52ffd24021100007b7dd194f27a")
+    if variant == "bad-frame":
+        frame = frame[:-1] + bytes([frame[-1] ^ 1])
+    seek = struct.pack("<IIIIIBI", 0x184D2A5E, 17, len(frame), 2, 1, 0, 0x8F92EAB1)
+    if variant == "bad-seek-table":
+        seek = seek[:-1]
+    (pack / "fixtures-4MiB.tar.zst").write_bytes(frame + seek)
+    index = {
+        "schema": 1,
+        "fixtures": {
+            "case.json": [1 if variant == "bad-range" else 0, 2, hashlib.sha256(b"{}").hexdigest()]
+        },
+    }
+    (pack / "fixtures.index.json").write_text(json.dumps(index))
+    monkeypatch.setenv("GOA2_FIXTURE_PACK", str(pack))
+    if variant == "valid":
+        assert fixtures.read_fixture("case.json", None) == b"{}"
+        # An explicit pack must not use an unrelated checkout payload.
+        assert fixtures.read_fixture("external.json", None) is None
+    else:
+        with pytest.raises(ValueError, match="fixture pack"):
+            fixtures.read_fixture("case.json", None)
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="seekable pack uses Linux libzstd")
+def test_seekable_alias_reconstructs_the_original_named_bytes(tmp_path, reference, monkeypatch):
+    archive, _ = reference
+    frame = bytes.fromhex(
+        "28b52ffd241ff900007b226e616d65223a226669727374222c226578706563746564223a5b315d7d36e83162"
+    )
+    first = b'{"name":"first","expected":[1]}'
+    second = b'{"name":"second","expected":[1]}'
+    seek = struct.pack("<IIIIIBI", 0x184D2A5E, 17, len(frame), len(first), 1, 0, 0x8F92EAB1)
+    (tmp_path / "fixtures-4MiB.tar.zst").write_bytes(frame + seek)
+    index = {
+        "schema": 2,
+        "fixtures": {
+            name: [0, len(first), hashlib.sha256(data).hexdigest()]
+            for name, data in [("first.json", first), ("second.json", second), ("bad.json", first)]
+        },
+        "aliases": {
+            name: ["first.json", '{"name":"first",', '{"name":"second",']
+            for name in ("second.json", "bad.json")
+        },
+    }
+    (tmp_path / "fixtures.index.json").write_text(json.dumps(index))
+    monkeypatch.setenv("GOA2_FIXTURE_PACK", str(tmp_path))
+    assert archive.fixtures.read_fixture("first.json", None) == first
+    assert archive.fixtures.read_fixture("second.json", None) == second
+    with pytest.raises(ValueError, match="alias checksum mismatch"):
+        archive.fixtures.read_fixture("bad.json", None)
+
+
+def test_pinned_seekable_manifest_detects_changed_archive_or_index(tmp_path, reference):
+    archive, _ = reference
+    fixtures = archive.fixtures
+    oracle = json.loads((fixtures.WORKSPACE / "oracle-manifest.json").read_bytes())
+    manifest = {"schema": 1, **oracle}
+    for name in ("fixtures-4MiB.tar.zst", "fixtures.index.json"):
+        (tmp_path / name).write_bytes(name.encode())
+        manifest[name] = hashlib.sha256(name.encode()).hexdigest()
+    encoded = fixtures.canonical(manifest)
+    (tmp_path / "manifest.json").write_bytes(encoded)
+    expected = hashlib.sha256(encoded).hexdigest()
+    fixtures.verify_pack_identity(tmp_path, expected)
+    with pytest.raises(ValueError, match="manifest checksum mismatch"):
+        fixtures.verify_pack_identity(tmp_path, "0" * 64)
+    for name in ("fixtures-4MiB.tar.zst", "fixtures.index.json"):
+        (tmp_path / name).write_bytes(b"changed")
+        with pytest.raises(ValueError, match="pack checksum mismatch"):
+            fixtures.verify_pack_identity(tmp_path, expected)
+        (tmp_path / name).write_bytes(name.encode())
 
 
 def write_archive(path, members):
@@ -343,3 +463,37 @@ def test_changed_local_archive_is_rejected_before_cache_publication(
         archive.install(str(source), identity, cache)
     assert not cache.exists()
     assert not list(tmp_path.glob(".reference-*"))
+
+
+
+@pytest.mark.parametrize(
+    ("mutation", "error"),
+    [("omit", "1 missing"), ("hash", "payload differs from fixture index")],
+)
+def test_paired_coverage_rejects_the_same_missing_or_wrong_case_in_both_runs(
+    tmp_path, mutation, error
+):
+    from compare_trace_coverage import compare
+
+    expected = {("gate", "first"): "a" * 64, ("gate", "second"): "b" * 64}
+    rows = [
+        {
+            "index": gate,
+            "case": name,
+            "fixture_sha256": digest,
+            "operations": 1,
+            "replay_key": None,
+            "replayed_as": name,
+        }
+        for (gate, name), digest in expected.items()
+    ]
+    if mutation == "omit":
+        rows.pop()
+    else:
+        rows[-1]["fixture_sha256"] = "c" * 64
+    logs = [tmp_path / mode for mode in ("baseline", "shared")]
+    for log in logs:
+        records = "".join("trace-coverage " + json.dumps(row) + chr(10) for row in rows)
+        log.write_text("test native::gate ... " + records + "test result: ok. 1 passed; 0 failed;")
+    with pytest.raises(ValueError, match=error):
+        compare(*logs, expected)

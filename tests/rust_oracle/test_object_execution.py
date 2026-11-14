@@ -1,7 +1,11 @@
 """Frozen-source execution contracts for live shared arena bindings."""
 
+import copy
+import hashlib
 import sys
 from pathlib import Path
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/rust_oracle"))
 
@@ -1292,3 +1296,47 @@ def test_live_discard_equal_models_have_distinct_mutations_and_source_precedence
             assert len(context["log_alias"]) == 2
             assert len(semantic["public_revealed_cards"]) == 1
     assert checked == 25
+
+
+
+def test_admitted_encoding_preserves_decisions_events_and_instance_identity():
+    from object_execution_traces import _admitted_case
+    from stack_traces import canonical
+
+    legacy = {
+        "name": "historical",
+        "envelope": {"state": {"board": {"zones": {}}}, "instances": [{"id": "a"}]},
+        "operations": [{"select": "first"}],
+        "expected": [{"events": ["first", "second"], "instance_bindings": {"card": "a"}}],
+    }
+    digest = hashlib.sha256(canonical(legacy).encode()).hexdigest()
+    generated = copy.deepcopy(legacy)
+    generated["envelope"]["board_keys"] = []
+    generated["envelope"]["instances"][0]["equality"] = {}
+    assert _admitted_case(generated, digest) == legacy
+
+    with_equality = copy.deepcopy(generated)
+    with_equality["envelope"].pop("board_keys")
+    equality_digest = hashlib.sha256(canonical(with_equality).encode()).hexdigest()
+    assert _admitted_case(generated, equality_digest) == with_equality
+
+    changed = [copy.deepcopy(generated) for _ in range(3)]
+    changed[0]["operations"][0]["select"] = "second"
+    changed[1]["expected"][0]["events"].reverse()
+    changed[2]["expected"][0]["instance_bindings"]["card"] = "b"
+    for fixture in changed:
+        with pytest.raises(ValueError, match="Cannot reproduce admitted fixture hash"):
+            _admitted_case(fixture, digest)
+
+
+
+def test_admitted_step_labels_preserve_shared_identity():
+    from stack_traces import restore_admitted_step_ids
+
+    first, second = "136639597960608", "136639597966080"
+    a, b = "126692640407392", "126692640406816"
+    case = {"name": "historical", "steps": [{"step_id": first}, {"step_id": second}, {"step_id": first}]}
+    restore_admitted_step_ids(case, (a, b))
+    assert [step["step_id"] for step in case["steps"]] == [a, b, a]
+    with pytest.raises(ValueError, match="Unexpected step identity count"):
+        restore_admitted_step_ids(case, (a,))

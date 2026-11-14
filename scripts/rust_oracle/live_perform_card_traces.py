@@ -61,7 +61,8 @@ def base(name, effect=None, performer_name=None):
     return state, actor, owner, card
 
 
-def scenes(*, heroes=None, include_common=True):
+def scenes(*, heroes=None, include_common=True, admitted_card_menus=False):
+    from admitted_card_menus import OMIT_PRIMARY_BY_HERO
     from model_traces import setup
     from primary_templates import ALL_EFFECTS as EFFECTS
 
@@ -104,6 +105,8 @@ def scenes(*, heroes=None, include_common=True):
                 if card.current_primary_action == ActionType.DEFENSE_SKILL
                 else card.current_primary_action
             )
+            if admitted_card_menus and str(card.id) in OMIT_PRIMARY_BY_HERO.get(name.lower(), ()):
+                body_ready = False
             selections = [
                 None,
                 "invalid-action",

@@ -7,13 +7,12 @@ ordinary Python mutations provide expected values and identity topology.
 
 from __future__ import annotations
 
-from fixture_cache import write_text
-
 import argparse
 import copy
 import json
 from pathlib import Path
 
+from fixture_cache import write_text
 from oracle import ROOT, Worker, digest, verify_sources
 from shared_objects import export_state_with_shared_objects
 
@@ -199,7 +198,9 @@ def reference(state, objects, operations):
         target = (
             state.execution_context
             if op.get("target") == "context"
-            else objects[op["target"]] if "target" in op else None
+            else objects[op["target"]]
+            if "target" in op
+            else None
         )
         try:
             kind = op["kind"]
@@ -207,7 +208,9 @@ def reference(state, objects, operations):
             value = (
                 objects[value["alias"]]
                 if value and "alias" in value
-                else copy.deepcopy(value["literal"]) if value else None
+                else copy.deepcopy(value["literal"])
+                if value
+                else None
             )
             if kind == "snapshot":
                 state.execution_context[op["key"]] = dict(state.execution_context)
@@ -246,13 +249,18 @@ def reference(state, objects, operations):
     return result
 
 
-def export(path):
+def export(path, *, admitted_envelope=False):
     from stack_traces import write_corpus
 
     manifest = verify_sources()
     cases = []
     for name, state, envelope, objects, operations in scenes():
         expected = reference(state, objects, operations)
+        if admitted_envelope:
+            # The frozen arena index predates board keys and instance equality metadata.
+            envelope.pop("board_keys", None)
+            for instance in envelope["instances"]:
+                instance.pop("equality", None)
         cases.append(
             {
                 "name": "objects-" + name,
@@ -305,10 +313,11 @@ if __name__ == "__main__":
     parser.add_argument(
         "--corpus", type=Path, default=ROOT / "rust/tests/fixtures/object-arena.json"
     )
+    parser.add_argument("--admitted-envelope", action="store_true")
     parser.add_argument("worker", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     if args.mode == "export":
-        data = export(args.corpus)
+        data = export(args.corpus, admitted_envelope=args.admitted_envelope)
         print(json.dumps({"cases": len(data["cases"]), "corpus_sha256": data["corpus_sha256"]}))
     else:
         print(

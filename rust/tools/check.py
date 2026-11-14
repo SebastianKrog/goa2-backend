@@ -53,7 +53,10 @@ def main():
     parser.add_argument("tier", choices=["quick", "full", "restore", "quality", "service"])
     parser.add_argument("--profile", default="dev", choices=["dev", "iterate", "release"])
     parser.add_argument("--binary", type=Path)
+    parser.add_argument("--pack-manifest-sha256", help="Independently pinned fixture pack manifest")
     args = parser.parse_args()
+    if args.pack_manifest_sha256 and args.tier not in {"full", "restore"}:
+        parser.error("--pack-manifest-sha256 requires full or restore")
     cargo = ["cargo"]
     common = ["--locked", "--profile", args.profile]
     if args.tier == "quality":
@@ -82,6 +85,11 @@ def main():
                 "tools/fixtures.py",
                 "verify",
                 *(["--full"] if args.tier in {"full", "restore"} else []),
+                *(
+                    ["--pack-manifest-sha256", args.pack_manifest_sha256]
+                    if args.pack_manifest_sha256
+                    else []
+                ),
             ]
         )
         if args.tier == "restore":

@@ -47,6 +47,7 @@ def main():
             "action_traces",
             "card_equality_traces",
             "displacement_effect_traces",
+            "effect_error_traces",
             "effect_stat_traces",
             "effect_traces",
             "mine_traces",

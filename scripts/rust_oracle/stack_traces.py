@@ -10,6 +10,7 @@ import os
 import sys
 from pathlib import Path
 
+from admitted_step_labels import CANONICAL_STEP_IDS
 from fixture_cache import (
     cached,
     install_verified_case,
@@ -158,7 +159,7 @@ def reference_trace(state, operations):
     return result
 
 
-def corpus():
+def corpus_cases(*, admitted_names=None):
     from goa2.domain.board import Board
     from goa2.domain.models import GamePhase, TargetType, Team, TeamColor
     from goa2.domain.state import GameState
@@ -173,8 +174,6 @@ def corpus():
         SetContextFlagStep,
     )
 
-    manifest = verify_sources()
-    cases = []
     advance = {"kind": "advance"}
 
     def answer(value, request_id="current"):
@@ -266,11 +265,9 @@ def corpus():
         push_steps(state, steps)
         envelope = export_state(state)
         expected = reference_trace(state, operations)
-        cases.append(
-            {"name": name, "envelope": envelope, "operations": operations, "expected": expected}
-        )
+        return {"name": name, "envelope": envelope, "operations": operations, "expected": expected}
 
-    add(
+    yield add(
         "number-input-resume",
         [
             SetContextFlagStep(key="enabled", value=True),
@@ -309,7 +306,7 @@ def corpus():
         ],
     )
     for value in (None, False, 0, [], {}, "", True):
-        add(
+        yield add(
             f"condition-{json.dumps(value, separators=(',', ':'))}",
             [
                 SetContextFlagStep(key="active_ran", active_if_key="condition"),
@@ -319,7 +316,7 @@ def corpus():
             [advance],
             {"condition": value, "n": False},
         )
-    add(
+    yield add(
         "optional-skip",
         [
             SelectStep(
@@ -334,7 +331,7 @@ def corpus():
         [advance, answer("SKIP"), advance, answer("anything else"), advance],
         {"old": 17},
     )
-    add(
+    yield add(
         "auto-and-empty-optional",
         [
             SelectStep(
@@ -356,7 +353,7 @@ def corpus():
         [advance],
         {"old": None},
     )
-    add(
+    yield add(
         "mandatory-abort",
         [
             FlipTieBreakerCoinStep(),
@@ -371,7 +368,7 @@ def corpus():
         [advance],
         {"unchanged": 42},
     )
-    add(
+    yield add(
         "foreach-paused-copies",
         [
             ForEachStep(
@@ -393,7 +390,7 @@ def corpus():
         [advance, answer(1), advance, answer(2), advance, answer(1), advance],
         {"items": ["hero_arien", "hero_hanu", "hero_arien"]},
     )
-    add(
+    yield add(
         "overrides-and-actor-save",
         [
             SetActorStep(actor_id="ignored_literal", actor_key="new_actor", save_key="before"),
@@ -411,7 +408,7 @@ def corpus():
         [advance, answer(3), advance, answer("NO"), advance],
         {"new_actor": "hero_hanu", "ignored_key": "hero_ignored"},
     )
-    add(
+    yield add(
         "numeric-coercions",
         [
             SelectStep(
@@ -429,7 +426,7 @@ def corpus():
         ],
         [advance, answer(-2.9), advance, answer(True), advance],
     )
-    add(
+    yield add(
         "no-actor",
         [
             AskConfirmationStep(prompt="Silently complete"),
@@ -438,8 +435,8 @@ def corpus():
         [advance, answer(1), advance],
         actor=None,
     )
-    add("game-over-no-execution", [FlipTieBreakerCoinStep()], [advance], phase=GamePhase.GAME_OVER)
-    add(
+    yield add("game-over-no-execution", [FlipTieBreakerCoinStep()], [advance], phase=GamePhase.GAME_OVER)
+    yield add(
         "piece-prompt-owner",
         [
             SelectStep(
@@ -461,7 +458,7 @@ def corpus():
         r = -q if r is None else r
         return Hex(q=q, r=r, s=-q - r)
 
-    add(
+    yield add(
         "movement-resume-events",
         [
             SelectStep(target_type=TargetType.NUMBER, prompt="Before move", number_options=[1, 2]),
@@ -473,7 +470,7 @@ def corpus():
         [advance, answer(1), advance, answer("YES"), advance],
         movement={},
     )
-    add(
+    yield add(
         "forced-move-context",
         [
             MoveUnitStep(
@@ -490,7 +487,7 @@ def corpus():
         ("same-zero", h(0), 0),
         ("same-negative", h(0), -1),
     ]:
-        add(
+        yield add(
             f"movement-{name}",
             [
                 MoveUnitStep(
@@ -506,7 +503,7 @@ def corpus():
             movement={},
         )
     for through in (False, True):
-        add(
+        yield add(
             f"movement-straight-through-{through}",
             [
                 MoveUnitStep(
@@ -522,13 +519,13 @@ def corpus():
             [advance],
             movement={"terrain": [(1, -1, 0)]},
         )
-    add(
+    yield add(
         "movement-bfs-detour",
         [MoveUnitStep(target_hex_arg=h(3), range_val=5, crossed_obstacles_output_key="crossed")],
         [advance],
         movement={"terrain": [(1, -1, 0)]},
     )
-    add(
+    yield add(
         "movement-nonstraight",
         [
             MoveUnitStep(target_hex_arg=h(2, -1), range_val=3, force_straight_line=True),
@@ -537,7 +534,7 @@ def corpus():
         [advance],
         movement={},
     )
-    add(
+    yield add(
         "movement-missing-map-bridge",
         [
             MoveUnitStep(target_hex_arg=h(2), range_val=2, pass_through_obstacles=True),
@@ -546,7 +543,7 @@ def corpus():
         [advance],
         movement={"hexes": [(0, 0, 0), (2, -2, 0), (3, -3, 0)], "other": (3, -3, 0)},
     )
-    add(
+    yield add(
         "movement-missing-unit",
         [
             MoveUnitStep(
@@ -559,7 +556,7 @@ def corpus():
         movement={},
     )
     for mandatory in (False, True):
-        add(
+        yield add(
             f"movement-unregistered-entity-{mandatory}",
             [
                 MoveUnitStep(
@@ -578,7 +575,7 @@ def corpus():
     from goa2.engine.filters_hex import MovementPathFilter, ObstacleFilter, RangeFilter
     from goa2.engine.steps import MoveSequenceStep
 
-    add(
+    yield add(
         "hex-input-validation",
         [
             SelectStep(target_type=TargetType.HEX, prompt="Hex", output_key="hex"),
@@ -593,7 +590,7 @@ def corpus():
         ],
         movement={},
     )
-    add(
+    yield add(
         "hex-optional-skip",
         [
             SelectStep(
@@ -607,7 +604,7 @@ def corpus():
         {"old": True},
         movement={},
     )
-    add(
+    yield add(
         "hex-movement-current-and-terrain",
         [
             SelectStep(
@@ -620,7 +617,7 @@ def corpus():
         [advance, answer(h(2).model_dump()), advance],
         movement={"terrain": [(1, -1, 0)]},
     )
-    add(
+    yield add(
         "hex-exclude-self",
         [
             SelectStep(
@@ -632,7 +629,7 @@ def corpus():
         [advance, answer(h(0).model_dump()), advance],
         movement={},
     )
-    add(
+    yield add(
         "hex-occupied",
         [
             SelectStep(
@@ -644,7 +641,7 @@ def corpus():
         [advance, answer(h(2).model_dump()), advance],
         movement={},
     )
-    add(
+    yield add(
         "hex-range-context",
         [
             SelectStep(
@@ -659,7 +656,7 @@ def corpus():
         {"origin": h(0).model_dump(), "min": True, "max": 1},
         movement={},
     )
-    add(
+    yield add(
         "hex-origin-context",
         [
             SelectStep(
@@ -674,7 +671,7 @@ def corpus():
     )
     for inverted, filter_type in [(False, InStraightLineFilter), (True, NotInStraightLineFilter)]:
         destination = h(1, -1) if not inverted else h(2, -1)
-        add(
+        yield add(
             f"hex-straight-{inverted}",
             [
                 SelectStep(
@@ -686,7 +683,7 @@ def corpus():
             [advance, answer(destination.model_dump()), advance],
             movement={},
         )
-    add(
+    yield add(
         "hex-clear-line",
         [
             SelectStep(
@@ -698,7 +695,7 @@ def corpus():
         [advance, answer(h(3).model_dump()), advance, answer(h(-1).model_dump()), advance],
         movement={"terrain": [(1, -1, 0)]},
     )
-    add(
+    yield add(
         "hex-no-origin-abort",
         [
             SelectStep(
@@ -710,7 +707,7 @@ def corpus():
         actor=None,
         movement={},
     )
-    add(
+    yield add(
         "hex-auto-single",
         [
             SelectStep(
@@ -723,13 +720,13 @@ def corpus():
         [advance],
         movement={},
     )
-    add(
+    yield add(
         "macro-default",
         [MoveSequenceStep(range_val=1), FlipTieBreakerCoinStep()],
         [advance, advance, answer(h(1).model_dump()), advance],
         movement={},
     )
-    add(
+    yield add(
         "macro-two-moves-fresh-scan",
         [
             MoveSequenceStep(range_val=1),
@@ -739,57 +736,57 @@ def corpus():
         [advance, answer(h(1).model_dump()), advance, answer(h(1, 0).model_dump()), advance],
         movement={},
     )
-    add(
+    yield add(
         "macro-full-range",
         [MoveSequenceStep(range_val=2, force_full_distance=True)],
         [advance, answer(h(0, 2).model_dump()), advance],
         movement={},
     )
-    add(
+    yield add(
         "macro-other-unit-full-range",
         [MoveSequenceStep(unit_id="hero_hanu", range_val=2, force_full_distance=True)],
         [advance, answer(h(2, 0).model_dump()), advance],
         movement={},
     )
-    add(
+    yield add(
         "macro-cross-obstacles-straight",
         [MoveSequenceStep(range_val=3, pass_through_obstacles=True, force_straight_line=True)],
         [advance, answer(h(3).model_dump()), advance],
         movement={"terrain": [(1, -1, 0)]},
     )
-    add(
+    yield add(
         "macro-zero-range-still-prompts",
         [MoveSequenceStep(range_val=0)],
         [advance, answer(h(0).model_dump()), advance],
         movement={},
     )
-    add(
+    yield add(
         "macro-preset-destination",
         [MoveSequenceStep(range_val=1)],
         [advance],
         {"target_hex": h(1).model_dump()},
         movement={},
     )
-    add(
+    yield add(
         "macro-actor-switch",
         [SetActorStep(actor_id="hero_hanu"), MoveSequenceStep(range_val=1)],
         [advance, answer(h(1).model_dump()), advance],
         movement={},
     )
-    add(
+    yield add(
         "macro-no-actor",
         [MoveSequenceStep(range_val=1), SetContextFlagStep(key="must_not_run")],
         [advance],
         actor=None,
         movement={},
     )
-    add(
+    yield add(
         "macro-optional-skip",
         [MoveSequenceStep(range_val=1, is_mandatory=False), SetContextFlagStep(key="continued")],
         [advance, answer("SKIP"), advance],
         movement={},
     )
-    add(
+    yield add(
         "macro-bound-razzle-piece",
         [MoveSequenceStep(range_val=1)],
         [advance, answer(h(-1).model_dump()), advance],
@@ -799,13 +796,13 @@ def corpus():
     )
     from goa2.domain.models import StatType
 
-    add(
+    yield add(
         "macro-computed-items",
         [MoveSequenceStep(range_val=1, range_stat_type=StatType.MOVEMENT)],
         [advance, answer(h(0, 3).model_dump()), advance],
         movement={"items": {"hero_arien": {"MOVEMENT": 2}}},
     )
-    add(
+    yield add(
         "macro-computed-actor-switch",
         [
             SetActorStep(actor_id="hero_hanu"),
@@ -814,7 +811,7 @@ def corpus():
         [advance, answer(h(1, 0).model_dump()), advance],
         movement={"items": {"hero_arien": {"MOVEMENT": 4}, "hero_hanu": {"MOVEMENT": 1}}},
     )
-    add(
+    yield add(
         "macro-computed-marker-stat",
         [MoveSequenceStep(range_val=3, range_stat_type=StatType.INITIATIVE)],
         [advance, answer(h(0, 3).model_dump()), advance],
@@ -823,13 +820,13 @@ def corpus():
             "markers": [("poison", "hero_arien", -2)],
         },
     )
-    add(
+    yield add(
         "macro-computed-negative",
         [MoveSequenceStep(range_val=1, range_stat_type=StatType.MOVEMENT)],
         [advance, answer(h(0).model_dump()), advance],
         movement={"items": {"hero_arien": {"MOVEMENT": -3}}},
     )
-    add(
+    yield add(
         "macro-computed-full-distance",
         [
             MoveSequenceStep(
@@ -839,7 +836,7 @@ def corpus():
         [advance, answer(h(0, 3).model_dump()), advance],
         movement={"items": {"hero_arien": {"MOVEMENT": 2}}},
     )
-    add(
+    yield add(
         "macro-computed-razzle-owner-items",
         [MoveSequenceStep(range_val=1, range_stat_type=StatType.MOVEMENT)],
         [advance, answer(h(1, 0).model_dump()), advance],
@@ -923,181 +920,257 @@ def corpus():
             first.is_facedown = True
         push_steps(state, [step])
         envelope = export_state(state)
-        cases.append(
-            {
-                "name": f"retrieve-unresolved-{variant}",
-                "envelope": envelope,
-                "operations": operations,
-                "expected": reference_trace(state, operations),
-            }
-        )
+        yield {
+            "name": f"retrieve-unresolved-{variant}",
+            "envelope": envelope,
+            "operations": operations,
+            "expected": reference_trace(state, operations),
+        }
 
     from unit_traces import cases as unit_cases
 
-    cases.extend(unit_cases(advance, answer))
+    yield from unit_cases(advance, answer)
 
     from travel_traces import cases as travel_cases
 
-    cases.extend(travel_cases(advance, answer))
+    yield from travel_cases(advance, answer)
 
     from combat_traces import cases as combat_cases
 
-    cases.extend(combat_cases(advance, answer))
+    yield from combat_cases(advance, answer)
 
     from reaction_traces import cases as reaction_cases
 
-    cases.extend(reaction_cases(advance, answer))
+    yield from reaction_cases(advance, answer)
 
     from attack_traces import cases as attack_cases
 
-    cases.extend(attack_cases(advance, answer))
+    yield from attack_cases(advance, answer)
 
     from defense_effect_traces import cases as defense_effect_cases
 
-    cases.extend(defense_effect_cases(advance, answer))
+    yield from defense_effect_cases(advance, answer)
 
     from card_selection_traces import cases as card_selection_cases
 
-    cases.extend(card_selection_cases(advance, answer))
+    yield from card_selection_cases(advance, answer)
 
     from action_execution_traces import cases as action_execution_cases
 
-    cases.extend(action_execution_cases(advance, answer))
+    yield from action_execution_cases(advance, answer)
 
-    from primary_traces import cases as primary_cases
+    from primary_traces import iter_cases as primary_cases
 
-    cases.extend(primary_cases(advance, answer))
+    if admitted_names is None:
+        yield from primary_cases(advance, answer)
+    else:
+        from primary_templates import DENSE_EFFECTS
+
+        effects = {
+            effect: hero
+            for effect, hero in DENSE_EFFECTS.items()
+            if f"primary-{effect}-ordinary" in admitted_names
+        }
+        yield from primary_cases(advance, answer, effects=effects)
 
     from push_traces import cases as push_cases
 
-    cases.extend(push_cases(advance, answer))
+    yield from push_cases(advance, answer)
 
     from minion_return_traces import cases as minion_return_cases
 
-    cases.extend(minion_return_cases(advance, answer))
+    yield from minion_return_cases(advance, answer)
 
     from minion_return_effect_traces import cases as minion_return_effect_cases
 
-    cases.extend(minion_return_effect_cases())
+    yield from minion_return_effect_cases()
 
     from battle_effect_traces import cases as battle_effect_cases
 
-    cases.extend(battle_effect_cases())
+    yield from battle_effect_cases()
 
     from round_effect_traces import cases as round_effect_cases
 
-    cases.extend(round_effect_cases())
+    yield from round_effect_cases()
 
     from battle_traces import cases as battle_cases
 
-    cases.extend(battle_cases(advance, answer))
+    yield from battle_cases(advance, answer)
 
     from turn_traces import cases as turn_cases
 
-    cases.extend(turn_cases(advance, answer))
+    yield from turn_cases(advance, answer)
 
     from round_traces import cases as round_cases
 
-    cases.extend(round_cases(advance, answer))
+    yield from round_cases(advance, answer)
 
     from game_traces import cases as game_cases
 
-    cases.extend(game_cases(advance, answer))
+    yield from game_cases(advance, answer)
 
     from aura_traces import cases as aura_cases
 
-    cases.extend(aura_cases(advance, answer))
+    yield from aura_cases(advance, answer)
 
     from conditional_aura_traces import cases as conditional_cases
 
-    cases.extend(conditional_cases(advance, answer))
+    yield from conditional_cases(advance, answer)
 
     from discard_or_defeat_traces import cases as discard_or_defeat_cases
 
-    cases.extend(discard_or_defeat_cases(advance, answer))
+    yield from discard_or_defeat_cases(advance, answer)
 
     from passive_traces import cases as passive_cases
 
-    cases.extend(passive_cases(advance, answer))
+    yield from passive_cases(advance, answer)
 
     from repeat_traces import cases as repeat_cases
 
-    cases.extend(repeat_cases(advance, answer))
+    yield from repeat_cases(advance, answer)
 
     from query_traces import cases as query_cases
 
-    cases.extend(query_cases(advance, answer))
+    yield from query_cases(advance, answer)
 
     from conditional_primary_traces import cases as conditional_primary_cases
 
-    cases.extend(conditional_primary_cases(advance, answer))
+    yield from conditional_primary_cases(advance, answer)
 
     from retrieval_primary_traces import cases as retrieval_primary_cases
     from retrieval_traces import cases as retrieval_cases
 
-    cases.extend(retrieval_cases(advance, answer))
-    cases.extend(retrieval_primary_cases(advance, answer))
+    yield from retrieval_cases(advance, answer)
+    yield from retrieval_primary_cases(advance, answer)
 
     from effect_step_traces import cases as effect_step_cases
 
-    cases.extend(effect_step_cases(advance, answer))
+    yield from effect_step_cases(advance, answer)
 
     from token_effect_traces import cases as token_effect_cases
 
-    cases.extend(token_effect_cases(advance, answer))
+    yield from token_effect_cases(advance, answer)
 
     from effect_adjacency_traces import cases as effect_adjacency_cases
 
-    cases.extend(effect_adjacency_cases(advance, answer))
+    yield from effect_adjacency_cases(advance, answer)
 
     from displacement_effect_traces import cases as displacement_effect_cases
 
-    cases.extend(displacement_effect_cases(advance, answer))
+    yield from displacement_effect_cases(advance, answer)
 
     from action_rule_traces import cases as action_rule_cases
 
-    cases.extend(action_rule_cases(advance, answer))
+    yield from action_rule_cases(advance, answer)
 
     from terrain_traces import cases as terrain_cases
 
-    cases.extend(terrain_cases(advance, answer))
+    yield from terrain_cases(advance, answer)
 
     from movement_sequence_traces import cases as movement_sequence_cases
 
-    cases.extend(movement_sequence_cases(advance, answer))
+    yield from movement_sequence_cases(advance, answer)
 
     from mine_traces import cases as mine_cases
 
-    cases.extend(mine_cases(advance, answer))
+    yield from mine_cases(advance, answer)
     from mine_movement_traces import cases as mine_movement_cases
 
-    cases.extend(mine_movement_cases(advance, answer))
+    yield from mine_movement_cases(advance, answer)
     from discard_effect_traces import cases as discard_effect_cases
 
-    cases.extend(discard_effect_cases(advance, answer))
+    yield from discard_effect_cases(advance, answer)
     from passive_provider_traces import cases as passive_provider_cases
 
-    cases.extend(passive_provider_cases(advance, answer))
+    yield from passive_provider_cases(advance, answer)
     from combat_effect_traces import cases as combat_effect_cases
 
-    cases.extend(combat_effect_cases(advance, answer))
+    yield from combat_effect_cases(advance, answer)
     from reaction_effect_traces import cases as reaction_effect_cases
 
-    cases.extend(reaction_effect_cases(advance, answer))
+    yield from reaction_effect_cases(advance, answer)
     from targeting_effect_traces import cases as targeting_effect_cases
 
-    cases.extend(targeting_effect_cases(advance, answer))
+    yield from targeting_effect_cases(advance, answer)
 
-    payload = {
+
+def corpus_metadata():
+    manifest = verify_sources()
+    return {
         "schema_version": 1,
         "oracle_revision": manifest["oracle_revision"],
         "source_sha256": manifest["source_sha256"],
-        "cases": cases,
     }
+
+
+def corpus():
+    payload = {**corpus_metadata(), "cases": list(corpus_cases())}
     return {**payload, "corpus_sha256": digest(payload)}
 
 
-def write_corpus_stream(path, metadata, cases):
+def match_admitted_cases(cases, index, project):
+    pending = {entry["name"]: entry["case_sha256"] for entry in index["cases"]}
+    for case in cases:
+        name = case["name"]
+        if name not in pending:
+            raise ValueError(f"Unexpected or duplicate admitted fixture {name}")
+        yield project(case, pending.pop(name))
+    if pending:
+        first = next(iter(pending))
+        raise ValueError(f"Missing {len(pending)} admitted fixtures, starting with {first}")
+
+
+def _address_step_ids(value):
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if (
+                key == "step_id"
+                and isinstance(item, str)
+                and len(item) >= 11
+                and item.isascii()
+                and item.isdigit()
+            ):
+                yield value, item
+            else:
+                yield from _address_step_ids(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from _address_step_ids(item)
+
+
+def restore_admitted_step_ids(case, labels):
+    refs = list(_address_step_ids(case))
+    observed = dict.fromkeys(label for _, label in refs)
+    if len(observed) != len(labels):
+        raise ValueError(f"Unexpected step identity count for {case['name']}")
+    mapping = dict(zip(observed, labels, strict=True))
+    for value, label in refs:
+        value["step_id"] = mapping[label]
+
+
+
+def admitted_stack_case(case, expected_sha256):
+    if hashlib.sha256(canonical(case).encode()).hexdigest() == expected_sha256:
+        return case
+    if labels := CANONICAL_STEP_IDS.get(case["name"]):
+        restore_admitted_step_ids(case, labels)
+        if hashlib.sha256(canonical(case).encode()).hexdigest() == expected_sha256:
+            return case
+    from state_codec import omit_instance_equality
+
+    omit_instance_equality([case])
+    if hashlib.sha256(canonical(case).encode()).hexdigest() == expected_sha256:
+        return case
+    # Older input operations omitted the request field to mean the current prompt.
+    for operation in case["operations"]:
+        if operation.get("kind") == "input" and operation.get("request_id") == "current":
+            operation.pop("request_id")
+    if hashlib.sha256(canonical(case).encode()).hexdigest() != expected_sha256:
+        raise ValueError(f"Cannot reproduce admitted fixture hash for {case['name']}")
+    return case
+
+
+def write_corpus_stream(path, metadata, cases, *, case_order=None):
     """Freeze source snapshots one case at a time, with the same semantic digest."""
     metadata = dict(metadata)
     if metadata.get("schema_version") != 1 or any(
@@ -1111,9 +1184,10 @@ def write_corpus_stream(path, metadata, cases):
     entries = []
     for index, case in enumerate(cases):
         encoded = canonical(case).encode()
-        if index:
-            hasher.update(b",")
-        hasher.update(encoded)
+        if case_order is None:
+            if index:
+                hasher.update(b",")
+            hasher.update(encoded)
         identity = hashlib.sha256(encoded).hexdigest()
         relative = f"{path.stem}/{identity}.json"
         target = path.parent / relative
@@ -1121,6 +1195,22 @@ def write_corpus_stream(path, metadata, cases):
         temporary.unlink(missing_ok=True)
         write_bytes(target, encoded + b"\n")
         entries.append({"name": case["name"], "path": relative, "case_sha256": identity})
+    if case_order is not None:
+        by_name = {entry["name"]: entry for entry in entries}
+        if (
+            len(by_name) != len(entries)
+            or len(case_order) != len(entries)
+            or set(case_order) != by_name.keys()
+        ):
+            raise ValueError("Fixture names do not match the requested corpus order")
+        entries = [by_name[name] for name in case_order]
+        for index, entry in enumerate(entries):
+            if index:
+                hasher.update(b",")
+            encoded = read_bytes(path.parent / entry["path"]).removesuffix(b"\n")
+            if hashlib.sha256(encoded).hexdigest() != entry["case_sha256"]:
+                raise ValueError(f"Fixture changed before ordered export: {entry['name']}")
+            hasher.update(encoded)
     hasher.update(b"]}")
     metadata["schema_version"] = 2
     return _install_index(
@@ -1324,11 +1414,24 @@ def main():
     parser.add_argument(
         "--corpus", type=Path, default=ROOT / "rust/tests/fixtures/stack-traces.json"
     )
+    parser.add_argument("--admitted-encoding", action="store_true")
     parser.add_argument("worker", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     if args.mode == "export":
-        source = corpus()
-        index = write_corpus(args.corpus, source)
+        cases = corpus_cases()
+        order = None
+        admitted = ROOT / "rust/tests/fixtures/stack-traces.json"
+        if args.admitted_encoding:
+            if args.corpus.name != admitted.name or args.corpus.resolve() == admitted.resolve():
+                raise ValueError("Write admitted fixtures to stack-traces.json in a separate directory")
+            expected, _ = read_index(admitted)
+            order = [entry["name"] for entry in expected["cases"]]
+            cases = match_admitted_cases(
+                corpus_cases(admitted_names=set(order)), expected, admitted_stack_case
+            )
+        index = write_corpus_stream(args.corpus, corpus_metadata(), cases, case_order=order)
+        if args.admitted_encoding and args.corpus.read_bytes() != admitted.read_bytes():
+            raise ValueError("Regenerated stack-traces index differs from the admitted index")
         print(json.dumps({"cases": len(index["cases"]), "corpus_sha256": index["corpus_sha256"]}))
     else:
         command = args.worker

@@ -5,6 +5,30 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[cfg(target_os = "linux")]
+#[path = "fixture_pack.rs"]
+mod fixture_pack;
+
+fn packed_payload(relative: &Path) -> bool {
+    let Some(name) = relative.to_str() else {
+        return true;
+    };
+    !matches!(
+        name,
+        "movement.json"
+            | "states.json"
+            | "effect-errors.json"
+            | "mine-reference-errors.json"
+            | "stack-traces.json"
+            | "object-execution.json"
+            | "object-arena.json"
+            | "complete-games.json"
+            | "complete-games-hanu.json"
+            | "cache-identities.json"
+            | "registry.json"
+    )
+}
+
 fn local(path: &Path) -> io::Result<Box<dyn Read>> {
     match File::open(path) {
         Ok(file) => Ok(Box::new(file)),
@@ -24,8 +48,28 @@ pub fn open(path: impl AsRef<Path>) -> io::Result<Box<dyn Read>> {
     let base = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures");
     let mut candidates = vec![path.to_path_buf()];
     if let Ok(relative) = path.strip_prefix(&base) {
+        if let Some(pack) = std::env::var_os("GOA2_FIXTURE_PACK")
+            && packed_payload(relative)
+        {
+            #[cfg(target_os = "linux")]
+            return fixture_pack::read(Path::new(&pack), relative)
+                .map(|bytes| Box::new(io::Cursor::new(bytes)) as Box<dyn Read>);
+            #[cfg(not(target_os = "linux"))]
+            return Err(io::Error::new(
+                io::ErrorKind::Unsupported,
+                format!(
+                    "seekable fixture packs require Linux: {}",
+                    Path::new(&pack).display()
+                ),
+            ));
+        }
         if let Some(cache) = std::env::var_os("GOA2_FIXTURE_CACHE") {
-            candidates.push(PathBuf::from(cache).join(relative));
+            let cached = PathBuf::from(cache).join(relative);
+            if std::env::var_os("GOA2_FIXTURE_CACHE_ONLY").is_some() && packed_payload(relative) {
+                return local(&cached)
+                    .map(|reader| Box::new(BufReader::new(reader)) as Box<dyn Read>);
+            }
+            candidates.push(cached);
         }
         candidates.push(base.join("smoke").join(relative));
     }
@@ -43,6 +87,12 @@ pub fn open(path: impl AsRef<Path>) -> io::Result<Box<dyn Read>> {
             path.display()
         ),
     ))
+}
+
+#[allow(dead_code)] // Only the differential and restore gates collect coverage.
+pub fn report_decode_stats() {
+    #[cfg(target_os = "linux")]
+    fixture_pack::report_decode_stats();
 }
 
 #[allow(dead_code)] // Shared by integration targets needing only open().

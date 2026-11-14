@@ -14,6 +14,7 @@ sha2 = "0.10"
 
 [dev-dependencies]
 flate2 = "1"
+zstd = { version = "0.13.3", default-features = false }
 
 [features]
 # Enable exhaustive corpus-backed unit gates; quick tests retain named smoke cases.

@@ -95,3 +95,48 @@ def test_merge_rejects_valid_content_hash_under_a_false_entry_name(tmp_path):
     with pytest.raises(ValueError, match="content identity mismatch"):
         merge_corpora(target, extra)
     assert target.read_bytes() == before
+
+
+
+def test_ordered_corpus_preserves_index_and_rejects_missing_or_duplicate_cases(tmp_path):
+    import pytest
+
+    meta = {"schema_version": 1}
+    cases = [{"name": "a", "expected": [1]}, {"name": "b", "expected": [2]}]
+    target = tmp_path / "target/corpus.json"
+    write_corpus_stream(target, meta, iter(cases))
+    expected = target.read_bytes()
+    write_corpus_stream(target, meta, reversed(cases), case_order=["a", "b"])
+    assert target.read_bytes() == expected
+
+    for invalid in (cases[:1], [cases[0], cases[0]]):
+        with pytest.raises(ValueError, match="Fixture names do not match"):
+            write_corpus_stream(target, meta, iter(invalid), case_order=["a", "b"])
+        assert target.read_bytes() == expected
+
+
+
+def test_historical_current_request_shorthand_keeps_named_requests_and_selections():
+    import hashlib
+
+    import pytest
+    from stack_traces import admitted_stack_case, canonical
+
+    admitted = {
+        "name": "current-prompt",
+        "envelope": {"instances": []},
+        "operations": [
+            {"kind": "input", "selection": 1},
+            {"kind": "input", "request_id": "fixed", "selection": 2},
+        ],
+    }
+    expected = hashlib.sha256(canonical(admitted).encode()).hexdigest()
+    operations = [dict(op) for op in admitted["operations"]]
+    operations[0]["request_id"] = "current"
+    assert admitted_stack_case({**admitted, "operations": operations}, expected) == admitted
+
+    for changes in ({"request_id": "other"}, {"selection": 3}):
+        operations = [dict(op) for op in admitted["operations"]]
+        operations[0].update(changes)
+        with pytest.raises(ValueError, match="Cannot reproduce admitted fixture hash"):
+            admitted_stack_case({**admitted, "operations": operations}, expected)

@@ -13,3 +13,5 @@ serde_json.workspace = true
 
 [dev-dependencies]
 flate2 = "1"
+zstd = { version = "0.13.3", default-features = false }
+sha2 = "0.10"

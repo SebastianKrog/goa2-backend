@@ -8,9 +8,17 @@ use goa2_core::{
     world::NativeWorld,
 };
 use serde_json::{Value, json};
-use std::{sync::atomic::AtomicBool, time::Instant};
+use sha2::{Digest, Sha256};
+use std::{
+    cell::RefCell,
+    collections::VecDeque,
+    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+    time::Instant,
+};
 #[path = "../../../test-support/parallel.rs"]
 mod fixture_parallel;
+#[path = "../../../test-support/fixture_replay.rs"]
+mod fixture_replay;
 
 #[derive(serde::Deserialize)]
 struct RestorationCase {
@@ -189,9 +197,115 @@ fn apply_and_export(session: &mut NativeSession, operation: &Value) -> (Value, S
         _ => panic!("unknown test operation"),
     }
     let envelope = session.export_envelope().unwrap();
-    let record = json!({"semantic_state":envelope.materialize().unwrap(), "context_keys":envelope.state["execution_context"].as_object().unwrap().keys().collect::<Vec<_>>(), "instance_bindings":envelope.instance_bindings().unwrap(), "object_bindings":envelope.object_bindings,
-        "request":request, "events":events, "error":error});
+    // Move already-built JSON values into the record. Passing them to json!
+    // serializes them back into Value and copies the entire expanded state.
+    let context = envelope.state["execution_context"].as_object().unwrap();
+    let record = Value::Object(
+        [
+            ("semantic_state", envelope.materialize().unwrap()),
+            (
+                "context_keys",
+                serde_json::to_value(context.keys().collect::<Vec<_>>()).unwrap(),
+            ),
+            (
+                "instance_bindings",
+                serde_json::to_value(envelope.instance_bindings().unwrap()).unwrap(),
+            ),
+            (
+                "object_bindings",
+                serde_json::to_value(&envelope.object_bindings).unwrap(),
+            ),
+            ("request", request),
+            ("events", Value::Array(events)),
+            ("error", error),
+        ]
+        .into_iter()
+        .map(|(key, value)| (key.to_owned(), value))
+        .collect(),
+    );
     (record, envelope)
+}
+
+fn restore_shard_range(cases: usize, shard: usize, shards: usize) -> std::ops::Range<usize> {
+    let base = cases / shards;
+    let extra = cases % shards;
+    let start = (shard - 1) * base + (shard - 1).min(extra);
+    let len = base + usize::from(shard <= extra);
+    start..start + len
+}
+
+#[test]
+fn restore_shards_partition_the_ordered_corpus() {
+    for (cases, shards) in [(1, 1), (6, 3), (7, 3), (7, 7), (17_347, 8)] {
+        let mut next = 0;
+        for shard in 1..=shards {
+            let range = restore_shard_range(cases, shard, shards);
+            assert_eq!(range.start, next);
+            assert_eq!(range.len(), (shard - 1..cases).step_by(shards).len());
+            next = range.end;
+        }
+        assert_eq!(next, cases);
+    }
+}
+
+#[derive(Default)]
+struct RestoreStarts {
+    enabled: bool,
+    hits: AtomicUsize,
+    misses: AtomicUsize,
+}
+
+impl RestoreStarts {
+    fn compile(&self, envelope: StateEnvelope) -> NativeSession {
+        const MAX_ENTRIES: usize = 4;
+        const MAX_ENVELOPE_BYTES: usize = 4 * 1024 * 1024;
+        type Entry = ([u8; 32], NativeSession);
+        thread_local! {
+            static CACHE: RefCell<VecDeque<Entry>> = const { RefCell::new(VecDeque::new()) };
+        }
+
+        if !self.enabled {
+            return NativeSession::compile(envelope).unwrap();
+        }
+        let bytes = serde_json::to_vec(&envelope).unwrap();
+        if bytes.len() > MAX_ENVELOPE_BYTES {
+            return NativeSession::compile(envelope).unwrap();
+        }
+        let key: [u8; 32] = Sha256::digest(bytes).into();
+        CACHE.with_borrow_mut(|cache| {
+            if let Some(index) = cache.iter().position(|(digest, _)| *digest == key) {
+                let entry = cache.remove(index).unwrap();
+                let session = entry.1.clone();
+                cache.push_back(entry);
+                self.hits.fetch_add(1, Ordering::Relaxed);
+                return session;
+            }
+            let session = NativeSession::compile(envelope).unwrap();
+            if cache.len() == MAX_ENTRIES {
+                cache.pop_front();
+            }
+            cache.push_back((key, session.clone()));
+            self.misses.fetch_add(1, Ordering::Relaxed);
+            session
+        })
+    }
+}
+
+#[test]
+fn cached_restore_start_remains_pristine_after_a_branch_advances() {
+    let starts = RestoreStarts {
+        enabled: true,
+        ..RestoreStarts::default()
+    };
+    let envelope = source("object-execution-shared-pending-step");
+    let mut first = starts.compile(envelope.clone());
+    let before = first.execution_fingerprint();
+    first.advance(&ExecutionBudget::default()).unwrap();
+    assert_ne!(first.execution_fingerprint(), before);
+    let second = starts.compile(envelope);
+    assert_eq!(second.execution_fingerprint(), before);
+    assert_eq!(starts.hits.load(Ordering::Relaxed), 1);
+    assert_eq!(starts.misses.load(Ordering::Relaxed), 1);
 }
 
 #[test]
@@ -214,38 +328,70 @@ fn every_shared_execution_boundary_restores_values_aliases_and_request_generatio
         Err(std::env::VarError::NotPresent) => (1, 1),
         Err(error) => panic!("invalid GOA2_RESTORE_SHARD: {error}"),
     };
-    let selected = entries.into_iter().skip(shard - 1).step_by(shards);
+    let range = restore_shard_range(entries.len(), shard, shards);
+    let selected = entries.into_iter().skip(range.start).take(range.len());
     let expected = selected.len();
+    let coverage = fixture_replay::ReplayCoverage::from_environment();
+    let starts = RestoreStarts {
+        enabled: std::env::var_os("GOA2_SHARE_RESTORE_STARTS").is_some(),
+        ..RestoreStarts::default()
+    };
     let checked = fixture_parallel::for_each_case(selected, |entry| {
-        let case: RestorationCase = read_case(&entry);
-        let mut session = NativeSession::compile(case.envelope).unwrap();
-        assert_eq!(
-            case.operations.len(),
-            case.expected.len(),
-            "{} must have one expected record per operation",
-            case.name
-        );
-        let mut envelope = session.export_envelope().unwrap();
-        for op in &case.operations {
-            let mut restored = NativeSession::compile(envelope.clone()).unwrap();
-            // last_request is a transport convenience, not persisted semantics.
-            restored.last_request = session.last_request.clone().map(|mut request| {
-                request.id = restored.import_request_token(&session.request_token(request.id));
-                request
+        if coverage.enabled() {
+            let path = std::path::Path::new(FIXTURE_DIR).join(entry["path"].as_str().unwrap());
+            let mut reader = fixture_cache::open(path).unwrap();
+            let mut data = Vec::new();
+            std::io::Read::read_to_end(&mut reader, &mut data).unwrap();
+            let name = entry["name"].as_str().unwrap();
+            coverage.verify(name.to_owned(), &data, || {
+                let case: RestorationCase = serde_json::from_slice(&data).unwrap();
+                assert_eq!(case.name, name);
+                let operations = case.operations.len();
+                verify_restore_case(case, &starts);
+                operations
             });
-            {
-                let restored_envelope = restored.export_envelope().unwrap();
-                assert_eq!(restored_envelope.state, envelope.state);
-                assert_eq!(restored_envelope.board_keys, envelope.board_keys);
-                assert_eq!(restored_envelope.object_bindings, envelope.object_bindings);
-            }
-            let (record, next_envelope) = apply_and_export(&mut session, op);
-            assert!(record == apply(&mut restored, op), "{}: {op}", case.name);
-            envelope = next_envelope;
+        } else {
+            verify_restore_case(read_case(&entry), &starts);
         }
     });
     assert_eq!(checked, expected);
+    coverage.finish(&format!("restore-{shard}-of-{shards}"), checked);
     eprintln!("Restore shard {shard}/{shards} checked {checked} cases");
+    if starts.enabled {
+        eprintln!(
+            "Restore compiled starts: {} reused, {} cached",
+            starts.hits.load(Ordering::Relaxed),
+            starts.misses.load(Ordering::Relaxed),
+        );
+    }
+}
+
+fn verify_restore_case(case: RestorationCase, starts: &RestoreStarts) {
+    let mut session = starts.compile(case.envelope);
+    assert_eq!(
+        case.operations.len(),
+        case.expected.len(),
+        "{} must have one expected record per operation",
+        case.name
+    );
+    let mut envelope = session.export_envelope().unwrap();
+    for op in &case.operations {
+        let mut restored = NativeSession::compile(envelope.clone()).unwrap();
+        // last_request is a transport convenience, not persisted semantics.
+        restored.last_request = session.last_request.clone().map(|mut request| {
+            request.id = restored.import_request_token(&session.request_token(request.id));
+            request
+        });
+        {
+            let restored_envelope = restored.export_envelope().unwrap();
+            assert_eq!(restored_envelope.state, envelope.state);
+            assert_eq!(restored_envelope.board_keys, envelope.board_keys);
+            assert_eq!(restored_envelope.object_bindings, envelope.object_bindings);
+        }
+        let (record, next_envelope) = apply_and_export(&mut session, op);
+        assert!(record == apply(&mut restored, op), "{}: {op}", case.name);
+        envelope = next_envelope;
+    }
 }
 
 #[test]

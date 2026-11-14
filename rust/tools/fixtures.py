@@ -13,6 +13,7 @@ from pathlib import Path
 
 WORKSPACE = Path(__file__).resolve().parents[1]
 FIXTURES = WORKSPACE / "tests/fixtures"
+sys.path.insert(0, str(WORKSPACE.parent / "scripts/rust_oracle"))
 MAX_REFERENCE_BYTES = 256 * 1024 * 1024
 
 
@@ -33,17 +34,25 @@ def checked_path(base, relative):
 
 def raw(path, *, limit=None):
     try:
-        stream = path.open("rb")
+        with path.open("rb") as stream:
+            data = stream.read() if limit is None else stream.read(limit + 1)
     except FileNotFoundError:
-        stream = gzip.open(str(path) + ".gz", "rb")
-    with stream:
-        data = stream.read() if limit is None else stream.read(limit + 1)
+        with gzip.open(str(path) + ".gz", "rb") as stream:
+            data = stream.read() if limit is None else stream.read(limit + 1)
     if limit is not None and len(data) > limit:
         raise ValueError(f"Reference payload exceeds its expanded size limit: {path.name}")
     return data
 
 
 def read_fixture(relative, cache, *, payload_root=None):
+    if payload_root is None and (pack := os.environ.get("GOA2_FIXTURE_PACK")):
+        from fixture_pack import open_pack
+
+        checked_path(FIXTURES, relative)
+        try:
+            return open_pack(pack).read(relative)
+        except FileNotFoundError:
+            return None
     bases = [payload_root] if payload_root is not None else [FIXTURES, *([cache] if cache else [])]
     for base in bases:
         try:
@@ -174,6 +183,17 @@ def full(families, cache=None, *, payload_root=None):
             if data is None:
                 missing += 1
                 continue
+            # The indexed trace writers put the name first and hash canonical JSON
+            # before the final newline. An exact match needs no reserialization.
+            if family in {"object-execution", "stack-traces", "object-arena"}:
+                prefix = b'{"name":' + canonical(row["name"]) + b","
+                if data.startswith(prefix) and b'"expected_delta_chunks"' not in data:
+                    raw_case = memoryview(data)
+                    if data.endswith(b"\n"):
+                        raw_case = raw_case[:-1]
+                    if hashlib.sha256(raw_case).hexdigest() == row["case_sha256"]:
+                        executed += 1
+                        continue
             case = json.loads(data)
             if case.get("name") != row["name"] or digest(case) != row["case_sha256"]:
                 failed += 1
@@ -215,13 +235,38 @@ def full(families, cache=None, *, payload_root=None):
     return result
 
 
+def verify_pack_identity(directory, expected):
+    directory = Path(directory)
+    with (directory / "manifest.json").open("rb") as stream:
+        encoded = stream.read(16 * 1024 + 1)
+    if len(encoded) > 16 * 1024 or hashlib.sha256(encoded).hexdigest() != expected:
+        raise ValueError("Fixture pack manifest checksum mismatch")
+    manifest = json.loads(encoded)
+    if manifest["schema"] != 1:
+        raise ValueError("Unsupported fixture pack manifest schema")
+    oracle = json.loads((WORKSPACE / "oracle-manifest.json").read_bytes())
+    reference_identity(manifest, oracle, "Fixture pack manifest")
+    for filename in ("fixtures-4MiB.tar.zst", "fixtures.index.json"):
+        with (directory / filename).open("rb") as stream:
+            actual = hashlib.file_digest(stream, "sha256").hexdigest()
+        if actual != manifest[filename]:
+            raise ValueError(f"Fixture pack checksum mismatch: {filename}")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=["verify"])
     parser.add_argument("--full", action="store_true")
     parser.add_argument("--family", action="append")
     parser.add_argument("--cache", type=Path, default=os.environ.get("GOA2_FIXTURE_CACHE"))
+    parser.add_argument(
+        "--pack-manifest-sha256", help="Independently pinned fixture pack manifest SHA-256"
+    )
     args = parser.parse_args()
+    if args.pack_manifest_sha256:
+        if not args.full or not (pack := os.environ.get("GOA2_FIXTURE_PACK")):
+            parser.error("--pack-manifest-sha256 requires --full and GOA2_FIXTURE_PACK")
+        verify_pack_identity(pack, args.pack_manifest_sha256)
     if args.family and not args.full:
         parser.error("--family requires --full")
     reports = (

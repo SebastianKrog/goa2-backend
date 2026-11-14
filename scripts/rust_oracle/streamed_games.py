@@ -255,6 +255,19 @@ def verify_case(name, state, operations, command, directory):
     return case, facts
 
 
+def complete_game_metadata(source_sha256, policy, roster):
+    metadata = {
+        "oracle_revision": ORACLE_REVISION,
+        "source_sha256": source_sha256,
+        "contract": "complete-games-snapshot-deltas-v3",
+    }
+    if roster == "baseline":
+        metadata["schema_version"] = 1
+    else:
+        metadata = {"schema_version": 1, **metadata}
+    return {**metadata, "policy": policy, "python_hash_seed": "0"}
+
+
 def export(path, command, *, roster="baseline"):
     from live_game_traces import hanu_scenes, scenes
 
@@ -275,18 +288,9 @@ def export(path, command, *, roster="baseline"):
             print(json.dumps(result), flush=True)
             yield case
 
-    index = write_corpus_stream(
-        path,
-        dict(
-            schema_version=1,
-            oracle_revision=ORACLE_REVISION,
-            source_sha256=manifest["source_sha256"],
-            contract="complete-games-snapshot-deltas-v3",
-            policy=policy,
-            python_hash_seed="0",
-        ),
-        cases(),
-    )
+    # The first admitted index put the schema field after the contract.
+    metadata = complete_game_metadata(manifest["source_sha256"], policy, roster)
+    index = write_corpus_stream(path, metadata, cases())
     return index, facts
 
 

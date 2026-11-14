@@ -9,7 +9,6 @@ from __future__ import annotations
 from enum import Enum
 
 from fixture_cache import read_text, write_text
-
 from oracle import ORACLE_REVISION, digest, verify_sources
 
 REFERENCE_KEY = "$goa2_instance"
@@ -210,7 +209,14 @@ def materialize(envelope):
     return expand(envelope["state"])
 
 
-def state_corpus():
+def omit_instance_equality(cases):
+    """Project fixture envelopes written before physical equality metadata."""
+    for case in cases:
+        for instance in case["envelope"]["instances"]:
+            instance.pop("equality", None)
+
+
+def state_corpus(*, admitted_envelope=False):
     from oracle import ROOT
 
     from goa2.bootstrap import register_all_effects
@@ -272,6 +278,8 @@ def state_corpus():
             "expected": state.model_dump(mode="json"),
         }
     )
+    if admitted_envelope:
+        omit_instance_equality(cases)
     payload = {"schema_version": 1, "oracle_revision": ORACLE_REVISION, "cases": cases}
     return {**payload, "corpus_sha256": digest(payload)}
 
@@ -286,10 +294,11 @@ def main():
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument("mode", choices=["export", "verify"])
     parser.add_argument("--corpus", type=Path, default=ROOT / "rust/tests/fixtures/states.json")
+    parser.add_argument("--admitted-envelope", action="store_true")
     parser.add_argument("worker", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     if args.mode == "export":
-        corpus = state_corpus()
+        corpus = state_corpus(admitted_envelope=args.admitted_envelope)
         args.corpus.parent.mkdir(parents=True, exist_ok=True)
         write_text(args.corpus, json.dumps(corpus, separators=(",", ":")) + "\n")
         print(json.dumps({"cases": len(corpus["cases"]), "corpus_sha256": corpus["corpus_sha256"]}))

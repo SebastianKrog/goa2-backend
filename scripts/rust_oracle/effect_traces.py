@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from fixture_cache import cached, read_text, write_text
-
 import argparse
 import json
 from pathlib import Path
 
+from fixture_cache import cached, read_text, write_text
 from model_traces import setup
 from oracle import ROOT, Worker, digest, verify_sources
 from state_codec import export_state
@@ -273,12 +272,16 @@ def cases():
     return result
 
 
-def corpus():
+def corpus(*, admitted_envelope=False):
     payload = {
         "schema_version": 1,
         "source_sha256": verify_sources()["source_sha256"],
         "cases": cases(),
     }
+    if admitted_envelope:
+        from state_codec import omit_instance_equality
+
+        omit_instance_equality(payload["cases"])
     return {**payload, "corpus_sha256": digest(payload)}
 
 
@@ -310,10 +313,11 @@ def main():
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument("--corpus", type=Path, default=ROOT / "rust/tests/fixtures/effects.json")
     parser.add_argument("mode", choices=("export", "verify"))
+    parser.add_argument("--admitted-envelope", action="store_true")
     parser.add_argument("worker", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     if args.mode == "export":
-        data = corpus()
+        data = corpus(admitted_envelope=args.admitted_envelope)
         temporary = args.corpus.with_suffix(args.corpus.suffix + ".tmp")
         temporary.unlink(missing_ok=True)
         if cached(args.corpus):

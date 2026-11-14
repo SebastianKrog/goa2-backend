@@ -24,11 +24,11 @@
       "generator_argv": [
         "python",
         "scripts/rust_oracle/fixture_cache.py",
-        "compress",
-        "--workers",
-        "1"
+        "identities",
+        "--output",
+        "OUTPUT"
       ],
-      "generator_sha256": "e4952d6c9650722817d01481e4a75e25913a3d9ea28a201abdf9893a29ee0dbd"
+      "generator_sha256": "110d8e2904ffc9322d2e7a3cf55121f07ed08bfb4df9112cf8f738a0754ad71f"
     },
     {
       "family": "complete-games-hanu",
@@ -50,7 +50,7 @@
       "retention": "retain unique coverage; no retirement authorized",
       "rules_version": 9,
       "runtime_manifest": "rust/oracle-manifest.json#runtime",
-      "generator_sha256": "ab4b0d5cf61706ec8ac3025c33df02614538109c5f06bcf3e227a38bb90db9f2",
+      "generator_sha256": "c45617f2caf22836ba7a8090bcb77b57d3722b4141331300189548e1e9c8a241",
       "generator_argv": [
         "python",
         "scripts/rust_oracle/run_pinned.py",
@@ -83,7 +83,7 @@
       "retention": "retain unique coverage; no retirement authorized",
       "rules_version": 9,
       "runtime_manifest": "rust/oracle-manifest.json#runtime",
-      "generator_sha256": "ab4b0d5cf61706ec8ac3025c33df02614538109c5f06bcf3e227a38bb90db9f2",
+      "generator_sha256": "c45617f2caf22836ba7a8090bcb77b57d3722b4141331300189548e1e9c8a241",
       "generator_argv": [
         "python",
         "scripts/rust_oracle/run_pinned.py",
@@ -105,7 +105,7 @@
       "case_count": 1,
       "oracle_revision": "00becf4a68615afa410f8eabe0c841809af0427b",
       "source_sha256": "76702801afa0ac816e2ee0fc269d78cbea28c677f1128912b981cc9d4498cd43",
-      "generator": "Historical isolated Python failure capture; no current standalone exporter. Preserve admitted bytes and original source provenance in rust/docs/audits/error-guards.json.",
+      "generator": "scripts/rust_oracle/effect_error_traces.py",
       "consumers": [
         "rust/crates/goa2-core/src/interpreter/tests.rs"
       ],
@@ -114,7 +114,14 @@
       "owner": "engine maintainers",
       "retention": "retain unique coverage; no retirement authorized",
       "rules_version": 9,
-      "runtime_manifest": "rust/oracle-manifest.json#runtime"
+      "runtime_manifest": "rust/oracle-manifest.json#runtime",
+      "generator_sha256": "ecb8873c0f461f6216295da272430b08f26fce34142309c6111a13bdb8686d19",
+      "generator_argv": [
+        "python",
+        "scripts/rust_oracle/run_pinned.py",
+        "effect_error_traces",
+        "OUTPUT"
+      ]
     },
     {
       "family": "mine-reference-errors",
@@ -136,7 +143,7 @@
       "retention": "retain unique coverage; no retirement authorized",
       "rules_version": 9,
       "runtime_manifest": "rust/oracle-manifest.json#runtime",
-      "generator_sha256": "862827405b818cf62de6f78ec71efd78d5a0d134633808d546630d785925e786",
+      "generator_sha256": "e5fc570663f7819b327af22992a477db98e62c631d602bbd0267bb07be9dc496",
       "generator_argv": [
         "python",
         "scripts/rust_oracle/run_pinned.py",
@@ -194,13 +201,14 @@
       "retention": "retain unique coverage; no retirement authorized",
       "rules_version": 9,
       "runtime_manifest": "rust/oracle-manifest.json#runtime",
-      "generator_sha256": "b1fdebc859583c7dd34c9a5701272964a78be8275741889199447014fe7d161a",
+      "generator_sha256": "865d779159c1cbd912dc25176380afd9e3520cfa22066553fa786f7c19abadea",
       "generator_argv": [
         "python",
         "scripts/rust_oracle/run_pinned.py",
         "object_arena_traces",
         "--corpus",
         "OUTPUT",
+        "--admitted-envelope",
         "export"
       ]
     },
@@ -233,13 +241,14 @@
       "retention": "retain unique coverage; no retirement authorized",
       "rules_version": 9,
       "runtime_manifest": "rust/oracle-manifest.json#runtime",
-      "generator_sha256": "3f623c5079a8c45c5cc2c17b10d63d24f2f6ce16a43986d886ff0147d21412f2",
+      "generator_sha256": "0201f5bc67379291f111186b6d8e363b65a24ba9729904630ddbbbea381fb3cc",
       "generator_argv": [
         "python",
         "scripts/rust_oracle/run_pinned.py",
         "object_execution_traces",
         "--corpus",
         "OUTPUT",
+        "--admitted-encoding",
         "export"
       ]
     },
@@ -263,13 +272,14 @@
       "retention": "retain unique coverage; no retirement authorized",
       "rules_version": 9,
       "runtime_manifest": "rust/oracle-manifest.json#runtime",
-      "generator_sha256": "c4989e8632d59a3d9b8f46a28329f52ac98d1d50629c40dd987faa62156e48fa",
+      "generator_sha256": "c297393ece0d82a9c7e439fde4b9982a30b7496fa9e63ab800d2d69786e69bf1",
       "generator_argv": [
         "python",
         "scripts/rust_oracle/run_pinned.py",
         "stack_traces",
         "--corpus",
         "OUTPUT",
+        "--admitted-encoding",
         "export"
       ]
     },
@@ -293,13 +303,14 @@
       "retention": "retain unique coverage; no retirement authorized",
       "rules_version": 9,
       "runtime_manifest": "rust/oracle-manifest.json#runtime",
-      "generator_sha256": "c168dba9e24c17cfb98097791609635864372b0be231802dc885e01693162e1f",
+      "generator_sha256": "b446782feeeb1191e8844c6f110ced923cd7bacf44618a1eb167175eb7579ba6",
       "generator_argv": [
         "python",
         "scripts/rust_oracle/run_pinned.py",
         "state_codec",
         "--corpus",
         "OUTPUT",
+        "--admitted-envelope",
         "export"
       ]
     },
@@ -322,13 +333,14 @@
       "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE",
       "rules_version": 9,
       "runtime_manifest": "rust/oracle-manifest.json#runtime",
-      "generator_sha256": "b73a605cc9c8720b89fc7ba32e81ca924c6f0ed070049588740891bbb254b024",
+      "generator_sha256": "de7fe44643b200e2462895226f1841bf0143121a58c59481ac796b6e44845f1a",
       "generator_argv": [
         "python",
         "scripts/rust_oracle/run_pinned.py",
         "action_rule_traces",
         "--corpus",
         "OUTPUT",
+        "--admitted-envelope",
         "export"
       ],
       "schema_version": 1,
@@ -355,13 +367,14 @@
       "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE",
       "rules_version": 9,
       "runtime_manifest": "rust/oracle-manifest.json#runtime",
-      "generator_sha256": "7767930c115f8a8ddb351b99ea798999b1762e6e9d2ba784831f68f5adda3dbe",
+      "generator_sha256": "c868d709c6a50f1cf93c27d2f607db3006274f8e2c52f56e511dc39a8344699c",
       "generator_argv": [
         "python",
         "scripts/rust_oracle/run_pinned.py",
         "action_traces",
         "--corpus",
         "OUTPUT",
+        "--admitted-envelope",
         "export"
       ],
       "schema_version": 1,
@@ -422,13 +435,14 @@
       "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE",
       "rules_version": 9,
       "runtime_manifest": "rust/oracle-manifest.json#runtime",
-      "generator_sha256": "790feb24f229d1c50c78da9df106857be4456c836849d773c1e6bb5eeeedc5a7",
+      "generator_sha256": "ab672f05313bb9afee9b65c452ecef90db19c1f23b020e8793d4ed02a0af2fc4",
       "generator_argv": [
         "python",
         "scripts/rust_oracle/run_pinned.py",
         "displacement_effect_traces",
         "--corpus",
         "OUTPUT",
+        "--admitted-envelope",
         "export"
       ],
       "schema_version": 1,
@@ -455,13 +469,14 @@
       "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE",
       "rules_version": 9,
       "runtime_manifest": "rust/oracle-manifest.json#runtime",
-      "generator_sha256": "16866315f47c0baeda89081f3947f919f47345d20d6fd3a90a080d63e9f396d1",
+      "generator_sha256": "6d8097316ad9de16d72199d3e04b7f50895692756e88e637babd64147e70139f",
       "generator_argv": [
         "python",
         "scripts/rust_oracle/run_pinned.py",
         "effect_stat_traces",
         "--corpus",
         "OUTPUT",
+        "--admitted-envelope",
         "export"
       ],
       "schema_version": 1,
@@ -489,13 +504,14 @@
       "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE",
       "rules_version": 9,
       "runtime_manifest": "rust/oracle-manifest.json#runtime",
-      "generator_sha256": "f9100822e06d8f92a8619e4982a529bdab4319969df99be5bef8f214848f5e27",
+      "generator_sha256": "1d12b4b26e2856645b89a263b2360284bd4d3f0899c6da0713fdd7d5fa197607",
       "generator_argv": [
         "python",
         "scripts/rust_oracle/run_pinned.py",
         "effect_traces",
         "--corpus",
         "OUTPUT",
+        "--admitted-envelope",
         "export"
       ],
       "schema_version": 1,
@@ -522,13 +538,14 @@
       "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE",
       "rules_version": 9,
       "runtime_manifest": "rust/oracle-manifest.json#runtime",
-      "generator_sha256": "8a5ed5a832f209eed27a33633e0dbde00d219ddad75583a519394242129b275e",
+      "generator_sha256": "27edec674432159722bf760d8fc4b5a1e8aa225e8049bff693fa2503b8e60f42",
       "generator_argv": [
         "python",
         "scripts/rust_oracle/run_pinned.py",
         "movement_sequence_traces",
         "--corpus",
         "OUTPUT",
+        "--admitted-envelope",
         "export"
       ],
       "schema_version": 1,
@@ -555,13 +572,14 @@
       "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE",
       "rules_version": 9,
       "runtime_manifest": "rust/oracle-manifest.json#runtime",
-      "generator_sha256": "862827405b818cf62de6f78ec71efd78d5a0d134633808d546630d785925e786",
+      "generator_sha256": "e5fc570663f7819b327af22992a477db98e62c631d602bbd0267bb07be9dc496",
       "generator_argv": [
         "python",
         "scripts/rust_oracle/run_pinned.py",
         "mine_traces",
         "--corpus",
         "OUTPUT",
+        "--admitted-envelope",
         "export"
       ],
       "schema_version": 1,
@@ -589,13 +607,14 @@
       "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE",
       "rules_version": 9,
       "runtime_manifest": "rust/oracle-manifest.json#runtime",
-      "generator_sha256": "8eadbace7cf2f65a7b6dcf8a7cf48d5abdae5c8a08b7f175517609a6d23b354c",
+      "generator_sha256": "b6a218c121e7ba4eebe21a4adfceb86871cd469d5eb2d2783e9dbf7b4c1970de",
       "generator_argv": [
         "python",
         "scripts/rust_oracle/run_pinned.py",
         "model_traces",
         "--corpus",
         "OUTPUT",
+        "--admitted-envelope",
         "export"
       ],
       "schema_version": 1,
@@ -622,13 +641,14 @@
       "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE",
       "rules_version": 9,
       "runtime_manifest": "rust/oracle-manifest.json#runtime",
-      "generator_sha256": "8c42756a7ec04a4338687d0492fcc00609ac80183c868b22869d259a96f484ca",
+      "generator_sha256": "36dcbb355ef58ce042af409ad309b5311048e19c6577ca7403ee42139500f62d",
       "generator_argv": [
         "python",
         "scripts/rust_oracle/run_pinned.py",
         "planning_traces",
         "--corpus",
         "OUTPUT",
+        "--admitted-envelope",
         "export"
       ],
       "schema_version": 1,
@@ -655,13 +675,14 @@
       "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE",
       "rules_version": 9,
       "runtime_manifest": "rust/oracle-manifest.json#runtime",
-      "generator_sha256": "76df39b6141d89eae579708842d0fad774d06543bf6f0d9e8184b7cf5abf30be",
+      "generator_sha256": "6bf0c02fa86b07d02954971d9d0d496553444bf1deb704c1439031813b71e469",
       "generator_argv": [
         "python",
         "scripts/rust_oracle/run_pinned.py",
         "targeting_rules",
         "--corpus",
         "OUTPUT",
+        "--admitted-envelope",
         "export"
       ],
       "schema_version": 1,
@@ -688,13 +709,14 @@
       "retention": "preserve unique coverage; acquire separately into GOA2_FIXTURE_CACHE",
       "rules_version": 9,
       "runtime_manifest": "rust/oracle-manifest.json#runtime",
-      "generator_sha256": "49eb7d6e1a019332f474fac5357df69e0ca3c4d2530f498e823b7d781ec2b917",
+      "generator_sha256": "205ea1b72a3942d2129520beb247d7b1264e6635abde778c3cad8bd317cb5b81",
       "generator_argv": [
         "python",
         "scripts/rust_oracle/run_pinned.py",
         "terrain_traces",
         "--corpus",
         "OUTPUT",
+        "--admitted-envelope",
         "export"
       ],
       "schema_version": 1,
